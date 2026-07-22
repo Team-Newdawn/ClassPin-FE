@@ -3,8 +3,8 @@
 import { useMemo, useState } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { QRCodeSVG } from "qrcode.react";
-import { BarChart3, Check, ChevronLeft, ChevronRight, Clock3, Copy, Grid2X2, LayoutDashboard, Link2, ListFilter, MessageCircleQuestion, MoreHorizontal, Pause, Play, Search, Share2, Users, X } from "@/components/icons";
-import { PinLogo } from "@/components/pin-logo";
+import { Check, ChevronLeft, ChevronRight, Clock3, Copy, Link2, ListFilter, MessageCircleQuestion, Pause, Play, Search, Share2, Users, X } from "@/components/icons";
+import { AdminSidebar } from "@/components/admin-shell";
 import { SlideCanvas } from "@/components/slide-canvas";
 import { StatusBadge } from "@/components/status-badge";
 import { useSessions } from "@/components/session-store";
@@ -40,19 +40,10 @@ export default function SessionAdmin() {
 
   return (
     <div className="app-shell">
-      <aside className="sidebar">
-        <div className="sidebar-logo"><PinLogo /></div>
-        <nav>
-          <button className="nav-item"><LayoutDashboard />대시보드</button>
-          <button className="nav-item active"><Play />라이브 세션</button>
-          <button className="nav-item"><Grid2X2 />강의 자료</button>
-          <button className="nav-item"><BarChart3 />인사이트</button>
-        </nav>
-        <div className="sidebar-bottom"><span className="avatar">MP</span><span><b>민찬 강사</b><small>개인 워크스페이스</small></span><MoreHorizontal /></div>
-      </aside>
+      <AdminSidebar />
       <main className="admin-main">
         <header className="topbar">
-          <div className="session-identity"><button className="icon-btn" onClick={() => router.push("/")} aria-label="뒤로"><ChevronLeft /></button><span><b>{session.title}</b><small>{session.fileName}</small></span><span className={`live-badge ${session.status}`}><i />{session.status === "live" ? "진행 중" : session.status === "ended" ? "종료" : "초안"}</span></div>
+          <div className="session-identity"><button className="icon-btn" onClick={() => router.push("/admin/dashboard")} aria-label="뒤로"><ChevronLeft /></button><span><b>{session.title}</b><small>{session.fileName}</small></span><span className={`live-badge ${session.status}`}><i />{session.status === "live" ? "진행 중" : session.status === "ended" ? "종료" : "초안"}</span></div>
           <div className="top-actions"><button className="btn secondary" onClick={() => setStatus(session.id, session.status === "live" ? "ended" : "live")}>{session.status === "live" ? <><Pause />세션 종료</> : <><Play />다시 시작</>}</button><button className="btn primary" onClick={() => setShareOpen(true)}><Share2 />참여 링크</button></div>
         </header>
         <div className="workspace-tabs"><button className={tab === "live" ? "active" : ""} onClick={() => setTab("live")}><Play />라이브 플레이어<span>{session.questions.filter((q) => q.status === "unanswered").length}</span></button><button className={tab === "questions" ? "active" : ""} onClick={() => setTab("questions")}><MessageCircleQuestion />질문 목록<span>{session.questions.length}</span></button></div>

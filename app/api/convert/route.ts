@@ -12,6 +12,9 @@ const run = promisify(execFile);
 
 async function resolveBinary(name: "pdftoppm" | "soffice") {
   const envName = name === "pdftoppm" ? "PDFTOPPM_PATH" : "SOFFICE_PATH";
+  // LibreOffice 에는 -v 가 없다. 물어보면 사용법을 뱉으며 비정상 종료하므로,
+  // 멀쩡히 설치된 soffice 가 "없음" 으로 판정되어 PPT 변환이 통째로 막힌다.
+  const versionFlag = name === "pdftoppm" ? "-v" : "--version";
   const pathCandidates = (process.env.PATH ?? "").split(path.delimiter).filter(Boolean).map((directory) => path.join(/* turbopackIgnore: true */ directory, name));
   const candidates = [
     process.env[envName],
@@ -23,7 +26,8 @@ async function resolveBinary(name: "pdftoppm" | "soffice") {
 
   for (const candidate of candidates) {
     try {
-      await run(candidate, ["-v"], { timeout: 5000 });
+      // soffice 는 첫 실행에서 프로필을 만드느라 몇 초씩 걸린다.
+      await run(candidate, [versionFlag], { timeout: 20000 });
       return candidate;
     } catch { /* Try the next known runtime location. */ }
   }

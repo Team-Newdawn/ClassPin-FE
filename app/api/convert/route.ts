@@ -1,6 +1,6 @@
 import { execFile } from "node:child_process";
 import { copyFile, mkdir, mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises";
-import { homedir, tmpdir } from "node:os";
+import { availableParallelism, homedir, tmpdir } from "node:os";
 import path from "node:path";
 import { promisify } from "node:util";
 import { NextResponse } from "next/server";
@@ -15,10 +15,15 @@ const run = promisify(execFile);
 const RENDER_TIMEOUT_MS = 240_000;
 const SOFFICE_TIMEOUT_MS = 180_000;
 const PROBE_TIMEOUT_MS = 20_000;
-/** 페이지 구간을 나눠 동시에 렌더링할 pdftoppm 프로세스 수. */
-const RENDER_WORKERS = 3;
+/**
+ * 페이지 구간을 나눠 동시에 렌더링할 pdftoppm 프로세스 수.
+ *
+ * 래스터화는 CPU 바운드라 vCPU 수를 넘겨봐야 서로 뺏기만 한다. 컨테이너에
+ * 할당된 코어 수를 따라가되, 실측상 8 워커를 넘으면 효율이 급격히 떨어진다.
+ */
+const RENDER_WORKERS = Number(process.env.RENDER_WORKERS) || Math.min(8, Math.max(2, availableParallelism()));
 /** Storage 업로드 동시 실행 수. 순차로 올리면 장수만큼 왕복이 쌓인다. */
-const UPLOAD_CONCURRENCY = 6;
+const UPLOAD_CONCURRENCY = Number(process.env.UPLOAD_CONCURRENCY) || 12;
 
 /** 배열을 동시 실행 수 제한을 둔 채로 매핑한다. */
 async function mapWithLimit<T, R>(items: T[], limit: number, fn: (item: T, index: number) => Promise<R>): Promise<R[]> {
@@ -49,12 +54,16 @@ async function renderPages(pdftoppm: string, pdf: string, outDir: string) {
     total = Number(/^Pages:\s+(\d+)/m.exec(stdout)?.[1] ?? 0);
   } catch { /* 페이지 수를 못 세면 아래에서 통째로 렌더링한다. */ }
 
-  if (total <= RENDER_WORKERS * 2) {
+  // 워커 하나가 최소 두 장은 맡게 해서, 장수가 적을 때 프로세스 띄우는 비용이
+  // 렌더링 시간보다 커지지 않도록 한다. 워커 수를 고정하면 15 장짜리처럼 흔한
+  // 크기에서 병렬화가 통째로 꺼져 버린다.
+  const workers = Math.min(RENDER_WORKERS, Math.ceil(total / 2));
+  if (!total || workers <= 1) {
     await run(pdftoppm, [...args, pdf, prefix], { timeout: RENDER_TIMEOUT_MS });
     return;
   }
 
-  const size = Math.ceil(total / RENDER_WORKERS);
+  const size = Math.ceil(total / workers);
   const ranges: Array<[number, number]> = [];
   for (let start = 1; start <= total; start += size) ranges.push([start, Math.min(start + size - 1, total)]);
   await Promise.all(ranges.map(([first, last]) =>

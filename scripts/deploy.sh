@@ -37,17 +37,18 @@ gcloud builds submit \
   --substitutions "_IMAGE=${IMAGE},_APP_URL=${APP_URL},_SUPABASE_URL=${NEXT_PUBLIC_SUPABASE_URL},_SUPABASE_PUBLISHABLE_KEY=${NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY},_DATA_MODE=${DATA_MODE}"
 
 echo "==> Cloud Run 배포: ${SERVICE} (${REGION})"
-# concurrency 를 낮게 잡는 이유: LibreOffice 변환 한 건이 수백 MB 를 쓴다.
-# 기본값(80)이면 동시 업로드 몇 개만으로 인스턴스가 OOM 으로 죽는다.
+# 변환 한 건이 vCPU 수만큼 pdftoppm 을 띄우므로 동시성을 2 로 묶는다. 기본값(80)
+# 이면 서로 CPU 를 뺏어 한 건당 시간이 오히려 늘고, 메모리도 수백 MB 씩 겹친다.
+# 8 vCPU 는 Cloud Run 이 4GiB 이상을 요구한다.
 exec gcloud run deploy "$SERVICE" \
   --project "$PROJECT" \
   --region "$REGION" \
   --image "$IMAGE" \
   --allow-unauthenticated \
-  --memory 2Gi \
-  --cpu 1 \
+  --memory 4Gi \
+  --cpu 8 \
   --timeout 300 \
-  --concurrency 8 \
+  --concurrency 2 \
   --max-instances 3 \
   --set-env-vars "^@^NEXT_PUBLIC_APP_URL=${APP_URL}@NEXT_PUBLIC_SUPABASE_URL=${NEXT_PUBLIC_SUPABASE_URL}@NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=${NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY}@NEXT_PUBLIC_DATA_MODE=${DATA_MODE}" \
   "$@"

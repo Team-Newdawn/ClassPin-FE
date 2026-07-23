@@ -10,6 +10,58 @@ import type { Slide } from "@/lib/types";
 export const runtime = "nodejs";
 const run = promisify(execFile);
 
+// 1 vCPU 에서 실제 강의 자료를 렌더링하면 60 초로는 어림도 없다. Cloud Run 의
+// 요청 제한(300초) 안에서 최대한 여유를 두되, 그보다 먼저 끝나도록 잡는다.
+const RENDER_TIMEOUT_MS = 240_000;
+const SOFFICE_TIMEOUT_MS = 180_000;
+const PROBE_TIMEOUT_MS = 20_000;
+/** 페이지 구간을 나눠 동시에 렌더링할 pdftoppm 프로세스 수. */
+const RENDER_WORKERS = 3;
+/** Storage 업로드 동시 실행 수. 순차로 올리면 장수만큼 왕복이 쌓인다. */
+const UPLOAD_CONCURRENCY = 6;
+
+/** 배열을 동시 실행 수 제한을 둔 채로 매핑한다. */
+async function mapWithLimit<T, R>(items: T[], limit: number, fn: (item: T, index: number) => Promise<R>): Promise<R[]> {
+  const results = new Array<R>(items.length);
+  let cursor = 0;
+  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, async () => {
+    while (cursor < items.length) {
+      const index = cursor++;
+      results[index] = await fn(items[index], index);
+    }
+  }));
+  return results;
+}
+
+/**
+ * PDF 를 JPEG 로 렌더링한다.
+ *
+ * pdftoppm 은 페이지를 순차 처리하므로, 페이지 구간을 나눠 여러 프로세스로
+ * 동시에 돌린다. 파일명이 페이지 번호로 정해져 구간끼리 충돌하지 않는다.
+ */
+async function renderPages(pdftoppm: string, pdf: string, outDir: string) {
+  const args = ["-jpeg", "-r", "120", "-jpegopt", "quality=86"];
+  const prefix = path.join(outDir, "slide");
+
+  let total = 0;
+  try {
+    const { stdout } = await run(path.join(/* turbopackIgnore: true */ path.dirname(pdftoppm), "pdfinfo"), [pdf], { timeout: 30_000 });
+    total = Number(/^Pages:\s+(\d+)/m.exec(stdout)?.[1] ?? 0);
+  } catch { /* 페이지 수를 못 세면 아래에서 통째로 렌더링한다. */ }
+
+  if (total <= RENDER_WORKERS * 2) {
+    await run(pdftoppm, [...args, pdf, prefix], { timeout: RENDER_TIMEOUT_MS });
+    return;
+  }
+
+  const size = Math.ceil(total / RENDER_WORKERS);
+  const ranges: Array<[number, number]> = [];
+  for (let start = 1; start <= total; start += size) ranges.push([start, Math.min(start + size - 1, total)]);
+  await Promise.all(ranges.map(([first, last]) =>
+    run(pdftoppm, [...args, "-f", String(first), "-l", String(last), pdf, prefix], { timeout: RENDER_TIMEOUT_MS })
+  ));
+}
+
 async function resolveBinary(name: "pdftoppm" | "soffice") {
   const envName = name === "pdftoppm" ? "PDFTOPPM_PATH" : "SOFFICE_PATH";
   // LibreOffice 에는 -v 가 없다. 물어보면 사용법을 뱉으며 비정상 종료하므로,
@@ -27,7 +79,7 @@ async function resolveBinary(name: "pdftoppm" | "soffice") {
   for (const candidate of candidates) {
     try {
       // soffice 는 첫 실행에서 프로필을 만드느라 몇 초씩 걸린다.
-      await run(candidate, [versionFlag], { timeout: 20000 });
+      await run(candidate, [versionFlag], { timeout: PROBE_TIMEOUT_MS });
       return candidate;
     } catch { /* Try the next known runtime location. */ }
   }
@@ -52,14 +104,14 @@ export async function POST(request: Request) {
     let pdf = source;
     if (extension !== ".pdf") {
       const soffice = await resolveBinary("soffice");
-      await run(soffice, ["--headless", "--convert-to", "pdf", "--outdir", work, source], { timeout: 60000 });
+      await run(soffice, ["--headless", "--convert-to", "pdf", "--outdir", work, source], { timeout: SOFFICE_TIMEOUT_MS });
       pdf = path.join(work, "source.pdf");
     }
 
     const pages = path.join(work, "pages");
     await mkdir(pages, { recursive: true });
     const pdftoppm = await resolveBinary("pdftoppm");
-    await run(pdftoppm, ["-jpeg", "-r", "120", "-jpegopt", "quality=86", pdf, path.join(pages, "slide")], { timeout: 60000 });
+    await renderPages(pdftoppm, pdf, pages);
     const images = (await readdir(pages)).filter((name) => name.endsWith(".jpg")).sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
     if (!images.length) throw new Error("PDF에서 슬라이드를 생성하지 못했습니다.");
 
@@ -73,15 +125,14 @@ export async function POST(request: Request) {
 
       const uploadId = crypto.randomUUID();
       const bucket = client.storage.from("lecture-slides");
-      const slides: Slide[] = [];
-      for (const [index, name] of images.entries()) {
+      const slides = await mapWithLimit(images, UPLOAD_CONCURRENCY, async (name, index) => {
         const id = crypto.randomUUID();
         // storage 정책이 첫 폴더명을 소유자로 검증한다. 경로 모양을 바꾸면 업로드가 막힌다.
         const imagePath = `${auth.user.id}/${uploadId}/${id}.jpg`;
         const { error: uploadError } = await bucket.upload(imagePath, await readFile(path.join(pages, name)), { contentType: "image/jpeg", upsert: false });
         if (uploadError) throw uploadError;
-        slides.push({ id, pageIndex: index, title: `Slide ${index + 1}`, imagePath, imageUrl: bucket.getPublicUrl(imagePath).data.publicUrl });
-      }
+        return { id, pageIndex: index, title: `Slide ${index + 1}`, imagePath, imageUrl: bucket.getPublicUrl(imagePath).data.publicUrl } satisfies Slide;
+      });
       return NextResponse.json({ slides });
     }
 

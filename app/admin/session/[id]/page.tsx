@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { QRCodeSVG } from "qrcode.react";
 import { Check, ChevronLeft, ChevronRight, Clock3, Copy, Link2, ListFilter, MessageCircleQuestion, Pause, Play, Search, Share2, Users, X } from "@/components/icons";
@@ -28,6 +28,22 @@ export default function SessionAdmin() {
   const [copied, setCopied] = useState(false);
 
   const visibleQuestions = useMemo(() => session?.questions.filter((q) => (filter === "all" || q.status === filter) && q.text.toLowerCase().includes(query.toLowerCase())) ?? [], [filter, query, session]);
+
+  // 화살표나 점으로 슬라이드를 넘길 때 필름스트립이 따라오지 않으면, 장수가 많을수록
+  // 지금 어디인지 놓친다. scrollIntoView 는 창까지 움직여서 컨테이너만 직접 민다.
+  const filmstripRef = useRef<HTMLDivElement>(null);
+  const currentSlide = session?.currentSlide;
+  useEffect(() => {
+    const strip = filmstripRef.current;
+    if (!strip || currentSlide == null) return;
+    const active = strip.children[currentSlide] as HTMLElement | undefined;
+    if (!active) return;
+    const stripBox = strip.getBoundingClientRect();
+    const activeBox = active.getBoundingClientRect();
+    const offset = (activeBox.left - stripBox.left) - (stripBox.width - activeBox.width) / 2;
+    strip.scrollTo({ left: strip.scrollLeft + offset, behavior: "smooth" });
+  }, [currentSlide]);
+
   if (!ready) return <div className="loading-screen"><span className="spinner dark" /></div>;
   if (!session) return <div className="empty-state"><h1>세션을 찾을 수 없어요</h1><button className="btn primary" onClick={() => router.push("/")}>홈으로</button></div>;
 
@@ -54,7 +70,7 @@ export default function SessionAdmin() {
               <div className="stage-toolbar"><div><span className="status-dot" />수강생 화면과 동기화 중</div><span>{session.currentSlide + 1} / {session.slides.length}</span></div>
               <div className="stage-canvas-wrap"><SlideCanvas slide={slide} questions={slideQuestions} selectedId={selected?.id} onSelectPin={setSelectedId} /></div>
               <div className="player-controls"><button className="icon-btn" disabled={session.currentSlide === 0} onClick={() => setCurrentSlide(session.id, session.currentSlide - 1)} aria-label="이전 슬라이드"><ChevronLeft /></button><div className="slide-dots">{session.slides.map((_, i) => <button key={i} className={i === session.currentSlide ? "active" : ""} onClick={() => setCurrentSlide(session.id, i)} aria-label={`${i + 1}번 슬라이드`} />)}</div><button className="icon-btn" disabled={session.currentSlide === session.slides.length - 1} onClick={() => setCurrentSlide(session.id, session.currentSlide + 1)} aria-label="다음 슬라이드"><ChevronRight /></button></div>
-              <div className="filmstrip">{session.slides.map((item, index) => <button key={item.id} className={index === session.currentSlide ? "active" : ""} onClick={() => setCurrentSlide(session.id, index)}><SlideCanvas slide={item} compact /><span>{index + 1}</span>{session.questions.some((q) => q.slideIndex === index) && <i>{session.questions.filter((q) => q.slideIndex === index).length}</i>}</button>)}</div>
+              <div className="filmstrip" ref={filmstripRef}>{session.slides.map((item, index) => <button key={item.id} className={index === session.currentSlide ? "active" : ""} onClick={() => setCurrentSlide(session.id, index)}><SlideCanvas slide={item} compact /><span>{index + 1}</span>{session.questions.some((q) => q.slideIndex === index) && <i>{session.questions.filter((q) => q.slideIndex === index).length}</i>}</button>)}</div>
             </section>
             <aside className="live-questions">
               <div className="panel-heading"><div><h2>실시간 질문</h2><p>현재 슬라이드 · {slideQuestions.length}개</p></div><span className="pulse-dot" /></div>

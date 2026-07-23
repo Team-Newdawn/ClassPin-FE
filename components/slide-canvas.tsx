@@ -1,15 +1,17 @@
 "use client";
 /* eslint-disable @next/next/no-img-element */
 
+import type { ReactNode } from "react";
 import type { Question, Slide } from "@/lib/types";
 
-export function SlideCanvas({ slide, questions = [], selectedId, onSelectPin, onCanvasClick, compact = false }: {
+export function SlideCanvas({ slide, questions = [], selectedId, onSelectPin, onCanvasClick, compact = false, children }: {
   slide: Slide;
   questions?: Question[];
   selectedId?: string | null;
   onSelectPin?: (id: string) => void;
   onCanvasClick?: (x: number, y: number) => void;
   compact?: boolean;
+  children?: ReactNode;
 }) {
   const click = (event: React.MouseEvent<HTMLDivElement>) => {
     if (!onCanvasClick || (event.target as HTMLElement).closest("button")) return;
@@ -37,6 +39,7 @@ export function SlideCanvas({ slide, questions = [], selectedId, onSelectPin, on
           {index + 1}
         </button>
       ))}
+      {children}
     </div>
   );
 }

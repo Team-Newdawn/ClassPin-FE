@@ -29,7 +29,16 @@ Cloud Run 도메인 매핑을 지원하지 않는다.
 컨테이너 디스크에 쓰는 경로도 남아 있지만 Supabase를 설정하지 않은 로컬 실행
 전용이다. 배포 환경에서는 타지 않는다.
 
-## 최초 설정
+## 현재 배포 상태
+
+| | |
+|---|---|
+| GCP 프로젝트 | `pin-project-503023` |
+| 서비스 | `pin-class` (asia-northeast1) |
+| URL | https://pin-class-181304437134.asia-northeast1.run.app |
+| 이미지 | `asia-northeast1-docker.pkg.dev/pin-project-503023/pin-class/pin-class` |
+
+## 최초 설정 (완료됨 — 새 환경에서 재현할 때만 필요)
 
 ```bash
 gcloud auth login
@@ -37,6 +46,17 @@ gcloud config set project <PROJECT_ID>
 gcloud services enable run.googleapis.com cloudbuild.googleapis.com artifactregistry.googleapis.com
 gcloud artifacts repositories create pin-class --repository-format=docker --location=asia-northeast1
 ```
+
+신규 프로젝트에서는 Cloud Build가 쓰는 컴퓨트 기본 서비스 계정에 권한이 자동으로
+붙지 않는다. 빌드가 `storage.objects.get` 거부로 실패하면 다음을 부여한다:
+
+```bash
+gcloud projects add-iam-policy-binding <PROJECT_ID> \
+  --member="serviceAccount:<PROJECT_NUMBER>-compute@developer.gserviceaccount.com" \
+  --role=roles/storage.objectAdmin
+```
+
+`roles/artifactregistry.writer`, `roles/logging.logWriter`도 같은 방식으로 필요하다.
 
 ## 배포
 

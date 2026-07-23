@@ -24,6 +24,8 @@ const PROBE_TIMEOUT_MS = 20_000;
 const RENDER_WORKERS = Number(process.env.RENDER_WORKERS) || Math.min(8, Math.max(2, availableParallelism()));
 /** Storage 업로드 동시 실행 수. 순차로 올리면 장수만큼 왕복이 쌓인다. */
 const UPLOAD_CONCURRENCY = Number(process.env.UPLOAD_CONCURRENCY) || 12;
+/** 슬라이드 이미지 긴 변의 최대 픽셀 수. 렌더 비용과 전송량을 함께 좌우한다. */
+const SLIDE_MAX_EDGE = Number(process.env.SLIDE_MAX_EDGE) || 1600;
 
 /** 배열을 동시 실행 수 제한을 둔 채로 매핑한다. */
 async function mapWithLimit<T, R>(items: T[], limit: number, fn: (item: T, index: number) => Promise<R>): Promise<R[]> {
@@ -45,7 +47,11 @@ async function mapWithLimit<T, R>(items: T[], limit: number, fn: (item: T, index
  * 동시에 돌린다. 파일명이 페이지 번호로 정해져 구간끼리 충돌하지 않는다.
  */
 async function renderPages(pdftoppm: string, pdf: string, outDir: string) {
-  const args = ["-jpeg", "-r", "120", "-jpegopt", "quality=86"];
+  // DPI 로 렌더링하면 비용이 원본 페이지 규격에 끌려다닌다. 같은 16:9 슬라이드라도
+  // 1920pt 로 만든 자료는 960pt 짜리보다 네 배 비싸다 — 화면에서는 똑같이 보이는데도.
+  // 긴 변을 고정하면 규격과 무관하게 일정해지고, 앱이 슬라이드를 최대 1440 CSS px
+  // 로 그리므로 1600 이면 선명함도 남는다.
+  const args = ["-jpeg", "-scale-to", String(SLIDE_MAX_EDGE), "-jpegopt", "quality=86"];
   const prefix = path.join(outDir, "slide");
 
   let total = 0;

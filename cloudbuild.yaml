@@ -1,0 +1,18 @@
+# NEXT_PUBLIC_* 는 클라이언트 번들에 그대로 박히는 값이라 런타임 env 로는 늦는다.
+# 이미지를 구울 때 빌드 인자로 넣어야 브라우저에서 Supabase 가 붙는다.
+steps:
+  - name: gcr.io/cloud-builders/docker
+    args:
+      - build
+      - --build-arg=NEXT_PUBLIC_APP_URL=${_APP_URL}
+      - --build-arg=NEXT_PUBLIC_SUPABASE_URL=${_SUPABASE_URL}
+      - --build-arg=NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=${_SUPABASE_PUBLISHABLE_KEY}
+      - --build-arg=NEXT_PUBLIC_DATA_MODE=${_DATA_MODE}
+      - --tag=${_IMAGE}
+      - .
+
+images:
+  - ${_IMAGE}
+
+options:
+  logging: CLOUD_LOGGING_ONLY

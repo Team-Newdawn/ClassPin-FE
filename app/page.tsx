@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { ArrowRight, FileText, Plus, Upload } from "@/components/icons";
 import { PinLogo } from "@/components/pin-logo";
 import { useSessions } from "@/components/session-store";
-import type { Slide } from "@/lib/types";
+import { convertToSlides } from "@/lib/convert";
 
 export default function Home() {
   const router = useRouter();
@@ -20,15 +20,8 @@ export default function Home() {
     setBusy(true);
     setUploadError(null);
     try {
-      const form = new FormData();
-      form.append("file", file);
-      const response = await fetch("/api/convert", { method: "POST", body: form });
-      if (!response.ok) {
-        const failure = await response.json().catch(() => ({ error: "슬라이드 변환에 실패했습니다." })) as { error?: string };
-        throw new Error(failure.error || "슬라이드 변환에 실패했습니다.");
-      }
-      const data = await response.json() as { slides: Slide[] };
-      const session = createSession({ title: file.name.replace(/\.(pdf|pptx?)$/i, ""), fileName: file.name, slides: data.slides });
+      const slides = await convertToSlides(file);
+      const session = createSession({ title: file.name.replace(/\.(pdf|pptx?)$/i, ""), fileName: file.name, slides });
       router.push(`/admin/session/${session.id}`);
     } catch (error) {
       setUploadError(error instanceof Error ? error.message : "슬라이드 변환에 실패했습니다.");

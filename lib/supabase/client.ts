@@ -21,6 +21,15 @@ export function getSupabaseClient() {
   return browserClient;
 }
 
+/** /api/convert 가 업로드를 사용자 폴더에 넣으려면 누가 보냈는지 알아야 한다. */
+export async function getAccessToken() {
+  const client = getSupabaseClient();
+  if (!client) return null;
+  await ensureAnonymousUser();
+  const { data } = await client.auth.getSession();
+  return data.session?.access_token ?? null;
+}
+
 export async function ensureAnonymousUser() {
   const client = getSupabaseClient();
   if (!client) return null;

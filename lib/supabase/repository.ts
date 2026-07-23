@@ -18,13 +18,13 @@ export async function persistSession(session: ClassSession) {
   if (versionError) throw versionError;
   const slideRows = [];
   for (const slide of session.slides) {
-    let imagePath = `${user.id}/${session.id}/${slide.id}.jpg`;
-    if (slide.imageUrl) {
+    // 변환 단계에서 이미 Storage 에 올라온 슬라이드는 그대로 참조한다.
+    let imagePath = slide.imagePath ?? "";
+    if (!imagePath && slide.imageUrl) {
+      imagePath = `${user.id}/${session.id}/${slide.id}.jpg`;
       const image = await fetch(slide.imageUrl).then((response) => response.blob());
       const { error: uploadError } = await client.storage.from("lecture-slides").upload(imagePath, image, { contentType: image.type || "image/jpeg", upsert: false });
       if (uploadError) throw uploadError;
-    } else {
-      imagePath = "";
     }
     slideRows.push({ id: slide.id, material_version_id: session.materialVersionId, page_index: slide.pageIndex, image_path: imagePath });
   }

@@ -6,8 +6,9 @@ import { AdminShell, AdminTopbar } from "@/components/admin-shell";
 import { FileText, MessageCircleQuestion, Plus, Search, Upload } from "@/components/icons";
 import { SlideCanvas } from "@/components/slide-canvas";
 import { useSessions } from "@/components/session-store";
+import { convertToSlides } from "@/lib/convert";
 import { countBy } from "@/lib/stats";
-import type { ClassSession, Slide } from "@/lib/types";
+import type { ClassSession } from "@/lib/types";
 
 type Filter = "all" | ClassSession["status"];
 
@@ -32,15 +33,8 @@ export default function MaterialsPage() {
     setBusy(true);
     setUploadError(null);
     try {
-      const form = new FormData();
-      form.append("file", file);
-      const response = await fetch("/api/convert", { method: "POST", body: form });
-      if (!response.ok) {
-        const failure = await response.json().catch(() => ({ error: "슬라이드 변환에 실패했습니다." })) as { error?: string };
-        throw new Error(failure.error || "슬라이드 변환에 실패했습니다.");
-      }
-      const data = await response.json() as { slides: Slide[] };
-      const session = createSession({ title: file.name.replace(/\.(pdf|pptx?)$/i, ""), fileName: file.name, slides: data.slides });
+      const slides = await convertToSlides(file);
+      const session = createSession({ title: file.name.replace(/\.(pdf|pptx?)$/i, ""), fileName: file.name, slides });
       router.push(`/admin/session/${session.id}`);
     } catch (error) {
       setUploadError(error instanceof Error ? error.message : "슬라이드 변환에 실패했습니다.");

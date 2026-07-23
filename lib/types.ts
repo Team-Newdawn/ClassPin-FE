@@ -8,6 +8,8 @@ export interface Slide {
   eyebrow?: string;
   body?: string;
   imageUrl?: string;
+  /** lecture-slides 버킷 안의 경로. 변환 단계에서 이미 올라간 이미지를 가리킨다. */
+  imagePath?: string;
 }
 
 export interface Question {

@@ -58,7 +58,7 @@ COPY --from=builder /app/public ./public
 COPY --from=builder /app/.next/standalone ./
 COPY --from=builder /app/.next/static ./.next/static
 
-# 볼륨이 마운트되기 전에도 경로는 존재해야 한다.
+# Supabase 미설정 시의 로컬 폴백 경로. 배포 환경에서는 쓰이지 않는다.
 RUN mkdir -p /app/public/generated
 
 EXPOSE 3000

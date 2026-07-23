@@ -1,0 +1,20 @@
+node_modules
+.next
+.git
+.gitignore
+.claude
+.env*
+!.env.example
+*.log
+.DS_Store
+tsconfig.tsbuildinfo
+doc
+DESIGN.md
+README.md
+fly.toml
+Dockerfile
+.dockerignore
+
+# 로컬에서 변환해 둔 슬라이드는 이미지에 넣지 않는다 (런타임 볼륨이 담당).
+public/generated/*
+!public/generated/.gitkeep

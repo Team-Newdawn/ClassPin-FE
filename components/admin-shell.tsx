@@ -19,7 +19,8 @@ export function AdminSidebar() {
 
   return (
     <aside className="sidebar">
-      <div className="sidebar-logo"><Link href="/" className="pin-logo-link"><PinLogo /></Link></div>
+      {/* PinLogo 가 이미 홈으로 가는 Link 다. 한 번 더 감싸면 a 안의 a 가 된다. */}
+      <div className="sidebar-logo"><PinLogo /></div>
       <nav>
         {items.map(({ href, label, icon: Icon, active }) => (
           <Link key={label} href={href} className={`nav-item ${active ? "active" : ""}`} aria-current={active ? "page" : undefined}><Icon />{label}</Link>

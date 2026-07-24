@@ -5,6 +5,7 @@ import { useParams } from "next/navigation";
 import { Check, ChevronLeft, ChevronRight, Send, Trash2, X } from "@/components/icons";
 import { PinLogo } from "@/components/pin-logo";
 import { SlideCanvas } from "@/components/slide-canvas";
+import { useHorizontalSlideWheel } from "@/components/use-horizontal-slide-wheel";
 import { useSessions } from "@/components/session-store";
 import { categoryLabel } from "@/lib/format";
 import type { QuestionCategory } from "@/lib/types";
@@ -32,10 +33,18 @@ export default function JoinSession() {
     if (!ready || lookupDone || session) return;
     void loadSessionByCode(params.code).finally(() => setLookupDone(true));
   }, [loadSessionByCode, lookupDone, params.code, ready, session]);
+  const current = slideIndex ?? session?.currentSlide ?? 0;
+  const handleSlideWheel = useHorizontalSlideWheel({
+    currentIndex: current,
+    slideCount: session?.slides.length ?? 0,
+    onIndexChange: (index) => {
+      setSlideIndex(index);
+      setComposerOpen(false);
+    }
+  });
 
   if (!ready || (!session && !lookupDone)) return <div className="loading-screen"><span className="spinner dark" /></div>;
   if (!session) return <div className="student-empty"><PinLogo /><h1>참여할 세션을 찾을 수 없어요</h1><p>링크나 참여 코드를 다시 확인해 주세요.</p></div>;
-  const current = slideIndex ?? session.currentSlide;
   const slide = session.slides[current];
   const draftQuestion = draftQuestions[slide.id];
   const activeCategory = draftQuestion?.category ?? "concept";
@@ -123,11 +132,10 @@ export default function JoinSession() {
     setSubmitted(false);
     setComposerOpen(false);
   };
-
   return (
     <main className="student-shell student-slide-shell">
       <header className="student-header"><PinLogo /><span><i />{session.status === "live" ? "LIVE" : "종료된 세션"}</span></header>
-      <section className="student-stage" aria-label={`${session.title} 슬라이드`}>
+      <section className="student-stage" aria-label={`${session.title} 슬라이드`} onWheel={handleSlideWheel}>
         <div className="student-canvas">
           <SlideCanvas slide={slide} onCanvasClick={placeDraftTag}>
             {draftQuestion && <>

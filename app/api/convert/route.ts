@@ -4,7 +4,6 @@ import { availableParallelism, homedir, tmpdir } from "node:os";
 import path from "node:path";
 import { promisify } from "node:util";
 import { NextResponse } from "next/server";
-import sharp from "sharp";
 import { getSupabaseClientForToken } from "@/lib/supabase/server";
 import type { Slide } from "@/lib/types";
 
@@ -25,8 +24,6 @@ const PROBE_TIMEOUT_MS = 20_000;
 const RENDER_WORKERS = Number(process.env.RENDER_WORKERS) || Math.min(8, Math.max(2, availableParallelism()));
 /** Storage 업로드 동시 실행 수. 순차로 올리면 장수만큼 왕복이 쌓인다. */
 const UPLOAD_CONCURRENCY = Number(process.env.UPLOAD_CONCURRENCY) || 12;
-/** PNG→JPEG 재인코딩 동시 실행 수. sharp 도 내부 스레드를 쓰므로 과하게 벌리지 않는다. */
-const JPEG_CONCURRENCY = Number(process.env.JPEG_CONCURRENCY) || 4;
 /** 슬라이드 이미지 긴 변의 최대 픽셀 수. 렌더 비용과 전송량을 함께 좌우한다. */
 const SLIDE_MAX_EDGE = Number(process.env.SLIDE_MAX_EDGE) || 1600;
 
@@ -43,47 +40,17 @@ async function mapWithLimit<T, R>(items: T[], limit: number, fn: (item: T, index
   return results;
 }
 
-/** slide-1.png, slide-10.png … 를 페이지 번호 순서로 정렬한다. */
-const byPageNumber = (a: string, b: string) => a.localeCompare(b, undefined, { numeric: true });
-
 /**
- * PDF 를 슬라이드 JPEG 로 렌더링한다. 가능하면 MuPDF 를, 없으면 poppler 를 쓴다.
+ * PDF 를 JPEG 로 렌더링한다.
  *
- * poppler(pdftoppm)는 단일 스레드라 병렬화하려면 프로세스를 여러 개 띄워야 하고,
- * 그때마다 PDF 전체를 다시 파싱한다 — 9MB IR 자료에선 이 중복 파싱이 병렬 이득을
- * 절반 넘게 깎아먹었다. MuPDF 의 `mutool draw -P` 는 한 번만 파싱하고 페이지를
- * 스레드로 나눠 그리므로 그 낭비가 없다.
+ * pdftoppm 은 페이지를 순차 처리하므로, 페이지 구간을 나눠 여러 프로세스로
+ * 동시에 돌린다. 파일명이 페이지 번호로 정해져 구간끼리 충돌하지 않는다.
  */
-async function renderPages(pdf: string, outDir: string) {
-  const mutool = await resolveBinary("mutool", { optional: true });
-  if (mutool) {
-    await renderWithMuPdf(mutool, pdf, outDir);
-    return;
-  }
-  await renderWithPoppler(await resolveBinary("pdftoppm"), pdf, outDir);
-}
-
-async function renderWithMuPdf(mutool: string, pdf: string, outDir: string) {
-  // -w/-h 를 함께 주면 그 상자 안에 비율을 지키며 맞추므로, 세로 페이지든 가로든
-  // 긴 변이 SLIDE_MAX_EDGE 로 제한된다. mutool 은 JPEG 출력을 지원하지 않아 PNG 로
-  // 받고 sharp 로 재인코딩한다 — 렌더 단계에서 이미 축소돼 sharp 는 인코딩만 한다.
-  await run(mutool, [
-    "draw", "-P",
-    "-w", String(SLIDE_MAX_EDGE), "-h", String(SLIDE_MAX_EDGE),
-    "-o", path.join(outDir, "slide-%d.png"), pdf,
-  ], { timeout: RENDER_TIMEOUT_MS, maxBuffer: 32 * 1024 * 1024 });
-
-  const pngs = (await readdir(outDir)).filter((name) => name.endsWith(".png")).sort(byPageNumber);
-  if (!pngs.length) throw new Error("PDF에서 슬라이드를 생성하지 못했습니다.");
-  await mapWithLimit(pngs, JPEG_CONCURRENCY, async (name) => {
-    const source = path.join(outDir, name);
-    await sharp(source).jpeg({ quality: 86 }).toFile(source.replace(/\.png$/, ".jpg"));
-    await rm(source, { force: true });
-  });
-}
-
-/** poppler 폴백. MuPDF 가 없는 환경(예: 일부 로컬)에서만 쓰인다. */
-async function renderWithPoppler(pdftoppm: string, pdf: string, outDir: string) {
+async function renderPages(pdftoppm: string, pdf: string, outDir: string) {
+  // DPI 로 렌더링하면 비용이 원본 페이지 규격에 끌려다닌다. 같은 16:9 슬라이드라도
+  // 1920pt 로 만든 자료는 960pt 짜리보다 네 배 비싸다 — 화면에서는 똑같이 보이는데도.
+  // 긴 변을 고정하면 규격과 무관하게 일정해지고, 앱이 슬라이드를 최대 1440 CSS px
+  // 로 그리므로 1600 이면 선명함도 남는다.
   const args = ["-jpeg", "-scale-to", String(SLIDE_MAX_EDGE), "-jpegopt", "quality=86"];
   const prefix = path.join(outDir, "slide");
 
@@ -110,16 +77,11 @@ async function renderWithPoppler(pdftoppm: string, pdf: string, outDir: string) 
   ));
 }
 
-const VERSION_FLAG: Record<string, string> = { pdftoppm: "-v", mutool: "-v", soffice: "--version" };
-
-type BinaryName = "pdftoppm" | "soffice" | "mutool";
-async function resolveBinary(name: BinaryName): Promise<string>;
-async function resolveBinary(name: BinaryName, options: { optional: true }): Promise<string | null>;
-async function resolveBinary(name: BinaryName, options?: { optional?: boolean }): Promise<string | null> {
-  const envName = `${name.toUpperCase()}_PATH`;
+async function resolveBinary(name: "pdftoppm" | "soffice") {
+  const envName = name === "pdftoppm" ? "PDFTOPPM_PATH" : "SOFFICE_PATH";
   // LibreOffice 에는 -v 가 없다. 물어보면 사용법을 뱉으며 비정상 종료하므로,
   // 멀쩡히 설치된 soffice 가 "없음" 으로 판정되어 PPT 변환이 통째로 막힌다.
-  const versionFlag = VERSION_FLAG[name];
+  const versionFlag = name === "pdftoppm" ? "-v" : "--version";
   const pathCandidates = (process.env.PATH ?? "").split(path.delimiter).filter(Boolean).map((directory) => path.join(/* turbopackIgnore: true */ directory, name));
   const candidates = [
     process.env[envName],
@@ -136,7 +98,6 @@ async function resolveBinary(name: BinaryName, options?: { optional?: boolean })
       return candidate;
     } catch { /* Try the next known runtime location. */ }
   }
-  if (options?.optional) return null;
   throw new Error(`${name} 실행 파일을 찾을 수 없습니다.`);
 }
 
@@ -164,8 +125,9 @@ export async function POST(request: Request) {
 
     const pages = path.join(work, "pages");
     await mkdir(pages, { recursive: true });
-    await renderPages(pdf, pages);
-    const images = (await readdir(pages)).filter((name) => name.endsWith(".jpg")).sort(byPageNumber);
+    const pdftoppm = await resolveBinary("pdftoppm");
+    await renderPages(pdftoppm, pdf, pages);
+    const images = (await readdir(pages)).filter((name) => name.endsWith(".jpg")).sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
     if (!images.length) throw new Error("PDF에서 슬라이드를 생성하지 못했습니다.");
 
     // 컨테이너 디스크는 인스턴스가 죽으면 같이 사라지고 인스턴스끼리 공유되지도

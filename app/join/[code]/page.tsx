@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useParams } from "next/navigation";
-import { Check, ChevronLeft, ChevronRight, Send, X } from "@/components/icons";
+import { Check, ChevronLeft, ChevronRight, Send, Trash2, X } from "@/components/icons";
 import { PinLogo } from "@/components/pin-logo";
 import { SlideCanvas } from "@/components/slide-canvas";
 import { useSessions } from "@/components/session-store";
@@ -101,13 +101,13 @@ export default function JoinSession() {
     pinDragStart.current = null;
   };
   const submit = () => {
-    if (!draftQuestion?.text.trim()) return;
+    if (!draftQuestion) return;
     addQuestion(session.id, {
       slideIndex: current,
       x: draftQuestion.x,
       y: draftQuestion.y,
       category: draftQuestion.category,
-      text: draftQuestion.text.trim()
+      text: draftQuestion.text.trim() || categoryLabel[draftQuestion.category]
     });
     setSubmitted(true);
   };
@@ -116,6 +116,11 @@ export default function JoinSession() {
       clearDraftQuestion();
       setSubmitted(false);
     }
+    setComposerOpen(false);
+  };
+  const deleteDraftQuestion = () => {
+    clearDraftQuestion();
+    setSubmitted(false);
     setComposerOpen(false);
   };
 
@@ -163,11 +168,14 @@ export default function JoinSession() {
           {submitted ? <div className="submitted"><span><Check /></span><h2 id="question-modal-title">질문을 남겼어요</h2><p>강사님이 실시간으로 확인할 수 있어요.</p><button className="btn primary" onClick={closeComposer}>새 질문 남기기</button></div> : <>
             <div className="student-modal-heading">
               <span>?</span>
-              <div><h2 id="question-modal-title">이 위치에서 무엇이 궁금한가요?</h2><p>질문 유형을 선택하고 내용을 적어주세요.</p></div>
+              <div><h2 id="question-modal-title">이 위치에서 무엇이 궁금한가요?</h2><p>질문 유형만 선택하거나 내용을 함께 적어주세요.</p></div>
             </div>
             <div className="category-scroll">{(Object.keys(categoryLabel) as QuestionCategory[]).map((item) => <button key={item} className={activeCategory === item ? "active" : ""} onClick={() => selectCategory(item)}>{categoryLabel[item]}</button>)}</div>
-            <div className="textarea-wrap"><textarea autoFocus value={draftText} onChange={(event) => updateDraftText(event.target.value)} maxLength={300} placeholder="질문을 자유롭게 적어주세요" /><span>{draftText.length}/300</span></div>
-            <button className="btn primary large full" onClick={submit} disabled={!draftText.trim()}><Send />질문 보내기</button>
+            <div className="textarea-wrap"><textarea autoFocus value={draftText} onChange={(event) => updateDraftText(event.target.value)} maxLength={300} placeholder="선택 사항: 질문을 자유롭게 적어주세요" /><span>{draftText.length}/300</span></div>
+            <div className="student-composer-actions">
+              <button className="btn primary large full" onClick={submit}><Send />질문 보내기</button>
+              <button className="btn destructive large full" onClick={deleteDraftQuestion}><Trash2 />핀 삭제</button>
+            </div>
           </>}
         </section>
       </div>}

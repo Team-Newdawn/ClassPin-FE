@@ -36,7 +36,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           const nextProfile = await fetchOwnProfile(nextUser.id);
           if (active) setProfile(nextProfile);
         } catch (error) {
-          console.error("Profile fetch failed", error);
+          // PostgrestError 는 콘솔에서 {} 로 뭉개져 message 를 따로 찍는다.
+          const detail = (error as { message?: string })?.message ?? String(error);
+          console.error(`Profile fetch failed: ${detail}`, error);
           if (active) setProfile(null);
         }
       } else if (active) setProfile(null);

@@ -1,9 +1,11 @@
 import { execFile } from "node:child_process";
-import { copyFile, mkdir, mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises";
+import { copyFile, mkdir, mkdtemp, readFile, readdir, rm, stat, writeFile } from "node:fs/promises";
 import { availableParallelism, homedir, tmpdir } from "node:os";
 import path from "node:path";
+import { setTimeout as sleep } from "node:timers/promises";
 import { promisify } from "node:util";
 import { NextResponse } from "next/server";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { getSupabaseClientForToken } from "@/lib/supabase/server";
 import type { Slide } from "@/lib/types";
 
@@ -27,17 +29,16 @@ const UPLOAD_CONCURRENCY = Number(process.env.UPLOAD_CONCURRENCY) || 12;
 /** 슬라이드 이미지 긴 변의 최대 픽셀 수. 렌더 비용과 전송량을 함께 좌우한다. */
 const SLIDE_MAX_EDGE = Number(process.env.SLIDE_MAX_EDGE) || 1600;
 
-/** 배열을 동시 실행 수 제한을 둔 채로 매핑한다. */
-async function mapWithLimit<T, R>(items: T[], limit: number, fn: (item: T, index: number) => Promise<R>): Promise<R[]> {
-  const results = new Array<R>(items.length);
-  let cursor = 0;
-  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, async () => {
-    while (cursor < items.length) {
-      const index = cursor++;
-      results[index] = await fn(items[index], index);
-    }
-  }));
-  return results;
+/** slide-01.jpg, slide-10.jpg … 를 페이지 번호 순서로 정렬한다. */
+const byPageNumber = (a: string, b: string) => a.localeCompare(b, undefined, { numeric: true });
+/** slide-07.jpg → 6 (0-기반). pdftoppm 은 파일명에 절대 페이지 번호를 박는다. */
+const pageIndexOf = (name: string) => Number(/(\d+)\.jpg$/.exec(name)?.[1] ?? 0) - 1;
+
+async function getPageCount(pdftoppm: string, pdf: string) {
+  try {
+    const { stdout } = await run(path.join(/* turbopackIgnore: true */ path.dirname(pdftoppm), "pdfinfo"), [pdf], { timeout: 30_000 });
+    return Number(/^Pages:\s+(\d+)/m.exec(stdout)?.[1] ?? 0);
+  } catch { return 0; }
 }
 
 /**
@@ -46,7 +47,7 @@ async function mapWithLimit<T, R>(items: T[], limit: number, fn: (item: T, index
  * pdftoppm 은 페이지를 순차 처리하므로, 페이지 구간을 나눠 여러 프로세스로
  * 동시에 돌린다. 파일명이 페이지 번호로 정해져 구간끼리 충돌하지 않는다.
  */
-async function renderPages(pdftoppm: string, pdf: string, outDir: string) {
+function renderPages(pdftoppm: string, pdf: string, outDir: string, total: number) {
   // DPI 로 렌더링하면 비용이 원본 페이지 규격에 끌려다닌다. 같은 16:9 슬라이드라도
   // 1920pt 로 만든 자료는 960pt 짜리보다 네 배 비싸다 — 화면에서는 똑같이 보이는데도.
   // 긴 변을 고정하면 규격과 무관하게 일정해지고, 앱이 슬라이드를 최대 1440 CSS px
@@ -54,27 +55,87 @@ async function renderPages(pdftoppm: string, pdf: string, outDir: string) {
   const args = ["-jpeg", "-scale-to", String(SLIDE_MAX_EDGE), "-jpegopt", "quality=86"];
   const prefix = path.join(outDir, "slide");
 
-  let total = 0;
-  try {
-    const { stdout } = await run(path.join(/* turbopackIgnore: true */ path.dirname(pdftoppm), "pdfinfo"), [pdf], { timeout: 30_000 });
-    total = Number(/^Pages:\s+(\d+)/m.exec(stdout)?.[1] ?? 0);
-  } catch { /* 페이지 수를 못 세면 아래에서 통째로 렌더링한다. */ }
-
   // 워커 하나가 최소 두 장은 맡게 해서, 장수가 적을 때 프로세스 띄우는 비용이
   // 렌더링 시간보다 커지지 않도록 한다. 워커 수를 고정하면 15 장짜리처럼 흔한
   // 크기에서 병렬화가 통째로 꺼져 버린다.
   const workers = Math.min(RENDER_WORKERS, Math.ceil(total / 2));
   if (!total || workers <= 1) {
-    await run(pdftoppm, [...args, pdf, prefix], { timeout: RENDER_TIMEOUT_MS });
-    return;
+    return run(pdftoppm, [...args, pdf, prefix], { timeout: RENDER_TIMEOUT_MS }).then(() => undefined);
   }
 
   const size = Math.ceil(total / workers);
   const ranges: Array<[number, number]> = [];
   for (let start = 1; start <= total; start += size) ranges.push([start, Math.min(start + size - 1, total)]);
-  await Promise.all(ranges.map(([first, last]) =>
+  return Promise.all(ranges.map(([first, last]) =>
     run(pdftoppm, [...args, "-f", String(first), "-l", String(last), pdf, prefix], { timeout: RENDER_TIMEOUT_MS })
-  ));
+  )).then(() => undefined);
+}
+
+type UploadTarget = { bucket: ReturnType<SupabaseClient["storage"]["from"]>; ownerId: string; uploadId: string };
+
+/** 렌더된 슬라이드 한 장을 Storage 에 올리고 Slide 로 만든다. */
+async function uploadSlide(dir: string, name: string, target: UploadTarget): Promise<Slide> {
+  const id = crypto.randomUUID();
+  // storage 정책이 첫 폴더명을 소유자로 검증한다. 경로 모양을 바꾸면 업로드가 막힌다.
+  const imagePath = `${target.ownerId}/${target.uploadId}/${id}.jpg`;
+  const { error } = await target.bucket.upload(imagePath, await readFile(path.join(dir, name)), { contentType: "image/jpeg", upsert: false });
+  if (error) throw error;
+  const pageIndex = pageIndexOf(name);
+  return { id, pageIndex, title: `Slide ${pageIndex + 1}`, imagePath, imageUrl: target.bucket.getPublicUrl(imagePath).data.publicUrl };
+}
+
+/**
+ * 렌더링과 Storage 업로드를 겹친다.
+ *
+ * 예전엔 모든 페이지를 다 그린 뒤 한꺼번에 올려, 업로드 몇 초가 렌더 시간 뒤에
+ * 통째로 붙었다. 여기서는 pdftoppm 이 파일을 쓰는 족족 감지해서 바로 올리고,
+ * 올라간 슬라이드를 onSlide 로 흘려보낸다 — 업로드가 렌더 뒤로 숨고, 첫 슬라이드가
+ * 전체 완료를 기다리지 않고 먼저 도착한다.
+ *
+ * "다 써진 파일"은 두 번 연속 크기가 같은지로 판별한다. 렌더가 끝난 뒤 마지막으로
+ * 한 번 훑어 아직 안 올린 파일을 마저 처리한다.
+ */
+async function renderUploadStream(
+  pdftoppm: string, pdf: string, dir: string, total: number, target: UploadTarget,
+  onSlide: (slide: Slide) => void,
+): Promise<Slide[]> {
+  const rendering = renderPages(pdftoppm, pdf, dir, total);
+  let renderError: unknown = null;
+  const done = rendering.then(() => true, (error) => { renderError = error; return true; });
+
+  const sizes = new Map<string, number>();
+  const seen = new Set<string>();
+  const slides: Slide[] = [];
+  const inflight = new Set<Promise<void>>();
+  const enqueue = (name: string) => {
+    seen.add(name);
+    const task = uploadSlide(dir, name, target).then((slide) => { slides.push(slide); onSlide(slide); });
+    const tracked = task.finally(() => inflight.delete(tracked));
+    inflight.add(tracked);
+  };
+
+  let finished = false;
+  while (!finished) {
+    finished = await Promise.race([done, sleep(150).then(() => false)]);
+    const files = (await readdir(dir)).filter((name) => name.endsWith(".jpg")).sort(byPageNumber);
+    for (const name of files) {
+      if (seen.has(name)) continue;
+      if (!finished) {
+        // 크기가 두 번 연속 같아야 다 써진 것으로 본다. 렌더가 끝난 뒤엔 남은 파일이 모두 완성됐다.
+        const size = (await stat(path.join(dir, name))).size;
+        const prev = sizes.get(name);
+        sizes.set(name, size);
+        if (prev === undefined || prev !== size || size === 0) continue;
+      }
+      if (inflight.size >= UPLOAD_CONCURRENCY) await Promise.race(inflight);
+      enqueue(name);
+    }
+  }
+  await Promise.all(inflight);
+  if (renderError) throw renderError;
+  if (!slides.length) throw new Error("PDF에서 슬라이드를 생성하지 못했습니다.");
+  slides.sort((a, b) => a.pageIndex - b.pageIndex);
+  return slides;
 }
 
 async function resolveBinary(name: "pdftoppm" | "soffice") {
@@ -101,9 +162,43 @@ async function resolveBinary(name: "pdftoppm" | "soffice") {
   throw new Error(`${name} 실행 파일을 찾을 수 없습니다.`);
 }
 
+/**
+ * 변환 진행을 NDJSON 으로 흘려보낸다. 한 줄에 한 이벤트:
+ *   {"type":"meta","total":N} → {"type":"slide","slide":{…}} × N → {"type":"done"}
+ * 실패하면 {"type":"error","error":"…"} 를 마지막에 보낸다. 응답 시작 전에 검증·인증을
+ * 끝냈으므로 여기서는 200 스트림만 다룬다. work 정리 책임도 이 스트림이 가진다.
+ */
+function streamConversion(pdftoppm: string, pdf: string, pages: string, total: number, target: UploadTarget, workDir: string): Response {
+  const encoder = new TextEncoder();
+  const stream = new ReadableStream({
+    async start(controller) {
+      const emit = (event: unknown) => controller.enqueue(encoder.encode(`${JSON.stringify(event)}\n`));
+      try {
+        emit({ type: "meta", total });
+        await renderUploadStream(pdftoppm, pdf, pages, total, target, (slide) => emit({ type: "slide", slide }));
+        emit({ type: "done" });
+      } catch (error) {
+        const message = error instanceof Error ? error.message : "슬라이드 변환에 실패했습니다.";
+        console.error("Slide conversion failed:", message);
+        emit({ type: "error", error: message });
+      } finally {
+        controller.close();
+        await rm(workDir, { recursive: true, force: true });
+      }
+    },
+  });
+  return new Response(stream, {
+    headers: {
+      "Content-Type": "application/x-ndjson; charset=utf-8",
+      // 프록시가 스트림을 모아두지 않고 그대로 흘리게 한다.
+      "Cache-Control": "no-cache, no-transform",
+      "X-Accel-Buffering": "no",
+    },
+  });
+}
+
 export async function POST(request: Request) {
   let work: string | null = null;
-  let localDir: string | null = null;
   try {
     const form = await request.formData();
     const file = form.get("file");
@@ -126,9 +221,7 @@ export async function POST(request: Request) {
     const pages = path.join(work, "pages");
     await mkdir(pages, { recursive: true });
     const pdftoppm = await resolveBinary("pdftoppm");
-    await renderPages(pdftoppm, pdf, pages);
-    const images = (await readdir(pages)).filter((name) => name.endsWith(".jpg")).sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
-    if (!images.length) throw new Error("PDF에서 슬라이드를 생성하지 못했습니다.");
+    const total = await getPageCount(pdftoppm, pdf);
 
     // 컨테이너 디스크는 인스턴스가 죽으면 같이 사라지고 인스턴스끼리 공유되지도
     // 않는다. 변환한 자리에서 바로 Storage 에 올려야 재접속·재배포 후에도 남는다.
@@ -137,32 +230,33 @@ export async function POST(request: Request) {
     if (client) {
       const { data: auth, error: authError } = await client.auth.getUser();
       if (authError || !auth.user) return NextResponse.json({ error: "로그인 정보가 만료되었습니다. 새로고침 후 다시 시도해 주세요." }, { status: 401 });
-
-      const uploadId = crypto.randomUUID();
-      const bucket = client.storage.from("lecture-slides");
-      const slides = await mapWithLimit(images, UPLOAD_CONCURRENCY, async (name, index) => {
-        const id = crypto.randomUUID();
-        // storage 정책이 첫 폴더명을 소유자로 검증한다. 경로 모양을 바꾸면 업로드가 막힌다.
-        const imagePath = `${auth.user.id}/${uploadId}/${id}.jpg`;
-        const { error: uploadError } = await bucket.upload(imagePath, await readFile(path.join(pages, name)), { contentType: "image/jpeg", upsert: false });
-        if (uploadError) throw uploadError;
-        return { id, pageIndex: index, title: `Slide ${index + 1}`, imagePath, imageUrl: bucket.getPublicUrl(imagePath).data.publicUrl } satisfies Slide;
-      });
-      return NextResponse.json({ slides });
+      const target: UploadTarget = { bucket: client.storage.from("lecture-slides"), ownerId: auth.user.id, uploadId: crypto.randomUUID() };
+      const workDir = work;
+      work = null; // 정리 책임을 스트림에 넘긴다 — 아래 finally 는 건드리지 않는다.
+      return streamConversion(pdftoppm, pdf, pages, total, target, workDir);
     }
 
     // Supabase 를 설정하지 않은 로컬 데모 전용 경로. 배포 환경에서는 쓰이지 않는다.
-    const outputId = crypto.randomUUID();
-    localDir = path.join(/* turbopackIgnore: true */ process.cwd(), "public", "generated", outputId);
-    await mkdir(localDir, { recursive: true });
-    const slides: Slide[] = [];
-    for (const [index, name] of images.entries()) {
-      await copyFile(path.join(pages, name), path.join(localDir, name));
-      slides.push({ id: crypto.randomUUID(), pageIndex: index, title: `Slide ${index + 1}`, imageUrl: `/generated/${outputId}/${name}` });
+    let localDir: string | null = null;
+    try {
+      await renderPages(pdftoppm, pdf, pages, total);
+      const images = (await readdir(pages)).filter((name) => name.endsWith(".jpg")).sort(byPageNumber);
+      if (!images.length) throw new Error("PDF에서 슬라이드를 생성하지 못했습니다.");
+      const outputId = crypto.randomUUID();
+      localDir = path.join(/* turbopackIgnore: true */ process.cwd(), "public", "generated", outputId);
+      await mkdir(localDir, { recursive: true });
+      const slides = await Promise.all(images.map(async (name) => {
+        await copyFile(path.join(pages, name), path.join(localDir!, name));
+        const pageIndex = pageIndexOf(name);
+        return { id: crypto.randomUUID(), pageIndex, title: `Slide ${pageIndex + 1}`, imageUrl: `/generated/${outputId}/${name}` } satisfies Slide;
+      }));
+      slides.sort((a, b) => a.pageIndex - b.pageIndex);
+      return NextResponse.json({ slides });
+    } catch (error) {
+      if (localDir) await rm(localDir, { recursive: true, force: true });
+      throw error;
     }
-    return NextResponse.json({ slides });
   } catch (error) {
-    if (localDir) await rm(localDir, { recursive: true, force: true });
     const message = error instanceof Error ? error.message : "슬라이드 변환에 실패했습니다.";
     console.error("Slide conversion failed:", message);
     return NextResponse.json({ error: message }, { status: 500 });

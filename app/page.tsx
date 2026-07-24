@@ -5,31 +5,18 @@ import { useRouter } from "next/navigation";
 import { ArrowRight, FileText, Plus, Upload } from "@/components/icons";
 import { PinLogo } from "@/components/pin-logo";
 import { useSessions } from "@/components/session-store";
-import { convertToSlides } from "@/lib/convert";
+import { SlidePreview } from "@/components/slide-preview";
+import { UploadProgress } from "@/components/upload-progress";
+import { useSlideUpload } from "@/components/use-slide-upload";
 
 export default function Home() {
   const router = useRouter();
   const inputRef = useRef<HTMLInputElement>(null);
-  const { sessions, createSession, ready } = useSessions();
-  const [busy, setBusy] = useState(false);
+  const { sessions, ready } = useSessions();
   const [dragging, setDragging] = useState(false);
-  const [uploadError, setUploadError] = useState<string | null>(null);
-
-  const upload = async (file?: File) => {
-    if (!file) return;
-    setBusy(true);
-    setUploadError(null);
-    try {
-      const slides = await convertToSlides(file);
-      const session = createSession({ title: file.name.replace(/\.(pdf|pptx?)$/i, ""), fileName: file.name, slides });
-      router.push(`/admin/session/${session.id}`);
-    } catch (error) {
-      setUploadError(error instanceof Error ? error.message : "슬라이드 변환에 실패했습니다.");
-    } finally {
-      setBusy(false);
-      if (inputRef.current) inputRef.current.value = "";
-    }
-  };
+  const { phase, uploadPct, error: uploadError, slides, total, showPreview, busy, start } = useSlideUpload();
+  // 파일을 잡는 즉시 input 을 비워, 같은 파일을 다시 골라도 onChange 가 뜨게 한다.
+  const pick = (file?: File) => { if (inputRef.current) inputRef.current.value = ""; void start(file); };
 
   return (
     <main className="landing-shell">
@@ -38,13 +25,16 @@ export default function Home() {
         <span className="eyebrow">LECTURE QUESTION INTELLIGENCE</span>
         <h1>질문이 찍힌 곳에서,<br /><em>더 나은 강의</em>가 시작됩니다.</h1>
         <p>강의 자료를 올리면 수강생이 바로 참여할 수 있어요.<br />슬라이드의 정확한 위치에 질문을 모으고, 실시간으로 답변하세요.</p>
-        <div className={`upload-card ${dragging ? "dragging" : ""}`} onDragOver={(e) => { e.preventDefault(); setDragging(true); }} onDragLeave={() => setDragging(false)} onDrop={(e) => { e.preventDefault(); setDragging(false); upload(e.dataTransfer.files[0]); }}>
-          <input ref={inputRef} type="file" accept=".pdf,.ppt,.pptx" hidden onChange={(e) => upload(e.target.files?.[0])} />
+        <div className={`upload-card ${dragging ? "dragging" : ""}`} onDragOver={(e) => { e.preventDefault(); setDragging(true); }} onDragLeave={() => setDragging(false)} onDrop={(e) => { e.preventDefault(); setDragging(false); pick(e.dataTransfer.files[0]); }}>
+          <input ref={inputRef} type="file" accept=".pdf,.ppt,.pptx" hidden onChange={(e) => pick(e.target.files?.[0])} />
           <div className="upload-icon"><Upload /></div>
           <h2>{busy ? "슬라이드를 준비하고 있어요" : "강의 자료를 여기에 놓으세요"}</h2>
           <p>PDF, PPT, PPTX · 최대 40MB</p>
           {uploadError && <div className="upload-error" role="alert">{uploadError}</div>}
-          <button className="btn primary large" onClick={() => inputRef.current?.click()} disabled={busy}>{busy ? <span className="spinner" /> : <Plus />} {busy ? "변환 중…" : "파일 선택"}</button>
+          {busy
+            ? <UploadProgress phase={phase} uploadPct={uploadPct} done={slides.length} total={total} />
+            : <button className="btn primary large" onClick={() => inputRef.current?.click()}><Plus /> 파일 선택</button>}
+          {showPreview && <SlidePreview slides={slides} total={total} />}
         </div>
         {ready && sessions.length > 0 && (
           <div className="recent-section">

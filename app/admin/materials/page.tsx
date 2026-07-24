@@ -6,7 +6,9 @@ import { AdminShell, AdminTopbar } from "@/components/admin-shell";
 import { FileText, MessageCircleQuestion, Plus, Search, Upload } from "@/components/icons";
 import { SlideCanvas } from "@/components/slide-canvas";
 import { useSessions } from "@/components/session-store";
-import { convertToSlides } from "@/lib/convert";
+import { SlidePreview } from "@/components/slide-preview";
+import { UploadProgress } from "@/components/upload-progress";
+import { useSlideUpload } from "@/components/use-slide-upload";
 import { countBy } from "@/lib/stats";
 import type { ClassSession } from "@/lib/types";
 
@@ -17,32 +19,17 @@ const filterLabel: Record<Filter, string> = { all: "전체", draft: "초안", li
 export default function MaterialsPage() {
   const router = useRouter();
   const inputRef = useRef<HTMLInputElement>(null);
-  const { sessions, createSession, ready } = useSessions();
+  const { sessions, ready } = useSessions();
   const [filter, setFilter] = useState<Filter>("all");
   const [query, setQuery] = useState("");
-  const [busy, setBusy] = useState(false);
-  const [uploadError, setUploadError] = useState<string | null>(null);
+  const { phase, uploadPct, error: uploadError, slides, total, showPreview, busy, start } = useSlideUpload();
+  // 파일을 잡는 즉시 input 을 비워, 같은 파일을 다시 골라도 onChange 가 뜨게 한다.
+  const pick = (file?: File) => { if (inputRef.current) inputRef.current.value = ""; void start(file); };
 
   const visible = useMemo(
     () => sessions.filter((session) => (filter === "all" || session.status === filter) && `${session.title} ${session.fileName}`.toLowerCase().includes(query.toLowerCase())),
     [filter, query, sessions]
   );
-
-  const upload = async (file?: File) => {
-    if (!file) return;
-    setBusy(true);
-    setUploadError(null);
-    try {
-      const slides = await convertToSlides(file);
-      const session = createSession({ title: file.name.replace(/\.(pdf|pptx?)$/i, ""), fileName: file.name, slides });
-      router.push(`/admin/session/${session.id}`);
-    } catch (error) {
-      setUploadError(error instanceof Error ? error.message : "슬라이드 변환에 실패했습니다.");
-    } finally {
-      setBusy(false);
-      if (inputRef.current) inputRef.current.value = "";
-    }
-  };
 
   if (!ready) return <div className="loading-screen"><span className="spinner dark" /></div>;
 
@@ -50,12 +37,14 @@ export default function MaterialsPage() {
     <AdminShell>
       <AdminTopbar title="강의 자료" caption={`${sessions.length}개 자료`} actions={<button className="btn primary" onClick={() => inputRef.current?.click()} disabled={busy}>{busy ? <span className="spinner" /> : <Plus />}{busy ? "변환 중…" : "자료 업로드"}</button>} />
       <div className="admin-page">
-        <input ref={inputRef} type="file" accept=".pdf,.ppt,.pptx" hidden onChange={(event) => upload(event.target.files?.[0])} />
+        <input ref={inputRef} type="file" accept=".pdf,.ppt,.pptx" hidden onChange={(event) => pick(event.target.files?.[0])} />
         <div className="page-head">
           <div><h1>강의 자료</h1><p>업로드한 슬라이드와 회차별 질문 현황을 관리합니다.</p></div>
         </div>
 
         {uploadError && <div className="upload-error" role="alert">{uploadError}</div>}
+        {busy && <UploadProgress phase={phase} uploadPct={uploadPct} done={slides.length} total={total} />}
+        {showPreview && <SlidePreview slides={slides} total={total} />}
 
         <div className="filterbar">
           <div className="searchbox"><Search /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="자료 제목 · 파일명 검색" /></div>

@@ -171,7 +171,7 @@ export default function JoinSession() {
               <div><h2 id="question-modal-title">이 위치에서 무엇이 궁금한가요?</h2><p>질문 유형만 선택하거나 내용을 함께 적어주세요.</p></div>
             </div>
             <div className="category-scroll">{(Object.keys(categoryLabel) as QuestionCategory[]).map((item) => <button key={item} className={activeCategory === item ? "active" : ""} onClick={() => selectCategory(item)}>{categoryLabel[item]}</button>)}</div>
-            <div className="textarea-wrap"><textarea autoFocus value={draftText} onChange={(event) => updateDraftText(event.target.value)} maxLength={300} placeholder="선택 사항: 질문을 자유롭게 적어주세요" /><span>{draftText.length}/300</span></div>
+            <div className="textarea-wrap"><textarea value={draftText} onChange={(event) => updateDraftText(event.target.value)} maxLength={300} placeholder="선택 사항: 질문을 자유롭게 적어주세요" /><span>{draftText.length}/300</span></div>
             <div className="student-composer-actions">
               <button className="btn primary large full" onClick={submit}><Send />질문 보내기</button>
               <button className="btn destructive large full" onClick={deleteDraftQuestion}><Trash2 />핀 삭제</button>

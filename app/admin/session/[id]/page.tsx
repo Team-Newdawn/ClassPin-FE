@@ -7,6 +7,7 @@ import { Check, ChevronLeft, ChevronRight, Clock3, Copy, Link2, ListFilter, Mess
 import { AdminSidebar } from "@/components/admin-shell";
 import { SlideCanvas } from "@/components/slide-canvas";
 import { StatusBadge } from "@/components/status-badge";
+import { useHorizontalSlideWheel } from "@/components/use-horizontal-slide-wheel";
 import { useSessions } from "@/components/session-store";
 import { categoryLabel, timeAgo } from "@/lib/format";
 import type { Question, QuestionStatus } from "@/lib/types";
@@ -43,6 +44,13 @@ export default function SessionAdmin() {
     const offset = (activeBox.left - stripBox.left) - (stripBox.width - activeBox.width) / 2;
     strip.scrollTo({ left: strip.scrollLeft + offset, behavior: "smooth" });
   }, [currentSlide]);
+  const handleSlideWheel = useHorizontalSlideWheel({
+    currentIndex: session?.currentSlide ?? 0,
+    slideCount: session?.slides.length ?? 0,
+    onIndexChange: (index) => {
+      if (session) setCurrentSlide(session.id, index);
+    }
+  });
 
   if (!ready) return <div className="loading-screen"><span className="spinner dark" /></div>;
   if (!session) return <div className="empty-state"><h1>세션을 찾을 수 없어요</h1><button className="btn primary" onClick={() => router.push("/")}>홈으로</button></div>;
@@ -68,7 +76,7 @@ export default function SessionAdmin() {
           <div className="player-workspace">
             <section className="player-stage">
               <div className="stage-toolbar"><div><span className="status-dot" />수강생 화면과 동기화 중</div><span>{session.currentSlide + 1} / {session.slides.length}</span></div>
-              <div className="stage-canvas-wrap"><SlideCanvas slide={slide} questions={slideQuestions} selectedId={selected?.id} onSelectPin={setSelectedId} /></div>
+              <div className="stage-canvas-wrap" onWheel={handleSlideWheel}><SlideCanvas slide={slide} questions={slideQuestions} selectedId={selected?.id} onSelectPin={setSelectedId} /></div>
               <div className="player-controls"><button className="icon-btn" disabled={session.currentSlide === 0} onClick={() => setCurrentSlide(session.id, session.currentSlide - 1)} aria-label="이전 슬라이드"><ChevronLeft /></button><div className="slide-dots">{session.slides.map((_, i) => <button key={i} className={i === session.currentSlide ? "active" : ""} onClick={() => setCurrentSlide(session.id, i)} aria-label={`${i + 1}번 슬라이드`} />)}</div><button className="icon-btn" disabled={session.currentSlide === session.slides.length - 1} onClick={() => setCurrentSlide(session.id, session.currentSlide + 1)} aria-label="다음 슬라이드"><ChevronRight /></button></div>
               <div className="filmstrip" ref={filmstripRef}>{session.slides.map((item, index) => <button key={item.id} className={index === session.currentSlide ? "active" : ""} onClick={() => setCurrentSlide(session.id, index)}><SlideCanvas slide={item} compact /><span>{index + 1}</span>{session.questions.some((q) => q.slideIndex === index) && <i>{session.questions.filter((q) => q.slideIndex === index).length}</i>}</button>)}</div>
             </section>

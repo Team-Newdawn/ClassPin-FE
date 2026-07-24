@@ -36,10 +36,12 @@ export function SessionStore({ children }: { children: React.ReactNode }) {
     });
   }, []);
 
-  const subscriptionKey = sessions.filter((session) => session.courseId).map((session) => session.id).sort().join("|");
+  const subscriptionKey = [...new Set(sessions.filter((session) => session.courseId).map((session) => session.id))].sort().join("|");
   useEffect(() => {
     if (!ready || !supabaseConfigured || !subscriptionKey) return;
-    const tracked = sessions.filter((session) => session.courseId);
+    const tracked = [...new Map(
+      sessions.filter((session) => session.courseId).map((session) => [session.id, session])
+    ).values()];
     let active = true;
     const channels: NonNullable<ReturnType<typeof subscribeToLecture>>[] = [];
     const refresh = async (session: ClassSession) => {

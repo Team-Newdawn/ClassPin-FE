@@ -95,7 +95,10 @@ export async function updateLecture(sessionId: string, values: { current_page?: 
 export function subscribeToLecture(sessionId: string, onRefresh: () => void): RealtimeChannel | null {
   const client = getSupabaseClient();
   if (!client) return null;
-  return client.channel(`lecture:${sessionId}`)
+  // Realtime reuses an existing channel with the same topic. React effects can
+  // reconnect before an asynchronous removeChannel() has finished, so give
+  // every subscription its own topic to avoid mutating a subscribed channel.
+  return client.channel(`lecture:${sessionId}:${crypto.randomUUID()}`)
     .on("postgres_changes", { event: "*", schema: "public", table: "questions", filter: `lecture_id=eq.${sessionId}` }, onRefresh)
     .on("postgres_changes", { event: "UPDATE", schema: "public", table: "lectures", filter: `id=eq.${sessionId}` }, onRefresh)
     .subscribe();

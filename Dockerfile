@@ -40,6 +40,7 @@ WORKDIR /app
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
       libreoffice-impress \
+      mupdf-tools \
       poppler-utils \
       fonts-nanum \
       fonts-nanum-coding \

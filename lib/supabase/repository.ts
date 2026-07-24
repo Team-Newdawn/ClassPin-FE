@@ -1,12 +1,18 @@
 import type { RealtimeChannel } from "@supabase/supabase-js";
 import type { ClassSession, Question, Slide } from "@/lib/types";
-import { ensureAnonymousUser, getSupabaseClient } from "./client";
+import { ensureAnonymousUser, getSessionUser, getSupabaseClient } from "./client";
+
+/** 코스 개설·답변 같은 강사 전용 쓰기는 구글 로그인 세션을 요구한다. */
+async function requireOwnerUser() {
+  const user = await getSessionUser();
+  if (!user || user.is_anonymous) throw new Error("강사 로그인(Google)이 필요합니다.");
+  return user;
+}
 
 export async function persistSession(session: ClassSession) {
   const client = getSupabaseClient();
   if (!client || !session.courseId || !session.materialId || !session.materialVersionId) return;
-  const user = await ensureAnonymousUser();
-  if (!user) throw new Error("Anonymous Auth is disabled in Supabase.");
+  const user = await requireOwnerUser();
   const { error: courseError } = await client.from("courses").insert({ id: session.courseId, owner_id: user.id, title: session.title, visibility: "link" });
   if (courseError) throw courseError;
   const { error: lectureError } = await client.from("lectures").insert({ id: session.id, course_id: session.courseId, title: session.title, join_code: session.code, status: session.status, current_page: session.currentSlide, started_at: new Date().toISOString() });
@@ -71,8 +77,7 @@ export async function submitQuestion(session: ClassSession, question: Question) 
 export async function postAnswer(questionId: string, body: string) {
   const client = getSupabaseClient();
   if (!client) return;
-  const user = await ensureAnonymousUser();
-  if (!user) return;
+  const user = await requireOwnerUser();
   const { error } = await client.from("answers").insert({ question_id: questionId, author_id: user.id, body, visibility: "participants" });
   if (error) throw error;
 }
@@ -80,6 +85,7 @@ export async function postAnswer(questionId: string, body: string) {
 export async function markQuestionResolved(questionId: string) {
   const client = getSupabaseClient();
   if (!client) return;
+  await requireOwnerUser();
   const { error } = await client.from("questions").update({ status: "resolved", updated_at: new Date().toISOString() }).eq("id", questionId);
   if (error) throw error;
 }
@@ -87,7 +93,7 @@ export async function markQuestionResolved(questionId: string) {
 export async function updateLecture(sessionId: string, values: { current_page?: number; status?: "draft" | "live" | "ended" }) {
   const client = getSupabaseClient();
   if (!client) return;
-  await ensureAnonymousUser();
+  await requireOwnerUser();
   const { error } = await client.from("lectures").update(values).eq("id", sessionId);
   if (error) throw error;
 }

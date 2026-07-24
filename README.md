@@ -15,17 +15,29 @@ npm run dev
 
 1. `.env.example`을 `.env.local`로 복사합니다.
 2. 제공된 프로젝트 URL과 프로젝트의 publishable key를 입력합니다.
-3. Supabase Dashboard에서 Anonymous Sign-ins를 활성화합니다.
-4. `supabase/migrations`의 마이그레이션을 적용합니다.
-5. `NEXT_PUBLIC_DATA_MODE=supabase`로 변경합니다.
+3. Supabase Dashboard에서 Anonymous Sign-ins를 활성화합니다. (수강생 익명 참여용)
+4. Authentication → Providers에서 **Google**을 활성화합니다. Google Cloud Console에서 OAuth Client를 만들고, Authorized redirect URI에 `https://<project-ref>.supabase.co/auth/v1/callback`을 등록한 뒤 Client ID/Secret을 입력합니다.
+5. Authentication → URL Configuration에서 Site URL에 배포 도메인을 넣고, Redirect URLs에 `http://localhost:3000/auth/callback`과 `https://<배포 도메인>/auth/callback`을 추가합니다. 허용 목록에 없으면 로그인 후 Site URL로 떨어집니다.
+6. `supabase/migrations`의 마이그레이션을 적용합니다.
+7. `NEXT_PUBLIC_DATA_MODE=supabase`로 변경합니다.
 
-Secret/service-role key는 브라우저에 노출하지 않습니다. 현재 리포지토리는 Supabase 연결 클라이언트, 세션 조회/질문 등록/Realtime 어댑터, RLS 스키마까지 포함합니다. 자격 증명이 없는 로컬 실행은 demo 어댑터를 사용합니다.
+Secret/service-role key는 브라우저에 노출하지 않습니다. 현재 리포지토리는 Supabase 연결 클라이언트, 세션 조회/질문 등록/Realtime 어댑터, RLS 스키마까지 포함합니다. 자격 증명이 없는 로컬 실행은 demo 어댑터를 사용하며 로그인 없이 모든 화면을 쓸 수 있습니다.
+
+## 역할 (roles)
+
+역할은 `admin`과 `participant` 두 개뿐입니다.
+
+- **admin** — 구글 로그인으로 가입한 강사/운영자. 코스 개설·자료 업로드·답변·상태 관리를 합니다. 가입 즉시 `/`에서 슬라이드를 업로드할 수 있습니다.
+- **participant** — QR/링크로 들어온 수강생. 로그인 없이 익명 세션(`auth.signInAnonymously`)으로 질문을 남깁니다.
+
+역할은 `public.profiles.role`에 저장되고 `auth.users` 트리거가 가입 경로에 따라 자동 부여합니다(익명 → participant, 구글 → admin). 코스 생성과 Storage 업로드는 RLS restrictive 정책으로 admin에게만 열려 있습니다.
 
 ## MVP 화면
 
-- `/` — PDF/PPT/PPTX 업로드, 로컬 렌더링, 최근 세션
-- `/admin/session/:id` — 강사용 실시간 플레이어, 핀↔질문 연결, 답변/해결, 질문 목록
-- `/join/:code` — 모바일 수강생 화면, 핀 클릭 또는 질문 태그 드래그, 익명 질문 등록
+- `/` — PDF/PPT/PPTX 업로드(구글 로그인 필요, demo 모드 제외), 로컬 렌더링, 최근 세션
+- `/login` — 강사 구글 로그인, 로그인 후 바로 업로드 화면으로 이동
+- `/admin/session/:id` — 강사용 실시간 플레이어, 핀↔질문 연결, 답변/해결, 질문 목록 (admin 전용)
+- `/join/:code` — 모바일 수강생 화면, 핀 클릭 또는 질문 태그 드래그, 익명 질문 등록 (로그인 불필요)
 
 ## 설계 경계
 

@@ -1,6 +1,17 @@
 export type QuestionCategory = "concept" | "why" | "example" | "error" | "important";
 export type QuestionStatus = "unanswered" | "answered" | "resolved";
 
+/** admin = 구글 로그인 강사, participant = QR 익명 수강생 */
+export type UserRole = "admin" | "participant";
+
+export interface Profile {
+  id: string;
+  role: UserRole;
+  email: string | null;
+  displayName: string | null;
+  avatarUrl: string | null;
+}
+
 export interface Slide {
   id: string;
   pageIndex: number;

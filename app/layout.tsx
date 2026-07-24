@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from "next";
+import { AuthProvider } from "@/components/auth-context";
 import { SessionStore } from "@/components/session-store";
 import "./globals.css";
 
@@ -17,5 +18,5 @@ export const viewport: Viewport = {
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
-  return <html lang="ko"><body><SessionStore>{children}</SessionStore></body></html>;
+  return <html lang="ko"><body><AuthProvider><SessionStore>{children}</SessionStore></AuthProvider></body></html>;
 }

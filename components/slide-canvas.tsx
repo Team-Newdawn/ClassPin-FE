@@ -22,18 +22,10 @@ export function SlideCanvas({ slide, questions = [], selectedId, onSelectPin, on
   return (
     <div className={`slide-canvas ${compact ? "compact" : ""}`} onClick={click} role={onCanvasClick ? "button" : undefined} tabIndex={onCanvasClick ? 0 : undefined}>
       {/* Generated slide URLs are runtime assets and intentionally bypass Next image optimization. */}
-      {slide.imageUrl ? <img src={slide.imageUrl} alt={`${slide.pageIndex + 1}번 슬라이드`} /> : (
-        <div className="mock-slide">
-          <div className="mock-slide-grid" />
-          <div className="mock-slide-content">
-            <span>{slide.eyebrow}</span>
-            <h2>{slide.title}</h2>
-            <p>{slide.body}</p>
-            {slide.pageIndex === 2 && <div className="flywheel"><i>User signal</i><b>→</b><i>Context</i><b>→</b><i>Outcome</i></div>}
-          </div>
-          <strong className="mock-page">{String(slide.pageIndex + 1).padStart(2, "0")}</strong>
-        </div>
-      )}
+      {slide.imageUrl
+        ? <img src={slide.imageUrl} alt={`${slide.pageIndex + 1}번 슬라이드`} />
+        /* 변환된 슬라이드에는 항상 imageUrl 이 있다. 이미지가 아직/끝내 없을 때 흰 판만 남지 않게 한다. */
+        : <div className="slide-placeholder">{slide.pageIndex + 1}</div>}
       {questions.filter((q) => q.x !== null && q.y !== null).map((q, index) => (
         <button key={q.id} className={`question-pin ${selectedId === q.id ? "selected" : ""}`} style={{ left: `${q.x! * 100}%`, top: `${q.y! * 100}%` }} onClick={() => onSelectPin?.(q.id)} aria-label={`질문: ${q.text}`}>
           {index + 1}

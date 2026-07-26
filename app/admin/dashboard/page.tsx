@@ -2,9 +2,8 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { AdminShell, AdminTopbar } from "@/components/admin-shell";
+import { AdminShell } from "@/components/admin-shell";
 import { ArrowRight, BarChart3, Clock3, MessageCircleQuestion, Plus } from "@/components/icons";
-import { useAuth } from "@/components/auth-context";
 import { useSessions } from "@/components/session-store";
 import { StatusBadge } from "@/components/status-badge";
 import { categoryLabel, timeAgo } from "@/lib/format";
@@ -13,7 +12,6 @@ import { allQuestions, countBy, heatLevel, recentQuestions, resolveRate, slideHe
 export default function DashboardPage() {
   const router = useRouter();
   const { sessions, ready } = useSessions();
-  const { profile } = useAuth();
   if (!ready) return <div className="loading-screen"><span className="spinner dark" /></div>;
 
   const questions = allQuestions(sessions);
@@ -25,10 +23,10 @@ export default function DashboardPage() {
 
   return (
     <AdminShell>
-      <AdminTopbar title="워크스페이스" caption={`${profile?.displayName ?? profile?.email ?? "내 워크스페이스"} · 개인 플랜`} actions={<><Link className="btn secondary" href="/admin/insights"><BarChart3 />인사이트 열기</Link><button className="btn primary" onClick={() => router.push("/")}><Plus />새 강의 시작</button></>} />
       <div className="admin-page">
         <div className="page-head">
           <div><h1>대시보드</h1><p>지금 답해야 할 질문과 강의별 상태를 한 화면에서 확인하세요.</p></div>
+          <div className="page-actions"><Link className="btn secondary" href="/admin/insights"><BarChart3 />인사이트 열기</Link><button className="btn primary" onClick={() => router.push("/")}><Plus />새 강의 시작</button></div>
         </div>
 
         <div className="kpi-grid">
@@ -85,7 +83,7 @@ export default function DashboardPage() {
             <ul className="heat-list">
               {hotspots.map((item) => (
                 <li key={`${item.sessionId}-${item.slideIndex}`}>
-                  <Link className="heat-row" href={`/admin/session/${item.sessionId}`}>
+                  <Link className="heat-row" href={`/admin/session/${item.sessionId}?slide=${item.slideIndex}`}>
                     <span className="heat-slide">{item.slideIndex + 1}p</span>
                     <span className="heat-title"><b>{item.title}</b><small>{item.sessionTitle}</small></span>
                     <span className="heat-track"><i className={`heat-fill ${heatLevel(item.count, maxHeat)}`} style={{ width: `${maxHeat ? (item.count / maxHeat) * 100 : 0}%` }} /></span>

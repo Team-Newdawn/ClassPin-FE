@@ -101,7 +101,7 @@ export default function SessionAdmin() {
         <div className="workspace-tabs">
           <button className={tab === "live" ? "active" : ""} onClick={() => setTab("live")}><Play />라이브 플레이어<span>{session.questions.filter((q) => q.status === "unanswered").length}</span></button>
           <button className={tab === "questions" ? "active" : ""} onClick={() => setTab("questions")}><MessageCircleQuestion />질문 목록<span>{session.questions.length}</span></button>
-          <div className="top-actions"><span className={`live-badge ${session.status}`}><i />{session.status === "live" ? "진행 중" : session.status === "ended" ? "종료" : "초안"}</span><button className="btn secondary" onClick={() => runAction(setStatus(session.id, session.status === "live" ? "ended" : "live"), "강의 상태를 저장하지 못했습니다.")}>{session.status === "live" ? <><Pause />세션 종료</> : <><Play />다시 시작</>}</button><button className="btn primary" onClick={() => setShareOpen(true)}><Share2 />참여 링크</button></div>
+          <div className="top-actions"><span className={`live-badge ${session.status}`}><i />{session.status === "live" ? "진행 중" : "종료"}</span><button className="btn secondary" onClick={() => runAction(setStatus(session.id, session.status === "live" ? "ended" : "live"), "강의 상태를 저장하지 못했습니다.")}>{session.status === "live" ? <><Pause />세션 종료</> : <><Play />다시 시작</>}</button><button className="btn primary" onClick={() => setShareOpen(true)}><Share2 />참여 링크</button></div>
         </div>
         {actionError && <div className="login-error" role="alert">{actionError} 잠시 후 다시 시도해 주세요.</div>}
 

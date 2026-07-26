@@ -42,7 +42,7 @@ export interface ClassSession {
   code: string;
   title: string;
   fileName: string;
-  status: "draft" | "live" | "ended";
+  status: "live" | "ended";
   currentSlide: number;
   createdAt: string;
   slides: Slide[];

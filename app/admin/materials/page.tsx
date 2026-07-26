@@ -2,7 +2,7 @@
 
 import { useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { AdminShell, AdminTopbar } from "@/components/admin-shell";
+import { AdminShell } from "@/components/admin-shell";
 import { FileText, MessageCircleQuestion, Plus, Search, Upload } from "@/components/icons";
 import { SlideCanvas } from "@/components/slide-canvas";
 import { useSessions } from "@/components/session-store";
@@ -35,11 +35,11 @@ export default function MaterialsPage() {
 
   return (
     <AdminShell>
-      <AdminTopbar title="강의 자료" caption={`${sessions.length}개 자료`} actions={<button className="btn primary" onClick={() => inputRef.current?.click()} disabled={busy}>{busy ? <span className="spinner" /> : <Plus />}{busy ? "변환 중…" : "자료 업로드"}</button>} />
       <div className="admin-page">
         <input ref={inputRef} type="file" accept=".pdf,.ppt,.pptx" hidden onChange={(event) => pick(event.target.files?.[0])} />
         <div className="page-head">
           <div><h1>강의 자료</h1><p>업로드한 슬라이드와 회차별 질문 현황을 관리합니다.</p></div>
+          <div className="page-actions"><button className="btn primary" onClick={() => inputRef.current?.click()} disabled={busy}>{busy ? <span className="spinner" /> : <Plus />}{busy ? "변환 중…" : "자료 업로드"}</button></div>
         </div>
 
         {uploadError && <div className="upload-error" role="alert">{uploadError}</div>}

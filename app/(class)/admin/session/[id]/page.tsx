@@ -120,14 +120,15 @@ export default function SessionAdmin() {
                 {selected.answer && <div className="saved-answer"><span>최근 답변</span><p>{selected.answer}</p></div>}
                 <label htmlFor="answer">{selected.answer ? "추가 답변" : "빠른 답변"}</label>
                 <textarea id="answer" value={answer} onChange={(e) => setAnswer(e.target.value)} placeholder="수강생에게 보낼 답변을 입력하세요" />
-                <div className="answer-actions"><button className="btn tertiary" onClick={() => runAction(resolveQuestion(session.id, selected.id), "질문 상태를 저장하지 못했습니다.")}><Check />해결 처리</button><button className="btn primary" onClick={submitAnswer}>답변 보내기</button></div>
+                {/* 답변을 보내면 그대로 해결 처리다. 이미 해결된 질문에 같은 버튼을 또 두지 않는다. */}
+                <div className="answer-actions">{selected.status === "unanswered" && <button className="btn tertiary" onClick={() => runAction(resolveQuestion(session.id, selected.id), "질문 상태를 저장하지 못했습니다.")}><Check />답변 없이 해결</button>}<button className="btn primary" onClick={submitAnswer}>답변 보내기</button></div>
               </div>}
             </aside>
           </div>
         ) : (
           <div className="questions-page">
             <div className="questions-header"><div><h1>질문 목록</h1><p>슬라이드별 질문을 한눈에 확인하고 답변 상태를 관리하세요.</p></div><div className="kpi-inline"><span><b>{session.questions.length}</b>전체 질문</span><span><b>{session.questions.filter((q) => q.status === "unanswered").length}</b>미답변</span><span><b>{session.questions.filter((q) => q.status === "resolved").length}</b>해결됨</span></div></div>
-            <div className="filterbar"><div className="searchbox"><Search /><input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="질문 내용 검색" /></div><div className="filter-tabs">{(["all", "unanswered", "answered", "resolved"] as const).map((item) => <button key={item} className={filter === item ? "active" : ""} onClick={() => setFilter(item)}>{item === "all" ? "전체" : item === "unanswered" ? "미답변" : item === "answered" ? "답변 완료" : "해결됨"}</button>)}</div><button className="btn secondary"><ListFilter />필터</button></div>
+            <div className="filterbar"><div className="searchbox"><Search /><input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="질문 내용 검색" /></div><div className="filter-tabs">{(["all", "unanswered", "resolved"] as const).map((item) => <button key={item} className={filter === item ? "active" : ""} onClick={() => setFilter(item)}>{item === "all" ? "전체" : item === "unanswered" ? "미답변" : "해결됨"}</button>)}</div><button className="btn secondary"><ListFilter />필터</button></div>
             <div className="question-table"><div className="table-head"><span>슬라이드</span><span>질문</span><span>카테고리</span><span>상태</span><span>등록 시간</span><span /></div>{visibleQuestions.map((q) => <button className="table-row" key={q.id} onClick={() => { runAction(setCurrentSlide(session.id, q.slideIndex), "슬라이드 상태를 저장하지 못했습니다."); setSelectedId(q.id); setTab("live"); }}><span className="slide-cell"><b>{q.slideIndex + 1}</b><small>Slide {q.slideIndex + 1}</small></span><span className="question-text">{q.text}</span><span><em className={`category ${q.category}`}>{categoryLabel[q.category]}</em></span><span><StatusBadge status={q.status} /></span><span className="muted">{timeAgo(q.createdAt)}</span><span><ChevronRight /></span></button>)}</div>
           </div>
         )}

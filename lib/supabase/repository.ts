@@ -37,7 +37,8 @@ type QuestionRow = {
   slide_id: string | null;
   category: Question["category"];
   raw_text: string;
-  status: Question["status"];
+  /** DB enum 은 예전 상태(answered/archived)까지 담고 있어 앱 상태보다 넓다. */
+  status: "unanswered" | "answered" | "resolved" | "archived";
   created_at: string;
   region_anchors: { coords?: { x?: number; y?: number } } | Array<{ coords?: { x?: number; y?: number } }> | null;
   answers: Array<{ body: string; created_at: string }> | null;
@@ -54,6 +55,9 @@ function toQuestion(row: QuestionRow, sessionId: string, slides: Slide[]): Quest
   const anchorValue = row.region_anchors;
   const anchor = Array.isArray(anchorValue) ? anchorValue[0] : anchorValue;
   const answerRows = [...(row.answers ?? [])].sort((a, b) => a.created_at.localeCompare(b.created_at));
+  const answer = answerRows[answerRows.length - 1]?.body;
+  // 답변이 달렸다는 것 자체가 해결 처리다. 상태 컬럼이 뒤처진 예전 행(answered, 혹은
+  // 답변만 쌓이고 unanswered 로 남은 행)도 여기서 해결됨으로 읽어 화면을 맞춘다.
   return {
     id: row.id,
     sessionId,
@@ -62,8 +66,8 @@ function toQuestion(row: QuestionRow, sessionId: string, slides: Slide[]): Quest
     y: anchor?.coords?.y ?? null,
     category: row.category,
     text: row.raw_text,
-    status: row.status,
-    answer: answerRows[answerRows.length - 1]?.body,
+    status: row.status === "unanswered" && !answer ? "unanswered" : "resolved",
+    answer,
     createdAt: row.created_at
   };
 }
@@ -273,12 +277,15 @@ export async function updateQuestion(questionId: string, values: Pick<Question, 
   if (!data) throw new Error("수정할 수 있는 질문을 찾지 못했습니다.");
 }
 
+/** 답변 등록은 해결 처리를 겸한다. 상태를 함께 올려야 새로고침 후에도 해결됨으로 남는다. */
 export async function postAnswer(questionId: string, body: string) {
   const client = getSupabaseClient();
   if (!client) return;
   const user = await requireOwnerUser();
   const { error } = await client.from("answers").insert({ question_id: questionId, author_id: user.id, body, visibility: "participants" });
   if (error) throw error;
+  const { error: statusError } = await client.from("questions").update({ status: "resolved", updated_at: new Date().toISOString() }).eq("id", questionId);
+  if (statusError) throw statusError;
 }
 
 export async function markQuestionResolved(questionId: string) {

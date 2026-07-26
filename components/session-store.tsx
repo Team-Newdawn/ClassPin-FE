@@ -217,7 +217,8 @@ export function SessionStore({ children }: { children: React.ReactNode }) {
     },
     answerQuestion: async (sessionId, questionId, answer) => {
       if (supabaseConfigured) await postAnswer(questionId, answer);
-      updateSession(sessionId, (session) => ({ ...session, questions: session.questions.map((q) => q.id === questionId ? { ...q, answer, status: "answered" } : q) }));
+      // 답변을 보내는 것도 해결 처리다. 두 동작 모두 같은 resolved 로 끝난다.
+      updateSession(sessionId, (session) => ({ ...session, questions: session.questions.map((q) => q.id === questionId ? { ...q, answer, status: "resolved" } : q) }));
     },
     resolveQuestion: async (sessionId, questionId) => {
       if (supabaseConfigured) await markQuestionResolved(questionId);

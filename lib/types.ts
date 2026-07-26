@@ -1,5 +1,6 @@
 export type QuestionCategory = "concept" | "why" | "example" | "error" | "important";
-export type QuestionStatus = "unanswered" | "answered" | "resolved";
+/** 답변을 달았든 구두로 해결했든, 강사가 처리한 질문은 모두 resolved 하나로 모인다. */
+export type QuestionStatus = "unanswered" | "resolved";
 
 /** admin = 구글 로그인 강사, participant = QR 익명 수강생 */
 export type UserRole = "admin" | "participant";

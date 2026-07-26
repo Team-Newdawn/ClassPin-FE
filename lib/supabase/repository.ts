@@ -289,7 +289,7 @@ export async function markQuestionResolved(questionId: string) {
   if (error) throw error;
 }
 
-export async function updateLecture(sessionId: string, values: { current_page?: number; status?: "draft" | "live" | "ended" }) {
+export async function updateLecture(sessionId: string, values: { current_page?: number; status?: "live" | "ended" }) {
   const client = getSupabaseClient();
   if (!client) return;
   await requireOwnerUser();

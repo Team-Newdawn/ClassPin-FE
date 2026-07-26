@@ -14,7 +14,7 @@ import type { ClassSession } from "@/lib/types";
 
 type Filter = "all" | ClassSession["status"];
 
-const filterLabel: Record<Filter, string> = { all: "전체", draft: "초안", live: "진행 중", ended: "종료" };
+const filterLabel: Record<Filter, string> = { all: "전체", live: "진행 중", ended: "종료" };
 
 export default function MaterialsPage() {
   const router = useRouter();
@@ -58,7 +58,7 @@ export default function MaterialsPage() {
               const open = countBy(session.questions, "unanswered");
               return (
                 <button className="material-card" key={session.id} onClick={() => router.push(`/admin/session/${session.id}`)}>
-                  <span className="material-thumb"><SlideCanvas slide={session.slides[0]} compact /><em className={`live-badge ${session.status}`}><i />{session.status === "live" ? "진행 중" : session.status === "ended" ? "종료" : "초안"}</em></span>
+                  <span className="material-thumb"><SlideCanvas slide={session.slides[0]} compact /><em className={`live-badge ${session.status}`}><i />{session.status === "live" ? "진행 중" : "종료"}</em></span>
                   <span className="material-body">
                     <b>{session.title}</b>
                     <small><FileText />{session.fileName}</small>

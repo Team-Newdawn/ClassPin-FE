@@ -47,7 +47,7 @@ export default function DashboardPage() {
                     <li key={session.id}>
                       <Link className="session-row" href={`/admin/session/${session.id}`}>
                         <span className="session-row-main"><b>{session.title}</b><small>{session.slides.length}개 슬라이드 · 코드 {session.code}</small></span>
-                        <span className={`live-badge ${session.status}`}><i />{session.status === "live" ? "진행 중" : session.status === "ended" ? "종료" : "초안"}</span>
+                        <span className={`live-badge ${session.status}`}><i />{session.status === "live" ? "진행 중" : "종료"}</span>
                         <span className="session-row-stat"><b>{session.questions.length}</b>질문</span>
                         <span className={`session-row-stat ${open ? "alert" : ""}`}><b>{open}</b>미답변</span>
                         <ArrowRight />

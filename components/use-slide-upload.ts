@@ -63,7 +63,7 @@ export function useSlideUpload() {
         onSlide: (slide) => setSlides((prev) => insertByPage(prev, slide)),
       });
       clearTimer();
-      const session = createSession({ title: file.name.replace(/\.(pdf|pptx?)$/i, ""), fileName: file.name, slides: result });
+      const session = await createSession({ title: file.name.replace(/\.(pdf|pptx?)$/i, ""), fileName: file.name, slides: result });
       router.push(`/admin/session/${session.id}`);
     } catch (cause) {
       clearTimer();

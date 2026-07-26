@@ -17,11 +17,11 @@ npm run dev
 2. 제공된 프로젝트 URL과 프로젝트의 publishable key를 입력합니다.
 3. Supabase Dashboard에서 Anonymous Sign-ins를 활성화합니다. (수강생 익명 참여용)
 4. Authentication → Providers에서 **Google**을 활성화합니다. Google Cloud Console에서 OAuth Client를 만들고, Authorized redirect URI에 `https://<project-ref>.supabase.co/auth/v1/callback`을 등록한 뒤 Client ID/Secret을 입력합니다.
-5. Authentication → URL Configuration에서 Site URL에 배포 도메인을 넣고, Redirect URLs에 `http://localhost:3000/auth/callback`과 `https://<배포 도메인>/auth/callback`을 추가합니다. 허용 목록에 없으면 로그인 후 Site URL로 떨어집니다.
+5. Authentication → URL Configuration에서 Site URL에 배포 도메인을 넣고, Redirect URLs에 개발용 `http://localhost:3000/**`와 운영용 `https://<배포 도메인>/auth/callback`을 추가합니다. 허용 목록에 없으면 로그인 후 Site URL로 떨어집니다.
 6. `supabase/migrations`의 마이그레이션을 적용합니다.
 7. `NEXT_PUBLIC_DATA_MODE=supabase`로 변경합니다.
 
-Secret/service-role key는 브라우저에 노출하지 않습니다. 현재 리포지토리는 Supabase 연결 클라이언트, 세션 조회/질문 등록/Realtime 어댑터, RLS 스키마까지 포함합니다. 자격 증명이 없는 로컬 실행은 demo 어댑터를 사용하며 로그인 없이 모든 화면을 쓸 수 있습니다.
+Secret/service-role key는 브라우저에 노출하지 않습니다. `supabase` 모드에서는 강의·슬라이드 메타데이터·질문·답변·상태를 모두 DB에서 읽고 쓴 뒤 Realtime으로 갱신합니다. 브라우저 `localStorage`는 강사 계정별 임시 캐시로만 사용하며 DB 조회 결과가 항상 기준입니다. 자격 증명이 없는 로컬 실행은 demo 어댑터를 사용하고, 이때만 `localStorage`와 `BroadcastChannel`이 기준 데이터 역할을 합니다.
 
 ## 역할 (roles)
 

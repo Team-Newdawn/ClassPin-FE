@@ -28,8 +28,8 @@ h1,h2{word-break:keep-all;overflow-wrap:break-word}button:focus-visible,input:fo
 .player-workspace{display:grid;grid-template-columns:minmax(560px,1fr) 380px;height:calc(100dvh - 56px)}.player-stage{min-width:0;background:var(--pin-neutral-950);padding:16px 24px 14px;display:flex;flex-direction:column}.stage-toolbar{height:28px;display:flex;align-items:center;justify-content:space-between;gap:12px;color:var(--pin-neutral-400);font-size:12px}.stage-toolbar div{display:flex;align-items:center;gap:7px;min-width:0}.stage-toolbar>span{flex:0 0 auto}.stage-toolbar b{max-width:320px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--pin-neutral-200)}.stage-toolbar .status-dot{flex:0 0 auto}.status-dot{width:7px;height:7px;background:var(--color-success);border-radius:50%}.stage-canvas-wrap{flex:1;min-height:0;display:grid;place-items:center;padding:12px 3%}.slide-canvas{position:relative;width:100%;aspect-ratio:16/9;background:var(--color-bg-surface);overflow:hidden;border-radius:4px;box-shadow:0 14px 40px rgba(0,0,0,.3)}/* 높이로 자르면 16:9 가 깨져 흰 여백이 생긴다. 높이 예산을 폭 상한으로 환산해 건다. */
 .stage-canvas-wrap .slide-canvas{max-width:min(100%,1050px,calc((100dvh - 300px) * 16 / 9))}.slide-canvas[role=button]{cursor:crosshair}.slide-canvas img{width:100%;height:100%;display:block;object-fit:contain}.slide-placeholder{position:absolute;inset:0;display:grid;place-items:center;background:var(--pin-neutral-100);color:var(--color-text-tertiary);font-size:clamp(14px,3vw,32px);font-weight:600;font-variant-numeric:tabular-nums}.question-pin,.draft-pin{position:absolute;z-index:5;transform:translate(0,-100%);width:30px;height:30px;border-radius:50% 50% 50% 4px;border:2px solid var(--color-bg-surface);background:var(--color-brand);color:var(--color-bg-surface);font-size:12px;font-weight:700;box-shadow:0 2px 8px rgba(16,24,39,.25)}.question-pin.selected{box-shadow:0 0 0 2px var(--color-bg-surface),0 0 0 4px var(--color-brand);z-index:8}.player-controls{height:44px;display:flex;align-items:center;justify-content:center;gap:20px}.player-controls .icon-btn{width:32px;height:32px;background:var(--pin-neutral-800);border-color:var(--pin-neutral-700);color:var(--pin-neutral-200)}.slide-dots{display:flex;align-items:center;gap:7px}.slide-dots button{width:6px;height:6px;padding:0;border:0;border-radius:50%;background:var(--pin-neutral-600)}.slide-dots button.active{width:18px;border-radius:999px;background:var(--pin-blue-400)}/* safe center: 넘치지 않을 때만 가운데 정렬한다. 그냥 center 로 두면 넘친 만큼이
    왼쪽에도 배분되는데 scrollLeft 는 음수가 못 되어 첫 슬라이드에 닿을 수 없다. */
-.filmstrip{height:76px;display:flex;justify-content:safe center;gap:8px;overflow-x:auto;overscroll-behavior-x:contain;scroll-behavior:smooth;scrollbar-width:thin}.filmstrip>button{position:relative;width:108px;flex:0 0 108px;padding:0;border:2px solid transparent;border-radius:7px;background:transparent;overflow:hidden}.filmstrip>button.active{border-color:var(--pin-blue-400)}.filmstrip .slide-canvas{border-radius:4px;box-shadow:none}.filmstrip>button>span{position:absolute;left:4px;bottom:3px;color:var(--color-bg-surface);background:rgba(16,24,39,.7);border-radius:4px;padding:1px 4px;font-size:10px}.filmstrip>button>i{position:absolute;right:4px;top:3px;width:18px;height:18px;display:grid;place-items:center;border-radius:50%;background:var(--color-brand);color:var(--color-bg-surface);font-size:10px;font-style:normal}.live-questions{background:var(--color-bg-surface);border-left:1px solid var(--color-border);display:flex;flex-direction:column;min-height:0}.panel-heading{height:72px;padding:0 20px;border-bottom:1px solid var(--color-border);display:flex;align-items:center;justify-content:space-between}.panel-heading h2{font-size:16px;margin:0}.panel-heading p{font-size:12px;color:var(--color-text-tertiary);margin:3px 0 0}.pulse-dot{width:9px;height:9px;border-radius:50%;background:var(--color-error);box-shadow:0 0 0 4px var(--color-error-bg)}.question-stack{flex:1;overflow-y:auto;padding:14px;display:grid;align-content:start;gap:10px}.question-card{width:100%;padding:16px;border:1px solid var(--color-border);border-radius:12px;background:var(--color-bg-surface);text-align:left}.question-card:hover{border-color:var(--color-border-strong)}.question-card.selected{border-color:var(--pin-blue-500);background:var(--color-brand-subtle)}.question-meta{display:flex;align-items:center;justify-content:space-between}.question-meta>span:last-child{display:flex;align-items:center;gap:4px;color:var(--color-text-tertiary);font-size:11px}.question-meta svg{width:12px}.question-card p{font-size:14px;line-height:21px;margin:10px 0 12px}.question-card>div:last-child{display:flex;align-items:center;justify-content:space-between}.category{display:inline-flex;align-items:center;height:23px;padding:0 8px;border-radius:999px;background:var(--color-brand-subtle);color:var(--pin-blue-700);font-size:11px;font-weight:600;font-style:normal}.category.example{background:var(--color-success-bg);color:var(--color-success)}.category.why{background:var(--color-pending-bg);color:var(--color-pending)}.category.error{background:var(--color-error-bg);color:var(--color-error)}.category.important{background:var(--color-warning-bg);color:var(--color-warning)}.pin-context{font-size:11px;color:var(--color-text-tertiary)}.status-badge{height:23px;padding:0 8px;display:inline-flex;align-items:center;gap:4px;border-radius:999px;font-size:11px;font-weight:600}.status-badge svg{width:12px}.status-badge.unanswered{background:var(--color-warning-bg);color:var(--color-warning)}.status-badge.answered{background:var(--color-brand-subtle);color:var(--pin-blue-700)}.status-badge.resolved{background:var(--color-success-bg);color:var(--color-success)}.answer-box{padding:16px;border-top:1px solid var(--color-border);background:var(--pin-neutral-50)}.answer-box label{display:block;font-size:12px;font-weight:600;margin-bottom:7px}.answer-box textarea{width:100%;height:74px;resize:none;border:1px solid var(--color-border-strong);border-radius:10px;padding:10px 12px;color:var(--color-text-primary)}.answer-box>div{display:flex;justify-content:space-between;margin-top:8px}.no-questions{height:280px;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;color:var(--color-text-tertiary)}.no-questions svg{width:32px;margin-bottom:12px}.no-questions b{font-size:14px;color:var(--color-text-secondary)}.no-questions span{font-size:12px;line-height:18px;margin-top:5px}
-.question-answer{margin:0 0 12px;padding:10px 12px;border-left:3px solid var(--pin-blue-400);border-radius:8px;background:var(--pin-blue-50)}.question-answer>span{font-size:10px;font-weight:700;color:var(--pin-blue-700)}.question-answer>p{margin:4px 0 0;font-size:12px;line-height:18px;color:var(--color-text-secondary);white-space:pre-wrap}.answer-box>.saved-answer{display:block;margin:0 0 12px;padding:11px 12px;border:1px solid var(--pin-blue-200);border-radius:10px;background:var(--color-bg-surface)}.saved-answer span{font-size:10px;font-weight:700;color:var(--pin-blue-700)}.saved-answer p{margin:4px 0 0;font-size:12px;line-height:18px;color:var(--color-text-secondary);white-space:pre-wrap}.answer-box>.answer-actions{display:flex;justify-content:space-between;margin-top:8px}
+.filmstrip{height:76px;display:flex;justify-content:safe center;gap:8px;overflow-x:auto;overscroll-behavior-x:contain;scroll-behavior:smooth;scrollbar-width:thin}.filmstrip>button{position:relative;width:108px;flex:0 0 108px;padding:0;border:2px solid transparent;border-radius:7px;background:transparent;overflow:hidden}.filmstrip>button.active{border-color:var(--pin-blue-400)}.filmstrip .slide-canvas{border-radius:4px;box-shadow:none}.filmstrip>button>span{position:absolute;left:4px;bottom:3px;color:var(--color-bg-surface);background:rgba(16,24,39,.7);border-radius:4px;padding:1px 4px;font-size:10px}.filmstrip>button>i{position:absolute;right:4px;top:3px;width:18px;height:18px;display:grid;place-items:center;border-radius:50%;background:var(--color-brand);color:var(--color-bg-surface);font-size:10px;font-style:normal}.live-questions{background:var(--color-bg-surface);border-left:1px solid var(--color-border);display:flex;flex-direction:column;min-height:0}.panel-heading{height:72px;padding:0 20px;border-bottom:1px solid var(--color-border);display:flex;align-items:center;justify-content:space-between}.panel-heading h2{font-size:16px;margin:0}.panel-heading p{font-size:12px;color:var(--color-text-tertiary);margin:3px 0 0}.pulse-dot{width:9px;height:9px;border-radius:50%;background:var(--color-error);box-shadow:0 0 0 4px var(--color-error-bg)}.question-stack{flex:1;overflow-y:auto;padding:14px;display:grid;align-content:start;gap:10px}.question-card{width:100%;padding:16px;border:1px solid var(--color-border);border-radius:12px;background:var(--color-bg-surface);text-align:left}.question-card:hover{border-color:var(--color-border-strong)}.question-card.selected{border-color:var(--pin-blue-500);background:var(--color-brand-subtle)}.question-meta{display:flex;align-items:center;justify-content:space-between}.question-meta>span:last-child{display:flex;align-items:center;gap:4px;color:var(--color-text-tertiary);font-size:11px}.question-meta svg{width:12px}.question-card p{font-size:14px;line-height:21px;margin:10px 0 12px}.question-card>div:last-child{display:flex;align-items:center;justify-content:space-between}.category,.pin-category{display:inline-flex;align-items:center;height:23px;padding:0 8px;border-radius:999px;background:var(--color-brand-subtle);color:var(--pin-blue-700);font-size:11px;font-weight:600;font-style:normal}.category.example{background:var(--color-success-bg);color:var(--color-success)}.category.why{background:var(--color-pending-bg);color:var(--color-pending)}.category.error{background:var(--color-error-bg);color:var(--color-error)}.category.important{background:var(--color-warning-bg);color:var(--color-warning)}.pin-context{font-size:11px;color:var(--color-text-tertiary)}.status-badge{height:23px;padding:0 8px;display:inline-flex;align-items:center;gap:4px;border-radius:999px;font-size:11px;font-weight:600}.status-badge svg{width:12px}.status-badge.unanswered{background:var(--color-warning-bg);color:var(--color-warning)}.status-badge.resolved{background:var(--color-success-bg);color:var(--color-success)}.answer-box{padding:16px;border-top:1px solid var(--color-border);background:var(--pin-neutral-50)}.answer-box label{display:block;font-size:12px;font-weight:600;margin-bottom:7px}.answer-box textarea{width:100%;height:74px;resize:none;border:1px solid var(--color-border-strong);border-radius:10px;padding:10px 12px;color:var(--color-text-primary)}.answer-box>div{display:flex;justify-content:space-between;margin-top:8px}.no-questions{height:280px;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;color:var(--color-text-tertiary)}.no-questions svg{width:32px;margin-bottom:12px}.no-questions b{font-size:14px;color:var(--color-text-secondary)}.no-questions span{font-size:12px;line-height:18px;margin-top:5px}
+.question-answer{margin:0 0 12px;padding:10px 12px;border-left:3px solid var(--pin-blue-400);border-radius:8px;background:var(--pin-blue-50)}.question-answer>span{font-size:10px;font-weight:700;color:var(--pin-blue-700)}.question-answer>p{margin:4px 0 0;font-size:12px;line-height:18px;color:var(--color-text-secondary);white-space:pre-wrap}.answer-box>.saved-answer{display:block;margin:0 0 12px;padding:11px 12px;border:1px solid var(--pin-blue-200);border-radius:10px;background:var(--color-bg-surface)}.saved-answer span{font-size:10px;font-weight:700;color:var(--pin-blue-700)}.saved-answer p{margin:4px 0 0;font-size:12px;line-height:18px;color:var(--color-text-secondary);white-space:pre-wrap}.answer-box>.answer-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:8px}.answer-box>.answer-actions>.tertiary{margin-right:auto}
 .question-meta{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:12px;align-items:start}.question-copy{min-width:0;display:flex;flex-direction:column;align-items:flex-start;text-align:left}.question-copy>.category{margin-left:-8px}.question-copy>p{width:100%;margin:9px 0 12px;font-size:14px;line-height:21px;overflow-wrap:anywhere}.question-meta>.question-time{align-self:start;white-space:nowrap}
 
 /* Questions */
@@ -72,6 +72,79 @@ a.nav-item{text-decoration:none;color:inherit}
 .material-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:16px}.material-card{display:block;padding:0;overflow:hidden;background:var(--color-bg-surface);border:1px solid var(--color-border);border-radius:16px;text-align:left;color:var(--color-text-primary)}.material-card:hover{border-color:var(--color-border-strong);box-shadow:var(--shadow-xs)}.material-thumb{position:relative;display:block;border-bottom:1px solid var(--color-border);background:var(--pin-neutral-100)}.material-thumb .slide-canvas{border-radius:0;box-shadow:none}.material-thumb .live-badge{position:absolute;left:12px;top:12px;font-style:normal;box-shadow:var(--shadow-xs)}.material-body{display:block;padding:16px 20px 20px}.material-body b{display:block;font-size:16px;line-height:24px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.material-body>small{display:flex;align-items:center;gap:5px;margin-top:5px;font-size:12px;color:var(--color-text-tertiary)}.material-body>small svg{width:13px;flex:0 0 auto}.material-stats{display:flex;gap:20px;margin-top:16px;padding-top:14px;border-top:1px solid var(--color-border)}.material-stats span{font-size:11px;color:var(--color-text-tertiary)}.material-stats b{display:block;font-size:16px;color:var(--color-text-primary);font-variant-numeric:tabular-nums}.material-stats .alert b{color:var(--color-warning)}
 .scope-tabs{max-width:520px;overflow-x:auto;scrollbar-width:none;overscroll-behavior-x:contain}.scope-tabs::-webkit-scrollbar{display:none}.scope-tabs button{white-space:nowrap}
 .question-table.flat{border-radius:12px}.question-table.flat .table-row{text-decoration:none}.admin-page .question-table{margin-top:0}
+
+/* Pin 피드백 앱 — 강의 앱 클래스를 최대한 빌려 쓰고, 달라지는 것만 여기 둔다. */
+/* 종횡비는 ImageCanvas 가 이미지 원본 비율로 인라인 지정한다. 여기서 16:9 로 고정하면
+   레터박스가 생기고, 컨테이너 기준으로 계산하는 좌표가 이미지상 실제 위치와 어긋난다. */
+.pin-canvas{position:relative;width:100%;overflow:hidden;background:var(--color-bg-surface);border-radius:4px}
+.pin-canvas img{width:100%;height:100%;display:block;object-fit:contain}
+.pin-canvas[role=button]{cursor:crosshair}
+/* 피드백 카테고리는 칩(.category)과 핀 라벨(.pin-category) 두 자리에서 쓰인다. 강의 앱의
+   카테고리 이름과 겹치지 않아 같은 셀렉터에 나란히 둔다. 제안은 기본 브랜드색을 그대로 쓴다.
+   경고·오류 계열로만 칠하면 화면이 민원함처럼 읽힌다. 좋아요는 또렷한 긍정색을 준다. */
+.category.praise,.pin-category.praise{background:var(--color-success-bg);color:var(--color-success)}
+.category.improve,.pin-category.improve{background:var(--color-warning-bg);color:var(--color-warning)}
+.category.confusing,.pin-category.confusing{background:var(--color-pending-bg);color:var(--color-pending)}
+.category.bug,.pin-category.bug{background:var(--color-error-bg);color:var(--color-error)}
+.pin-mark.praise{background:var(--viz-cat-clean)}
+.pin-mark.improve{background:var(--viz-cat-mobility)}
+.pin-mark.confusing{background:var(--viz-cat-convenience)}
+.pin-mark.bug{background:var(--viz-cat-safety)}
+.pin-mark.idea{background:var(--viz-cat-facility)}
+.cat-fill.praise{background:var(--viz-cat-clean)}
+.cat-fill.improve{background:var(--viz-cat-mobility)}
+.cat-fill.confusing{background:var(--viz-cat-convenience)}
+.cat-fill.bug{background:var(--viz-cat-safety)}
+/* 결과 화면: 이미지 지도와 의견 목록이 나란히 서고, 핀을 누르면 목록이 그 항목으로 움직인다. */
+.pin-workspace{display:grid;grid-template-columns:minmax(0,1.6fr) minmax(320px,1fr);gap:20px;align-items:start}
+.pin-stage{padding:16px;margin-inline:auto;display:grid;place-items:center}
+.pin-stage .pin-canvas{max-width:min(100%,880px)}
+.pin-feed{max-height:560px;overflow-y:auto;padding:12px;display:grid;align-content:start;gap:10px}
+.pin-item{padding:0;overflow:hidden}
+.pin-item-main{width:100%;display:flex;align-items:flex-start;gap:10px;padding:14px 16px 8px;border:0;background:transparent;text-align:left}
+.pin-item-main .question-meta{flex:1;min-width:0}
+.pin-number{flex:0 0 auto;min-width:22px;height:22px;padding:0 6px;display:grid;place-items:center;border-radius:999px;background:var(--color-brand);color:var(--color-bg-surface);font-size:11px;font-weight:700}
+.pin-number.hidden{background:var(--pin-neutral-200);color:var(--color-text-tertiary)}
+.pin-item-foot{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:0 16px 12px}
+.pin-item-foot .muted{font-size:11px}
+.pin-item-foot .btn{height:28px;padding:0 10px;font-size:12px}
+.btn.secondary.active{background:var(--color-brand-subtle);border-color:var(--color-brand);color:var(--pin-blue-700)}
+/* 기준 이미지는 16:9 가 아닐 수 있다. 폭만 잡고 높이는 비율에 맡기되, 세로로 긴 이미지가
+   잘리지 않도록 스테이지를 스크롤시킨다. 캔버스를 억지로 눕히면 좌표가 다시 어긋난다. */
+.student-canvas.pin-fit{width:min(86vw,1440px);height:auto;aspect-ratio:auto}
+.student-stage:has(.pin-fit){overflow-y:auto}
+/* 테두리를 border 로 주면 클릭 좌표(border box 기준)와 핀 배치(padding box 기준)가 1px 어긋나고,
+   테두리가 없는 관리자 캔버스와도 같은 좌표가 다른 픽셀에 찍힌다. 박스 크기를 안 바꾸는 inset 으로 그린다. */
+.student-stage .pin-canvas{border-radius:10px;box-shadow:inset 0 0 0 1px rgba(255,255,255,.16),0 28px 80px rgba(0,0,0,.48)}
+.student-guide{flex:0 0 auto;margin:0;padding:10px 18px;background:var(--pin-neutral-900);border-bottom:1px solid rgba(255,255,255,.08)}
+.student-guide b{display:block;font-size:13px;color:var(--pin-neutral-100)}
+.student-guide span{display:block;margin-top:3px;font-size:12px;line-height:18px;color:var(--pin-neutral-400);white-space:pre-wrap}
+.student-answer-view .btn{margin-top:22px}
+.campaign-card{cursor:pointer}
+.campaign-card:focus-visible{outline:none;border-color:var(--color-brand);box-shadow:var(--focus)}
+.campaign-thumb{aspect-ratio:16/9}
+.campaign-thumb img{width:100%;height:100%;display:block;object-fit:cover}
+.campaign-share-button{margin-left:auto;width:30px;height:30px}
+.campaign-create-modal{width:520px;text-align:left}
+.campaign-create-modal h2,.campaign-create-modal>p{text-align:center}
+.campaign-form{display:grid;gap:16px;margin-top:20px}
+.campaign-field{display:grid;gap:6px}
+.campaign-field>span{font-size:12px;font-weight:600}
+.campaign-field>span small{margin-left:5px;font-weight:500;color:var(--color-text-tertiary)}
+.campaign-field>input{height:40px;padding:0 12px;border:1px solid var(--color-border-strong);border-radius:10px;color:var(--color-text-primary);font-size:14px}
+.campaign-field>small{justify-self:end;font-size:11px;color:var(--color-text-tertiary)}
+.campaign-image-picker{max-width:none;margin:0;padding:20px}
+.campaign-image-preview{display:block;max-width:100%;max-height:170px;margin:0 auto 12px;border-radius:10px;object-fit:contain}
+.campaign-form-actions{display:flex;justify-content:flex-end;gap:8px}
+/* 진입 화면: 운영자와 참여자가 갈라지는 자리라 두 문을 나란히 세운다. */
+.pin-entry-grid{max-width:860px;margin:44px auto 56px;display:grid;grid-template-columns:1fr 1fr;gap:16px;align-items:start}
+.pin-entry-card{max-width:none;margin:0;padding:28px 24px;text-align:center}
+.pin-entry-card .eyebrow{display:block;margin-bottom:10px}
+.pin-entry-card h2{font-size:17px;margin:0 0 6px}
+.pin-entry-card>p{margin-bottom:20px}
+.pin-code-form{display:flex;gap:8px}
+.pin-code-form input{flex:1;min-width:0;height:40px;padding:0 12px;border:1px solid var(--color-border-strong);border-radius:10px;text-align:center;letter-spacing:.14em;font-size:15px;font-weight:700;color:var(--color-text-primary)}
+.pin-code-form .btn{flex:0 0 auto}
 @media(max-width:1100px){.app-shell{grid-template-columns:72px 1fr}.sidebar{width:72px;padding:0 8px}.sidebar-logo{justify-content:center;padding:0}.sidebar-logo .pin-logo>span:last-child,.nav-item{font-size:0}.nav-item{justify-content:center;padding:0}.sidebar-bottom>span:not(.avatar),.sidebar-bottom>svg{display:none}.sidebar-bottom{display:flex;justify-content:center;padding:16px 0}/* 480px 하한 + 340px 패널 + 72px 레일은 892px 를 넘어, 820~891px 창에서 가로로 삐져나온다. */
 .player-workspace{grid-template-columns:minmax(0,1fr) 320px}.workspace-tabs{padding:0 20px}.questions-page{padding:28px 24px}.admin-page{padding:28px 24px;gap:24px}.kpi-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.section-grid{grid-template-columns:minmax(0,1fr)}}
 /* 사이드바를 숨기면 강사는 이동할 방법을 잃는다. 같은 마크업을 하단 탭바로 눕힌다.
@@ -132,3 +205,21 @@ a.nav-item{text-decoration:none;color:inherit}
 .slide-preview{width:100%;max-width:460px;margin:18px auto 0;text-align:left}.slide-preview-head{display:flex;align-items:center;justify-content:space-between;font-size:12px;font-weight:600;color:var(--color-text-tertiary);margin-bottom:10px}.slide-preview-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(96px,1fr));gap:8px}.slide-preview-grid img,.slide-preview-ph{aspect-ratio:16/9;width:100%;border-radius:6px;border:1px solid var(--color-border);background:var(--pin-neutral-100)}.slide-preview-grid img{object-fit:cover;box-shadow:var(--shadow-xs);animation:slide-pop .25s ease}.slide-preview-ph{animation:slide-shimmer 1.3s ease-in-out infinite}@keyframes slide-pop{from{opacity:0;transform:scale(.96)}to{opacity:1;transform:none}}@keyframes slide-shimmer{0%,100%{opacity:.45}50%{opacity:.8}}
 
 @media(prefers-reduced-motion:reduce){*,*:before,*:after{scroll-behavior:auto!important;animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}}
+
+/* 사이드바가 하단 탭바로 눕는 폭. 피드백 앱은 항목이 하나라 4등분 그리드를 쓰면 한 칸만 찬다. */
+@media(max-width:820px),(max-width:1100px) and (max-height:560px) and (orientation:landscape){
+  .pin-admin-sidebar nav{grid-template-columns:1fr}
+}
+@media(max-width:1100px){
+  .pin-workspace{grid-template-columns:minmax(0,1fr)}
+  .pin-feed{max-height:none}
+}
+@media(max-width:600px){
+  .student-canvas.pin-fit{width:100vw}
+  .student-stage .pin-canvas{border-radius:0}
+  .campaign-create-modal{width:100%}
+  /* .filterbar>.btn 을 통째로 접는 규칙이 있는데, 숨김 보기는 장식이 아니라 숨긴 의견에
+     닿는 유일한 통로다. 이게 사라지면 폰에서는 복원할 방법이 없다. */
+  .filterbar>.btn.pin-hidden-toggle{display:inline-flex}
+  .pin-entry-grid{grid-template-columns:1fr;margin-top:32px}
+}

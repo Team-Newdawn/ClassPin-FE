@@ -43,12 +43,3 @@ export function AdminSidebar() {
 export function AdminShell({ children }: { children: React.ReactNode }) {
   return <div className="app-shell"><AdminSidebar /><main className="admin-main">{children}</main></div>;
 }
-
-export function AdminTopbar({ title, caption, actions }: { title: string; caption?: string; actions?: React.ReactNode }) {
-  return (
-    <header className="topbar">
-      <div className="session-identity"><span><b>{title}</b>{caption && <small>{caption}</small>}</span></div>
-      {actions && <div className="top-actions">{actions}</div>}
-    </header>
-  );
-}

@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { AdminShell, AdminTopbar } from "@/components/admin-shell";
+import { AdminShell } from "@/components/admin-shell";
 import { ArrowRight, MessageCircleQuestion, Sparkles } from "@/components/icons";
 import { useSessions } from "@/components/session-store";
 import { StatusBadge } from "@/components/status-badge";
@@ -27,7 +27,6 @@ export default function InsightsPage() {
 
   return (
     <AdminShell>
-      <AdminTopbar title="인사이트" caption={scope === "all" ? "전체 강의" : scoped[0]?.title} />
       <div className="admin-page">
         <div className="page-head">
           <div><h1>인사이트</h1><p>질문이 몰린 위치와 유형을 집계해 다음 회차에 무엇을 바꿀지 찾습니다.</p></div>
@@ -51,7 +50,7 @@ export default function InsightsPage() {
               <ul className="heat-list">
                 {hotspots.slice(0, 8).map((item) => (
                   <li key={`${item.sessionId}-${item.slideIndex}`}>
-                    <Link className="heat-row" href={`/admin/session/${item.sessionId}`}>
+                    <Link className="heat-row" href={`/admin/session/${item.sessionId}?slide=${item.slideIndex}`}>
                       <span className="heat-slide">{item.slideIndex + 1}p</span>
                       <span className="heat-title"><b>{item.title}</b><small>{item.sessionTitle}</small></span>
                       <span className="heat-track"><i className={`heat-fill ${heatLevel(item.count, maxHeat)}`} style={{ width: `${maxHeat ? (item.count / maxHeat) * 100 : 0}%` }} /></span>

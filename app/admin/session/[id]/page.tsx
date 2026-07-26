@@ -61,6 +61,18 @@ export default function SessionAdmin() {
     }
   });
 
+  // 인사이트 핫스팟에서 ?slide= 로 진입하면 해당 슬라이드를 펼친 채 시작한다.
+  // 최초 1회만 적용해, 이후 강사가 슬라이드를 넘기는 것을 URL 이 되돌리지 않게 한다.
+  const slideParamApplied = useRef(false);
+  useEffect(() => {
+    if (slideParamApplied.current || !session) return;
+    slideParamApplied.current = true;
+    const param = search.get("slide");
+    if (param === null) return;
+    const index = Number(param);
+    if (Number.isInteger(index) && index >= 0 && index < session.slides.length) setCurrentSlide(session.id, index);
+  }, [search, session, setCurrentSlide]);
+
   if (!ready) return <div className="loading-screen"><span className="spinner dark" /></div>;
   if (!session) return <div className="empty-state"><h1>세션을 찾을 수 없어요</h1><button className="btn primary" onClick={() => router.push("/")}>홈으로</button></div>;
 
@@ -86,17 +98,17 @@ export default function SessionAdmin() {
     <div className="app-shell">
       <AdminSidebar />
       <main className="admin-main">
-        <header className="topbar">
-          <div className="session-identity"><button className="icon-btn" onClick={() => router.push("/admin/dashboard")} aria-label="뒤로"><ChevronLeft /></button><span><b>{session.title}</b><small>{session.fileName}</small></span><span className={`live-badge ${session.status}`}><i />{session.status === "live" ? "진행 중" : session.status === "ended" ? "종료" : "초안"}</span></div>
-          <div className="top-actions"><button className="btn secondary" onClick={() => runAction(setStatus(session.id, session.status === "live" ? "ended" : "live"), "강의 상태를 저장하지 못했습니다.")}>{session.status === "live" ? <><Pause />세션 종료</> : <><Play />다시 시작</>}</button><button className="btn primary" onClick={() => setShareOpen(true)}><Share2 />참여 링크</button></div>
-        </header>
+        <div className="workspace-tabs">
+          <button className={tab === "live" ? "active" : ""} onClick={() => setTab("live")}><Play />라이브 플레이어<span>{session.questions.filter((q) => q.status === "unanswered").length}</span></button>
+          <button className={tab === "questions" ? "active" : ""} onClick={() => setTab("questions")}><MessageCircleQuestion />질문 목록<span>{session.questions.length}</span></button>
+          <div className="top-actions"><span className={`live-badge ${session.status}`}><i />{session.status === "live" ? "진행 중" : session.status === "ended" ? "종료" : "초안"}</span><button className="btn secondary" onClick={() => runAction(setStatus(session.id, session.status === "live" ? "ended" : "live"), "강의 상태를 저장하지 못했습니다.")}>{session.status === "live" ? <><Pause />세션 종료</> : <><Play />다시 시작</>}</button><button className="btn primary" onClick={() => setShareOpen(true)}><Share2 />참여 링크</button></div>
+        </div>
         {actionError && <div className="login-error" role="alert">{actionError} 잠시 후 다시 시도해 주세요.</div>}
-        <div className="workspace-tabs"><button className={tab === "live" ? "active" : ""} onClick={() => setTab("live")}><Play />라이브 플레이어<span>{session.questions.filter((q) => q.status === "unanswered").length}</span></button><button className={tab === "questions" ? "active" : ""} onClick={() => setTab("questions")}><MessageCircleQuestion />질문 목록<span>{session.questions.length}</span></button></div>
 
         {tab === "live" ? (
           <div className="player-workspace">
             <section className="player-stage">
-              <div className="stage-toolbar"><div><span className="status-dot" />수강생 화면과 동기화 중</div><span>{session.currentSlide + 1} / {session.slides.length}</span></div>
+              <div className="stage-toolbar"><div><span className="status-dot" /><b>{session.title}</b>수강생 화면과 동기화 중</div><span>{session.currentSlide + 1} / {session.slides.length}</span></div>
               <div className="stage-canvas-wrap" onWheel={handleSlideWheel}><SlideCanvas slide={slide} questions={slideQuestions} selectedId={selected?.id} onSelectPin={setSelectedId} /></div>
               <div className="player-controls"><button className="icon-btn" disabled={session.currentSlide === 0} onClick={() => runAction(setCurrentSlide(session.id, session.currentSlide - 1), "슬라이드 상태를 저장하지 못했습니다.")} aria-label="이전 슬라이드"><ChevronLeft /></button><div className="slide-dots">{session.slides.map((_, i) => <button key={i} className={i === session.currentSlide ? "active" : ""} onClick={() => runAction(setCurrentSlide(session.id, i), "슬라이드 상태를 저장하지 못했습니다.")} aria-label={`${i + 1}번 슬라이드`} />)}</div><button className="icon-btn" disabled={session.currentSlide === session.slides.length - 1} onClick={() => runAction(setCurrentSlide(session.id, session.currentSlide + 1), "슬라이드 상태를 저장하지 못했습니다.")} aria-label="다음 슬라이드"><ChevronRight /></button></div>
               <div className="filmstrip" ref={filmstripRef}>{session.slides.map((item, index) => <button key={item.id} className={index === session.currentSlide ? "active" : ""} onClick={() => runAction(setCurrentSlide(session.id, index), "슬라이드 상태를 저장하지 못했습니다.")}><SlideCanvas slide={item} compact /><span>{index + 1}</span>{session.questions.some((q) => q.slideIndex === index) && <i>{session.questions.filter((q) => q.slideIndex === index).length}</i>}</button>)}</div>

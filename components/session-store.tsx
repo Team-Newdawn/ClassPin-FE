@@ -61,6 +61,7 @@ export function SessionStore({ children }: { children: React.ReactNode }) {
   const [sessions, setSessions] = useState<ClassSession[]>([]);
   const [ready, setReady] = useState(false);
   const lookups = useRef(new Map<string, Promise<ClassSession | null>>());
+  const slideWrites = useRef(new Map<string, Promise<void>>());
   const ownerId = useRef<string | null>(null);
   const authUserId = user?.id ?? null;
   const authIsAnonymous = user?.is_anonymous ?? false;
@@ -225,8 +226,25 @@ export function SessionStore({ children }: { children: React.ReactNode }) {
       updateSession(sessionId, (session) => ({ ...session, questions: session.questions.map((q) => q.id === questionId ? { ...q, status: "resolved" } : q) }));
     },
     setCurrentSlide: async (sessionId, currentSlide) => {
-      if (supabaseConfigured) await updateLecture(sessionId, { current_page: currentSlide });
-      updateSession(sessionId, (session) => ({ ...session, currentSlide }));
+      const session = sessions.find((item) => item.id === sessionId);
+      if (!session) throw new Error("슬라이드를 변경할 강의를 찾지 못했습니다.");
+      const nextSlide = Math.min(Math.max(0, currentSlide), Math.max(0, session.slides.length - 1));
+
+      // 발표 화면은 네트워크 응답을 기다리지 않고 즉시 넘어가야 한다. Supabase 쓰기는
+      // 세션별 큐로 직렬화해 빠른 연속 입력의 오래된 요청이 최신 페이지를 덮지 않게 한다.
+      updateSession(sessionId, (current) => ({ ...current, currentSlide: nextSlide }));
+      if (!supabaseConfigured) return;
+
+      const previous = slideWrites.current.get(sessionId) ?? Promise.resolve();
+      const write = previous
+        .catch(() => undefined)
+        .then(() => updateLecture(sessionId, { current_page: nextSlide }));
+      slideWrites.current.set(sessionId, write);
+      try {
+        await write;
+      } finally {
+        if (slideWrites.current.get(sessionId) === write) slideWrites.current.delete(sessionId);
+      }
     },
     setStatus: async (sessionId, status) => {
       if (supabaseConfigured) await updateLecture(sessionId, { status });

@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { QRCodeSVG } from "qrcode.react";
-import { Check, ChevronLeft, ChevronRight, Clock3, Copy, Link2, ListFilter, MessageCircleQuestion, Pause, Play, Search, Share2, Users, X } from "@/components/icons";
+import { Check, ChevronLeft, ChevronRight, Clock3, Copy, Link2, ListFilter, MessageCircleQuestion, MonitorUp, Pause, Play, Search, Share2, Users, X } from "@/components/icons";
 import { AdminSidebar } from "@/components/admin-shell";
 import { SlideCanvas } from "@/components/slide-canvas";
 import { StatusBadge } from "@/components/status-badge";
@@ -28,6 +28,8 @@ export default function SessionAdmin() {
   const [answer, setAnswer] = useState("");
   const [copied, setCopied] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
+  const [presentationError, setPresentationError] = useState<string | null>(null);
+  const presentationWindowRef = useRef<Window | null>(null);
 
   const visibleQuestions = useMemo(() => session?.questions.filter((q) => (filter === "all" || q.status === filter) && q.text.toLowerCase().includes(query.toLowerCase())) ?? [], [filter, query, session]);
   const runAction = (action: Promise<void>, message: string) => {
@@ -93,6 +95,31 @@ export default function SessionAdmin() {
         setActionError("답변을 저장하지 못했습니다.");
       });
   };
+  const openPresentation = () => {
+    setActionError(null);
+    setPresentationError(null);
+    const existing = presentationWindowRef.current;
+    if (existing && !existing.closed) {
+      existing.focus();
+      return;
+    }
+
+    // 팝업 차단을 피하려면 사용자 클릭 핸들러 안에서 동기적으로 열어야 한다.
+    // 이름을 세션별로 고정해 버튼을 다시 눌러도 발표 창을 하나만 재사용한다.
+    const width = window.screen.availWidth;
+    const height = window.screen.availHeight;
+    const popup = window.open(
+      `/admin/session/${session.id}/present`,
+      `pin-class-present-${session.id}`,
+      `popup=yes,width=${width},height=${height}`
+    );
+    if (!popup) {
+      setPresentationError("발표 창이 차단됐어요. 브라우저에서 이 사이트의 팝업을 허용해 주세요.");
+      return;
+    }
+    presentationWindowRef.current = popup;
+    popup.focus();
+  };
 
   return (
     <div className="app-shell">
@@ -101,9 +128,11 @@ export default function SessionAdmin() {
         <div className="workspace-tabs">
           <button className={tab === "live" ? "active" : ""} onClick={() => setTab("live")}><Play />라이브 플레이어<span>{session.questions.filter((q) => q.status === "unanswered").length}</span></button>
           <button className={tab === "questions" ? "active" : ""} onClick={() => setTab("questions")}><MessageCircleQuestion />질문 목록<span>{session.questions.length}</span></button>
-          <div className="top-actions"><span className={`live-badge ${session.status}`}><i />{session.status === "live" ? "진행 중" : "종료"}</span><button className="btn secondary" onClick={() => runAction(setStatus(session.id, session.status === "live" ? "ended" : "live"), "강의 상태를 저장하지 못했습니다.")}>{session.status === "live" ? <><Pause />세션 종료</> : <><Play />다시 시작</>}</button><button className="btn primary" onClick={() => setShareOpen(true)}><Share2 />참여 링크</button></div>
+          <div className="top-actions"><span className={`live-badge ${session.status}`}><i />{session.status === "live" ? "진행 중" : "종료"}</span><button className="btn secondary" onClick={() => runAction(setStatus(session.id, session.status === "live" ? "ended" : "live"), "강의 상태를 저장하지 못했습니다.")}>{session.status === "live" ? <><Pause />세션 종료</> : <><Play />다시 시작</>}</button><button className="btn secondary" onClick={() => setShareOpen(true)}><Share2 />참여 링크</button><button className="btn primary presentation-launch" onClick={openPresentation} title="별도 창으로 슬라이드쇼 열기"><MonitorUp />슬라이드쇼</button></div>
         </div>
-        {actionError && <div className="login-error" role="alert">{actionError} 잠시 후 다시 시도해 주세요.</div>}
+        {presentationError
+          ? <div className="login-error" role="alert">{presentationError}</div>
+          : actionError && <div className="login-error" role="alert">{actionError} 잠시 후 다시 시도해 주세요.</div>}
 
         {tab === "live" ? (
           <div className="player-workspace">

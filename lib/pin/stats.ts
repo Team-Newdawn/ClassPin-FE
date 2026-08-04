@@ -52,6 +52,7 @@ const ZONE_LABELS = ["좌측 상단", "상단 중앙", "우측 상단", "좌측 
 const zoneAxis = (value: number) => Math.min(2, Math.max(0, Math.floor(value * 3)));
 
 export interface HotZone {
+  index: number;
   label: string;
   count: number;
   share: number;
@@ -63,7 +64,7 @@ export const hotZone = (pins: FeedbackPin[]): HotZone | null => {
   const counts = ZONE_LABELS.map(() => 0);
   pins.forEach((pin) => { counts[zoneAxis(pin.y) * 3 + zoneAxis(pin.x)] += 1; });
   const best = counts.reduce((top, count, index) => (count > counts[top] ? index : top), 0);
-  return { label: ZONE_LABELS[best], count: counts[best], share: share(counts[best], pins.length) };
+  return { index: best, label: ZONE_LABELS[best], count: counts[best], share: share(counts[best], pins.length) };
 };
 
 // 문자열 비교는 타임존 표기가 섞이면 어긋난다. 시각으로 바꿔서 고른다.

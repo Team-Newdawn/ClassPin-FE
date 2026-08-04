@@ -5,10 +5,11 @@ import { useParams } from "next/navigation";
 import { Check, Send, Trash2, X } from "@/components/icons";
 import { PinLogo } from "@/components/pin-logo";
 import { useAuth } from "@/components/auth-context";
+import { LanguageSwitcher, useLanguage } from "@/components/language-context";
 import { ImageCanvas } from "@/components/pin/image-canvas";
 import { useCampaigns } from "@/components/pin/campaign-store";
 import { supabaseConfigured } from "@/lib/supabase/client";
-import { feedbackCategoryHint, feedbackCategoryLabel, type FeedbackCategory } from "@/lib/pin/types";
+import type { FeedbackCategory } from "@/lib/pin/types";
 
 // DB 가 body 를 1~200자로 강제한다(feedback_pins CHECK).
 const BODY_MAX = 200;
@@ -22,6 +23,7 @@ type DraftPin = {
 };
 
 export default function JoinCampaign() {
+  const { feedbackCategoryHint, feedbackCategoryLabel, t } = useLanguage();
   const params = useParams<{ code: string }>();
   const { user } = useAuth();
   const userId = user?.id ?? null;
@@ -46,9 +48,9 @@ export default function JoinCampaign() {
       .finally(() => setLookupDone(true));
   }, [campaign, loadCampaignByCode, lookupDone, params.code, ready]);
 
-  if (!supabaseConfigured) return <div className="student-empty"><PinLogo href="/pin" product="" label="Pin 홈" /><h1>Supabase 설정이 필요해요</h1><p>피드백 캠페인은 이미지 저장소를 쓰기 때문에 Supabase 모드에서만 참여할 수 있어요.</p></div>;
+  if (!supabaseConfigured) return <div className="student-empty"><PinLogo href="/pin" product="" label={t("pin.logo.home")} /><LanguageSwitcher /><h1>{t("pin.supabase.title")}</h1><p>{t("pin.supabase.participantDescription")}</p></div>;
   if (!ready || (!campaign && !lookupDone)) return <div className="loading-screen"><span className="spinner dark" /></div>;
-  if (!campaign) return <div className="student-empty"><PinLogo href="/pin" product="" label="Pin 홈" /><h1>참여할 캠페인을 찾을 수 없어요</h1><p>링크나 참여 코드를 다시 확인해 주세요. 이미 종료된 캠페인일 수도 있어요.</p></div>;
+  if (!campaign) return <div className="student-empty"><PinLogo href="/pin" product="" label={t("pin.logo.home")} /><LanguageSwitcher /><h1>{t("pin.join.notFound")}</h1><p>{t("pin.join.checkLink")}</p></div>;
   const live = campaign.status === "live";
   const stageRatio = campaign.imageWidth && campaign.imageHeight ? campaign.imageWidth / campaign.imageHeight : 16 / 9;
   // RLS 만 믿으면 안 된다. 캠페인 소유자가 자기 참여 링크를 열면 참여자 전원의 핀이 내려오는데,
@@ -113,11 +115,11 @@ export default function JoinCampaign() {
   const submit = async () => {
     if (!draft || submitting) return;
     if (!live) {
-      setSubmitError("마감된 캠페인이라 피드백을 더 받을 수 없어요.");
+      setSubmitError(t("pin.join.endedError"));
       return;
     }
     // 빈 본문은 DB CHECK 에 걸린다. 유형만 고른 참여자는 카테고리 라벨로 채워 보낸다.
-    const values = { category: draft.category, body: draft.body.trim().slice(0, BODY_MAX) || feedbackCategoryLabel[draft.category] };
+    const values = { category: draft.category, body: draft.body.trim().slice(0, BODY_MAX) || feedbackCategoryLabel(draft.category) };
     setSubmitError(null);
     setSubmitting(true);
     try {
@@ -130,7 +132,7 @@ export default function JoinCampaign() {
     } catch (error) {
       const detail = error && typeof error === "object" && "message" in error ? String(error.message) : String(error);
       console.error(`Feedback pin save failed: ${detail}`, error);
-      setSubmitError(editingPinId ? "피드백을 고치지 못했어요. 잠시 후 다시 시도해 주세요." : "피드백을 저장하지 못했어요. 잠시 후 다시 시도해 주세요.");
+      setSubmitError(t(editingPinId ? "pin.join.editError" : "pin.join.saveError"));
     } finally {
       setSubmitting(false);
     }
@@ -155,10 +157,10 @@ export default function JoinCampaign() {
   };
   return (
     <main className="student-shell student-slide-shell">
-      <header className="student-header"><PinLogo href="/pin" product="" label="Pin 홈" /><span><i />{live ? "받는 중" : "마감된 캠페인"}</span></header>
+      <header className="student-header"><PinLogo href="/pin" product="" label={t("pin.logo.home")} /><div className="student-header-actions"><LanguageSwitcher /><span className="student-live-status"><i />{t(live ? "pin.status.live" : "pin.status.endedCampaign")}</span></div></header>
       {/* QR 로 바로 들어온 참여자는 무엇에 대한 피드백인지 알 방법이 여기밖에 없다. */}
       <p className="student-guide"><b>{campaign.title}</b>{campaign.guideText && <span>{campaign.guideText}</span>}</p>
-      <section className="student-stage" aria-label={`${campaign.title} 기준 이미지`}>
+      <section className="student-stage" aria-label={t("pin.join.imageAria", { title: campaign.title })}>
         {/* 폭만 잡으면 세로로 긴 이미지는 화면 몇 배 높이가 되어 참여자가 일부만 보게 된다.
             관리자 화면과 같은 방식으로 뷰포트 높이에서 폭 상한을 역산해 한 화면에 담는다. */}
         <div className="student-canvas pin-fit" style={{ maxWidth: `min(86vw, calc(72dvh * ${stageRatio.toFixed(3)}))` }}>
@@ -167,7 +169,7 @@ export default function JoinCampaign() {
               <button
                 className="draft-pin"
                 style={{ left: `${draft.x * 100}%`, top: `${draft.y * 100}%` }}
-                aria-label="선택한 위치 — 드래그하여 이동"
+                aria-label={t("pin.join.movePin")}
                 onPointerDown={(event) => {
                   event.stopPropagation();
                   pinDragged.current = false;
@@ -183,33 +185,33 @@ export default function JoinCampaign() {
                   pinDragged.current = false;
                 }}
               >!</button>
-              <span className={`draft-tag pin-category ${draft.category}`} style={{ left: `${draft.x * 100}%`, top: `${draft.y * 100}%` }}>{feedbackCategoryLabel[draft.category]}</span>
+              <span className={`draft-tag pin-category ${draft.category}`} style={{ left: `${draft.x * 100}%`, top: `${draft.y * 100}%` }}>{feedbackCategoryLabel(draft.category)}</span>
             </>}
           </ImageCanvas>
         </div>
-        <p className="student-stage-hint">{live ? "느낀 점이 있는 자리를 눌러 피드백을 남겨보세요" : "마감된 캠페인이에요. 남긴 피드백만 확인할 수 있어요"}</p>
+        <p className="student-stage-hint">{t(live ? "pin.join.liveHint" : "pin.join.endedHint")}</p>
       </section>
       {composerOpen && <div className="student-modal-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) closeComposer(); }}>
         <section className="student-question-modal" role="dialog" aria-modal="true" aria-labelledby="pin-modal-title">
-          <button className="modal-close" onClick={closeComposer} aria-label="피드백 입력 닫기"><X /></button>
+          <button className="modal-close" onClick={closeComposer} aria-label={t("pin.join.closeComposer")}><X /></button>
           {viewingPin ? <div className="student-answer-view">
-            <span className={`pin-category ${viewingPin.category}`}>{feedbackCategoryLabel[viewingPin.category]}</span>
-            <h2 id="pin-modal-title">내 피드백</h2>
+            <span className={`pin-category ${viewingPin.category}`}>{feedbackCategoryLabel(viewingPin.category)}</span>
+            <h2 id="pin-modal-title">{t("pin.join.myFeedback")}</h2>
             <p className="student-answer-question">{viewingPin.body}</p>
-            <button className="btn primary large full" onClick={closeComposer}>확인</button>
-          </div> : submitted ? <div className="submitted"><span><Check /></span><h2 id="pin-modal-title">{editingPinId ? "피드백을 고쳤어요" : "피드백을 남겼어요"}</h2><p>남긴 자리 그대로 운영자에게 전달됩니다.</p><button className="btn primary" onClick={closeComposer}>{editingPinId ? "확인" : "다른 곳에도 남기기"}</button></div> : <>
+            <button className="btn primary large full" onClick={closeComposer}>{t("common.confirm")}</button>
+          </div> : submitted ? <div className="submitted"><span><Check /></span><h2 id="pin-modal-title">{t(editingPinId ? "pin.join.updated" : "pin.join.submitted")}</h2><p>{t("pin.join.delivered")}</p><button className="btn primary" onClick={closeComposer}>{t(editingPinId ? "common.confirm" : "pin.join.leaveAnother")}</button></div> : <>
             <div className="student-modal-heading">
               <span>!</span>
-              <div><h2 id="pin-modal-title">{editingPinId ? "피드백을 고쳐 주세요" : "이 부분, 어떠셨나요?"}</h2><p>{editingPinId ? "유형이나 내용을 바꾼 뒤 다시 보낼 수 있어요." : "좋았던 점도 환영합니다. 유형을 고르고 한 줄 남겨주세요."}</p></div>
+              <div><h2 id="pin-modal-title">{t(editingPinId ? "pin.join.editPrompt" : "pin.join.newPrompt")}</h2><p>{t(editingPinId ? "pin.join.editDescription" : "pin.join.newDescription")}</p></div>
             </div>
-            <div className="category-scroll">{(Object.keys(feedbackCategoryLabel) as FeedbackCategory[]).map((item) => <button key={item} className={activeCategory === item ? "active" : ""} onClick={() => selectCategory(item)}>{feedbackCategoryLabel[item]}</button>)}</div>
-            <div className="textarea-wrap"><textarea value={draftBody} onChange={(event) => updateDraftBody(event.target.value)} maxLength={BODY_MAX} placeholder={feedbackCategoryHint[activeCategory]} /><span>{draftBody.length}/{BODY_MAX}</span></div>
+            <div className="category-scroll">{(["praise", "improve", "confusing", "bug", "idea"] as FeedbackCategory[]).map((item) => <button key={item} className={activeCategory === item ? "active" : ""} onClick={() => selectCategory(item)}>{feedbackCategoryLabel(item)}</button>)}</div>
+            <div className="textarea-wrap"><textarea value={draftBody} onChange={(event) => updateDraftBody(event.target.value)} maxLength={BODY_MAX} placeholder={feedbackCategoryHint(activeCategory)} /><span>{draftBody.length}/{BODY_MAX}</span></div>
             {submitError && <div className="student-submit-error" role="alert">{submitError}</div>}
             <div className="student-composer-actions">
-              <button className="btn primary large full" onClick={() => void submit()} disabled={submitting}>{submitting ? <span className="spinner" /> : <Send />}{editingPinId ? "고친 피드백 보내기" : "피드백 보내기"}</button>
+              <button className="btn primary large full" onClick={() => void submit()} disabled={submitting}>{submitting ? <span className="spinner" /> : <Send />}{t(editingPinId ? "pin.join.sendEdited" : "pin.join.send")}</button>
               {editingPinId
-                ? <button className="btn secondary large full" onClick={closeComposer} disabled={submitting}>수정 취소</button>
-                : <button className="btn destructive large full" onClick={deleteDraftPin}><Trash2 />핀 삭제</button>}
+                ? <button className="btn secondary large full" onClick={closeComposer} disabled={submitting}>{t("pin.join.cancelEdit")}</button>
+                : <button className="btn destructive large full" onClick={deleteDraftPin}><Trash2 />{t("pin.join.deletePin")}</button>}
             </div>
           </>}
         </section>

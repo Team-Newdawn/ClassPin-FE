@@ -2,7 +2,8 @@
 /* eslint-disable @next/next/no-img-element */
 
 import { Fragment, useState, type ReactNode } from "react";
-import { feedbackCategoryLabel, type Campaign, type FeedbackPin } from "@/lib/pin/types";
+import { useLanguage } from "@/components/language-context";
+import type { Campaign, FeedbackPin } from "@/lib/pin/types";
 
 /**
  * 기준 이미지 위에 핀을 얹는 캔버스.
@@ -24,6 +25,7 @@ export function ImageCanvas({ campaign, pins = [], selectedId, onSelectPin, onCa
   labelMode?: "always" | "selected";
   children?: ReactNode;
 }) {
+  const { feedbackCategoryLabel, t } = useLanguage();
   // 예전 행이나 업로드 직후처럼 크기를 모를 때는 이미지가 로드되며 알려주는 값으로 메운다.
   const [measured, setMeasured] = useState<{ width: number; height: number } | null>(null);
   const width = campaign.imageWidth ?? measured?.width;
@@ -47,14 +49,14 @@ export function ImageCanvas({ campaign, pins = [], selectedId, onSelectPin, onCa
       {campaign.imageUrl
         ? <img
             src={campaign.imageUrl}
-            alt={`${campaign.title} 기준 이미지`}
+            alt={t("pin.image.alt", { title: campaign.title })}
             onLoad={(event) => {
               if (width && height) return;
               const image = event.currentTarget;
               setMeasured({ width: image.naturalWidth, height: image.naturalHeight });
             }}
           />
-        : <div className="slide-placeholder">이미지 없음</div>}
+        : <div className="slide-placeholder">{t("pin.image.unavailable")}</div>}
       {pins.map((pin, index) => (
         <Fragment key={pin.id}>
           {/* 핀 자체를 유형 색으로 칠하면 라벨 없이도 지도가 한눈에 읽힌다. */}
@@ -62,7 +64,7 @@ export function ImageCanvas({ campaign, pins = [], selectedId, onSelectPin, onCa
             className={`question-pin pin-mark ${pin.category} ${selectedId === pin.id ? "selected" : ""}`}
             style={{ left: `${pin.x * 100}%`, top: `${pin.y * 100}%` }}
             onClick={() => onSelectPin?.(pin.id)}
-            aria-label={`${feedbackCategoryLabel[pin.category]} 피드백: ${pin.body}`}
+            aria-label={t("pin.image.feedbackAria", { category: feedbackCategoryLabel(pin.category), body: pin.body })}
           >
             {index + 1}
           </button>
@@ -71,9 +73,9 @@ export function ImageCanvas({ campaign, pins = [], selectedId, onSelectPin, onCa
               className={`question-tag pin-category ${pin.category}`}
               style={{ left: `${pin.x * 100}%`, top: `${pin.y * 100}%` }}
               onClick={() => onSelectPin?.(pin.id)}
-              aria-label={`피드백: ${pin.body}`}
+              aria-label={t("pin.image.feedbackBodyAria", { body: pin.body })}
             >
-              {feedbackCategoryLabel[pin.category]}
+              {feedbackCategoryLabel(pin.category)}
             </button>
           )}
         </Fragment>

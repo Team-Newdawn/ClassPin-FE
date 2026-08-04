@@ -8,22 +8,27 @@ import { PinAdminShell } from "@/components/pin/admin-shell";
 import { useCampaigns } from "@/components/pin/campaign-store";
 import { Check, Clock3, Copy, Grid2X2, Link2, Plus, Search, Share2, Upload, Users, X } from "@/components/icons";
 import { useLanguage } from "@/components/language-context";
+import type { TranslationKey } from "@/lib/i18n";
 import type { Campaign } from "@/lib/pin/types";
 
 type Filter = "all" | Campaign["status"];
 
-const filterLabel: Record<Filter, string> = { all: "전체", live: "받는 중", ended: "마감" };
+const filterTranslationKey: Record<Filter, TranslationKey> = {
+  all: "common.all",
+  live: "pin.status.live",
+  ended: "pin.status.ended"
+};
 const acceptedImageTypes = new Set(["image/jpeg", "image/png", "image/webp"]);
 const maxImageBytes = 10 * 1024 * 1024;
 
-function imageValidationError(file: File) {
-  if (!acceptedImageTypes.has(file.type)) return "JPG, PNG, WEBP 이미지만 올릴 수 있어요.";
-  if (file.size > maxImageBytes) return "이미지는 10MB 이하만 올릴 수 있어요.";
+function imageValidationError(file: File, t: (key: TranslationKey) => string) {
+  if (!acceptedImageTypes.has(file.type)) return t("pin.admin.validationImageType");
+  if (file.size > maxImageBytes) return t("pin.admin.validationImageSize");
   return null;
 }
 
 export default function PinAdminPage() {
-  const { timeAgo } = useLanguage();
+  const { t, timeAgo } = useLanguage();
   const router = useRouter();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const previewUrlRef = useRef("");
@@ -80,7 +85,7 @@ export default function PinAdminPage() {
   const pickImage = (file?: File) => {
     if (fileInputRef.current) fileInputRef.current.value = "";
     if (!file) return;
-    const error = imageValidationError(file);
+    const error = imageValidationError(file, t);
     if (error) {
       replaceImage(null);
       setFormError(error);
@@ -95,22 +100,22 @@ export default function PinAdminPage() {
     const cleanTitle = title.trim();
     const cleanGuideText = guideText.trim();
     if (!cleanTitle) {
-      setFormError("캠페인 제목을 입력해 주세요.");
+      setFormError(t("pin.admin.validationTitleRequired"));
       return;
     }
     if (cleanTitle.length > 120) {
-      setFormError("캠페인 제목은 120자 이내로 입력해 주세요.");
+      setFormError(t("pin.admin.validationTitleLength"));
       return;
     }
     if (cleanGuideText.length > 300) {
-      setFormError("안내문은 300자 이내로 입력해 주세요.");
+      setFormError(t("pin.admin.validationGuideLength"));
       return;
     }
     if (!imageFile) {
-      setFormError("기준 이미지를 선택해 주세요.");
+      setFormError(t("pin.admin.validationImageRequired"));
       return;
     }
-    const imageError = imageValidationError(imageFile);
+    const imageError = imageValidationError(imageFile, t);
     if (imageError) {
       setFormError(imageError);
       return;
@@ -123,7 +128,7 @@ export default function PinAdminPage() {
       router.push(`/pin/admin/${campaign.id}`);
     } catch (error) {
       console.error("Campaign creation failed", error);
-      setFormError("캠페인을 만들지 못했습니다. 잠시 후 다시 시도해 주세요.");
+      setFormError(t("pin.admin.createError"));
       setSubmitting(false);
     }
   };
@@ -155,20 +160,20 @@ export default function PinAdminPage() {
     <PinAdminShell>
       <div className="admin-page">
         <div className="page-head">
-          <div><h1>피드백 캠페인</h1><p>포스터·운영표·화면 위에 모인 피드백을 한눈에 관리하세요.</p></div>
-          <div className="page-actions"><button className="btn primary" onClick={() => setCreateOpen(true)}><Plus />새 캠페인</button></div>
+          <div><h1>{t("pin.admin.title")}</h1><p>{t("pin.admin.description")}</p></div>
+          <div className="page-actions"><button className="btn primary" onClick={() => setCreateOpen(true)}><Plus />{t("pin.admin.newCampaign")}</button></div>
         </div>
 
         <div className="kpi-grid">
-          <KpiCard label="전체 캠페인" value={campaigns.length} hint="지금까지 만든 캠페인" />
-          <KpiCard label="받는 중" value={liveCount} hint="지금 피드백을 받는 캠페인" />
-          <KpiCard label="누적 피드백" value={pinCount} hint="모든 캠페인에 모인 피드백" />
-          <KpiCard label="마감" value={campaigns.length - liveCount} hint="피드백 수집을 마친 캠페인" />
+          <KpiCard label={t("pin.admin.totalCampaigns")} value={campaigns.length} hint={t("pin.admin.totalCampaignsHint")} />
+          <KpiCard label={t("pin.admin.liveCampaigns")} value={liveCount} hint={t("pin.admin.liveCampaignsHint")} />
+          <KpiCard label={t("pin.admin.totalFeedback")} value={pinCount} hint={t("pin.admin.totalFeedbackHint")} />
+          <KpiCard label={t("pin.admin.endedCampaigns")} value={campaigns.length - liveCount} hint={t("pin.admin.endedCampaignsHint")} />
         </div>
 
         <div className="filterbar">
-          <div className="searchbox"><Search /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="캠페인 제목 · 참여 코드 검색" /></div>
-          <div className="filter-tabs">{(Object.keys(filterLabel) as Filter[]).map((key) => <button key={key} className={filter === key ? "active" : ""} onClick={() => setFilter(key)}>{filterLabel[key]}</button>)}</div>
+          <div className="searchbox"><Search /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder={t("pin.admin.searchCampaigns")} /></div>
+          <div className="filter-tabs">{(Object.keys(filterTranslationKey) as Filter[]).map((key) => <button key={key} className={filter === key ? "active" : ""} onClick={() => setFilter(key)}>{t(filterTranslationKey[key])}</button>)}</div>
         </div>
 
         {visible.length ? (
@@ -181,20 +186,20 @@ export default function PinAdminPage() {
                 tabIndex={0}
                 onClick={() => openCampaign(campaign)}
                 onKeyDown={(event) => openCampaignWithKeyboard(event, campaign)}
-                aria-label={`${campaign.title} 캠페인 열기`}
+                aria-label={t("pin.admin.openCampaign", { title: campaign.title })}
               >
                 <span className="material-thumb campaign-thumb">
                   {campaign.imageUrl
-                    ? <img src={campaign.imageUrl} alt={`${campaign.title} 기준 이미지`} />
-                    : <span className="slide-placeholder">이미지 없음</span>}
-                  <em className={`live-badge ${campaign.status}`}><i />{campaign.status === "live" ? "받는 중" : "마감"}</em>
+                    ? <img src={campaign.imageUrl} alt={t("pin.image.alt", { title: campaign.title })} />
+                    : <span className="slide-placeholder">{t("pin.image.unavailable")}</span>}
+                  <em className={`live-badge ${campaign.status}`}><i />{t(campaign.status === "live" ? "pin.status.live" : "pin.status.ended")}</em>
                 </span>
                 <span className="material-body">
                   <b>{campaign.title}</b>
-                  <small><Clock3 />{timeAgo(campaign.createdAt)} 생성</small>
+                  <small><Clock3 />{t("pin.admin.created", { time: timeAgo(campaign.createdAt) })}</small>
                   <span className="material-stats">
-                    <span><b>{campaign.pins.length}</b>피드백</span>
-                    <span><b>{campaign.code}</b>참여 코드</span>
+                    <span><b>{campaign.pins.length}</b>{t("pin.admin.feedback")}</span>
+                    <span><b>{campaign.code}</b>{t("pin.admin.joinCode")}</span>
                     <button
                       className="icon-btn campaign-share-button"
                       onClick={(event) => {
@@ -202,8 +207,8 @@ export default function PinAdminPage() {
                         setCopied(false);
                         setSharedCampaign(campaign);
                       }}
-                      aria-label={`${campaign.title} 참여 링크 공유`}
-                      title="참여 링크 공유"
+                      aria-label={t("pin.admin.shareCampaign", { title: campaign.title })}
+                      title={t("pin.admin.shareJoinLink")}
                     >
                       <Share2 />
                     </button>
@@ -216,9 +221,9 @@ export default function PinAdminPage() {
           <div className="panel">
             <div className="panel-empty">
               <Grid2X2 />
-              <b>{campaigns.length ? "조건에 맞는 캠페인이 없어요" : "아직 만든 캠페인이 없어요"}</b>
-              <span>{campaigns.length ? "검색어나 필터를 바꿔보세요." : "행사 포스터, 운영표, 앱 화면 무엇이든 올리고 피드백을 받아보세요."}</span>
-              {!campaigns.length && <button className="btn primary" onClick={() => setCreateOpen(true)}><Plus />새 캠페인</button>}
+              <b>{t(campaigns.length ? "pin.admin.noMatch" : "pin.admin.none")}</b>
+              <span>{t(campaigns.length ? "pin.admin.changeSearch" : "pin.admin.emptyHint")}</span>
+              {!campaigns.length && <button className="btn primary" onClick={() => setCreateOpen(true)}><Plus />{t("pin.admin.newCampaign")}</button>}
             </div>
           </div>
         )}
@@ -227,38 +232,38 @@ export default function PinAdminPage() {
       {createOpen && (
         <div className="modal-backdrop" onMouseDown={closeCreate}>
           <div className="share-modal campaign-create-modal" role="dialog" aria-modal="true" aria-labelledby="create-campaign-title" onMouseDown={(event) => event.stopPropagation()}>
-            <button className="modal-close" type="button" onClick={closeCreate} disabled={submitting} aria-label="닫기"><X /></button>
+            <button className="modal-close" type="button" onClick={closeCreate} disabled={submitting} aria-label={t("pin.admin.close")}><X /></button>
             <div className="modal-icon"><Plus /></div>
-            <h2 id="create-campaign-title">새 캠페인 만들기</h2>
-            <p>피드백을 받을 기준 이미지와 안내를 등록하세요.</p>
+            <h2 id="create-campaign-title">{t("pin.admin.createTitle")}</h2>
+            <p>{t("pin.admin.createDescription")}</p>
             <form className="campaign-form" onSubmit={submit}>
               {formError && <div className="upload-error" role="alert">{formError}</div>}
               <label className="campaign-field">
-                <span>제목 <small>필수</small></span>
-                <input value={title} onChange={(event) => setTitle(event.target.value)} maxLength={120} placeholder="예: 가을 축제 운영 피드백" required autoFocus />
+                <span>{t("pin.admin.fieldTitle")} <small>{t("pin.admin.required")}</small></span>
+                <input value={title} onChange={(event) => setTitle(event.target.value)} maxLength={120} placeholder={t("pin.admin.titlePlaceholder")} required autoFocus />
                 <small>{title.length}/120</small>
               </label>
               <label className="campaign-field">
-                <span>안내문 <small>선택</small></span>
+                <span>{t("pin.admin.fieldGuide")} <small>{t("pin.admin.optional")}</small></span>
                 <div className="textarea-wrap">
-                  <textarea value={guideText} onChange={(event) => setGuideText(event.target.value)} maxLength={300} placeholder="예: 부스 배치와 동선에서 좋았던 점과 아쉬웠던 점을 눌러서 남겨주세요." />
+                  <textarea value={guideText} onChange={(event) => setGuideText(event.target.value)} maxLength={300} placeholder={t("pin.admin.guidePlaceholder")} />
                   <span>{guideText.length}/300</span>
                 </div>
               </label>
               <div className="campaign-field">
-                <span>기준 이미지 <small>필수</small></span>
+                <span>{t("pin.admin.fieldImage")} <small>{t("pin.admin.required")}</small></span>
                 <input ref={fileInputRef} type="file" accept="image/jpeg,image/png,image/webp" hidden onChange={(event) => pickImage(event.target.files?.[0])} />
                 <div className="upload-card campaign-image-picker">
                   {previewUrl
-                    ? <img className="campaign-image-preview" src={previewUrl} alt="선택한 기준 이미지 미리보기" />
+                    ? <img className="campaign-image-preview" src={previewUrl} alt={t("pin.admin.selectedImageAlt")} />
                     : <div className="upload-icon"><Upload /></div>}
-                  <p>{imageFile ? imageFile.name : "JPG, PNG, WEBP · 최대 10MB"}</p>
-                  <button className="btn secondary" type="button" onClick={() => fileInputRef.current?.click()} disabled={submitting}><Upload />{imageFile ? "다른 이미지 선택" : "이미지 선택"}</button>
+                  <p>{imageFile ? imageFile.name : t("pin.admin.imageRequirement")}</p>
+                  <button className="btn secondary" type="button" onClick={() => fileInputRef.current?.click()} disabled={submitting}><Upload />{t(imageFile ? "pin.admin.chooseDifferentImage" : "pin.admin.chooseImage")}</button>
                 </div>
               </div>
               <div className="campaign-form-actions">
-                <button className="btn secondary" type="button" onClick={closeCreate} disabled={submitting}>취소</button>
-                <button className="btn primary" type="submit" disabled={submitting}>{submitting ? <><span className="spinner" />생성 중…</> : <><Plus />캠페인 만들기</>}</button>
+                <button className="btn secondary" type="button" onClick={closeCreate} disabled={submitting}>{t("pin.admin.cancel")}</button>
+                <button className="btn primary" type="submit" disabled={submitting}>{submitting ? <><span className="spinner" />{t("pin.admin.creating")}</> : <><Plus />{t("pin.home.createCampaign")}</>}</button>
               </div>
             </form>
           </div>
@@ -268,14 +273,14 @@ export default function PinAdminPage() {
       {sharedCampaign && (
         <div className="modal-backdrop" onMouseDown={() => setSharedCampaign(null)}>
           <div className="share-modal" role="dialog" aria-modal="true" aria-labelledby="share-campaign-title" onMouseDown={(event) => event.stopPropagation()}>
-            <button className="modal-close" onClick={() => setSharedCampaign(null)} aria-label="닫기"><X /></button>
+            <button className="modal-close" onClick={() => setSharedCampaign(null)} aria-label={t("pin.admin.close")}><X /></button>
             <div className="modal-icon"><Users /></div>
-            <h2 id="share-campaign-title">참여자를 초대하세요</h2>
-            <p>QR 코드를 보여주거나 참여 링크를 공유하세요.<br />로그인 없이 바로 피드백을 남길 수 있어요.</p>
+            <h2 id="share-campaign-title">{t("pin.admin.shareTitle")}</h2>
+            <p>{t("pin.admin.shareDescription1")}<br />{t("pin.admin.shareDescription2")}</p>
             <div className="qr-frame"><QRCodeSVG value={joinUrl} size={180} fgColor="#171D26" /></div>
-            <div className="session-code"><span>참여 코드</span><b>{sharedCampaign.code}</b></div>
-            <div className="link-copy"><Link2 /><span>{joinUrl}</span><button onClick={() => void copyJoinUrl()} aria-label="참여 링크 복사">{copied ? <Check /> : <Copy />}</button></div>
-            <button className="btn primary large full" onClick={() => void copyJoinUrl()}>{copied ? <><Check />복사했어요</> : <><Copy />참여 링크 복사</>}</button>
+            <div className="session-code"><span>{t("pin.admin.joinCode")}</span><b>{sharedCampaign.code}</b></div>
+            <div className="link-copy"><Link2 /><span>{joinUrl}</span><button onClick={() => void copyJoinUrl()} aria-label={t("pin.admin.copyJoinLink")}>{copied ? <Check /> : <Copy />}</button></div>
+            <button className="btn primary large full" onClick={() => void copyJoinUrl()}>{copied ? <><Check />{t("pin.admin.copied")}</> : <><Copy />{t("pin.admin.copyJoinLink")}</>}</button>
           </div>
         </div>
       )}

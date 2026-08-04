@@ -3,19 +3,19 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { QRCodeSVG } from "qrcode.react";
-import { BarChart3, Check, Clock3, Copy, FileText, Link2, ListFilter, MessageCircleQuestion, Pause, Play, Search, Share2, Sparkles, Users, X } from "@/components/icons";
+import { BarChart3, Check, Clock3, Copy, FileText, Link2, ListFilter, MessageCircleQuestion, MonitorUp, Pause, Play, Search, Share2, Sparkles, Users, X } from "@/components/icons";
 import { PinAdminShell } from "@/components/pin/admin-shell";
 import { useCampaigns } from "@/components/pin/campaign-store";
 import { ImageCanvas } from "@/components/pin/image-canvas";
 import { useLanguage } from "@/components/language-context";
 import { downloadPinsCsv } from "@/lib/pin/csv";
 import { CATEGORY_KEYS, categoryBreakdown, countBy, hiddenPins, hotZone, latestPinAt, sentiment, topCategory, visiblePins } from "@/lib/pin/stats";
-import { feedbackCategoryLabel, type FeedbackCategory, type FeedbackPin } from "@/lib/pin/types";
+import type { FeedbackCategory, FeedbackPin } from "@/lib/pin/types";
 
 type CategoryFilter = FeedbackCategory | "all";
 
 export default function CampaignResults() {
-  const { timeAgo } = useLanguage();
+  const { feedbackCategoryLabel, feedbackZoneLabel, locale, t, timeAgo } = useLanguage();
   const params = useParams<{ id: string }>();
   const router = useRouter();
   const { ready, campaigns, setPinHidden, setStatus } = useCampaigns();
@@ -82,12 +82,21 @@ export default function CampaignResults() {
   }, [selected]);
 
   if (!ready) return <div className="loading-screen"><span className="spinner dark" /></div>;
-  if (!campaign) return <div className="empty-state"><h1>캠페인을 찾을 수 없어요</h1><p>주소가 바뀌었거나 접근 권한이 없는 캠페인입니다.</p><button className="btn primary" onClick={() => router.push("/pin/admin")}>캠페인 목록</button></div>;
+  if (!campaign) return <div className="empty-state"><h1>{t("pin.detail.notFound")}</h1><p>{t("pin.detail.notFoundDescription")}</p><button className="btn primary" onClick={() => router.push("/pin/admin")}>{t("pin.detail.campaignList")}</button></div>;
 
   const stageRatio = campaign.imageWidth && campaign.imageHeight ? campaign.imageWidth / campaign.imageHeight : 16 / 9;
   const joinUrl = typeof window === "undefined" ? "" : `${window.location.origin}/pin/join/${campaign.code}`;
   const copy = async () => { await navigator.clipboard.writeText(joinUrl); setCopied(true); setTimeout(() => setCopied(false), 1500); };
-  const toggleHidden = (pin: FeedbackPin) => runAction(setPinHidden(campaign.id, pin.id, !pin.hidden), pin.hidden ? "피드백을 되돌리지 못했습니다." : "피드백을 제외하지 못했습니다.");
+  const toggleHidden = (pin: FeedbackPin) => runAction(setPinHidden(campaign.id, pin.id, !pin.hidden), t(pin.hidden ? "pin.detail.restoreError" : "pin.detail.excludeError"));
+  const openPlayer = () => {
+    setActionError(null);
+    const player = window.open(`/pin/admin/${campaign.id}/present`, `pin-feedback-player-${campaign.id}`, "popup=yes,width=1440,height=900");
+    if (!player) {
+      setActionError(t("pin.detail.popupBlocked"));
+      return;
+    }
+    player.focus();
+  };
 
   return (
     <PinAdminShell>
@@ -95,43 +104,44 @@ export default function CampaignResults() {
         <div className="page-head">
           <div>
             <h1>{campaign.title}</h1>
-            <p>{campaign.guideText || "참여자가 이미지 위에 남긴 피드백을 한 화면에서 확인하고 정리하세요."}</p>
+            <p>{campaign.guideText || t("pin.detail.defaultGuide")}</p>
           </div>
           <div className="top-actions">
-            <span className={`live-badge ${campaign.status}`}><i />{campaign.status === "live" ? "받는 중" : "마감"}</span>
-            <button className="btn secondary" onClick={() => runAction(setStatus(campaign.id, campaign.status === "live" ? "ended" : "live"), "캠페인 상태를 저장하지 못했습니다.")}>{campaign.status === "live" ? <><Pause />수집 마감</> : <><Play />다시 열기</>}</button>
+            <span className={`live-badge ${campaign.status}`}><i />{t(campaign.status === "live" ? "pin.status.live" : "pin.status.ended")}</span>
+            <button className="btn secondary" onClick={() => runAction(setStatus(campaign.id, campaign.status === "live" ? "ended" : "live"), t("pin.detail.saveStatusError"))}>{campaign.status === "live" ? <><Pause />{t("pin.detail.endCollection")}</> : <><Play />{t("pin.detail.reopen")}</>}</button>
+            <button className="btn secondary" onClick={openPlayer}><MonitorUp />{t("pin.detail.openPlayer")}</button>
             {/* 화면에 보이는 것과 같은 것을 내보낸다. 숨김이 "공유 대상에서 뺀다"는 뜻인데
                 내보내기에만 딸려 나오면 숨긴 의미가 없다. */}
-            <button className="btn secondary" onClick={() => downloadPinsCsv(campaign, listPins)} disabled={!listPins.length} title={`화면에 보이는 ${listPins.length}건을 CSV 로 저장합니다`}><FileText />CSV 내보내기</button>
-            <button className="btn primary" onClick={() => setShareOpen(true)}><Share2 />참여 링크</button>
+            <button className="btn secondary" onClick={() => downloadPinsCsv(campaign, listPins, locale)} disabled={!listPins.length} title={t("pin.detail.csvTitle", { count: listPins.length })}><FileText />{t("pin.detail.csvExport")}</button>
+            <button className="btn primary" onClick={() => setShareOpen(true)}><Share2 />{t("pin.detail.joinLink")}</button>
           </div>
         </div>
-        {actionError && <div className="login-error" role="alert">{actionError} 잠시 후 다시 시도해 주세요.</div>}
+        {actionError && <div className="login-error" role="alert">{actionError} {t("common.tryAgain")}</div>}
 
         {/* 개선 항목만 세면 어느 행사든 "문제 투성이"로 읽힌다. 잘된 점을 같은 크기로 보여준다. */}
         <div className="kpi-grid">
-          <Kpi label="모인 피드백" value={pins.length} hint={hidden.length ? `표시 ${visible.length}건 · 제외 ${hidden.length}건` : "모두 표시 중"} />
-          <Kpi label="좋아요 비율" value={visible.length ? `${mood.positiveShare}%` : "—"}
-               hint={visible.length ? `좋아요 ${mood.positive}건 · 개선 신호 ${mood.improvement}건` : "피드백이 쌓이면 계산합니다"}
+          <Kpi label={t("pin.detail.collectedFeedback")} value={pins.length} hint={hidden.length ? t("pin.detail.visibleExcluded", { visible: visible.length, hidden: hidden.length }) : t("pin.detail.allVisible")} />
+          <Kpi label={t("pin.detail.positiveRate")} value={visible.length ? `${mood.positiveShare}%` : "—"}
+               hint={visible.length ? t("pin.detail.positiveHint", { positive: mood.positive, improvement: mood.improvement }) : t("pin.detail.positivePending")}
                tone={visible.length ? (mood.positiveShare >= 50 ? "success" : undefined) : undefined} />
-          <Kpi label="가장 많은 유형" value={top ? top.label : "—"} hint={top ? `${top.count}건 · 전체의 ${top.share}%` : "분류할 피드백이 없습니다"} />
-          <Kpi label="피드백이 몰린 곳" value={zone ? zone.label : "—"} hint={zone ? `${zone.count}건 · 전체의 ${zone.share}%` : "좌표가 모이면 계산합니다"} />
+          <Kpi label={t("pin.detail.topCategory")} value={top ? feedbackCategoryLabel(top.key) : "—"} hint={top ? t("pin.detail.categoryHint", { count: top.count, percent: top.share }) : t("pin.detail.noCategory")} />
+          <Kpi label={t("pin.detail.hotZone")} value={zone ? feedbackZoneLabel(zone.index) : "—"} hint={zone ? t("pin.detail.categoryHint", { count: zone.count, percent: zone.share }) : t("pin.detail.noZone")} />
         </div>
 
         <div className="filterbar">
-          <div className="searchbox"><Search /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="피드백 내용 검색" /></div>
+          <div className="searchbox"><Search /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder={t("pin.detail.searchFeedback")} /></div>
           <div className="filter-tabs">
-            <button className={filter === "all" ? "active" : ""} onClick={() => setFilter("all")}>전체 {visible.length}</button>
-            {CATEGORY_KEYS.map((key) => <button key={key} className={filter === key ? "active" : ""} onClick={() => setFilter(key)}>{feedbackCategoryLabel[key]} {countBy(visible, key)}</button>)}
+            <button className={filter === "all" ? "active" : ""} onClick={() => setFilter("all")}>{t("common.all")} {visible.length}</button>
+            {CATEGORY_KEYS.map((key) => <button key={key} className={filter === key ? "active" : ""} onClick={() => setFilter(key)}>{feedbackCategoryLabel(key)} {countBy(visible, key)}</button>)}
           </div>
-          <button className={`btn secondary pin-hidden-toggle ${showHidden ? "active" : ""}`} onClick={() => setShowHidden(!showHidden)} disabled={!hidden.length} aria-pressed={showHidden}><ListFilter />제외한 것 보기 {hidden.length}</button>
+          <button className={`btn secondary pin-hidden-toggle ${showHidden ? "active" : ""}`} onClick={() => setShowHidden(!showHidden)} disabled={!hidden.length} aria-pressed={showHidden}><ListFilter />{t("pin.detail.showExcluded", { count: hidden.length })}</button>
         </div>
 
         <div className="pin-workspace">
           <section className="panel pin-stage-panel">
             <div className="panel-head">
-              <div><h2>피드백 지도</h2><p>이미지 위 핀을 누르면 오른쪽 목록이 그 피드백으로 이동합니다</p></div>
-              <span className="panel-note"><Sparkles />제외한 피드백은 이미지에 표시되지 않습니다</span>
+              <div><h2>{t("pin.detail.mapTitle")}</h2><p>{t("pin.detail.mapDescription")}</p></div>
+              <span className="panel-note"><Sparkles />{t("pin.detail.mapNote")}</span>
             </div>
             {/* 캔버스는 폭 100%에 원본 비율이라, 세로 사진이면 화면을 넘긴다. 비율로 폭을 눌러 높이를 잡는다. */}
             <div className="pin-stage" style={{ maxWidth: `min(100%, calc(58dvh * ${stageRatio.toFixed(3)}))` }}>
@@ -141,7 +151,7 @@ export default function CampaignResults() {
 
           <aside className="panel pin-list-panel">
             <div className="panel-head">
-              <div><h2>피드백 목록</h2><p>{listPins.length}건 표시 중{latest ? ` · 마지막 피드백 ${timeAgo(latest)}` : ""}</p></div>
+              <div><h2>{t("pin.detail.listTitle")}</h2><p>{latest ? t("pin.detail.listSummaryLatest", { count: listPins.length, time: timeAgo(latest) }) : t("pin.detail.listSummary", { count: listPins.length })}</p></div>
             </div>
             <div className="pin-feed" ref={listRef}>
               {listPins.length ? listPins.map((pin, index) => (
@@ -156,8 +166,8 @@ export default function CampaignResults() {
               )) : (
                 <div className="panel-empty">
                   <MessageCircleQuestion />
-                  <b>{pins.length ? "조건에 맞는 피드백이 없어요" : "아직 피드백이 없어요"}</b>
-                  <span>{pins.length ? "검색어나 카테고리를 바꿔 보세요." : "참여 링크를 공유하면 여기에 피드백이 쌓입니다."}</span>
+                  <b>{t(pins.length ? "pin.detail.noMatch" : "pin.detail.none")}</b>
+                  <span>{t(pins.length ? "pin.detail.changeFilters" : "pin.detail.emptyHint")}</span>
                 </div>
               )}
             </div>
@@ -165,21 +175,21 @@ export default function CampaignResults() {
         </div>
 
         <section className="panel">
-          <div className="panel-head"><div><h2>유형 분포</h2><p>표시 중인 피드백 {visible.length}건 기준</p></div><span className="panel-note"><BarChart3 />제외한 피드백은 집계에서 빠집니다</span></div>
+          <div className="panel-head"><div><h2>{t("pin.detail.distributionTitle")}</h2><p>{t("pin.detail.distributionBasis", { count: visible.length })}</p></div><span className="panel-note"><BarChart3 />{t("pin.detail.distributionNote")}</span></div>
           {maxCategory ? (
             <ul className="cat-list">
               {categories.filter((item) => item.count).map((item) => (
                 <li key={item.key}>
-                  <span className="cat-head"><em className={`pin-category ${item.key}`}>{item.label}</em><b>{item.count}건 · {item.share}%</b></span>
+                  <span className="cat-head"><em className={`pin-category ${item.key}`}>{feedbackCategoryLabel(item.key)}</em><b>{t("pin.detail.categoryStat", { count: item.count, percent: item.share })}</b></span>
                   <span className="cat-track"><i className={`cat-fill ${item.key}`} style={{ width: `${(item.count / maxCategory) * 100}%` }} /></span>
                 </li>
               ))}
             </ul>
-          ) : <div className="panel-empty"><MessageCircleQuestion /><b>집계할 피드백이 없어요</b><span>피드백이 쌓이면 유형별 분포를 계산합니다.</span></div>}
+          ) : <div className="panel-empty"><MessageCircleQuestion /><b>{t("pin.detail.noAggregate")}</b><span>{t("pin.detail.aggregateHint")}</span></div>}
         </section>
       </div>
 
-    {shareOpen && <div className="modal-backdrop" onMouseDown={() => setShareOpen(false)}><div className="share-modal" onMouseDown={(event) => event.stopPropagation()}><button className="modal-close" onClick={() => setShareOpen(false)}><X /></button><div className="modal-icon"><Users /></div><h2>참여자를 초대하세요</h2><p>{campaign.status === "live" ? <>QR 코드를 보여주거나 참여 링크를 공유하세요.<br />로그인 없이 이미지 위에 피드백을 남길 수 있어요.</> : <>마감된 캠페인은 새 피드백을 받지 않습니다.<br />다시 열면 같은 링크와 코드로 참여할 수 있어요.</>}</p><div className="qr-frame"><QRCodeSVG value={joinUrl} size={180} fgColor="#171D26" /></div><div className="session-code"><span>참여 코드</span><b>{campaign.code}</b></div><div className="link-copy"><Link2 /><span>{joinUrl}</span><button onClick={copy}>{copied ? <Check /> : <Copy />}</button></div><button className="btn primary large full" onClick={copy}>{copied ? <><Check />복사했어요</> : <><Copy />참여 링크 복사</>}</button></div></div>}
+    {shareOpen && <div className="modal-backdrop" onMouseDown={() => setShareOpen(false)}><div className="share-modal" onMouseDown={(event) => event.stopPropagation()}><button className="modal-close" onClick={() => setShareOpen(false)} aria-label={t("pin.admin.close")}><X /></button><div className="modal-icon"><Users /></div><h2>{t("pin.admin.shareTitle")}</h2><p>{campaign.status === "live" ? <>{t("pin.admin.shareDescription1")}<br />{t("pin.detail.shareLiveDescription2")}</> : <>{t("pin.detail.shareEndedDescription1")}<br />{t("pin.detail.shareEndedDescription2")}</>}</p><div className="qr-frame"><QRCodeSVG value={joinUrl} size={180} fgColor="#171D26" /></div><div className="session-code"><span>{t("pin.admin.joinCode")}</span><b>{campaign.code}</b></div><div className="link-copy"><Link2 /><span>{joinUrl}</span><button onClick={copy} aria-label={t("pin.admin.copyJoinLink")}>{copied ? <Check /> : <Copy />}</button></div><button className="btn primary large full" onClick={copy}>{copied ? <><Check />{t("pin.admin.copied")}</> : <><Copy />{t("pin.admin.copyJoinLink")}</>}</button></div></div>}
     </PinAdminShell>
   );
 }
@@ -189,22 +199,22 @@ function Kpi({ label, value, hint, tone }: { label: string; value: number | stri
 }
 
 function PinItem({ pin, number, selected, onSelect, onToggleHidden }: { pin: FeedbackPin; number: number | null; selected: boolean; onSelect: () => void; onToggleHidden: () => void }) {
-  const { timeAgo } = useLanguage();
+  const { feedbackCategoryLabel, t, timeAgo } = useLanguage();
   return (
     <div className={`question-card pin-item ${selected ? "selected" : ""}`} data-pin-id={pin.id}>
       <button className="pin-item-main" onClick={onSelect} aria-pressed={selected}>
-        <span className={`pin-number ${pin.hidden ? "hidden" : ""}`}>{pin.hidden ? "제외" : number}</span>
+        <span className={`pin-number ${pin.hidden ? "hidden" : ""}`}>{pin.hidden ? t("pin.detail.excluded") : number}</span>
         <span className="question-meta">
           <span className="question-copy">
-            <em className={`pin-category ${pin.category}`}>{feedbackCategoryLabel[pin.category]}</em>
+            <em className={`pin-category ${pin.category}`}>{feedbackCategoryLabel(pin.category)}</em>
             <p>{pin.body}</p>
           </span>
           <span className="question-time"><Clock3 />{timeAgo(pin.createdAt)}</span>
         </span>
       </button>
       <div className="pin-item-foot">
-        <span className="muted">이미지 좌 {Math.round(pin.x * 100)}% · 상 {Math.round(pin.y * 100)}%</span>
-        <button className="btn tertiary" onClick={onToggleHidden}>{pin.hidden ? <><Check />되돌리기</> : <><X />제외</>}</button>
+        <span className="muted">{t("pin.detail.position", { x: Math.round(pin.x * 100), y: Math.round(pin.y * 100) })}</span>
+        <button className="btn tertiary" onClick={onToggleHidden}>{pin.hidden ? <><Check />{t("pin.detail.restore")}</> : <><X />{t("pin.detail.exclude")}</>}</button>
       </div>
     </div>
   );

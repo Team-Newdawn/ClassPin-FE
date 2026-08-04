@@ -2,6 +2,7 @@
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import { categoryLabel as getCategoryLabel, type Locale, statusLabel as getStatusLabel, timeAgo as getTimeAgo, translate, type TranslationKey } from "@/lib/i18n";
+import type { FeedbackCategory } from "@/lib/pin/types";
 import type { QuestionCategory, QuestionStatus } from "@/lib/types";
 
 const STORAGE_KEY = "pin-class-locale";
@@ -11,6 +12,9 @@ type LanguageContextValue = {
   setLocale: (locale: Locale) => void;
   t: (key: TranslationKey, values?: Record<string, string | number>) => string;
   categoryLabel: (category: QuestionCategory) => string;
+  feedbackCategoryLabel: (category: FeedbackCategory) => string;
+  feedbackCategoryHint: (category: FeedbackCategory) => string;
+  feedbackZoneLabel: (index: number) => string;
   statusLabel: (status: QuestionStatus) => string;
   timeAgo: (value: string) => string;
 };
@@ -43,9 +47,12 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
 
   const t = useCallback((key: TranslationKey, values?: Record<string, string | number>) => translate(locale, key, values), [locale]);
   const categoryLabel = useCallback((category: QuestionCategory) => getCategoryLabel(locale, category), [locale]);
+  const feedbackCategoryLabel = useCallback((category: FeedbackCategory) => translate(locale, `pin.category.${category}` as TranslationKey), [locale]);
+  const feedbackCategoryHint = useCallback((category: FeedbackCategory) => translate(locale, `pin.categoryHint.${category}` as TranslationKey), [locale]);
+  const feedbackZoneLabel = useCallback((index: number) => translate(locale, `pin.zone.${index}` as TranslationKey), [locale]);
   const statusLabel = useCallback((status: QuestionStatus) => getStatusLabel(locale, status), [locale]);
   const timeAgo = useCallback((value: string) => getTimeAgo(locale, value), [locale]);
-  const value = useMemo(() => ({ locale, setLocale, t, categoryLabel, statusLabel, timeAgo }), [categoryLabel, locale, statusLabel, t, timeAgo]);
+  const value = useMemo(() => ({ locale, setLocale, t, categoryLabel, feedbackCategoryLabel, feedbackCategoryHint, feedbackZoneLabel, statusLabel, timeAgo }), [categoryLabel, feedbackCategoryHint, feedbackCategoryLabel, feedbackZoneLabel, locale, statusLabel, t, timeAgo]);
 
   return <LanguageContext.Provider value={value}>{children}</LanguageContext.Provider>;
 }

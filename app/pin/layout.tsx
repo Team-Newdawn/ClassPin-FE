@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { CampaignStore } from "@/components/pin/campaign-store";
+import { PinLocaleDocumentTitle } from "@/components/pin/locale-document-title";
 
 export const metadata: Metadata = {
   title: "Pin — 문제가 어디 있는지까지",
@@ -8,5 +9,5 @@ export const metadata: Metadata = {
 
 /** 피드백 앱 전용 상태. 강의 앱의 SessionStore 와 섞이지 않는다. */
 export default function PinLayout({ children }: { children: React.ReactNode }) {
-  return <CampaignStore>{children}</CampaignStore>;
+  return <CampaignStore><PinLocaleDocumentTitle />{children}</CampaignStore>;
 }

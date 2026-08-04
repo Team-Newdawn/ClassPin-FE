@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { PinLogo } from "@/components/pin-logo";
 import { useAuth } from "@/components/auth-context";
+import { LanguageSwitcher, useLanguage } from "@/components/language-context";
 
 // 강의 앱 로그인과 같은 마크지만, 두 앱을 따로 굴리기로 했으므로 파일을 공유하지 않는다.
 function GoogleIcon() {
@@ -19,6 +20,7 @@ function GoogleIcon() {
 }
 
 function PinLoginContent() {
+  const { t } = useLanguage();
   const router = useRouter();
   const params = useSearchParams();
   const next = params.get("next") || "/pin/admin";
@@ -38,32 +40,32 @@ function PinLoginContent() {
       // 앱마다 늘리면 콘솔 설정까지 따라와야 한다. 돌아올 자리는 next 가 정한다.
       await signIn(next);
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "로그인을 시작하지 못했습니다.");
+      setError(cause instanceof Error ? cause.message : t("pin.login.startError"));
       setRedirecting(false);
     }
   };
 
   return (
     <main className="landing-shell">
-      <header className="landing-nav"><PinLogo href="/pin" product="" label="Pin 홈" /></header>
+      <header className="landing-nav"><PinLogo href="/pin" product="" label={t("pin.logo.home")} /><LanguageSwitcher /></header>
       <section className="login-card">
-        <h1>운영자로 시작하기</h1>
-        <p>구글 계정으로 로그인하면 기준 이미지를 올리고<br />바로 피드백을 받을 수 있어요.</p>
+        <h1>{t("pin.login.title")}</h1>
+        <p>{t("pin.login.description1")}<br />{t("pin.login.description2")}</p>
         {configured ? (
           <button className="btn google-btn large full" onClick={() => void startGoogle()} disabled={loading || redirecting}>
             {redirecting ? <span className="spinner dark" /> : <GoogleIcon />}
-            Google로 계속하기
+            {t("login.continueGoogle")}
           </button>
         ) : (
           <>
-            <p className="login-note">피드백 캠페인은 이미지 저장소를 쓰기 때문에 Supabase 설정이 있어야 동작해요.</p>
-            <Link className="btn primary large full" href="/pin">돌아가기</Link>
+            <p className="login-note">{t("pin.login.supabaseNote")}</p>
+            <Link className="btn primary large full" href="/pin">{t("pin.login.back")}</Link>
           </>
         )}
         {error && <div className="login-error" role="alert">{error}</div>}
-        <p className="login-note">참여자는 로그인 없이 QR·링크·참여 코드로 들어옵니다.</p>
+        <p className="login-note">{t("pin.login.participantNote")}</p>
       </section>
-      <footer className="landing-footer">Pin · 문제가 어디 있는지까지</footer>
+      <footer className="landing-footer">Pin · {t("pin.brand.tagline")}</footer>
     </main>
   );
 }

@@ -1,0 +1,72 @@
+"use client";
+
+import { useEffect, useId, useRef } from "react";
+import { X } from "@/components/icons";
+import { useLanguage } from "@/components/language-context";
+import { StatusBadge } from "@/components/status-badge";
+import type { Question } from "@/lib/types";
+
+export function QuestionDetailDialog({ question, onClose }: {
+  question: Question;
+  onClose: () => void;
+}) {
+  const { t, categoryLabel, timeAgo } = useLanguage();
+  const titleId = useId();
+  const dialogRef = useRef<HTMLElement>(null);
+  const onCloseRef = useRef(onClose);
+
+  useEffect(() => {
+    onCloseRef.current = onClose;
+  }, [onClose]);
+
+  useEffect(() => {
+    const previousFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    dialogRef.current?.focus();
+
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      event.preventDefault();
+      onCloseRef.current();
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => {
+      window.removeEventListener("keydown", onKeyDown);
+      document.body.style.overflow = previousOverflow;
+      previousFocus?.focus();
+    };
+  }, [question.id]);
+
+  return (
+    <div className="question-detail-backdrop" onMouseDown={(event) => {
+      if (event.target === event.currentTarget) onClose();
+    }}>
+      <section
+        ref={dialogRef}
+        className="question-detail-dialog"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+        tabIndex={-1}
+      >
+        <button className="modal-close" onClick={onClose} aria-label={t("question.closeDetail")}><X /></button>
+        <div className="question-detail-heading">
+          <span className={`category ${question.category}`}>{categoryLabel(question.category)}</span>
+          <span>{t("common.slideLabel", { number: question.slideIndex + 1 })}</span>
+        </div>
+        <h2 id={titleId}>{t("question.questionAndAnswer")}</h2>
+        <p className="question-detail-question">{question.text}</p>
+        <div className="question-detail-meta">
+          <StatusBadge status={question.status} />
+          <time dateTime={question.createdAt}>{timeAgo(question.createdAt)}</time>
+        </div>
+        <div className={`question-detail-answer ${question.answer ? "" : "pending"}`}>
+          <span>{t("question.instructorAnswer")}</span>
+          <p>{question.answer ?? t("question.noAnswer")}</p>
+        </div>
+        <button className="btn primary large full" onClick={onClose}>{t("common.confirm")}</button>
+      </section>
+    </div>
+  );
+}

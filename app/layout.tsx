@@ -1,11 +1,12 @@
 import type { Metadata, Viewport } from "next";
 import { AuthProvider } from "@/components/auth-context";
+import { LanguageProvider } from "@/components/language-context";
 import { SessionStore } from "@/components/session-store";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Pin Class — 질문이 찍힌 곳에서",
-  description: "슬라이드 위 질문을 강의의 지식으로 바꾸는 실시간 강의 질문 플랫폼"
+  title: "Pin Class",
+  description: "Real-time lecture questions pinned to the exact spot on a slide."
 };
 
 // viewport-fit=cover 없이는 env(safe-area-inset-*) 이 늘 0 이라, 노치·홈 인디케이터를 피하려고
@@ -18,5 +19,5 @@ export const viewport: Viewport = {
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
-  return <html lang="ko"><body><AuthProvider><SessionStore>{children}</SessionStore></AuthProvider></body></html>;
+  return <html lang="ko"><body><LanguageProvider><AuthProvider><SessionStore>{children}</SessionStore></AuthProvider></LanguageProvider></body></html>;
 }

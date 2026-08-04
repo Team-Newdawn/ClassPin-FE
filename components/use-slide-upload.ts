@@ -4,6 +4,8 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { convertToSlides } from "@/lib/convert";
 import { useSessions } from "@/components/session-store";
+import { useLanguage } from "@/components/language-context";
+import { localizeUploadError } from "@/lib/i18n";
 import type { Slide } from "@/lib/types";
 
 /** idle → uploading(바이트 전송) → processing(서버 렌더링) → 이동 */
@@ -26,6 +28,7 @@ function insertByPage(list: Slide[], slide: Slide): Slide[] {
  */
 export function useSlideUpload() {
   const router = useRouter();
+  const { locale, t } = useLanguage();
   const { createSession } = useSessions();
   const [phase, setPhase] = useState<UploadPhase>("idle");
   const [uploadPct, setUploadPct] = useState(0);
@@ -67,11 +70,11 @@ export function useSlideUpload() {
       router.push(`/admin/session/${session.id}`);
     } catch (cause) {
       clearTimer();
-      setError(cause instanceof Error ? cause.message : "슬라이드 변환에 실패했습니다.");
+      setError(cause instanceof Error ? localizeUploadError(locale, cause.message) : t("upload.failed"));
       setPhase("idle");
       setShowPreview(false);
     }
-  }, [createSession, router]);
+  }, [createSession, locale, router, t]);
 
   return { phase, uploadPct, error, slides, total, showPreview, busy: phase !== "idle", start };
 }

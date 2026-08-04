@@ -2,8 +2,8 @@
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { useAuth } from "@/components/auth-context";
-import type { ClassSession, Question, Slide } from "@/lib/types";
-import { getSupabaseClient, supabaseConfigured } from "@/lib/supabase/client";
+import type { ClassSession, PresentationQrPosition, Question, Slide } from "@/lib/types";
+import { getAudienceSupabaseClient, getSupabaseClient, supabaseConfigured } from "@/lib/supabase/client";
 import { fetchLectureSnapshot, fetchLiveSession, fetchOwnedSessions, markQuestionResolved, persistSession, postAnswer, submitQuestion, subscribeToLecture, updateLecture, updateQuestion as persistQuestionUpdate } from "@/lib/supabase/repository";
 
 const STORAGE_KEY = "pin-class-sessions-v1";
@@ -21,6 +21,8 @@ type Store = {
   resolveQuestion: (sessionId: string, questionId: string) => Promise<void>;
   setCurrentSlide: (sessionId: string, slide: number) => Promise<void>;
   setStatus: (sessionId: string, status: ClassSession["status"]) => Promise<void>;
+  setShowQuestionPins: (sessionId: string, visible: boolean) => Promise<void>;
+  setPresentationQrPosition: (sessionId: string, position: PresentationQrPosition) => Promise<void>;
   loadSessionByCode: (code: string) => Promise<ClassSession | null>;
 };
 
@@ -48,12 +50,19 @@ const readCachedSessions = (userId: string) => {
 // 중복이 없으면 원본 배열을 그대로 돌려줘 헛도는 리렌더를 만들지 않는다.
 const dedupeById = (list: ClassSession[]) => {
   const seen = new Set<string>();
-  const unique = list.filter((session) => {
+  const normalized = list.map((session) => {
+    const showQuestionPins = session.showQuestionPins ?? true;
+    const presentationQrPosition = session.presentationQrPosition ?? "bottom-right";
+    return showQuestionPins === session.showQuestionPins && presentationQrPosition === session.presentationQrPosition
+      ? session
+      : { ...session, showQuestionPins, presentationQrPosition };
+  });
+  const unique = normalized.filter((session) => {
     if (seen.has(session.id)) return false;
     seen.add(session.id);
     return true;
   });
-  return unique.length === list.length ? list : unique;
+  return unique.length === list.length && normalized.every((session, index) => session === list[index]) ? list : unique;
 };
 
 export function SessionStore({ children }: { children: React.ReactNode }) {
@@ -61,6 +70,9 @@ export function SessionStore({ children }: { children: React.ReactNode }) {
   const [sessions, setSessions] = useState<ClassSession[]>([]);
   const [ready, setReady] = useState(false);
   const lookups = useRef(new Map<string, Promise<ClassSession | null>>());
+  const slideWrites = useRef(new Map<string, Promise<void>>());
+  const slideTargets = useRef(new Map<string, number>());
+  const refreshSequences = useRef(new Map<string, number>());
   const ownerId = useRef<string | null>(null);
   const authUserId = user?.id ?? null;
   const authIsAnonymous = user?.is_anonymous ?? false;
@@ -121,13 +133,28 @@ export function SessionStore({ children }: { children: React.ReactNode }) {
     const tracked = [...new Map(
       sessions.filter((session) => session.courseId).map((session) => [session.id, session])
     ).values()];
+    const asAudience = !ownerId.current;
     let active = true;
     const channels: NonNullable<ReturnType<typeof subscribeToLecture>>[] = [];
     const refresh = async (session: ClassSession) => {
+      const refreshSequence = (refreshSequences.current.get(session.id) ?? 0) + 1;
+      refreshSequences.current.set(session.id, refreshSequence);
       try {
-        const snapshot = await fetchLectureSnapshot(session);
-        if (!active || !snapshot) return;
-        setSessions((current) => current.map((item) => item.id === session.id ? { ...item, ...snapshot } : item));
+        const snapshot = await fetchLectureSnapshot(session, asAudience);
+        if (!active || !snapshot || refreshSequences.current.get(session.id) !== refreshSequence) return;
+        setSessions((current) => current.map((item) => {
+          if (item.id !== session.id) return item;
+          const localTarget = slideTargets.current.get(session.id);
+          return {
+            ...item,
+            ...snapshot,
+            // 발표자가 빠르게 넘기는 동안에는 DB의 중간 페이지가 낙관적 화면을
+            // 되돌리지 못하게 한다. 청중은 계속 서버 페이지를 그대로 따른다.
+            currentSlide: !asAudience && localTarget !== undefined
+              ? item.currentSlide
+              : snapshot.currentSlide
+          };
+        }));
       } catch (error) { console.error("Supabase realtime refresh failed", error); }
     };
     const connect = async () => {
@@ -135,7 +162,7 @@ export function SessionStore({ children }: { children: React.ReactNode }) {
         await Promise.all(tracked.map(refresh));
         if (!active) return;
         tracked.forEach((session) => {
-          const channel = subscribeToLecture(session.id, () => void refresh(session));
+          const channel = subscribeToLecture(session.id, () => void refresh(session), asAudience);
           if (channel) channels.push(channel);
         });
       } catch (error) { console.error("Supabase authentication failed", error); }
@@ -143,7 +170,7 @@ export function SessionStore({ children }: { children: React.ReactNode }) {
     void connect();
     return () => {
       active = false;
-      const client = getSupabaseClient();
+      const client = asAudience ? getAudienceSupabaseClient() : getSupabaseClient();
       if (client) channels.forEach((channel) => void client.removeChannel(channel));
     };
     // Session question changes do not recreate subscriptions; only the stable id set does.
@@ -181,7 +208,8 @@ export function SessionStore({ children }: { children: React.ReactNode }) {
     const session: ClassSession = {
       id: crypto.randomUUID(), courseId: crypto.randomUUID(), materialId: crypto.randomUUID(), materialVersionId,
       code: makeCode(), title: input.title, fileName: input.fileName,
-      status: "live", currentSlide: 0, createdAt: new Date().toISOString(), slides: input.slides, questions: []
+      status: "live", currentSlide: 0, showQuestionPins: true, presentationQrPosition: "bottom-right",
+      createdAt: new Date().toISOString(), slides: input.slides, questions: []
     };
     if (supabaseConfigured) await persistSession(session);
     setSessions((current) => [session, ...current]);
@@ -224,12 +252,54 @@ export function SessionStore({ children }: { children: React.ReactNode }) {
       updateSession(sessionId, (session) => ({ ...session, questions: session.questions.map((q) => q.id === questionId ? { ...q, status: "resolved" } : q) }));
     },
     setCurrentSlide: async (sessionId, currentSlide) => {
-      if (supabaseConfigured) await updateLecture(sessionId, { current_page: currentSlide });
-      updateSession(sessionId, (session) => ({ ...session, currentSlide }));
+      const session = sessions.find((item) => item.id === sessionId);
+      if (!session) throw new Error("슬라이드를 변경할 강의를 찾지 못했습니다.");
+      const nextSlide = Math.min(Math.max(0, currentSlide), Math.max(0, session.slides.length - 1));
+
+      // 화면은 즉시 마지막 입력을 반영하고, DB에는 현재 처리 중인 값과 마지막 목표만
+      // 저장한다. 빠른 입력 사이의 모든 중간 페이지를 순서대로 쓰지 않는다.
+      slideTargets.current.set(sessionId, nextSlide);
+      updateSession(sessionId, (current) => ({ ...current, currentSlide: nextSlide }));
+      if (!supabaseConfigured) {
+        slideTargets.current.delete(sessionId);
+        return;
+      }
+
+      let write = slideWrites.current.get(sessionId);
+      if (!write) {
+        write = (async () => {
+          try {
+            while (true) {
+              const target = slideTargets.current.get(sessionId);
+              if (target === undefined) return;
+              await updateLecture(sessionId, { current_page: target });
+              if (slideTargets.current.get(sessionId) === target) return;
+            }
+          } finally {
+            // 이미 시작된 Realtime 조회가 마지막 DB 응답 뒤에 도착해도 폐기한다.
+            refreshSequences.current.set(sessionId, (refreshSequences.current.get(sessionId) ?? 0) + 1);
+            slideTargets.current.delete(sessionId);
+          }
+        })();
+        slideWrites.current.set(sessionId, write);
+        const clearWrite = () => {
+          if (slideWrites.current.get(sessionId) === write) slideWrites.current.delete(sessionId);
+        };
+        void write.then(clearWrite, clearWrite);
+      }
+      await write;
     },
     setStatus: async (sessionId, status) => {
       if (supabaseConfigured) await updateLecture(sessionId, { status });
       updateSession(sessionId, (session) => ({ ...session, status }));
+    },
+    setShowQuestionPins: async (sessionId, visible) => {
+      if (supabaseConfigured) await updateLecture(sessionId, { show_question_pins: visible });
+      updateSession(sessionId, (session) => ({ ...session, showQuestionPins: visible }));
+    },
+    setPresentationQrPosition: async (sessionId, position) => {
+      if (supabaseConfigured) await updateLecture(sessionId, { presentation_qr_position: position });
+      updateSession(sessionId, (session) => ({ ...session, presentationQrPosition: position }));
     },
     loadSessionByCode: async (code) => {
       const key = code.toLowerCase();

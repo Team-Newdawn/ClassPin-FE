@@ -3,13 +3,14 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { AdminShell } from "@/components/admin-shell";
+import { useLanguage } from "@/components/language-context";
 import { ArrowRight, BarChart3, Clock3, MessageCircleQuestion, Plus } from "@/components/icons";
 import { useSessions } from "@/components/session-store";
 import { StatusBadge } from "@/components/status-badge";
-import { categoryLabel, timeAgo } from "@/lib/format";
 import { allQuestions, countBy, heatLevel, recentQuestions, resolveRate, slideHeatmap } from "@/lib/stats";
 
 export default function DashboardPage() {
+  const { t, categoryLabel, timeAgo } = useLanguage();
   const router = useRouter();
   const { sessions, ready } = useSessions();
   if (!ready) return <div className="loading-screen"><span className="spinner dark" /></div>;
@@ -25,20 +26,20 @@ export default function DashboardPage() {
     <AdminShell>
       <div className="admin-page">
         <div className="page-head">
-          <div><h1>대시보드</h1><p>지금 답해야 할 질문과 강의별 상태를 한 화면에서 확인하세요.</p></div>
-          <div className="page-actions"><Link className="btn secondary" href="/admin/insights"><BarChart3 />인사이트 열기</Link><button className="btn primary" onClick={() => router.push("/")}><Plus />새 강의 시작</button></div>
+          <div><h1>{t("nav.dashboard")}</h1><p>{t("dashboard.description")}</p></div>
+          <div className="page-actions"><Link className="btn secondary" href="/admin/insights"><BarChart3 />{t("dashboard.openInsights")}</Link><button className="btn primary" onClick={() => router.push("/")}><Plus />{t("dashboard.startLecture")}</button></div>
         </div>
 
         <div className="kpi-grid">
-          <KpiCard label="전체 강의" value={sessions.length} hint={`진행 중 ${liveSessions.length}개`} />
-          <KpiCard label="누적 질문" value={questions.length} hint={`핀 질문 ${questions.filter((q) => q.x !== null).length}개`} />
-          <KpiCard label="미답변" value={unanswered} hint={questions.length ? `전체의 ${Math.round((unanswered / questions.length) * 100)}%` : "질문 없음"} tone={unanswered > 0 ? "warning" : undefined} />
-          <KpiCard label="해결률" value={`${resolveRate(questions)}%`} hint={`해결 ${countBy(questions, "resolved")}건`} tone="success" />
+          <KpiCard label={t("dashboard.totalLectures")} value={sessions.length} hint={t("dashboard.liveLectures", { count: liveSessions.length })} />
+          <KpiCard label={t("dashboard.totalQuestions")} value={questions.length} hint={t("dashboard.pinQuestions", { count: questions.filter((q) => q.x !== null).length })} />
+          <KpiCard label={t("dashboard.unanswered")} value={unanswered} hint={questions.length ? t("dashboard.percentTotal", { percent: Math.round((unanswered / questions.length) * 100) }) : t("dashboard.noQuestions")} tone={unanswered > 0 ? "warning" : undefined} />
+          <KpiCard label={t("dashboard.resolveRate")} value={`${resolveRate(questions)}%`} hint={t("common.resolvedCount", { count: countBy(questions, "resolved") })} tone="success" />
         </div>
 
         <div className="section-grid">
           <section className="panel">
-            <div className="panel-head"><div><h2>강의 현황</h2><p>세션을 열어 질문에 답하고 슬라이드를 넘기세요.</p></div><Link className="panel-link" href="/admin/materials">전체 보기<ArrowRight /></Link></div>
+            <div className="panel-head"><div><h2>{t("dashboard.lectureStatus")}</h2><p>{t("dashboard.lectureStatusHint")}</p></div><Link className="panel-link" href="/admin/materials">{t("dashboard.viewAll")}<ArrowRight /></Link></div>
             {sessions.length ? (
               <ul className="session-list">
                 {sessions.slice(0, 5).map((session) => {
@@ -46,53 +47,53 @@ export default function DashboardPage() {
                   return (
                     <li key={session.id}>
                       <Link className="session-row" href={`/admin/session/${session.id}`}>
-                        <span className="session-row-main"><b>{session.title}</b><small>{session.slides.length}개 슬라이드 · 코드 {session.code}</small></span>
-                        <span className={`live-badge ${session.status}`}><i />{session.status === "live" ? "진행 중" : "종료"}</span>
-                        <span className="session-row-stat"><b>{session.questions.length}</b>질문</span>
-                        <span className={`session-row-stat ${open ? "alert" : ""}`}><b>{open}</b>미답변</span>
+                        <span className="session-row-main"><b>{session.title}</b><small>{t("common.slidesCount", { count: session.slides.length })} · {t("dashboard.code", { code: session.code })}</small></span>
+                        <span className={`live-badge ${session.status}`}><i />{session.status === "live" ? t("common.live") : t("common.ended")}</span>
+                        <span className="session-row-stat"><b>{session.questions.length}</b>{t("common.question")}</span>
+                        <span className={`session-row-stat ${open ? "alert" : ""}`}><b>{open}</b>{t("status.unanswered")}</span>
                         <ArrowRight />
                       </Link>
                     </li>
                   );
                 })}
               </ul>
-            ) : <EmptyBlock message="아직 강의가 없어요" hint="강의 자료를 업로드하면 여기에 표시됩니다." />}
+            ) : <EmptyBlock message={t("dashboard.noLectures")} hint={t("dashboard.noLecturesHint")} />}
           </section>
 
           <section className="panel">
-            <div className="panel-head"><div><h2>최근 질문</h2><p>방금 들어온 질문부터</p></div></div>
+            <div className="panel-head"><div><h2>{t("dashboard.recentQuestions")}</h2><p>{t("dashboard.recentQuestionsHint")}</p></div></div>
             {feed.length ? (
               <ul className="feed-list">
                 {feed.map(({ question, session }) => (
                   <li key={question.id}>
                     <Link className="feed-item" href={`/admin/session/${session.id}?tab=questions`}>
-                      <span className="feed-top"><em className={`category ${question.category}`}>{categoryLabel[question.category]}</em><span className="feed-time"><Clock3 />{timeAgo(question.createdAt)}</span></span>
+                      <span className="feed-top"><em className={`category ${question.category}`}>{categoryLabel(question.category)}</em><span className="feed-time"><Clock3 />{timeAgo(question.createdAt)}</span></span>
                       <p>{question.text}</p>
-                      <span className="feed-bottom"><StatusBadge status={question.status} /><small>{session.title} · {question.slideIndex + 1}p</small></span>
+                      <span className="feed-bottom"><StatusBadge status={question.status} /><small>{session.title} · {t("common.page", { number: question.slideIndex + 1 })}</small></span>
                     </Link>
                   </li>
                 ))}
               </ul>
-            ) : <EmptyBlock message="아직 질문이 없어요" hint="수강생이 질문을 남기면 바로 표시됩니다." />}
+            ) : <EmptyBlock message={t("dashboard.noRecentQuestions")} hint={t("dashboard.noRecentQuestionsHint")} />}
           </section>
         </div>
 
         <section className="panel">
-          <div className="panel-head"><div><h2>질문이 몰린 슬라이드</h2><p>수강생이 가장 많이 막힌 지점 · 근거 질문 수 기준</p></div><Link className="panel-link" href="/admin/insights">인사이트<ArrowRight /></Link></div>
+          <div className="panel-head"><div><h2>{t("dashboard.hotSlides")}</h2><p>{t("dashboard.hotSlidesHint")}</p></div><Link className="panel-link" href="/admin/insights">{t("nav.insights")}<ArrowRight /></Link></div>
           {hotspots.length ? (
             <ul className="heat-list">
               {hotspots.map((item) => (
                 <li key={`${item.sessionId}-${item.slideIndex}`}>
                   <Link className="heat-row" href={`/admin/session/${item.sessionId}?slide=${item.slideIndex}`}>
-                    <span className="heat-slide">{item.slideIndex + 1}p</span>
+                    <span className="heat-slide">{t("common.page", { number: item.slideIndex + 1 })}</span>
                     <span className="heat-title"><b>{item.title}</b><small>{item.sessionTitle}</small></span>
                     <span className="heat-track"><i className={`heat-fill ${heatLevel(item.count, maxHeat)}`} style={{ width: `${maxHeat ? (item.count / maxHeat) * 100 : 0}%` }} /></span>
-                    <span className="heat-count">{item.count}건{item.unanswered > 0 && <em>미답변 {item.unanswered}</em>}</span>
+                    <span className="heat-count">{t("common.cases", { count: item.count })}{item.unanswered > 0 && <em>{t("common.unansweredCount", { count: item.unanswered })}</em>}</span>
                   </Link>
                 </li>
               ))}
             </ul>
-          ) : <EmptyBlock message="집계할 질문이 없어요" hint="질문이 쌓이면 혼란 핫스팟을 자동으로 계산합니다." />}
+          ) : <EmptyBlock message={t("dashboard.noAggregate")} hint={t("dashboard.noAggregateHint")} />}
         </section>
       </div>
     </AdminShell>

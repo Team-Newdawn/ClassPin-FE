@@ -1,5 +1,12 @@
 export type QuestionCategory = "concept" | "why" | "example" | "error" | "important";
 export type QuestionStatus = "unanswered" | "answered" | "resolved";
+export type QuestionAnchorKind = "point" | "box" | "path";
+export type PresentationQrPosition = "top-left" | "top-right" | "bottom-left" | "bottom-right";
+
+export interface NormalizedPoint {
+  x: number;
+  y: number;
+}
 
 /** admin = 구글 로그인 강사, participant = QR 익명 수강생 */
 export type UserRole = "admin" | "participant";
@@ -27,6 +34,10 @@ export interface Question {
   slideIndex: number;
   x: number | null;
   y: number | null;
+  anchorKind?: QuestionAnchorKind;
+  width?: number | null;
+  height?: number | null;
+  path?: NormalizedPoint[] | null;
   category: QuestionCategory;
   text: string;
   status: QuestionStatus;
@@ -44,6 +55,8 @@ export interface ClassSession {
   fileName: string;
   status: "live" | "ended";
   currentSlide: number;
+  showQuestionPins: boolean;
+  presentationQrPosition: PresentationQrPosition;
   createdAt: string;
   slides: Slide[];
   questions: Question[];

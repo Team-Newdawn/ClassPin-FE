@@ -2,13 +2,17 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
+import { QRCodeSVG } from "qrcode.react";
 import { ChevronLeft, ChevronRight, Maximize2, Minimize2, X } from "@/components/icons";
+import { LanguageSwitcher, useLanguage } from "@/components/language-context";
+import { QuestionDetailDialog } from "@/components/question-detail-dialog";
 import { SlideCanvas } from "@/components/slide-canvas";
 import { useSessions } from "@/components/session-store";
 
 const CONTROLS_HIDE_DELAY = 2600;
 
 export default function SessionPresentation() {
+  const { t, locale } = useLanguage();
   const params = useParams<{ id: string }>();
   const router = useRouter();
   const { sessions, ready, setCurrentSlide } = useSessions();
@@ -21,6 +25,8 @@ export default function SessionPresentation() {
   const [controlsVisible, setControlsVisible] = useState(true);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
+  const [selectedQuestionId, setSelectedQuestionId] = useState<string | null>(null);
+  const [detailQuestionId, setDetailQuestionId] = useState<string | null>(null);
 
   const revealControls = useCallback(() => {
     setControlsVisible(true);
@@ -43,9 +49,9 @@ export default function SessionPresentation() {
   useEffect(() => {
     if (!sessionTitle) return;
     const previousTitle = document.title;
-    document.title = `${sessionTitle} — 슬라이드쇼`;
+    document.title = `${sessionTitle} — ${t("presentation.title")}`;
     return () => { document.title = previousTitle; };
-  }, [sessionTitle]);
+  }, [locale, sessionTitle, t]);
 
   useEffect(() => {
     const onFullscreenChange = () => {
@@ -65,11 +71,11 @@ export default function SessionPresentation() {
     revealControls();
     void setCurrentSlide(session.id, nextIndex).catch((error) => {
       const detail = error && typeof error === "object" && "message" in error ? String(error.message) : String(error);
-      console.error(`슬라이드 상태를 저장하지 못했습니다: ${detail}`, error);
-      setActionError("슬라이드 동기화가 지연되고 있어요.");
+      console.error(`Slide state save failed: ${detail}`, error);
+      setActionError(t("presentation.syncDelay"));
       revealControls();
     });
-  }, [revealControls, session, setCurrentSlide]);
+  }, [revealControls, session, setCurrentSlide, t]);
 
   const toggleFullscreen = useCallback(async () => {
     setActionError(null);
@@ -81,17 +87,22 @@ export default function SessionPresentation() {
       }
     } catch (error) {
       const detail = error instanceof Error ? error.message : String(error);
-      console.error(`전체화면을 시작하지 못했습니다: ${detail}`, error);
-      setActionError("전체화면을 시작하지 못했어요. 브라우저의 전체화면 권한을 확인해 주세요.");
+      console.error(`Fullscreen start failed: ${detail}`, error);
+      setActionError(t("presentation.fullscreenError"));
       revealControls();
     }
-  }, [revealControls]);
+  }, [revealControls, t]);
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
-      if (!session) return;
+      if (!session || detailQuestionId) return;
       const target = event.target instanceof HTMLElement ? event.target : null;
       if (target?.closest("button") && (event.key === " " || event.key === "Enter")) return;
+      const isNavigationKey = ["ArrowRight", "PageDown", " ", "ArrowLeft", "PageUp", "Home", "End"].includes(event.key);
+      if (event.repeat && isNavigationKey) {
+        event.preventDefault();
+        return;
+      }
       const current = currentIndexRef.current;
       if (event.key === "ArrowRight" || event.key === "PageDown" || event.key === " ") {
         event.preventDefault();
@@ -114,13 +125,21 @@ export default function SessionPresentation() {
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [goToSlide, revealControls, session, toggleFullscreen]);
+  }, [detailQuestionId, goToSlide, revealControls, session, toggleFullscreen]);
 
   if (!ready) return <main className="presentation-shell presentation-message"><span className="spinner" /></main>;
-  if (!session) return <main className="presentation-shell presentation-message"><h1>세션을 찾을 수 없어요</h1><button className="presentation-text-button" onClick={() => router.push("/")}>홈으로 돌아가기</button></main>;
-  if (session.slides.length === 0) return <main className="presentation-shell presentation-message"><h1>표시할 슬라이드가 없어요</h1><button className="presentation-text-button" onClick={() => router.push(`/admin/session/${session.id}`)}>관리 화면으로</button></main>;
+  if (!session) return <main className="presentation-shell presentation-message"><h1>{t("session.notFound")}</h1><button className="presentation-text-button" onClick={() => router.push("/")}>{t("common.homeBack")}</button></main>;
+  if (session.slides.length === 0) return <main className="presentation-shell presentation-message"><h1>{t("presentation.noSlides")}</h1><button className="presentation-text-button" onClick={() => router.push(`/admin/session/${session.id}`)}>{t("presentation.backToAdmin")}</button></main>;
 
   const slide = session.slides[session.currentSlide];
+  const slideQuestions = session.questions.filter((question) => question.slideIndex === session.currentSlide);
+  const detailQuestion = session.questions.find((question) => question.id === detailQuestionId);
+  const joinUrl = typeof window === "undefined" ? "" : `${window.location.origin}/join/${session.code}`;
+  const openQuestionDetail = (questionId: string) => {
+    setSelectedQuestionId(questionId);
+    setDetailQuestionId(questionId);
+    revealControls();
+  };
   const closePresentation = () => {
     if (window.opener) window.close();
     else router.push(`/admin/session/${session.id}`);
@@ -129,32 +148,50 @@ export default function SessionPresentation() {
   return (
     <main
       ref={stageRef}
-      className={`presentation-shell ${controlsVisible ? "controls-visible" : ""}`}
+      className={`presentation-shell qr-${session.presentationQrPosition} ${controlsVisible ? "controls-visible" : ""}`}
       onMouseMove={revealControls}
       onPointerDown={revealControls}
     >
-      <div className="presentation-slide" aria-label={`${session.title} ${session.currentSlide + 1}번 슬라이드`}>
-        <SlideCanvas slide={slide} />
+      <div className="presentation-slide" aria-label={`${session.title} · ${t("common.slideNumber", { number: session.currentSlide + 1 })}`}>
+        <SlideCanvas
+          slide={slide}
+          questions={slideQuestions}
+          selectedId={selectedQuestionId}
+          onSelectPin={openQuestionDetail}
+          showPins={session.showQuestionPins}
+        />
       </div>
+
+      <aside
+        className={`presentation-join-qr ${session.presentationQrPosition}`}
+        role="img"
+        aria-label={`${t("presentation.joinQrAria")} · ${session.code}`}
+      >
+        <QRCodeSVG value={joinUrl} size={108} bgColor="#ffffff" fgColor="#101827" level="M" />
+        <div><span>{t("presentation.scanToJoin")}</span><b>{session.code}</b></div>
+      </aside>
 
       <header className="presentation-topbar">
         <div className="presentation-title"><span className={`status-dot ${session.status}`} /><b>{session.title}</b></div>
         <div className="presentation-top-actions">
-          <button onClick={() => void toggleFullscreen()} aria-label={isFullscreen ? "전체화면 종료" : "전체화면 시작"} title={isFullscreen ? "전체화면 종료 (F)" : "전체화면 시작 (F)"}>
+          <LanguageSwitcher />
+          <button onClick={() => void toggleFullscreen()} aria-label={isFullscreen ? t("presentation.exitFullscreen") : t("presentation.startFullscreen")} title={`${isFullscreen ? t("presentation.exitFullscreen") : t("presentation.startFullscreen")} (F)`}>
             {isFullscreen ? <Minimize2 /> : <Maximize2 />}
           </button>
-          <button onClick={closePresentation} aria-label="슬라이드쇼 창 닫기" title="슬라이드쇼 창 닫기"><X /></button>
+          <button onClick={closePresentation} aria-label={t("presentation.close")} title={t("presentation.close")}><X /></button>
         </div>
       </header>
 
-      <button className="presentation-side-control previous" disabled={session.currentSlide === 0} onClick={() => goToSlide(currentIndexRef.current - 1)} aria-label="이전 슬라이드"><ChevronLeft /></button>
-      <button className="presentation-side-control next" disabled={session.currentSlide === session.slides.length - 1} onClick={() => goToSlide(currentIndexRef.current + 1)} aria-label="다음 슬라이드"><ChevronRight /></button>
+      <button className="presentation-side-control previous" disabled={session.currentSlide === 0} onClick={() => goToSlide(currentIndexRef.current - 1)} aria-label={t("session.previousSlide")}><ChevronLeft /></button>
+      <button className="presentation-side-control next" disabled={session.currentSlide === session.slides.length - 1} onClick={() => goToSlide(currentIndexRef.current + 1)} aria-label={t("session.nextSlide")}><ChevronRight /></button>
 
       <footer className="presentation-footer">
         {actionError && <span className="presentation-error" role="alert">{actionError}</span>}
         <span className="presentation-page" aria-live="polite">{session.currentSlide + 1} / {session.slides.length}</span>
-        <span className="presentation-hint">← → 또는 Space로 이동 · F 전체화면</span>
+        <span className="presentation-hint">{t("presentation.hint")}</span>
       </footer>
+
+      {detailQuestion && <QuestionDetailDialog question={detailQuestion} onClose={() => setDetailQuestionId(null)} />}
     </main>
   );
 }

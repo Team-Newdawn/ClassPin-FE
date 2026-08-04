@@ -1,4 +1,3 @@
-import { categoryLabel } from "./format";
 import type { ClassSession, Question, QuestionCategory } from "./types";
 
 export const countBy = (questions: Question[], status: Question["status"]) => questions.filter((q) => q.status === status).length;
@@ -36,9 +35,9 @@ export const heatLevel = (count: number, max: number): "low" | "mid" | "high" | 
   return "low";
 };
 
-export const categoryBreakdown = (questions: Question[]) =>
-  (Object.keys(categoryLabel) as QuestionCategory[])
-    .map((key) => ({ key, label: categoryLabel[key], count: questions.filter((q) => q.category === key).length }))
+export const categoryBreakdown = (questions: Question[], getLabel: (key: QuestionCategory) => string) =>
+  (["concept", "why", "example", "error", "important"] as QuestionCategory[])
+    .map((key) => ({ key, label: getLabel(key), count: questions.filter((q) => q.category === key).length }))
     .filter((item) => item.count > 0)
     .sort((a, b) => b.count - a.count);
 

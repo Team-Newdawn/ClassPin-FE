@@ -33,6 +33,11 @@ type SlideRow = {
   image_path: string;
 };
 
+type SlideInstructorNoteRow = {
+  slide_id: string;
+  body: string;
+};
+
 type QuestionRow = {
   id: string;
   lecture_id: string;
@@ -192,6 +197,14 @@ export async function fetchOwnedSessions(): Promise<ClassSession[]> {
     if (error) throw error;
     slideRows.push(...((data ?? []) as SlideRow[]));
   }
+  const noteBySlide = new Map<string, string>();
+  if (slideRows.length) {
+    const { data, error } = await client.from("slide_instructor_notes")
+      .select("slide_id, body")
+      .in("slide_id", slideRows.map((slide) => slide.id));
+    if (error) throw error;
+    ((data ?? []) as SlideInstructorNoteRow[]).forEach((note) => noteBySlide.set(note.slide_id, note.body));
+  }
   const slidesByVersion = new Map<string, Slide[]>();
   slideRows.forEach((slide) => {
     const rows = slidesByVersion.get(slide.material_version_id) ?? [];
@@ -200,7 +213,8 @@ export async function fetchOwnedSessions(): Promise<ClassSession[]> {
       pageIndex: slide.page_index,
       title: `Slide ${slide.page_index + 1}`,
       imagePath: slide.image_path,
-      imageUrl: client.storage.from("lecture-slides").getPublicUrl(slide.image_path).data.publicUrl
+      imageUrl: client.storage.from("lecture-slides").getPublicUrl(slide.image_path).data.publicUrl,
+      speakerNote: noteBySlide.get(slide.id) ?? ""
     });
     slidesByVersion.set(slide.material_version_id, rows);
   });
@@ -241,6 +255,19 @@ export async function fetchOwnedSessions(): Promise<ClassSession[]> {
       questions: (questionsByLecture.get(lecture.id) ?? []).map((question) => toQuestion(question, lecture.id, slides))
     }];
   });
+}
+
+/** 현재 강사가 소유한 슬라이드의 발표 메모만 생성하거나 갱신한다. */
+export async function saveSlideInstructorNote(slideId: string, body: string) {
+  const client = getSupabaseClient();
+  if (!client) throw new Error("Supabase 연결을 찾지 못했습니다.");
+  await requireOwnerUser();
+  const { error } = await client.from("slide_instructor_notes").upsert({
+    slide_id: slideId,
+    body,
+    updated_at: new Date().toISOString()
+  }, { onConflict: "slide_id" });
+  if (error) throw error;
 }
 
 export async function fetchLiveSession(joinCode: string): Promise<ClassSession | null> {

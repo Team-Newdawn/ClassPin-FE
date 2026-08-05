@@ -4,7 +4,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import { useAuth } from "@/components/auth-context";
 import type { ClassSession, PresentationQrPosition, Question, Slide } from "@/lib/types";
 import { getAudienceSupabaseClient, getSupabaseClient, supabaseConfigured } from "@/lib/supabase/client";
-import { fetchLectureSnapshot, fetchLiveSession, fetchOwnedSessions, markQuestionResolved, persistSession, postAnswer, submitQuestion, subscribeToLecture, updateLecture, updateQuestion as persistQuestionUpdate } from "@/lib/supabase/repository";
+import { fetchLectureSnapshot, fetchLiveSession, fetchOwnedSessions, markQuestionResolved, persistSession, postAnswer, saveSlideInstructorNote, submitQuestion, subscribeToLecture, updateLecture, updateQuestion as persistQuestionUpdate } from "@/lib/supabase/repository";
 
 const STORAGE_KEY = "pin-class-sessions-v1";
 const SUPABASE_CACHE_PREFIX = "pin-class-sessions-cache-v2";
@@ -23,6 +23,7 @@ type Store = {
   setStatus: (sessionId: string, status: ClassSession["status"]) => Promise<void>;
   setShowQuestionPins: (sessionId: string, visible: boolean) => Promise<void>;
   setPresentationQrPosition: (sessionId: string, position: PresentationQrPosition) => Promise<void>;
+  updateSlideNote: (sessionId: string, slideId: string, body: string) => Promise<void>;
   loadSessionByCode: (code: string) => Promise<ClassSession | null>;
 };
 
@@ -300,6 +301,13 @@ export function SessionStore({ children }: { children: React.ReactNode }) {
     setPresentationQrPosition: async (sessionId, position) => {
       if (supabaseConfigured) await updateLecture(sessionId, { presentation_qr_position: position });
       updateSession(sessionId, (session) => ({ ...session, presentationQrPosition: position }));
+    },
+    updateSlideNote: async (sessionId, slideId, body) => {
+      if (supabaseConfigured) await saveSlideInstructorNote(slideId, body);
+      updateSession(sessionId, (session) => ({
+        ...session,
+        slides: session.slides.map((slide) => slide.id === slideId ? { ...slide, speakerNote: body } : slide)
+      }));
     },
     loadSessionByCode: async (code) => {
       const key = code.toLowerCase();

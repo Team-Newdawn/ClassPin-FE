@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import Link from "next/link";
 import { useParams } from "next/navigation";
 import { Check, Send, Trash2, X } from "@/components/icons";
 import { PinLogo } from "@/components/pin-logo";
@@ -26,6 +27,7 @@ type DraftPin = {
 export default function JoinCampaign() {
   const { feedbackCategoryHint, feedbackCategoryLabel, t } = useLanguage();
   const params = useParams<{ code: string }>();
+  const finalHref = `/pin/join/${encodeURIComponent(params.code)}/final`;
   const { user } = useAuth();
   const userId = user?.id ?? null;
   const { campaigns, ready, addPin, updatePin, loadCampaignByCode } = useCampaigns();
@@ -97,9 +99,9 @@ export default function JoinCampaign() {
   if (!ready || !audienceReady || metadataLookupKey !== metadataRequestKey) return <div className="loading-screen"><span className="spinner dark" /></div>;
   if (!campaign) return <div className="student-empty"><PinLogo href="/pin" product="" label={t("pin.logo.home")} /><LanguageSwitcher /><h1>{t("pin.join.notFound")}</h1><p>{t("pin.join.checkLink")}</p></div>;
   const live = campaign.status === "live";
-  if (!live) return <div className="student-empty"><PinLogo href="/pin" product="" label={t("pin.logo.home")} /><LanguageSwitcher /><h1>{t("pin.join.endedTitle")}</h1><p>{t("pin.join.endedDescription")}</p></div>;
+  if (!live) return <div className="student-empty"><PinLogo href="/pin" product="" label={t("pin.logo.home")} /><LanguageSwitcher /><h1>{t("pin.join.endedTitle")}</h1><p>{t("pin.join.endedDescription")}</p><Link className="btn primary" href={finalHref}>{t("experience.complete")}</Link></div>;
   if (campaign.audienceGroups.length && !selectedAudience) return <main className="student-shell audience-selection-shell">
-    <header className="student-header"><PinLogo href="/pin" product="" label={t("pin.logo.home")} /><LanguageSwitcher /></header>
+    <header className="student-header"><PinLogo href="/pin" product="" label={t("pin.logo.home")} /><div className="student-header-actions"><Link className="student-complete-button" href={finalHref}>{t("experience.complete")}</Link><LanguageSwitcher /></div></header>
     <section className="audience-selection" aria-labelledby="audience-selection-title">
       <span className="eyebrow">{t("pin.audience.eyebrow")}</span>
       <h1 id="audience-selection-title">{t("pin.audience.chooseTitle")}</h1>
@@ -109,7 +111,7 @@ export default function JoinCampaign() {
   </main>;
   if (selectedAudience && audienceLookupKey !== audienceRequestKey) return <div className="loading-screen"><span className="spinner dark" /></div>;
   const visiblePages = selectedAudience ? pagesForAudience(campaign.pages, selectedAudience) : campaign.pages;
-  if (!visiblePages.length) return <div className="student-empty"><PinLogo href="/pin" product="" label={t("pin.logo.home")} /><LanguageSwitcher /><h1>{t("pin.audience.noPagesTitle")}</h1><p>{t("pin.audience.noPagesDescription", { group: selectedAudience ?? "" })}</p>{selectedAudience && <button className="btn primary" onClick={() => selectAudience(null)}>{t("pin.audience.change")}</button>}</div>;
+  if (!visiblePages.length) return <div className="student-empty"><PinLogo href="/pin" product="" label={t("pin.logo.home")} /><LanguageSwitcher /><h1>{t("pin.audience.noPagesTitle")}</h1><p>{t("pin.audience.noPagesDescription", { group: selectedAudience ?? "" })}</p><div className="student-empty-actions">{selectedAudience && <button className="btn secondary" onClick={() => selectAudience(null)}>{t("pin.audience.change")}</button>}<Link className="btn primary" href={finalHref}>{t("experience.complete")}</Link></div></div>;
   const activePage = visiblePages[activePageIndex] ?? visiblePages[0];
   const stageRatio = activePage ? activePage.imageWidth / activePage.imageHeight : 16 / 9;
   // RLS 만 믿으면 안 된다. 캠페인 소유자가 자기 참여 링크를 열면 참여자 전원의 핀이 내려오는데,
@@ -225,7 +227,7 @@ export default function JoinCampaign() {
   };
   return (
     <main className="student-shell student-slide-shell">
-      <header className="student-header"><PinLogo href="/pin" product="" label={t("pin.logo.home")} /><div className="student-header-actions">{selectedAudience && <button className="student-audience-switch" onClick={() => selectAudience(null)}>{t("pin.audience.change")}</button>}<LanguageSwitcher /><span className="student-live-status"><i />{t(live ? "pin.status.live" : "pin.status.endedCampaign")}</span></div></header>
+      <header className="student-header"><PinLogo href="/pin" product="" label={t("pin.logo.home")} /><div className="student-header-actions">{selectedAudience && <button className="student-audience-switch" onClick={() => selectAudience(null)}>{t("pin.audience.change")}</button>}<Link className="student-complete-button" href={finalHref}>{t("experience.complete")}</Link><LanguageSwitcher /><span className="student-live-status"><i />{t(live ? "pin.status.live" : "pin.status.endedCampaign")}</span></div></header>
       {/* QR 로 바로 들어온 참여자는 무엇에 대한 피드백인지 알 방법이 여기밖에 없다. */}
       <p className="student-guide"><b>{campaign.title}{selectedAudience && <em>{selectedAudience}</em>}</b>{campaign.guideText && <span>{campaign.guideText}</span>}</p>
       <section className="student-stage" aria-label={t("pin.join.imageAria", { title: campaign.title })}>

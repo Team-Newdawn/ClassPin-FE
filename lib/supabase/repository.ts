@@ -2,6 +2,8 @@ import type { RealtimeChannel } from "@supabase/supabase-js";
 import type { ClassSession, NormalizedPoint, Question, Slide } from "@/lib/types";
 import { ensureAnonymousUser, getAudienceSupabaseClient, getSessionUser, getSupabaseClient } from "./client";
 
+export type PlatformExperienceSource = "lecture" | "feedback";
+
 type LectureRow = {
   id: string;
   course_id: string;
@@ -473,6 +475,25 @@ export async function markQuestionResolved(questionId: string) {
   if (!client) return;
   await requireOwnerUser();
   const { error } = await client.from("questions").update({ status: "resolved", updated_at: new Date().toISOString() }).eq("id", questionId);
+  if (error) throw error;
+}
+
+export async function submitPlatformExperienceResponse(
+  source: PlatformExperienceSource,
+  code: string,
+  experience: string,
+  improvement: string
+) {
+  const client = getAudienceSupabaseClient();
+  if (!client) throw new Error("Supabase 연결을 찾지 못했습니다.");
+  const user = await ensureAnonymousUser();
+  if (!user) throw new Error("참여 세션을 만들지 못했습니다.");
+  const { error } = await client.rpc("submit_platform_experience_response", {
+    target_platform: source,
+    target_code: code,
+    target_experience: experience,
+    target_improvement: improvement
+  });
   if (error) throw error;
 }
 

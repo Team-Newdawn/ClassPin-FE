@@ -1,7 +1,7 @@
 import type { RealtimeChannel } from "@supabase/supabase-js";
 import { ensureAnonymousUser, getAudienceSupabaseClient, getSessionUser, getSupabaseClient } from "@/lib/supabase/client";
 import { isPdfFile, renderPdfPages } from "@/lib/pin/pdf-reference";
-import { AUDIENCE_GROUPS, isAudienceGroup, type AudienceGroup, type Campaign, type CampaignPage, type FeedbackCategory, type FeedbackPin } from "@/lib/pin/types";
+import { isAudienceGroupName, normalizeAudienceGroups, type Campaign, type CampaignPage, type FeedbackCategory, type FeedbackPin } from "@/lib/pin/types";
 
 const BUCKET = "campaign-images";
 
@@ -14,6 +14,7 @@ type CampaignRow = {
   image_width: number | null;
   image_height: number | null;
   status: string;
+  audience_groups: unknown;
   created_at: string;
 };
 
@@ -37,10 +38,10 @@ type CampaignPageRow = {
   image_path: string;
   image_width: number;
   image_height: number;
-  audience_groups: AudienceGroup[];
+  audience_groups: unknown;
 };
 
-const CAMPAIGN_COLUMNS = "id, title, guide_text, join_code, image_path, image_width, image_height, status, created_at";
+const CAMPAIGN_COLUMNS = "id, title, guide_text, join_code, image_path, image_width, image_height, status, audience_groups, created_at";
 const PAGE_COLUMNS = "id, campaign_id, page_index, image_path, image_width, image_height, audience_groups";
 const PIN_COLUMNS = "id, campaign_id, author_id, page_index, x, y, category, body, hidden, created_at";
 
@@ -102,7 +103,7 @@ function toPage(row: CampaignPageRow): CampaignPage {
     imageUrl: publicImageUrl(row.image_path) ?? "",
     imageWidth: row.image_width,
     imageHeight: row.image_height,
-    audienceGroups: row.audience_groups,
+    audienceGroups: normalizeAudienceGroups(row.audience_groups),
   };
 }
 
@@ -116,7 +117,7 @@ function legacyPage(row: CampaignRow): CampaignPage[] {
     imageUrl: publicImageUrl(row.image_path) ?? "",
     imageWidth: row.image_width,
     imageHeight: row.image_height,
-    audienceGroups: [...AUDIENCE_GROUPS],
+    audienceGroups: [],
   }];
 }
 
@@ -127,6 +128,7 @@ function toCampaign(row: CampaignRow, pins: FeedbackPin[], pages: CampaignPage[]
     title: row.title,
     guideText: row.guide_text ?? "",
     status: row.status === "live" ? "live" : "ended",
+    audienceGroups: normalizeAudienceGroups(row.audience_groups),
     pages: (pages.length ? pages : legacyPage(row)).sort((a, b) => a.pageIndex - b.pageIndex),
     createdAt: row.created_at,
     pins
@@ -178,7 +180,7 @@ export async function createCampaign(input: { id: string; code: string; title: s
       imageUrl: client.storage.from(BUCKET).getPublicUrl(imagePath).data.publicUrl,
       imageWidth: size.width,
       imageHeight: size.height,
-      audienceGroups: [...AUDIENCE_GROUPS],
+      audienceGroups: [],
     }];
   }
 
@@ -197,7 +199,8 @@ export async function createCampaign(input: { id: string; code: string; title: s
         image_path: first.imagePath,
         image_width: first.imageWidth,
         image_height: first.imageHeight,
-        status: "live"
+        status: "live",
+        audience_groups: []
       })
       .select(CAMPAIGN_COLUMNS)
       .single();
@@ -254,7 +257,7 @@ export async function fetchOwnedCampaigns(): Promise<Campaign[]> {
  * 테이블 select 는 "내가 의견을 남긴 캠페인"만 열어 주므로, 첫 진입은 코드를 대조하는
  * definer 함수를 거친다. 코드를 모르면 남의 캠페인을 열거할 수 없다.
  */
-export async function fetchLiveCampaign(code: string, audienceGroup: AudienceGroup): Promise<Campaign | null> {
+export async function fetchLiveCampaign(code: string, audienceGroup: string | null): Promise<Campaign | null> {
   const { client } = await participantContext();
   const { data, error } = await client.rpc("find_live_campaign", { target_code: code });
   if (error) throw error;
@@ -321,8 +324,8 @@ export async function updateCampaign(campaignId: string, values: { status?: "liv
   if (error) throw error;
 }
 
-export async function updateCampaignPageAudienceGroups(pageId: string, audienceGroups: AudienceGroup[]) {
-  if (new Set(audienceGroups).size !== audienceGroups.length || !audienceGroups.every(isAudienceGroup)) {
+export async function updateCampaignPageAudienceGroups(pageId: string, audienceGroups: string[]) {
+  if (new Set(audienceGroups.map((group) => group.toLocaleLowerCase())).size !== audienceGroups.length || !audienceGroups.every(isAudienceGroupName)) {
     throw new Error("참여 유형이 올바르지 않습니다.");
   }
   const client = getSupabaseClient();
@@ -335,6 +338,22 @@ export async function updateCampaignPageAudienceGroups(pageId: string, audienceG
     .maybeSingle();
   if (error) throw error;
   if (!data) throw new Error("공개 범위를 바꿀 페이지를 찾지 못했습니다.");
+}
+
+export async function updateCampaignAudienceGroups(campaignId: string, audienceGroups: string[]) {
+  if (audienceGroups.length > 20
+    || new Set(audienceGroups.map((group) => group.toLocaleLowerCase())).size !== audienceGroups.length
+    || !audienceGroups.every(isAudienceGroupName)) {
+    throw new Error("참여자 그룹이 올바르지 않습니다.");
+  }
+  const client = getSupabaseClient();
+  if (!client) return;
+  await requireOwnerUser();
+  const { error } = await client.rpc("set_campaign_audience_groups", {
+    target_campaign_id: campaignId,
+    target_audience_groups: audienceGroups,
+  });
+  if (error) throw error;
 }
 
 export function subscribeToCampaign(campaignId: string, onRefresh: () => void, asAudience = false): RealtimeChannel | null {

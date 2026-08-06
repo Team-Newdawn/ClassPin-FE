@@ -13,10 +13,11 @@ import {
   submitPin,
   subscribeToCampaign,
   updateCampaign,
+  updateCampaignAudienceGroups as persistAudienceGroups,
   updateCampaignPageAudienceGroups as persistPageAudienceGroups,
   updatePin as persistPinUpdate
 } from "@/lib/pin/repository";
-import { mergeAudiencePages, type AudienceGroup, type Campaign, type FeedbackCategory, type FeedbackPin } from "@/lib/pin/types";
+import { mergeAudiencePages, type Campaign, type FeedbackCategory, type FeedbackPin } from "@/lib/pin/types";
 
 type Store = {
   ready: boolean;
@@ -25,9 +26,10 @@ type Store = {
   addPin: (campaignId: string, pin: Omit<FeedbackPin, "id" | "campaignId" | "authorId" | "hidden" | "createdAt">) => Promise<void>;
   updatePin: (campaignId: string, pinId: string, values: { category: FeedbackCategory; body: string }) => Promise<void>;
   setPinHidden: (campaignId: string, pinId: string, hidden: boolean) => Promise<void>;
-  setPageAudienceGroups: (campaignId: string, pageId: string, audienceGroups: AudienceGroup[]) => Promise<void>;
+  setAudienceGroups: (campaignId: string, audienceGroups: string[]) => Promise<void>;
+  setPageAudienceGroups: (campaignId: string, pageId: string, audienceGroups: string[]) => Promise<void>;
   setStatus: (campaignId: string, status: Campaign["status"]) => Promise<void>;
-  loadCampaignByCode: (code: string, audienceGroup: AudienceGroup) => Promise<Campaign | null>;
+  loadCampaignByCode: (code: string, audienceGroup: string | null) => Promise<Campaign | null>;
 };
 
 const CampaignContext = createContext<Store | null>(null);
@@ -186,7 +188,22 @@ export function CampaignStore({ children }: { children: React.ReactNode }) {
         pins: campaign.pins.map((pin) => pin.id === pinId ? { ...pin, hidden } : pin)
       }));
     },
+    setAudienceGroups: async (campaignId, audienceGroups) => {
+      await persistAudienceGroups(campaignId, audienceGroups);
+      updateCampaignState(campaignId, (campaign) => ({
+        ...campaign,
+        audienceGroups,
+        pages: campaign.pages.map((page) => ({
+          ...page,
+          audienceGroups: page.audienceGroups.filter((group) => audienceGroups.includes(group))
+        }))
+      }));
+    },
     setPageAudienceGroups: async (campaignId, pageId, audienceGroups) => {
+      const campaign = campaigns.find((item) => item.id === campaignId);
+      if (!campaign || audienceGroups.some((group) => !campaign.audienceGroups.includes(group))) {
+        throw new Error("캠페인에 없는 참여자 그룹입니다.");
+      }
       await persistPageAudienceGroups(pageId, audienceGroups);
       updateCampaignState(campaignId, (campaign) => ({
         ...campaign,
@@ -198,7 +215,7 @@ export function CampaignStore({ children }: { children: React.ReactNode }) {
       updateCampaignState(campaignId, (campaign) => ({ ...campaign, status }));
     },
     loadCampaignByCode: async (code, audienceGroup) => {
-      const key = `${code.toLowerCase()}:${audienceGroup}`;
+      const key = `${code.toLowerCase()}:${audienceGroup ?? "metadata"}`;
       // campaigns 는 이 클로저가 만들어진 시점의 값이다. 같은 코드로 조회가 겹치면 (StrictMode 의
       // 이펙트 재실행, 재진입) 같은 요청이 겹친다. 유형까지 포함한 키로 조회를 하나로 묶는다.
       const inflight = lookups.current.get(key);
@@ -211,7 +228,9 @@ export function CampaignStore({ children }: { children: React.ReactNode }) {
             return current.map((campaign) => campaign.id === remote.id ? {
               ...campaign,
               ...remote,
-              pages: mergeAudiencePages(campaign.pages, remote.pages, audienceGroup)
+              pages: audienceGroup
+                ? mergeAudiencePages(campaign.pages, remote.pages, audienceGroup)
+                : remote.audienceGroups.length ? campaign.pages : remote.pages
             } : campaign);
           });
           return remote;

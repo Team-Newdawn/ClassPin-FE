@@ -4,11 +4,15 @@
  */
 export type FeedbackCategory = "praise" | "improve" | "confusing" | "bug" | "idea";
 
-export const AUDIENCE_GROUPS = ["design_sprint", "ai_playground", "event"] as const;
-export type AudienceGroup = typeof AUDIENCE_GROUPS[number];
+export const isAudienceGroupName = (value: string) => {
+  const length = [...value].length;
+  return value === value.trim() && length >= 1 && length <= 40;
+};
 
-export const isAudienceGroup = (value: string | null): value is AudienceGroup =>
-  AUDIENCE_GROUPS.includes(value as AudienceGroup);
+export const normalizeAudienceGroups = (value: unknown): string[] =>
+  Array.isArray(value)
+    ? [...new Set(value.filter((item): item is string => typeof item === "string" && isAudienceGroupName(item)))]
+    : [];
 
 export const feedbackCategoryLabel = {
   praise: "좋아요",
@@ -45,14 +49,14 @@ export interface CampaignPage {
   imagePath: string;
   imageWidth: number;
   imageHeight: number;
-  audienceGroups: AudienceGroup[];
+  audienceGroups: string[];
 }
 
-export const pagesForAudience = (pages: CampaignPage[], audienceGroup: AudienceGroup) =>
+export const pagesForAudience = (pages: CampaignPage[], audienceGroup: string) =>
   pages.filter((page) => page.audienceGroups.includes(audienceGroup));
 
 /** 한 참여 유형의 최신 응답만 교체해, 관리자 전체 목록과 이미 조회한 다른 유형을 보존한다. */
-export function mergeAudiencePages(current: CampaignPage[], incoming: CampaignPage[], audienceGroup: AudienceGroup) {
+export function mergeAudiencePages(current: CampaignPage[], incoming: CampaignPage[], audienceGroup: string) {
   const retained = current.filter((page) => !page.audienceGroups.includes(audienceGroup));
   return [...new Map([...retained, ...incoming].map((page) => [page.id, page])).values()]
     .sort((a, b) => a.pageIndex - b.pageIndex);
@@ -64,6 +68,8 @@ export interface Campaign {
   title: string;
   guideText: string;
   status: "live" | "ended";
+  /** 관리자가 캠페인별로 만든 참여자 분기 이름. 비어 있으면 분기를 사용하지 않는다. */
+  audienceGroups: string[];
   /** PDF는 모든 페이지, 이미지는 한 페이지로 정규화한다. */
   pages: CampaignPage[];
   createdAt: string;

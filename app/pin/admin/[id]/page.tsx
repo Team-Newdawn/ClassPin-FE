@@ -11,20 +11,15 @@ import { ImageCanvas } from "@/components/pin/image-canvas";
 import { useLanguage } from "@/components/language-context";
 import { downloadPinsCsv } from "@/lib/pin/csv";
 import { CATEGORY_KEYS, categoryBreakdown, countBy, hiddenPins, hotZone, latestPinAt, sentiment, topCategory, visiblePins } from "@/lib/pin/stats";
-import { AUDIENCE_GROUPS, type AudienceGroup, type FeedbackCategory, type FeedbackPin } from "@/lib/pin/types";
+import type { FeedbackCategory, FeedbackPin } from "@/lib/pin/types";
 
 type CategoryFilter = FeedbackCategory | "all";
-const audienceLabelKey = {
-  design_sprint: "pin.audience.designSprint",
-  ai_playground: "pin.audience.aiPlayground",
-  event: "pin.audience.event",
-} as const;
 
 export default function CampaignResults() {
   const { feedbackCategoryLabel, feedbackZoneLabel, locale, t, timeAgo } = useLanguage();
   const params = useParams<{ id: string }>();
   const router = useRouter();
-  const { ready, campaigns, setPageAudienceGroups, setPinHidden, setStatus } = useCampaigns();
+  const { ready, campaigns, setAudienceGroups, setPageAudienceGroups, setPinHidden, setStatus } = useCampaigns();
   const campaign = campaigns.find((item) => item.id === params.id);
   // 같은 핀을 다시 눌러도 목록을 또 중앙으로 보내려면 매번 새 객체여야 한다.
   const [selected, setSelected] = useState<{ id: string } | null>(null);
@@ -35,6 +30,7 @@ export default function CampaignResults() {
   const [copied, setCopied] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
   const [savingAudience, setSavingAudience] = useState(false);
+  const [newAudienceName, setNewAudienceName] = useState("");
   const [activePageIndex, setActivePageIndex] = useState(0);
   const selectedId = selected?.id ?? null;
 
@@ -81,7 +77,39 @@ export default function CampaignResults() {
     });
   };
 
-  const toggleAudience = async (audienceGroup: AudienceGroup) => {
+  const saveAudienceGroups = async (audienceGroups: string[]) => {
+    if (!campaign || savingAudience) return false;
+    setActionError(null);
+    setSavingAudience(true);
+    try {
+      await setAudienceGroups(campaign.id, audienceGroups);
+      return true;
+    } catch (error) {
+      const detail = error && typeof error === "object" && "message" in error ? String(error.message) : String(error);
+      console.error(`${t("pin.detail.groupSaveError")}: ${detail}`, error);
+      setActionError(t("pin.detail.groupSaveError"));
+      return false;
+    } finally {
+      setSavingAudience(false);
+    }
+  };
+
+  const addAudience = async () => {
+    if (!campaign) return;
+    const name = newAudienceName.trim();
+    if (!name || campaign.audienceGroups.some((group) => group.toLocaleLowerCase() === name.toLocaleLowerCase())) {
+      setActionError(t(name ? "pin.detail.groupDuplicate" : "pin.detail.groupNameRequired"));
+      return;
+    }
+    if (await saveAudienceGroups([...campaign.audienceGroups, name])) setNewAudienceName("");
+  };
+
+  const removeAudience = async (audienceGroup: string) => {
+    if (!campaign || !window.confirm(t("pin.detail.groupDeleteConfirm", { group: audienceGroup }))) return;
+    await saveAudienceGroups(campaign.audienceGroups.filter((group) => group !== audienceGroup));
+  };
+
+  const toggleAudience = async (audienceGroup: string) => {
     if (!campaign || !activePage || savingAudience) return;
     const audienceGroups = activePage.audienceGroups.includes(audienceGroup)
       ? activePage.audienceGroups.filter((group) => group !== audienceGroup)
@@ -181,11 +209,21 @@ export default function CampaignResults() {
               <div><h2>{t("pin.detail.mapTitle")}</h2><p>{t("pin.detail.mapDescription")}</p></div>
               <div className="pin-panel-page-tools"><CampaignPageNavigation pageIndex={activePageIndex} pageCount={campaign.pages.length} onChange={changePage} /><span className="panel-note"><Sparkles />{t("pin.detail.mapNote")}</span></div>
             </div>
+            <div className="pin-audience-manager">
+              <div><b>{t("pin.detail.groupTitle")}</b><small>{t("pin.detail.groupDescription")}</small></div>
+              <form onSubmit={(event) => { event.preventDefault(); void addAudience(); }}>
+                <input value={newAudienceName} onChange={(event) => setNewAudienceName(event.target.value)} maxLength={40} placeholder={t("pin.detail.groupPlaceholder")} aria-label={t("pin.detail.groupPlaceholder")} disabled={savingAudience || campaign.audienceGroups.length >= 20} />
+                <button className="btn secondary" disabled={savingAudience || !newAudienceName.trim() || campaign.audienceGroups.length >= 20}>{t("pin.detail.groupAdd")}</button>
+              </form>
+              {campaign.audienceGroups.length > 0 && <div className="pin-audience-list" aria-label={t("pin.detail.groupTitle")}>
+                {campaign.audienceGroups.map((group) => <span key={group}>{group}<button onClick={() => void removeAudience(group)} disabled={savingAudience} aria-label={t("pin.detail.groupDelete", { group })}><X /></button></span>)}
+              </div>}
+            </div>
             {activePage && <div className="pin-audience-setting">
-              <div><b>{t("pin.detail.audienceTitle")}</b><small>{activePage.audienceGroups.length ? t("pin.detail.audienceDescription") : t("pin.detail.audienceAdminOnly")}</small></div>
-              <div role="group" aria-label={t("pin.detail.audienceTitle")}>
-                {AUDIENCE_GROUPS.map((group) => <button key={group} className={activePage.audienceGroups.includes(group) ? "active" : ""} aria-pressed={activePage.audienceGroups.includes(group)} disabled={savingAudience} onClick={() => void toggleAudience(group)}>{activePage.audienceGroups.includes(group) && <Check />}{t(audienceLabelKey[group])}</button>)}
-              </div>
+              <div><b>{t("pin.detail.audienceTitle")}</b><small>{!campaign.audienceGroups.length ? t("pin.detail.audienceUnconfigured") : activePage.audienceGroups.length ? t("pin.detail.audienceDescription") : t("pin.detail.audienceAdminOnly")}</small></div>
+              {campaign.audienceGroups.length > 0 && <div role="group" aria-label={t("pin.detail.audienceTitle")}>
+                {campaign.audienceGroups.map((group) => <button key={group} className={activePage.audienceGroups.includes(group) ? "active" : ""} aria-pressed={activePage.audienceGroups.includes(group)} disabled={savingAudience} onClick={() => void toggleAudience(group)}>{activePage.audienceGroups.includes(group) && <Check />}{group}</button>)}
+              </div>}
             </div>}
             {/* 캔버스는 폭 100%에 원본 비율이라, 세로 사진이면 화면을 넘긴다. 비율로 폭을 눌러 높이를 잡는다. */}
             <div className="pin-stage" style={{ maxWidth: `min(100%, calc(58dvh * ${stageRatio.toFixed(3)}))` }}>

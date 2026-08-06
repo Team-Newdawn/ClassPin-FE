@@ -3,7 +3,7 @@
 
 import { Fragment, useState, type ReactNode } from "react";
 import { useLanguage } from "@/components/language-context";
-import type { Campaign, FeedbackPin } from "@/lib/pin/types";
+import type { Campaign, CampaignPage, FeedbackPin } from "@/lib/pin/types";
 
 /**
  * 기준 이미지 위에 핀을 얹는 캔버스.
@@ -14,8 +14,9 @@ import type { Campaign, FeedbackPin } from "@/lib/pin/types";
  * 임의 비율 사진에서는 레터박스 여백에도 핀이 찍히고 저장 좌표가 이미지상 위치와 어긋난다.
  * 그래서 여기서는 컨테이너를 이미지 원본 비율에 맞춰 여백 자체를 없앤다.
  */
-export function ImageCanvas({ campaign, pins = [], selectedId, onSelectPin, onCanvasClick, showLabels = false, labelMode = "always", children }: {
+export function ImageCanvas({ campaign, page, pins = [], selectedId, onSelectPin, onCanvasClick, showLabels = false, labelMode = "always", children }: {
   campaign: Campaign;
+  page?: CampaignPage;
   pins?: FeedbackPin[];
   selectedId?: string | null;
   onSelectPin?: (id: string) => void;
@@ -28,8 +29,9 @@ export function ImageCanvas({ campaign, pins = [], selectedId, onSelectPin, onCa
   const { feedbackCategoryLabel, t } = useLanguage();
   // 예전 행이나 업로드 직후처럼 크기를 모를 때는 이미지가 로드되며 알려주는 값으로 메운다.
   const [measured, setMeasured] = useState<{ width: number; height: number } | null>(null);
-  const width = campaign.imageWidth ?? measured?.width;
-  const height = campaign.imageHeight ?? measured?.height;
+  const activePage = page ?? campaign.pages[0];
+  const width = activePage?.imageWidth ?? measured?.width;
+  const height = activePage?.imageHeight ?? measured?.height;
 
   const click = (event: React.MouseEvent<HTMLDivElement>) => {
     if (!onCanvasClick || (event.target as HTMLElement).closest("button")) return;
@@ -46,9 +48,10 @@ export function ImageCanvas({ campaign, pins = [], selectedId, onSelectPin, onCa
       tabIndex={onCanvasClick ? 0 : undefined}
     >
       {/* 캠페인 이미지는 런타임 자산이라 Next 이미지 최적화를 일부러 거친다. */}
-      {campaign.imageUrl
+      {activePage?.imageUrl
         ? <img
-            src={campaign.imageUrl}
+            key={activePage.id}
+            src={activePage.imageUrl}
             alt={t("pin.image.alt", { title: campaign.title })}
             onLoad={(event) => {
               if (width && height) return;

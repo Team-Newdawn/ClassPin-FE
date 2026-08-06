@@ -1,6 +1,6 @@
 "use client";
 
-import { Check, Clock3 } from "lucide-react";
+import { Check, Clock3 } from "@/components/icons";
 import { useLanguage } from "@/components/language-context";
 import type { QuestionStatus } from "@/lib/types";
 

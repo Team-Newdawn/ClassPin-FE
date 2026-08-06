@@ -7,6 +7,7 @@ import { PinLogo } from "@/components/pin-logo";
 import { useAuth } from "@/components/auth-context";
 import { LanguageSwitcher, useLanguage } from "@/components/language-context";
 import { ImageCanvas } from "@/components/pin/image-canvas";
+import { CampaignPageNavigation } from "@/components/pin/campaign-page-navigation";
 import { useCampaigns } from "@/components/pin/campaign-store";
 import { supabaseConfigured } from "@/lib/supabase/client";
 import type { FeedbackCategory } from "@/lib/pin/types";
@@ -16,6 +17,7 @@ const BODY_MAX = 200;
 const DEFAULT_CATEGORY: FeedbackCategory = "praise";
 
 type DraftPin = {
+  pageIndex: number;
   x: number;
   y: number;
   category: FeedbackCategory;
@@ -37,6 +39,7 @@ export default function JoinCampaign() {
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [composerOpen, setComposerOpen] = useState(false);
+  const [activePageIndex, setActivePageIndex] = useState(0);
   const [lookupDone, setLookupDone] = useState(false);
   const pinDragged = useRef(false);
   const pinDragStart = useRef<{ x: number; y: number } | null>(null);
@@ -52,11 +55,13 @@ export default function JoinCampaign() {
   if (!ready || (!campaign && !lookupDone)) return <div className="loading-screen"><span className="spinner dark" /></div>;
   if (!campaign) return <div className="student-empty"><PinLogo href="/pin" product="" label={t("pin.logo.home")} /><LanguageSwitcher /><h1>{t("pin.join.notFound")}</h1><p>{t("pin.join.checkLink")}</p></div>;
   const live = campaign.status === "live";
-  const stageRatio = campaign.imageWidth && campaign.imageHeight ? campaign.imageWidth / campaign.imageHeight : 16 / 9;
+  if (!live) return <div className="student-empty"><PinLogo href="/pin" product="" label={t("pin.logo.home")} /><LanguageSwitcher /><h1>{t("pin.join.endedTitle")}</h1><p>{t("pin.join.endedDescription")}</p></div>;
+  const activePage = campaign.pages[activePageIndex] ?? campaign.pages[0];
+  const stageRatio = activePage ? activePage.imageWidth / activePage.imageHeight : 16 / 9;
   // RLS 만 믿으면 안 된다. 캠페인 소유자가 자기 참여 링크를 열면 참여자 전원의 핀이 내려오는데,
   // 그대로 그리면 남의 의견이 "내 의견"으로 보이고 수정 컴포저까지 열려 덮어쓰게 된다.
   // 관리자가 숨긴 핀도 여기서 뺀다 — 지운 것처럼 보이는 게 반쯤 살아 있는 것보다 정직하다.
-  const myPins = campaign.pins.filter((pin) => pin.authorId && pin.authorId === userId && !pin.hidden);
+  const myPins = campaign.pins.filter((pin) => pin.pageIndex === (activePage?.pageIndex ?? 0) && pin.authorId && pin.authorId === userId && !pin.hidden);
   const viewingPin = viewingPinId ? myPins.find((pin) => pin.id === viewingPinId) : null;
   const activeCategory = draft?.category ?? DEFAULT_CATEGORY;
   const draftBody = draft?.body ?? "";
@@ -64,7 +69,7 @@ export default function JoinCampaign() {
     setEditingPinId(null);
     setViewingPinId(null);
     setSubmitError(null);
-    setDraft((current) => ({ x, y, category: current?.category ?? DEFAULT_CATEGORY, body: current?.body ?? "" }));
+    setDraft((current) => ({ pageIndex: activePage?.pageIndex ?? 0, x, y, category: current?.category ?? DEFAULT_CATEGORY, body: current?.body ?? "" }));
     setSubmitted(false);
     setComposerOpen(true);
   };
@@ -83,7 +88,7 @@ export default function JoinCampaign() {
       setComposerOpen(true);
       return;
     }
-    setDraft({ x: pin.x, y: pin.y, category: pin.category, body: pin.body });
+    setDraft({ pageIndex: pin.pageIndex, x: pin.x, y: pin.y, category: pin.category, body: pin.body });
     setEditingPinId(pin.id);
     setViewingPinId(null);
     setSubmitted(false);
@@ -126,7 +131,7 @@ export default function JoinCampaign() {
       if (editingPinId) {
         await updatePin(campaign.id, editingPinId, values);
       } else {
-        await addPin(campaign.id, { x: draft.x, y: draft.y, ...values });
+        await addPin(campaign.id, { pageIndex: draft.pageIndex, x: draft.x, y: draft.y, ...values });
       }
       setSubmitted(true);
     } catch (error) {
@@ -155,16 +160,26 @@ export default function JoinCampaign() {
     setSubmitError(null);
     setComposerOpen(false);
   };
+  const changePage = (pageIndex: number) => {
+    setActivePageIndex(pageIndex);
+    clearDraft();
+    setEditingPinId(null);
+    setViewingPinId(null);
+    setSubmitted(false);
+    setSubmitError(null);
+    setComposerOpen(false);
+  };
   return (
     <main className="student-shell student-slide-shell">
       <header className="student-header"><PinLogo href="/pin" product="" label={t("pin.logo.home")} /><div className="student-header-actions"><LanguageSwitcher /><span className="student-live-status"><i />{t(live ? "pin.status.live" : "pin.status.endedCampaign")}</span></div></header>
       {/* QR 로 바로 들어온 참여자는 무엇에 대한 피드백인지 알 방법이 여기밖에 없다. */}
       <p className="student-guide"><b>{campaign.title}</b>{campaign.guideText && <span>{campaign.guideText}</span>}</p>
       <section className="student-stage" aria-label={t("pin.join.imageAria", { title: campaign.title })}>
+        <CampaignPageNavigation pageIndex={activePageIndex} pageCount={campaign.pages.length} onChange={changePage} className="participant-pages" />
         {/* 폭만 잡으면 세로로 긴 이미지는 화면 몇 배 높이가 되어 참여자가 일부만 보게 된다.
             관리자 화면과 같은 방식으로 뷰포트 높이에서 폭 상한을 역산해 한 화면에 담는다. */}
         <div className="student-canvas pin-fit" style={{ maxWidth: `min(86vw, calc(72dvh * ${stageRatio.toFixed(3)}))` }}>
-          <ImageCanvas campaign={campaign} pins={myPins} selectedId={editingPinId ?? viewingPinId} onSelectPin={startEditingPin} onCanvasClick={live ? placeDraftPin : undefined} showLabels>
+          <ImageCanvas campaign={campaign} page={activePage} pins={myPins} selectedId={editingPinId ?? viewingPinId} onSelectPin={startEditingPin} onCanvasClick={live ? placeDraftPin : undefined} showLabels>
             {draft && !editingPinId && !submitted && <>
               <button
                 className="draft-pin"

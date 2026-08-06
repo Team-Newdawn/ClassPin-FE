@@ -2,10 +2,11 @@
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { useAuth } from "@/components/auth-context";
-import { getSupabaseClient, supabaseConfigured } from "@/lib/supabase/client";
+import { getAudienceSupabaseClient, getSupabaseClient, supabaseConfigured } from "@/lib/supabase/client";
 import {
   createCampaign as persistCampaign,
   fetchCampaignSnapshot,
+  fetchCampaignStatus,
   fetchLiveCampaign,
   fetchOwnedCampaigns,
   setPinHidden as persistPinHidden,
@@ -19,7 +20,7 @@ import type { Campaign, FeedbackCategory, FeedbackPin } from "@/lib/pin/types";
 type Store = {
   ready: boolean;
   campaigns: Campaign[];
-  createCampaign: (input: { title: string; guideText: string; imageFile: File }) => Promise<Campaign>;
+  createCampaign: (input: { title: string; guideText: string; referenceFile: File }) => Promise<Campaign>;
   addPin: (campaignId: string, pin: Omit<FeedbackPin, "id" | "campaignId" | "authorId" | "hidden" | "createdAt">) => Promise<void>;
   updatePin: (campaignId: string, pinId: string, values: { category: FeedbackCategory; body: string }) => Promise<void>;
   setPinHidden: (campaignId: string, pinId: string, hidden: boolean) => Promise<void>;
@@ -28,6 +29,7 @@ type Store = {
 };
 
 const CampaignContext = createContext<Store | null>(null);
+const PARTICIPANT_STATUS_POLL_MS = 2_000;
 
 // 사람이 받아 적는 코드라 서로 헷갈리는 0/O, 1/I 는 뺀다.
 const CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
@@ -54,8 +56,11 @@ export function CampaignStore({ children }: { children: React.ReactNode }) {
   const [ready, setReady] = useState(false);
   const lookups = useRef(new Map<string, Promise<Campaign | null>>());
   const ownerId = useRef<string | null>(null);
+  const campaignsRef = useRef<Campaign[]>([]);
   const authUserId = user?.id ?? null;
   const authIsAnonymous = user?.is_anonymous ?? false;
+
+  useEffect(() => { campaignsRef.current = campaigns; }, [campaigns]);
 
   // 피드백 앱은 기준 이미지를 Storage 에 올려야 성립하므로 Supabase 모드만 지원한다.
   // DB 가 유일한 기준이고, 로컬 캐시는 두지 않는다.
@@ -103,6 +108,7 @@ export function CampaignStore({ children }: { children: React.ReactNode }) {
     if (!ready || !supabaseConfigured || !subscriptionKey) return;
     const tracked = [...new Map(campaigns.map((campaign) => [campaign.id, campaign])).values()];
     let active = true;
+    let statusPoll: ReturnType<typeof setInterval> | null = null;
     const channels: NonNullable<ReturnType<typeof subscribeToCampaign>>[] = [];
     const asAudience = !authUserId || authIsAnonymous;
     const refresh = async (campaign: Campaign) => {
@@ -116,9 +122,23 @@ export function CampaignStore({ children }: { children: React.ReactNode }) {
       const channel = subscribeToCampaign(campaign.id, () => void refresh(campaign), asAudience);
       if (channel) channels.push(channel);
     });
+    if (asAudience) {
+      statusPoll = setInterval(() => {
+        tracked.forEach((campaign) => {
+          const latestCampaign = campaignsRef.current.find((item) => item.id === campaign.id) ?? campaign;
+          void fetchCampaignStatus(latestCampaign, true)
+            .then((status) => {
+              if (!active) return;
+              setCampaigns((current) => current.map((item) => item.id === campaign.id && item.status !== status ? { ...item, status } : item));
+            })
+            .catch((error) => console.error("Supabase campaign status refresh failed", error));
+        });
+      }, PARTICIPANT_STATUS_POLL_MS);
+    }
     return () => {
       active = false;
-      const client = getSupabaseClient();
+      if (statusPoll) clearInterval(statusPoll);
+      const client = asAudience ? getAudienceSupabaseClient() : getSupabaseClient();
       if (client) channels.forEach((channel) => void client.removeChannel(channel));
     };
     // 핀이 늘어난다고 구독을 다시 만들지 않는다. 캠페인 id 집합이 바뀔 때만 재구독한다.

@@ -76,6 +76,7 @@ export default function JoinSession() {
 
   if (!ready || (!session && !lookupDone)) return <div className="loading-screen"><span className="spinner dark" /></div>;
   if (!session) return <div className="student-empty"><PinLogo /><LanguageSwitcher /><h1>{t("student.sessionNotFound")}</h1><p>{t("student.checkLink")}</p></div>;
+  if (session.status !== "live") return <div className="student-empty"><PinLogo /><LanguageSwitcher /><h1>{t("student.sessionEndedTitle")}</h1><p>{t("student.sessionEndedDescription")}</p></div>;
   const effectiveTool = !session.showQuestionPins && activeTool === "emoji" ? "pin" : activeTool;
   const slide = session.slides[current];
   const submittedQuestions = session.questions.filter((question) => question.slideIndex === current);

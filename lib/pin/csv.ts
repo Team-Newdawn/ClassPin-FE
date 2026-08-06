@@ -6,6 +6,7 @@ const categoryLabel = (locale: Locale, category: FeedbackPin["category"]) =>
 
 const headers = (locale: Locale) => [
   translate(locale, "pin.csv.order"),
+  translate(locale, "pin.csv.page"),
   "x",
   "y",
   translate(locale, "pin.csv.type"),
@@ -34,6 +35,7 @@ export const buildPinsCsv = (pins: FeedbackPin[], locale: Locale = "ko") =>
     headers(locale).map(escapeCell).join(","),
     ...pins.map((pin, index) => [
       String(index + 1),
+      String(pin.pageIndex + 1),
       coord(pin.x),
       coord(pin.y),
       categoryLabel(locale, pin.category),

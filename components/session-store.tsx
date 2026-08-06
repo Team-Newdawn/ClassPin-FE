@@ -4,7 +4,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import { useAuth } from "@/components/auth-context";
 import type { ClassSession, PresentationQrPosition, Question, Slide } from "@/lib/types";
 import { getAudienceSupabaseClient, getSupabaseClient, supabaseConfigured } from "@/lib/supabase/client";
-import { fetchLectureSnapshot, fetchLiveSession, fetchOwnedSessions, markQuestionResolved, persistSession, postAnswer, saveSlideInstructorNote, submitQuestion, subscribeToLecture, updateLecture, updateQuestion as persistQuestionUpdate } from "@/lib/supabase/repository";
+import { appendSessionSlides, deleteSessionSlide, fetchLectureSnapshot, fetchLectureStatus, fetchLiveSession, fetchOwnedSessions, fetchSessionSlides, markQuestionResolved, persistSession, postAnswer, saveSlideInstructorNote, submitQuestion, subscribeToLecture, updateLecture, updateQuestion as persistQuestionUpdate } from "@/lib/supabase/repository";
 
 const STORAGE_KEY = "pin-class-sessions-v1";
 const SUPABASE_CACHE_PREFIX = "pin-class-sessions-cache-v2";
@@ -15,6 +15,8 @@ type Store = {
   ready: boolean;
   sessions: ClassSession[];
   createSession: (input: { title: string; fileName: string; slides: Slide[] }) => Promise<ClassSession>;
+  appendSlides: (sessionId: string, files: File[]) => Promise<void>;
+  deleteSlide: (sessionId: string, slideId: string) => Promise<void>;
   addQuestion: (sessionId: string, question: Omit<Question, "id" | "sessionId" | "createdAt" | "status">) => Promise<void>;
   updateQuestion: (sessionId: string, questionId: string, values: Pick<Question, "category" | "text">) => Promise<void>;
   answerQuestion: (sessionId: string, questionId: string, answer: string) => Promise<void>;
@@ -31,6 +33,16 @@ const SessionContext = createContext<Store | null>(null);
 
 const makeCode = () => `PIN${Math.floor(100 + Math.random() * 900)}`;
 const cacheKey = (userId: string) => `${SUPABASE_CACHE_PREFIX}:${userId}`;
+const APPENDABLE_SLIDE_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
+const MAX_SLIDE_IMAGE_BYTES = 10 * 1024 * 1024;
+const PARTICIPANT_STATUS_POLL_MS = 2_000;
+
+const fileToDataUrl = (file: File) => new Promise<string>((resolve, reject) => {
+  const reader = new FileReader();
+  reader.onload = () => resolve(String(reader.result));
+  reader.onerror = () => reject(reader.error ?? new Error("이미지를 읽지 못했습니다."));
+  reader.readAsDataURL(file);
+});
 
 const errorDetail = (error: unknown) => {
   if (error && typeof error === "object" && "message" in error && typeof error.message === "string") return error.message;
@@ -74,9 +86,13 @@ export function SessionStore({ children }: { children: React.ReactNode }) {
   const slideWrites = useRef(new Map<string, Promise<void>>());
   const slideTargets = useRef(new Map<string, number>());
   const refreshSequences = useRef(new Map<string, number>());
+  const slideRefreshSequences = useRef(new Map<string, number>());
   const ownerId = useRef<string | null>(null);
+  const sessionsRef = useRef<ClassSession[]>([]);
   const authUserId = user?.id ?? null;
   const authIsAnonymous = user?.is_anonymous ?? false;
+
+  useEffect(() => { sessionsRef.current = sessions; }, [sessions]);
 
   // demo 모드에서만 localStorage가 기준 데이터다.
   useEffect(() => {
@@ -136,12 +152,14 @@ export function SessionStore({ children }: { children: React.ReactNode }) {
     ).values()];
     const asAudience = !ownerId.current;
     let active = true;
+    let statusPoll: ReturnType<typeof setInterval> | null = null;
     const channels: NonNullable<ReturnType<typeof subscribeToLecture>>[] = [];
     const refresh = async (session: ClassSession) => {
       const refreshSequence = (refreshSequences.current.get(session.id) ?? 0) + 1;
       refreshSequences.current.set(session.id, refreshSequence);
       try {
-        const snapshot = await fetchLectureSnapshot(session, asAudience);
+        const latestSession = sessionsRef.current.find((item) => item.id === session.id) ?? session;
+        const snapshot = await fetchLectureSnapshot(latestSession, asAudience);
         if (!active || !snapshot || refreshSequences.current.get(session.id) !== refreshSequence) return;
         setSessions((current) => current.map((item) => {
           if (item.id !== session.id) return item;
@@ -158,19 +176,48 @@ export function SessionStore({ children }: { children: React.ReactNode }) {
         }));
       } catch (error) { console.error("Supabase realtime refresh failed", error); }
     };
+    const refreshSlides = async (session: ClassSession) => {
+      const refreshSequence = (slideRefreshSequences.current.get(session.id) ?? 0) + 1;
+      slideRefreshSequences.current.set(session.id, refreshSequence);
+      try {
+        const latestSession = sessionsRef.current.find((item) => item.id === session.id) ?? session;
+        const slides = await fetchSessionSlides(latestSession, asAudience);
+        if (!active || slideRefreshSequences.current.get(session.id) !== refreshSequence) return;
+        setSessions((current) => current.map((item) => item.id === session.id ? { ...item, slides } : item));
+      } catch (error) { console.error("Supabase slide refresh failed", error); }
+    };
     const connect = async () => {
       try {
-        await Promise.all(tracked.map(refresh));
-        if (!active) return;
         tracked.forEach((session) => {
-          const channel = subscribeToLecture(session.id, () => void refresh(session), asAudience);
+          const channel = subscribeToLecture(
+            session.id,
+            session.materialVersionId,
+            () => void refresh(session),
+            () => void refreshSlides(session),
+            asAudience
+          );
           if (channel) channels.push(channel);
         });
+        await Promise.all(tracked.flatMap((session) => [refresh(session), refreshSlides(session)]));
       } catch (error) { console.error("Supabase authentication failed", error); }
     };
     void connect();
+    if (asAudience) {
+      statusPoll = setInterval(() => {
+        tracked.forEach((session) => {
+          const latestSession = sessionsRef.current.find((item) => item.id === session.id) ?? session;
+          void fetchLectureStatus(latestSession, true)
+            .then((status) => {
+              if (!active) return;
+              setSessions((current) => current.map((item) => item.id === session.id && item.status !== status ? { ...item, status } : item));
+            })
+            .catch((error) => console.error("Supabase lecture status refresh failed", error));
+        });
+      }, PARTICIPANT_STATUS_POLL_MS);
+    }
     return () => {
       active = false;
+      if (statusPoll) clearInterval(statusPoll);
       const client = asAudience ? getAudienceSupabaseClient() : getSupabaseClient();
       if (client) channels.forEach((channel) => void client.removeChannel(channel));
     };
@@ -225,6 +272,58 @@ export function SessionStore({ children }: { children: React.ReactNode }) {
     ready,
     sessions,
     createSession,
+    appendSlides: async (sessionId, files) => {
+      const session = sessions.find((item) => item.id === sessionId);
+      if (!session) throw new Error("슬라이드를 추가할 강의를 찾지 못했습니다.");
+      if (files.length < 1 || files.length > 20) throw new Error("슬라이드는 한 번에 1~20장까지 추가할 수 있습니다.");
+      if (files.some((file) => !APPENDABLE_SLIDE_TYPES.has(file.type) || file.size > MAX_SLIDE_IMAGE_BYTES)) {
+        throw new Error("10MB 이하의 PNG, JPG, WebP 이미지만 추가할 수 있습니다.");
+      }
+      const appended = supabaseConfigured
+        ? await appendSessionSlides(session, files)
+        : await Promise.all(files.map(async (file, index): Promise<Slide> => ({
+          id: crypto.randomUUID(),
+          pageIndex: session.slides.length + index,
+          title: `Slide ${session.slides.length + index + 1}`,
+          imageUrl: await fileToDataUrl(file),
+          speakerNote: ""
+        })));
+      updateSession(sessionId, (current) => {
+        const byId = new Map(current.slides.map((slide) => [slide.id, slide]));
+        appended.forEach((slide) => byId.set(slide.id, slide));
+        return { ...current, slides: [...byId.values()].sort((a, b) => a.pageIndex - b.pageIndex) };
+      });
+    },
+    deleteSlide: async (sessionId, slideId) => {
+      const session = sessions.find((item) => item.id === sessionId);
+      if (!session) throw new Error("슬라이드를 삭제할 강의를 찾지 못했습니다.");
+      const deletedIndex = session.slides.findIndex((slide) => slide.id === slideId);
+      if (deletedIndex < 0) throw new Error("삭제할 슬라이드를 찾지 못했습니다.");
+      if (session.slides.length <= 1) throw new Error("마지막 슬라이드는 삭제할 수 없습니다.");
+
+      if (supabaseConfigured) {
+        await deleteSessionSlide(slideId);
+        const slides = await fetchSessionSlides(session);
+        const snapshot = await fetchLectureSnapshot({ ...session, slides });
+        updateSession(sessionId, (current) => ({ ...current, slides, ...(snapshot ?? {}) }));
+        return;
+      }
+
+      updateSession(sessionId, (current) => {
+        const slides = current.slides
+          .filter((slide) => slide.id !== slideId)
+          .map((slide, pageIndex) => ({ ...slide, pageIndex, title: `Slide ${pageIndex + 1}` }));
+        const questions = current.questions
+          .filter((question) => question.slideIndex !== deletedIndex)
+          .map((question) => question.slideIndex > deletedIndex ? { ...question, slideIndex: question.slideIndex - 1 } : question);
+        const currentSlide = current.currentSlide > deletedIndex
+          ? current.currentSlide - 1
+          : current.currentSlide === deletedIndex
+            ? Math.min(deletedIndex, slides.length - 1)
+            : current.currentSlide;
+        return { ...current, slides, questions, currentSlide };
+      });
+    },
     addQuestion: async (sessionId, input) => {
       const session = sessions.find((item) => item.id === sessionId);
       if (!session) throw new Error("질문을 남길 강의를 찾지 못했습니다.");

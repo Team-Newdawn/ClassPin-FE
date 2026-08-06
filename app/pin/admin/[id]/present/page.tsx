@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { QRCodeSVG } from "qrcode.react";
-import { Clock3, MapPin, Maximize2, Minimize2, X } from "@/components/icons";
+import { ChevronLeft, ChevronRight, Clock3, MapPin, Maximize2, Minimize2, X } from "@/components/icons";
 import { LanguageSwitcher, useLanguage } from "@/components/language-context";
 import { useCampaigns } from "@/components/pin/campaign-store";
 import { ImageCanvas } from "@/components/pin/image-canvas";
@@ -31,6 +31,7 @@ export default function FeedbackPresentation() {
   const [activePinId, setActivePinId] = useState<string | null>(null);
   const [rotationCycle, setRotationCycle] = useState(0);
   const [actionError, setActionError] = useState<string | null>(null);
+  const [activePageIndex, setActivePageIndex] = useState(0);
 
   const revealControls = useCallback(() => {
     setControlsVisible(true);
@@ -97,6 +98,21 @@ export default function FeedbackPresentation() {
   }, [revealControls]);
 
   const activePin = visiblePins.find((pin) => pin.id === activePinId) ?? null;
+  const displayedPageIndex = activePin?.pageIndex ?? activePageIndex;
+  const activePage = campaign?.pages[displayedPageIndex] ?? campaign?.pages[0];
+  const pagePins = visiblePins.filter((pin) => pin.pageIndex === (activePage?.pageIndex ?? 0));
+
+  const changePage = useCallback((pageIndex: number) => {
+    const pageCount = campaign?.pages.length ?? 0;
+    if (!pageCount) return;
+    const next = Math.min(pageCount - 1, Math.max(0, pageIndex));
+    setActivePageIndex(next);
+    const nextPin = visiblePins.find((pin) => pin.pageIndex === next);
+    setActivePinId(nextPin?.id ?? null);
+    if (nextPin) rotationQueueRef.current = rotationQueueRef.current.filter((id) => id !== nextPin.id);
+    setRotationCycle((current) => current + 1);
+    revealControls();
+  }, [campaign?.pages.length, revealControls, visiblePins]);
 
   const toggleFullscreen = useCallback(async () => {
     setActionError(null);
@@ -123,16 +139,22 @@ export default function FeedbackPresentation() {
         event.preventDefault();
         revealControls();
         void toggleFullscreen();
+      } else if (event.key === "ArrowLeft") {
+        event.preventDefault();
+        changePage(displayedPageIndex - 1);
+      } else if (event.key === "ArrowRight") {
+        event.preventDefault();
+        changePage(displayedPageIndex + 1);
       }
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [revealControls, toggleFullscreen]);
+  }, [changePage, displayedPageIndex, revealControls, toggleFullscreen]);
 
   if (!ready) return <main className="presentation-shell presentation-message"><span className="spinner" /></main>;
   if (!campaign) return <main className="presentation-shell presentation-message"><h1>{t("pin.presentation.notFound")}</h1><button className="presentation-text-button" onClick={() => router.push("/pin/admin")}>{t("pin.detail.campaignList")}</button></main>;
 
-  const stageRatio = campaign.imageWidth && campaign.imageHeight ? campaign.imageWidth / campaign.imageHeight : 16 / 9;
+  const stageRatio = activePage ? activePage.imageWidth / activePage.imageHeight : 16 / 9;
   const joinUrl = typeof window === "undefined" ? "" : `${window.location.origin}/pin/join/${campaign.code}`;
   const closePresentation = () => {
     if (window.opener && !window.opener.closed) window.close();
@@ -150,7 +172,8 @@ export default function FeedbackPresentation() {
         <div className="pin-presentation-canvas" style={{ maxWidth: `min(88vw, calc((100dvh - var(--pin-presentation-safe-height)) * ${stageRatio.toFixed(3)}))` }}>
           <ImageCanvas
             campaign={campaign}
-            pins={showPins ? visiblePins : []}
+            page={activePage}
+            pins={showPins ? pagePins : []}
             selectedId={showPins ? activePinId : null}
             onSelectPin={(id) => {
               setActivePinId(id);
@@ -163,6 +186,9 @@ export default function FeedbackPresentation() {
           />
         </div>
       </div>
+
+      <button className="presentation-side-control previous" onClick={() => changePage(displayedPageIndex - 1)} disabled={displayedPageIndex <= 0} aria-label={t("pin.pages.previous")}><ChevronLeft /></button>
+      <button className="presentation-side-control next" onClick={() => changePage(displayedPageIndex + 1)} disabled={displayedPageIndex >= campaign.pages.length - 1} aria-label={t("pin.pages.next")}><ChevronRight /></button>
 
       <aside className="presentation-join-qr bottom-right" role="img" aria-label={`${t("pin.presentation.joinQrAria")} · ${campaign.code}`}>
         <QRCodeSVG value={joinUrl} size={108} bgColor="#ffffff" fgColor="#101827" level="M" />
@@ -202,6 +228,7 @@ export default function FeedbackPresentation() {
 
       <footer className="presentation-footer">
         {actionError && <span className="presentation-error" role="alert">{actionError}</span>}
+        {campaign.pages.length > 1 && <span className="presentation-page">{t("pin.pages.position", { current: displayedPageIndex + 1, total: campaign.pages.length })}</span>}
         <span className="presentation-hint">{t("pin.presentation.hint")}</span>
       </footer>
     </main>

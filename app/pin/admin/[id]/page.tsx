@@ -5,6 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import { QRCodeSVG } from "qrcode.react";
 import { BarChart3, Check, Clock3, Copy, FileText, Link2, ListFilter, MessageCircleQuestion, MonitorUp, Pause, Play, Search, Share2, Sparkles, Users, X } from "@/components/icons";
 import { PinAdminShell } from "@/components/pin/admin-shell";
+import { CampaignPageNavigation } from "@/components/pin/campaign-page-navigation";
 import { useCampaigns } from "@/components/pin/campaign-store";
 import { ImageCanvas } from "@/components/pin/image-canvas";
 import { useLanguage } from "@/components/language-context";
@@ -28,14 +29,25 @@ export default function CampaignResults() {
   const [shareOpen, setShareOpen] = useState(false);
   const [copied, setCopied] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
+  const [activePageIndex, setActivePageIndex] = useState(0);
   const selectedId = selected?.id ?? null;
-  const selectPin = (id: string) => setSelected({ id });
 
   const pins = useMemo(() => campaign?.pins ?? [], [campaign]);
+  const activePage = campaign?.pages[activePageIndex] ?? campaign?.pages[0];
+  const pagePins = useMemo(() => pins.filter((pin) => pin.pageIndex === (activePage?.pageIndex ?? 0)), [activePage?.pageIndex, pins]);
+  const selectPin = (id: string) => {
+    const pin = pins.find((item) => item.id === id);
+    if (pin) setActivePageIndex(pin.pageIndex);
+    setSelected({ id });
+  };
+  const changePage = (pageIndex: number) => {
+    setActivePageIndex(pageIndex);
+    setSelected(null);
+  };
   const matched = useMemo(() => {
     const keyword = query.trim().toLowerCase();
-    return pins.filter((pin) => (filter === "all" || pin.category === filter) && (!keyword || pin.body.toLowerCase().includes(keyword)));
-  }, [filter, pins, query]);
+    return pagePins.filter((pin) => (filter === "all" || pin.category === filter) && (!keyword || pin.body.toLowerCase().includes(keyword)));
+  }, [filter, pagePins, query]);
   // 이미지와 목록이 같은 배열을 나눠 써야 핀 번호와 목록 번호가 어긋나지 않는다.
   const stagePins = useMemo(() => matched.filter((pin) => !pin.hidden), [matched]);
   const hiddenMatched = useMemo(() => matched.filter((pin) => pin.hidden), [matched]);
@@ -45,10 +57,12 @@ export default function CampaignResults() {
 
   const visible = visiblePins(pins);
   const hidden = hiddenPins(pins);
+  const pageVisible = visible.filter((pin) => pin.pageIndex === (activePage?.pageIndex ?? 0));
+  const pageHidden = hidden.filter((pin) => pin.pageIndex === (activePage?.pageIndex ?? 0));
   const categories = categoryBreakdown(visible);
   const top = topCategory(visible);
-  const zone = hotZone(visible);
-  const latest = latestPinAt(visible);
+  const zone = hotZone(pageVisible);
+  const latest = latestPinAt(pageVisible);
   const mood = sentiment(visible);
   const maxCategory = categories[0]?.count ?? 0;
 
@@ -84,7 +98,7 @@ export default function CampaignResults() {
   if (!ready) return <div className="loading-screen"><span className="spinner dark" /></div>;
   if (!campaign) return <div className="empty-state"><h1>{t("pin.detail.notFound")}</h1><p>{t("pin.detail.notFoundDescription")}</p><button className="btn primary" onClick={() => router.push("/pin/admin")}>{t("pin.detail.campaignList")}</button></div>;
 
-  const stageRatio = campaign.imageWidth && campaign.imageHeight ? campaign.imageWidth / campaign.imageHeight : 16 / 9;
+  const stageRatio = activePage ? activePage.imageWidth / activePage.imageHeight : 16 / 9;
   const joinUrl = typeof window === "undefined" ? "" : `${window.location.origin}/pin/join/${campaign.code}`;
   const copy = async () => { await navigator.clipboard.writeText(joinUrl); setCopied(true); setTimeout(() => setCopied(false), 1500); };
   const toggleHidden = (pin: FeedbackPin) => runAction(setPinHidden(campaign.id, pin.id, !pin.hidden), t(pin.hidden ? "pin.detail.restoreError" : "pin.detail.excludeError"));
@@ -131,21 +145,21 @@ export default function CampaignResults() {
         <div className="filterbar">
           <div className="searchbox"><Search /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder={t("pin.detail.searchFeedback")} /></div>
           <div className="filter-tabs">
-            <button className={filter === "all" ? "active" : ""} onClick={() => setFilter("all")}>{t("common.all")} {visible.length}</button>
-            {CATEGORY_KEYS.map((key) => <button key={key} className={filter === key ? "active" : ""} onClick={() => setFilter(key)}>{feedbackCategoryLabel(key)} {countBy(visible, key)}</button>)}
+            <button className={filter === "all" ? "active" : ""} onClick={() => setFilter("all")}>{t("common.all")} {pageVisible.length}</button>
+            {CATEGORY_KEYS.map((key) => <button key={key} className={filter === key ? "active" : ""} onClick={() => setFilter(key)}>{feedbackCategoryLabel(key)} {countBy(pageVisible, key)}</button>)}
           </div>
-          <button className={`btn secondary pin-hidden-toggle ${showHidden ? "active" : ""}`} onClick={() => setShowHidden(!showHidden)} disabled={!hidden.length} aria-pressed={showHidden}><ListFilter />{t("pin.detail.showExcluded", { count: hidden.length })}</button>
+          <button className={`btn secondary pin-hidden-toggle ${showHidden ? "active" : ""}`} onClick={() => setShowHidden(!showHidden)} disabled={!pageHidden.length} aria-pressed={showHidden}><ListFilter />{t("pin.detail.showExcluded", { count: pageHidden.length })}</button>
         </div>
 
         <div className="pin-workspace">
           <section className="panel pin-stage-panel">
             <div className="panel-head">
               <div><h2>{t("pin.detail.mapTitle")}</h2><p>{t("pin.detail.mapDescription")}</p></div>
-              <span className="panel-note"><Sparkles />{t("pin.detail.mapNote")}</span>
+              <div className="pin-panel-page-tools"><CampaignPageNavigation pageIndex={activePageIndex} pageCount={campaign.pages.length} onChange={changePage} /><span className="panel-note"><Sparkles />{t("pin.detail.mapNote")}</span></div>
             </div>
             {/* 캔버스는 폭 100%에 원본 비율이라, 세로 사진이면 화면을 넘긴다. 비율로 폭을 눌러 높이를 잡는다. */}
             <div className="pin-stage" style={{ maxWidth: `min(100%, calc(58dvh * ${stageRatio.toFixed(3)}))` }}>
-              <ImageCanvas campaign={campaign} pins={stagePins} selectedId={selectedId} onSelectPin={selectPin} showLabels labelMode="selected" />
+              <ImageCanvas campaign={campaign} page={activePage} pins={stagePins} selectedId={selectedId} onSelectPin={selectPin} showLabels labelMode="selected" />
             </div>
           </section>
 
@@ -166,8 +180,8 @@ export default function CampaignResults() {
               )) : (
                 <div className="panel-empty">
                   <MessageCircleQuestion />
-                  <b>{t(pins.length ? "pin.detail.noMatch" : "pin.detail.none")}</b>
-                  <span>{t(pins.length ? "pin.detail.changeFilters" : "pin.detail.emptyHint")}</span>
+                  <b>{t(pagePins.length ? "pin.detail.noMatch" : "pin.detail.none")}</b>
+                  <span>{t(pagePins.length ? "pin.detail.changeFilters" : "pin.detail.emptyHint")}</span>
                 </div>
               )}
             </div>

@@ -9,6 +9,7 @@ import { useCampaigns } from "@/components/pin/campaign-store";
 import { Check, Clock3, Copy, Grid2X2, Link2, Plus, Search, Share2, Upload, Users, X } from "@/components/icons";
 import { useLanguage } from "@/components/language-context";
 import type { TranslationKey } from "@/lib/i18n";
+import { isPdfFile } from "@/lib/pin/pdf-reference";
 import type { Campaign } from "@/lib/pin/types";
 
 type Filter = "all" | Campaign["status"];
@@ -22,7 +23,7 @@ const acceptedImageTypes = new Set(["image/jpeg", "image/png", "image/webp"]);
 const maxImageBytes = 10 * 1024 * 1024;
 
 function imageValidationError(file: File, t: (key: TranslationKey) => string) {
-  if (!acceptedImageTypes.has(file.type)) return t("pin.admin.validationImageType");
+  if (!acceptedImageTypes.has(file.type) && !isPdfFile(file)) return t("pin.admin.validationImageType");
   if (file.size > maxImageBytes) return t("pin.admin.validationImageSize");
   return null;
 }
@@ -39,7 +40,9 @@ export default function PinAdminPage() {
   const [sharedCampaign, setSharedCampaign] = useState<Campaign | null>(null);
   const [title, setTitle] = useState("");
   const [guideText, setGuideText] = useState("");
-  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [referenceFile, setReferenceFile] = useState<File | null>(null);
+  const [sourceFileName, setSourceFileName] = useState("");
+  const [pdfSelected, setPdfSelected] = useState(false);
   const [previewUrl, setPreviewUrl] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
@@ -60,11 +63,13 @@ export default function PinAdminPage() {
     if (previewUrlRef.current) URL.revokeObjectURL(previewUrlRef.current);
   }, []);
 
-  const replaceImage = (file: File | null) => {
+  const replaceImage = (file: File | null, sourceName = file?.name ?? "", fromPdf = false) => {
     if (previewUrlRef.current) URL.revokeObjectURL(previewUrlRef.current);
-    const nextPreviewUrl = file ? URL.createObjectURL(file) : "";
+    const nextPreviewUrl = file && !fromPdf ? URL.createObjectURL(file) : "";
     previewUrlRef.current = nextPreviewUrl;
-    setImageFile(file);
+    setReferenceFile(file);
+    setSourceFileName(sourceName);
+    setPdfSelected(fromPdf);
     setPreviewUrl(nextPreviewUrl);
   };
 
@@ -91,7 +96,7 @@ export default function PinAdminPage() {
       setFormError(error);
       return;
     }
-    replaceImage(file);
+    replaceImage(file, file.name, isPdfFile(file));
     setFormError(null);
   };
 
@@ -111,11 +116,11 @@ export default function PinAdminPage() {
       setFormError(t("pin.admin.validationGuideLength"));
       return;
     }
-    if (!imageFile) {
+    if (!referenceFile) {
       setFormError(t("pin.admin.validationImageRequired"));
       return;
     }
-    const imageError = imageValidationError(imageFile, t);
+    const imageError = imageValidationError(referenceFile, t);
     if (imageError) {
       setFormError(imageError);
       return;
@@ -124,11 +129,11 @@ export default function PinAdminPage() {
     setSubmitting(true);
     setFormError(null);
     try {
-      const campaign = await createCampaign({ title: cleanTitle, guideText: cleanGuideText, imageFile });
+      const campaign = await createCampaign({ title: cleanTitle, guideText: cleanGuideText, referenceFile });
       router.push(`/pin/admin/${campaign.id}`);
     } catch (error) {
       console.error("Campaign creation failed", error);
-      setFormError(t("pin.admin.createError"));
+      setFormError(error instanceof Error && error.message ? error.message : t("pin.admin.createError"));
       setSubmitting(false);
     }
   };
@@ -189,8 +194,8 @@ export default function PinAdminPage() {
                 aria-label={t("pin.admin.openCampaign", { title: campaign.title })}
               >
                 <span className="material-thumb campaign-thumb">
-                  {campaign.imageUrl
-                    ? <img src={campaign.imageUrl} alt={t("pin.image.alt", { title: campaign.title })} />
+                  {campaign.pages[0]?.imageUrl
+                    ? <img src={campaign.pages[0].imageUrl} alt={t("pin.image.alt", { title: campaign.title })} />
                     : <span className="slide-placeholder">{t("pin.image.unavailable")}</span>}
                   <em className={`live-badge ${campaign.status}`}><i />{t(campaign.status === "live" ? "pin.status.live" : "pin.status.ended")}</em>
                 </span>
@@ -252,18 +257,20 @@ export default function PinAdminPage() {
               </label>
               <div className="campaign-field">
                 <span>{t("pin.admin.fieldImage")} <small>{t("pin.admin.required")}</small></span>
-                <input ref={fileInputRef} type="file" accept="image/jpeg,image/png,image/webp" hidden onChange={(event) => pickImage(event.target.files?.[0])} />
+                <input ref={fileInputRef} type="file" accept=".pdf,application/pdf,image/jpeg,image/png,image/webp" hidden onChange={(event) => void pickImage(event.target.files?.[0])} />
                 <div className="upload-card campaign-image-picker">
                   {previewUrl
                     ? <img className="campaign-image-preview" src={previewUrl} alt={t("pin.admin.selectedImageAlt")} />
                     : <div className="upload-icon"><Upload /></div>}
-                  <p>{imageFile ? imageFile.name : t("pin.admin.imageRequirement")}</p>
-                  <button className="btn secondary" type="button" onClick={() => fileInputRef.current?.click()} disabled={submitting}><Upload />{t(imageFile ? "pin.admin.chooseDifferentImage" : "pin.admin.chooseImage")}</button>
+                  <p>{sourceFileName
+                      ? `${sourceFileName}${pdfSelected ? ` · ${t("pin.admin.pdfAllPages")}` : ""}`
+                      : t("pin.admin.imageRequirement")}</p>
+                  <button className="btn secondary" type="button" onClick={() => fileInputRef.current?.click()} disabled={submitting}><Upload />{t(referenceFile ? "pin.admin.chooseDifferentImage" : "pin.admin.chooseImage")}</button>
                 </div>
               </div>
               <div className="campaign-form-actions">
                 <button className="btn secondary" type="button" onClick={closeCreate} disabled={submitting}>{t("pin.admin.cancel")}</button>
-                <button className="btn primary" type="submit" disabled={submitting}>{submitting ? <><span className="spinner" />{t("pin.admin.creating")}</> : <><Plus />{t("pin.home.createCampaign")}</>}</button>
+                <button className="btn primary" type="submit" disabled={submitting}>{submitting ? <><span className="spinner" />{t(pdfSelected ? "pin.admin.convertingAndCreating" : "pin.admin.creating")}</> : <><Plus />{t("pin.home.createCampaign")}</>}</button>
               </div>
             </form>
           </div>

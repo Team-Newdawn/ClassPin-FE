@@ -1,6 +1,7 @@
 import type { RealtimeChannel } from "@supabase/supabase-js";
 import { ensureAnonymousUser, getAudienceSupabaseClient, getSessionUser, getSupabaseClient } from "@/lib/supabase/client";
-import type { Campaign, FeedbackCategory, FeedbackPin } from "@/lib/pin/types";
+import { isPdfFile, renderPdfPages } from "@/lib/pin/pdf-reference";
+import type { Campaign, CampaignPage, FeedbackCategory, FeedbackPin } from "@/lib/pin/types";
 
 const BUCKET = "campaign-images";
 
@@ -20,6 +21,7 @@ type PinRow = {
   id: string;
   campaign_id: string;
   author_id: string | null;
+  page_index: number;
   x: number | string;
   y: number | string;
   category: FeedbackCategory;
@@ -28,8 +30,18 @@ type PinRow = {
   created_at: string;
 };
 
+type CampaignPageRow = {
+  id: string;
+  campaign_id: string;
+  page_index: number;
+  image_path: string;
+  image_width: number;
+  image_height: number;
+};
+
 const CAMPAIGN_COLUMNS = "id, title, guide_text, join_code, image_path, image_width, image_height, status, created_at";
-const PIN_COLUMNS = "id, campaign_id, author_id, x, y, category, body, hidden, created_at";
+const PAGE_COLUMNS = "id, campaign_id, page_index, image_path, image_width, image_height";
+const PIN_COLUMNS = "id, campaign_id, author_id, page_index, x, y, category, body, hidden, created_at";
 
 /** 캠페인 개설·숨김 처리 같은 관리자 전용 쓰기는 구글 로그인 세션을 요구한다. */
 async function requireOwnerUser() {
@@ -70,6 +82,7 @@ function toPin(row: PinRow): FeedbackPin {
     id: row.id,
     campaignId: row.campaign_id,
     authorId: row.author_id,
+    pageIndex: row.page_index,
     x: toNumber(row.x),
     y: toNumber(row.y),
     category: row.category,
@@ -79,17 +92,39 @@ function toPin(row: PinRow): FeedbackPin {
   };
 }
 
-function toCampaign(row: CampaignRow, pins: FeedbackPin[]): Campaign {
+function toPage(row: CampaignPageRow): CampaignPage {
+  return {
+    id: row.id,
+    campaignId: row.campaign_id,
+    pageIndex: row.page_index,
+    imagePath: row.image_path,
+    imageUrl: publicImageUrl(row.image_path) ?? "",
+    imageWidth: row.image_width,
+    imageHeight: row.image_height,
+  };
+}
+
+function legacyPage(row: CampaignRow): CampaignPage[] {
+  if (!row.image_path || !row.image_width || !row.image_height) return [];
+  return [{
+    id: `${row.id}-legacy-page`,
+    campaignId: row.id,
+    pageIndex: 0,
+    imagePath: row.image_path,
+    imageUrl: publicImageUrl(row.image_path) ?? "",
+    imageWidth: row.image_width,
+    imageHeight: row.image_height,
+  }];
+}
+
+function toCampaign(row: CampaignRow, pins: FeedbackPin[], pages: CampaignPage[]): Campaign {
   return {
     id: row.id,
     code: row.join_code,
     title: row.title,
     guideText: row.guide_text ?? "",
     status: row.status === "live" ? "live" : "ended",
-    imageUrl: publicImageUrl(row.image_path),
-    imagePath: row.image_path ?? undefined,
-    imageWidth: row.image_width ?? undefined,
-    imageHeight: row.image_height ?? undefined,
+    pages: (pages.length ? pages : legacyPage(row)).sort((a, b) => a.pageIndex - b.pageIndex),
     createdAt: row.created_at,
     pins
   };
@@ -116,38 +151,70 @@ export async function readImageSize(file: File): Promise<{ width: number; height
   }
 }
 
-export async function createCampaign(input: { id: string; code: string; title: string; guideText: string; imageFile: File }): Promise<Campaign> {
+export async function createCampaign(input: { id: string; code: string; title: string; guideText: string; referenceFile: File }): Promise<Campaign> {
   const client = getSupabaseClient();
   if (!client) throw new Error("Supabase 연결을 찾지 못했습니다.");
   const user = await requireOwnerUser();
-  const size = await readImageSize(input.imageFile);
-  const extension = input.imageFile.type === "image/png" ? "png" : input.imageFile.type === "image/webp" ? "webp" : "jpg";
-  // storage 정책이 첫 폴더명을 소유자로 검증한다. 경로 모양을 바꾸면 업로드가 막힌다.
-  const imagePath = `${user.id}/${input.id}.${extension}`;
-  const { error: uploadError } = await client.storage.from(BUCKET)
-    .upload(imagePath, input.imageFile, { contentType: input.imageFile.type || "image/jpeg", upsert: false });
-  if (uploadError) throw uploadError;
+  let pages: CampaignPage[];
+  if (isPdfFile(input.referenceFile)) {
+    pages = await renderPdfPages(input.id, input.referenceFile);
+  } else {
+    const size = await readImageSize(input.referenceFile);
+    const pageId = crypto.randomUUID();
+    const extension = input.referenceFile.type === "image/png" ? "png" : input.referenceFile.type === "image/webp" ? "webp" : "jpg";
+    // storage 정책이 첫 폴더명을 소유자로 검증한다. 경로 모양을 바꾸면 업로드가 막힌다.
+    const imagePath = `${user.id}/${input.id}/${pageId}.${extension}`;
+    const { error: uploadError } = await client.storage.from(BUCKET)
+      .upload(imagePath, input.referenceFile, { contentType: input.referenceFile.type || "image/jpeg", upsert: false });
+    if (uploadError) throw uploadError;
+    pages = [{
+      id: pageId,
+      campaignId: input.id,
+      pageIndex: 0,
+      imagePath,
+      imageUrl: client.storage.from(BUCKET).getPublicUrl(imagePath).data.publicUrl,
+      imageWidth: size.width,
+      imageHeight: size.height,
+    }];
+  }
 
-  const { data, error } = await client.from("campaigns")
-    .insert({
-      id: input.id,
-      owner_id: user.id,
-      title: input.title,
-      guide_text: input.guideText || null,
-      join_code: input.code,
-      image_path: imagePath,
-      image_width: size.width,
-      image_height: size.height,
-      status: "live"
-    })
-    .select(CAMPAIGN_COLUMNS)
-    .single();
-  if (error) {
-    // 이미지가 먼저 올라가므로 여기서 멈추면 아무도 참조하지 않는 객체가 남는다.
-    await client.storage.from(BUCKET).remove([imagePath]).catch(() => {});
+  const uploadedPaths = pages.map((page) => page.imagePath);
+  let campaignCreated = false;
+  try {
+    const first = pages[0];
+    const { data, error } = await client.from("campaigns")
+      .insert({
+        id: input.id,
+        owner_id: user.id,
+        title: input.title,
+        guide_text: input.guideText || null,
+        join_code: input.code,
+        // 구버전 클라이언트와 기존 공개 URL을 위해 첫 페이지를 legacy 컬럼에도 유지한다.
+        image_path: first.imagePath,
+        image_width: first.imageWidth,
+        image_height: first.imageHeight,
+        status: "live"
+      })
+      .select(CAMPAIGN_COLUMNS)
+      .single();
+    if (error) throw error;
+    campaignCreated = true;
+
+    const { error: pagesError } = await client.from("campaign_pages").insert(pages.map((page) => ({
+      id: page.id,
+      campaign_id: input.id,
+      page_index: page.pageIndex,
+      image_path: page.imagePath,
+      image_width: page.imageWidth,
+      image_height: page.imageHeight,
+    })));
+    if (pagesError) throw pagesError;
+    return toCampaign(data as CampaignRow, [], pages);
+  } catch (error) {
+    if (campaignCreated) await client.from("campaigns").delete().eq("id", input.id);
+    if (uploadedPaths.length) await client.storage.from(BUCKET).remove(uploadedPaths);
     throw error;
   }
-  return toCampaign(data as CampaignRow, []);
 }
 
 /** 현재 관리자가 소유한 캠페인 전체를 핀까지 함께 복원한다. */
@@ -161,13 +228,20 @@ export async function fetchOwnedCampaigns(): Promise<Campaign[]> {
   if (error) throw error;
   const rows = (data ?? []) as CampaignRow[];
   if (!rows.length) return [];
-  const { data: pinData, error: pinError } = await client.from("feedback_pins")
-    .select(PIN_COLUMNS)
-    .in("campaign_id", rows.map((row) => row.id))
-    .order("created_at", { ascending: false });
+  const campaignIds = rows.map((row) => row.id);
+  const [{ data: pinData, error: pinError }, { data: pageData, error: pageError }] = await Promise.all([
+    client.from("feedback_pins").select(PIN_COLUMNS).in("campaign_id", campaignIds).order("created_at", { ascending: false }),
+    client.from("campaign_pages").select(PAGE_COLUMNS).in("campaign_id", campaignIds).order("page_index", { ascending: true }),
+  ]);
   if (pinError) throw pinError;
+  if (pageError) throw pageError;
   const pins = ((pinData ?? []) as PinRow[]).map(toPin);
-  return rows.map((row) => toCampaign(row, pins.filter((pin) => pin.campaignId === row.id)));
+  const pages = ((pageData ?? []) as CampaignPageRow[]).map(toPage);
+  return rows.map((row) => toCampaign(
+    row,
+    pins.filter((pin) => pin.campaignId === row.id),
+    pages.filter((page) => page.campaignId === row.id)
+  ));
 }
 
 /**
@@ -181,12 +255,13 @@ export async function fetchLiveCampaign(code: string): Promise<Campaign | null> 
   if (error) throw error;
   const row = (data as CampaignRow[] | null)?.[0];
   if (!row) return null;
-  const { data: pinData, error: pinError } = await client.from("feedback_pins")
-    .select(PIN_COLUMNS)
-    .eq("campaign_id", row.id)
-    .order("created_at", { ascending: false });
+  const [{ data: pinData, error: pinError }, { data: pageData, error: pageError }] = await Promise.all([
+    client.from("feedback_pins").select(PIN_COLUMNS).eq("campaign_id", row.id).order("created_at", { ascending: false }),
+    client.rpc("find_campaign_pages", { target_code: code }),
+  ]);
   if (pinError) throw pinError;
-  return toCampaign(row, ((pinData ?? []) as PinRow[]).map(toPin));
+  if (pageError) throw pageError;
+  return toCampaign(row, ((pinData ?? []) as PinRow[]).map(toPin), ((pageData ?? []) as CampaignPageRow[]).map(toPage));
 }
 
 /** 실제로 기록된 작성자 id 를 돌려준다. 참여자 화면이 "내 피드백"을 가리는 기준이 된다. */
@@ -197,6 +272,7 @@ export async function submitPin(campaign: Campaign, pin: FeedbackPin): Promise<s
     campaign_id: campaign.id,
     author_id: user.id,
     is_anonymous: true,
+    page_index: pin.pageIndex,
     x: pin.x,
     y: pin.y,
     category: pin.category,
@@ -251,21 +327,30 @@ export function subscribeToCampaign(campaignId: string, onRefresh: () => void, a
     .subscribe();
 }
 
+/** 코드 기반 조회를 보조해, 캠페인 행을 아직 직접 볼 수 없는 참여자도 종료를 감지한다. */
+export async function fetchCampaignStatus(
+  campaign: Pick<Campaign, "id" | "code" | "status">,
+  asAudience = false
+): Promise<Campaign["status"]> {
+  const client = asAudience ? getAudienceSupabaseClient() : getSupabaseClient();
+  if (!client) return campaign.status;
+  if (asAudience) await ensureAnonymousUser();
+  const { data: row, error } = await client.from("campaigns").select("status").eq("id", campaign.id).maybeSingle();
+  if (error) throw error;
+  if (row?.status) return row.status as Campaign["status"];
+  if (!asAudience) return campaign.status;
+
+  const { data: lookup, error: lookupError } = await client.rpc("find_live_campaign", { target_code: campaign.code });
+  if (lookupError) throw lookupError;
+  const matched = (lookup as CampaignRow[] | null)?.[0];
+  return matched?.status === "live" ? "live" : "ended";
+}
+
 export async function fetchCampaignSnapshot(campaign: Campaign, asAudience = false): Promise<Pick<Campaign, "status" | "pins"> | null> {
   const client = asAudience ? getAudienceSupabaseClient() : getSupabaseClient();
   if (!client) return null;
   if (asAudience) await ensureAnonymousUser();
-  const { data: row, error: statusError } = await client.from("campaigns").select("status").eq("id", campaign.id).maybeSingle();
-  if (statusError) throw statusError;
-  // 아직 의견을 남기지 않은 참여자에게는 캠페인 행이 보이지 않는다. 그때 예전 상태를 그대로
-  // 두면 종료된 캠페인이 화면에는 계속 LIVE 로 남아, 제출이 조용히 거부되는데도 재시도만 한다.
-  // 행이 안 보이면 코드로 다시 물어 살아 있는지 확인한다.
-  let status = row?.status as Campaign["status"] | undefined;
-  if (!status) {
-    const { data: lookup } = await client.rpc("find_live_campaign", { target_code: campaign.code });
-    const matched = (lookup as CampaignRow[] | null)?.[0];
-    status = matched?.status === "live" ? "live" : "ended";
-  }
+  const status = await fetchCampaignStatus(campaign, asAudience);
   const { data, error } = await client.from("feedback_pins")
     .select(PIN_COLUMNS)
     .eq("campaign_id", campaign.id)

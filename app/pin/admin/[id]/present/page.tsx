@@ -10,7 +10,8 @@ import { ImageCanvas } from "@/components/pin/image-canvas";
 import { reconcileFeedbackRotation, shuffle } from "@/lib/pin/presentation-rotation";
 
 const CONTROLS_HIDE_DELAY = 2800;
-const FEEDBACK_ROTATION_DELAY = 4200;
+const FEEDBACK_ROTATION_DELAY = 2000;
+const PAGE_ROTATION_DELAY = 8000;
 
 export default function FeedbackPresentation() {
   const { feedbackCategoryLabel, locale, t, timeAgo } = useLanguage();
@@ -23,12 +24,14 @@ export default function FeedbackPresentation() {
   const visiblePinKey = visiblePinIds.join("|");
   const stageRef = useRef<HTMLElement>(null);
   const visiblePinIdsRef = useRef<string[]>([]);
+  const campaignIdRef = useRef<string | null>(null);
   const rotationQueueRef = useRef<string[]>([]);
   const hideTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [controlsVisible, setControlsVisible] = useState(true);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [showPins, setShowPins] = useState(true);
   const [activePinId, setActivePinId] = useState<string | null>(null);
+  const [shownPinIds, setShownPinIds] = useState<string[]>([]);
   const [rotationCycle, setRotationCycle] = useState(0);
   const [actionError, setActionError] = useState<string | null>(null);
   const [activePageIndex, setActivePageIndex] = useState(0);
@@ -46,40 +49,59 @@ export default function FeedbackPresentation() {
     };
   }, []);
 
-  // 피드백은 생성 시각과 무관하게 한 번씩 섞어 순환한다. Realtime 으로 새 핀이 들어오면
-  // 지도 태그와 하단 설명 카드가 같은 새 의견을 즉시 가리킨다. 여러 건이 한꺼번에 추가된
-  // 경우에는 추가된 의견끼리도 섞어, 생성 순서가 플레이 순서를 고정하지 않게 한다.
+  // Realtime 으로 새 핀이 들어오면 자동 재생 차례를 기다리지 않고 해당 페이지로 이동한다.
+  // 첫 스냅샷은 새 핀으로 보지 않아 플레이어가 항상 첫 페이지부터 시작한다.
   useEffect(() => {
+    if (!campaign) return;
     const previousIds = visiblePinIdsRef.current;
     visiblePinIdsRef.current = visiblePinIds;
-    setActivePinId((current) => {
-      const rotation = reconcileFeedbackRotation({ previousIds, visibleIds: visiblePinIds, currentId: current });
-      rotationQueueRef.current = rotation.queue;
-      return rotation.activeId;
+    const firstSnapshot = campaignIdRef.current !== campaign.id;
+    campaignIdRef.current = campaign.id;
+    const incomingPin = firstSnapshot ? null : shuffle(visiblePins.filter((pin) => !previousIds.includes(pin.id)))[0];
+    const nextPageIndex = incomingPin?.pageIndex ?? (firstSnapshot ? 0 : activePageIndex);
+    const pageIds = visiblePins.filter((pin) => pin.pageIndex === nextPageIndex).map((pin) => pin.id);
+    const rotation = reconcileFeedbackRotation({
+      previousIds: pageIds,
+      visibleIds: pageIds,
+      currentId: incomingPin?.id ?? (firstSnapshot ? null : activePinId)
     });
+    const retained = firstSnapshot || (incomingPin && nextPageIndex !== activePageIndex)
+      ? []
+      : shownPinIds.filter((id) => pageIds.includes(id));
+    const nextShown = rotation.activeId && !retained.includes(rotation.activeId) ? [...retained, rotation.activeId] : retained;
+    setActivePageIndex(nextPageIndex);
+    setActivePinId(rotation.activeId);
+    setShownPinIds(nextShown);
+    rotationQueueRef.current = shuffle(pageIds.filter((id) => !nextShown.includes(id)));
     setRotationCycle((current) => current + 1);
     // id 집합이 같으면 본문 수정만으로 순환 타이머를 다시 시작하지 않는다.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [visiblePinKey]);
+  }, [campaign?.id, visiblePinKey]);
+
+  const activePage = campaign?.pages[activePageIndex] ?? campaign?.pages[0];
+  const pagePins = useMemo(
+    () => visiblePins.filter((pin) => pin.pageIndex === (activePage?.pageIndex ?? 0)),
+    [activePage?.pageIndex, visiblePins]
+  );
+  const pagePinIds = useMemo(() => pagePins.map((pin) => pin.id), [pagePins]);
+  const shownPagePins = useMemo(() => pagePins.filter((pin) => shownPinIds.includes(pin.id)), [pagePins, shownPinIds]);
 
   const rotateFeedback = useCallback(() => {
-    const ids = visiblePinIdsRef.current;
-    setActivePinId((current) => {
-      let queue = rotationQueueRef.current.filter((id) => ids.includes(id) && id !== current);
-      if (!queue.length) queue = shuffle(ids.filter((id) => id !== current));
-      const next = queue.shift() ?? ids[0] ?? null;
-      rotationQueueRef.current = queue;
-      return next;
-    });
+    let queue = rotationQueueRef.current.filter((id) => pagePinIds.includes(id) && id !== activePinId);
+    if (!queue.length) queue = shuffle(pagePinIds.filter((id) => id !== activePinId));
+    const next = queue.shift() ?? pagePinIds[0] ?? null;
+    rotationQueueRef.current = queue;
+    setActivePinId(next);
+    if (next) setShownPinIds((current) => current.includes(next) ? current : [...current, next]);
     // 한 건뿐이어도 같은 태그가 다시 등장하는 애니메이션을 재생한다.
     setRotationCycle((current) => current + 1);
-  }, []);
+  }, [activePinId, pagePinIds]);
 
   useEffect(() => {
-    if (!visiblePinIds.length) return;
+    if (!pagePinIds.length) return;
     const interval = window.setInterval(rotateFeedback, FEEDBACK_ROTATION_DELAY);
     return () => window.clearInterval(interval);
-  }, [rotateFeedback, visiblePinIds.length]);
+  }, [pagePinIds.length, rotateFeedback]);
 
   useEffect(() => {
     if (!campaign) return;
@@ -97,22 +119,31 @@ export default function FeedbackPresentation() {
     return () => document.removeEventListener("fullscreenchange", onFullscreenChange);
   }, [revealControls]);
 
-  const activePin = visiblePins.find((pin) => pin.id === activePinId) ?? null;
-  const displayedPageIndex = activePin?.pageIndex ?? activePageIndex;
-  const activePage = campaign?.pages[displayedPageIndex] ?? campaign?.pages[0];
-  const pagePins = visiblePins.filter((pin) => pin.pageIndex === (activePage?.pageIndex ?? 0));
+  const activePin = shownPagePins.find((pin) => pin.id === activePinId) ?? null;
 
-  const changePage = useCallback((pageIndex: number) => {
+  const changePage = useCallback((pageIndex: number, showControls = true) => {
     const pageCount = campaign?.pages.length ?? 0;
     if (!pageCount) return;
     const next = Math.min(pageCount - 1, Math.max(0, pageIndex));
+    const nextPage = campaign?.pages[next];
+    const [nextPinId, ...queue] = shuffle(visiblePins.filter((pin) => pin.pageIndex === nextPage?.pageIndex).map((pin) => pin.id));
     setActivePageIndex(next);
-    const nextPin = visiblePins.find((pin) => pin.pageIndex === next);
-    setActivePinId(nextPin?.id ?? null);
-    if (nextPin) rotationQueueRef.current = rotationQueueRef.current.filter((id) => id !== nextPin.id);
+    setActivePinId(nextPinId ?? null);
+    setShownPinIds(nextPinId ? [nextPinId] : []);
+    rotationQueueRef.current = queue;
     setRotationCycle((current) => current + 1);
-    revealControls();
-  }, [campaign?.pages.length, revealControls, visiblePins]);
+    if (showControls) revealControls();
+  }, [campaign?.pages, revealControls, visiblePins]);
+
+  useEffect(() => {
+    const pageCount = campaign?.pages.length ?? 0;
+    if (pageCount < 2) return;
+    const interval = window.setInterval(
+      () => changePage((activePageIndex + 1) % pageCount, false),
+      PAGE_ROTATION_DELAY
+    );
+    return () => window.clearInterval(interval);
+  }, [activePageIndex, campaign?.pages.length, changePage]);
 
   const toggleFullscreen = useCallback(async () => {
     setActionError(null);
@@ -141,15 +172,15 @@ export default function FeedbackPresentation() {
         void toggleFullscreen();
       } else if (event.key === "ArrowLeft") {
         event.preventDefault();
-        changePage(displayedPageIndex - 1);
+        changePage(activePageIndex - 1);
       } else if (event.key === "ArrowRight") {
         event.preventDefault();
-        changePage(displayedPageIndex + 1);
+        changePage(activePageIndex + 1);
       }
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [changePage, displayedPageIndex, revealControls, toggleFullscreen]);
+  }, [activePageIndex, changePage, revealControls, toggleFullscreen]);
 
   if (!ready) return <main className="presentation-shell presentation-message"><span className="spinner" /></main>;
   if (!campaign) return <main className="presentation-shell presentation-message"><h1>{t("pin.presentation.notFound")}</h1><button className="presentation-text-button" onClick={() => router.push("/pin/admin")}>{t("pin.detail.campaignList")}</button></main>;
@@ -173,7 +204,7 @@ export default function FeedbackPresentation() {
           <ImageCanvas
             campaign={campaign}
             page={activePage}
-            pins={showPins ? pagePins : []}
+            pins={showPins ? shownPagePins : []}
             selectedId={showPins ? activePinId : null}
             onSelectPin={(id) => {
               setActivePinId(id);
@@ -183,12 +214,13 @@ export default function FeedbackPresentation() {
             }}
             showLabels
             labelMode="selected"
+            labelContent="body"
           />
         </div>
       </div>
 
-      <button className="presentation-side-control previous" onClick={() => changePage(displayedPageIndex - 1)} disabled={displayedPageIndex <= 0} aria-label={t("pin.pages.previous")}><ChevronLeft /></button>
-      <button className="presentation-side-control next" onClick={() => changePage(displayedPageIndex + 1)} disabled={displayedPageIndex >= campaign.pages.length - 1} aria-label={t("pin.pages.next")}><ChevronRight /></button>
+      <button className="presentation-side-control previous" onClick={() => changePage(activePageIndex - 1)} disabled={activePageIndex <= 0} aria-label={t("pin.pages.previous")}><ChevronLeft /></button>
+      <button className="presentation-side-control next" onClick={() => changePage(activePageIndex + 1)} disabled={activePageIndex >= campaign.pages.length - 1} aria-label={t("pin.pages.next")}><ChevronRight /></button>
 
       <aside className="presentation-join-qr bottom-right" role="img" aria-label={`${t("pin.presentation.joinQrAria")} · ${campaign.code}`}>
         <QRCodeSVG value={joinUrl} size={108} bgColor="#ffffff" fgColor="#101827" level="M" />
@@ -228,7 +260,7 @@ export default function FeedbackPresentation() {
 
       <footer className="presentation-footer">
         {actionError && <span className="presentation-error" role="alert">{actionError}</span>}
-        {campaign.pages.length > 1 && <span className="presentation-page">{t("pin.pages.position", { current: displayedPageIndex + 1, total: campaign.pages.length })}</span>}
+        {campaign.pages.length > 1 && <span className="presentation-page">{t("pin.pages.position", { current: activePageIndex + 1, total: campaign.pages.length })}</span>}
         <span className="presentation-hint">{t("pin.presentation.hint")}</span>
       </footer>
     </main>

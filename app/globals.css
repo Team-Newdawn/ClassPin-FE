@@ -258,6 +258,12 @@ a.nav-item{text-decoration:none;color:inherit}
 .pin-presentation-canvas{width:100%;margin:auto}
 .pin-presentation-canvas .pin-canvas{border-radius:12px;box-shadow:inset 0 0 0 1px rgba(255,255,255,.18),0 28px 90px rgba(0,0,0,.56)}
 .pin-presentation-canvas .question-pin{cursor:pointer}
+.pin-presentation-canvas .feedback-bubble{height:auto;min-height:30px;max-width:clamp(132px,24vw,360px);padding:7px 11px;display:-webkit-box;overflow:hidden;-webkit-box-orient:vertical;-webkit-line-clamp:2;white-space:normal;text-align:left;font-size:clamp(10px,1.05vw,14px);line-height:1.35;overflow-wrap:anywhere;border:1px solid currentColor;border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,.32)}
+.pin-presentation-canvas .feedback-bubble:before{content:"";position:absolute;left:-5px;top:50%;width:9px;height:9px;background:inherit;border-left:1px solid currentColor;border-bottom:1px solid currentColor;transform:translateY(-50%) rotate(45deg)}
+.pin-presentation-canvas .feedback-bubble.to-left{transform:translate(calc(-100% - 12px),calc(-50% - 17px))}
+.pin-presentation-canvas .feedback-bubble.to-left:before{left:auto;right:-5px;transform:translateY(-50%) rotate(225deg)}
+.pin-presentation-canvas .feedback-bubble.below{transform:translate(36px,8px)}
+.pin-presentation-canvas .feedback-bubble.to-left.below{transform:translate(calc(-100% - 12px),8px)}
 .pin-presentation-count{height:25px;padding:0 9px;display:inline-flex;align-items:center;border:1px solid rgba(255,255,255,.13);border-radius:999px;background:rgba(23,29,38,.58);color:var(--pin-neutral-300);font-size:10px;font-weight:600;white-space:nowrap}
 .pin-presentation-shell .presentation-top-actions button.active{border-color:rgba(91,148,255,.58);background:rgba(40,103,232,.48);color:#fff}
 .pin-presentation-feedback{position:absolute;z-index:8;left:50%;bottom:calc(var(--pin-presentation-footer-height) + 12px);width:min(620px,calc(100vw - 48px));max-height:calc(var(--pin-presentation-bottom-rail-height) - var(--pin-presentation-footer-height) - 24px);padding:14px 16px;overflow:hidden;transform:translateX(-50%);border:1px solid rgba(255,255,255,.16);border-radius:16px;background:rgba(16,24,39,.86);color:var(--pin-neutral-100);box-shadow:0 18px 54px rgba(0,0,0,.38);backdrop-filter:blur(14px);animation:pin-player-feedback-in 220ms ease-out}

@@ -456,7 +456,7 @@ const ko = {
   "pin.presentation.joinQrAria": "피드백 캠페인 참여 QR 코드",
   "pin.presentation.feedbackCount": ({ count: value }) => `실시간 피드백 ${value}건`,
   "pin.presentation.empty": "새 피드백이 도착하면 이 화면에 바로 표시됩니다.",
-  "pin.presentation.hint": "피드백이 자동으로 반복됩니다 · P 핀 표시 · F 전체화면",
+  "pin.presentation.hint": "이미지와 피드백이 자동으로 반복됩니다 · P 핀 표시 · F 전체화면",
   "pin.presentation.fullscreenError": "전체화면을 시작하지 못했어요. 브라우저의 전체화면 권한을 확인해 주세요.",
   "pin.presentation.imageAria": ({ title }) => `${title} 피드백 지도`,
 
@@ -990,7 +990,7 @@ const en: Record<TranslationKey, Message> = {
   "pin.presentation.joinQrAria": "Feedback campaign join QR code",
   "pin.presentation.feedbackCount": ({ count: value }) => `${value} live feedback items`,
   "pin.presentation.empty": "New feedback will appear here as soon as it arrives.",
-  "pin.presentation.hint": "Feedback repeats automatically · P toggle pins · F full screen",
+  "pin.presentation.hint": "Images and feedback repeat automatically · P toggle pins · F full screen",
   "pin.presentation.fullscreenError": "Could not enter full screen. Check your browser's full-screen permission.",
   "pin.presentation.imageAria": ({ title }) => `${title} feedback map`,
 

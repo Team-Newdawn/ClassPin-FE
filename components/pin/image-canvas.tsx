@@ -14,7 +14,7 @@ import type { Campaign, CampaignPage, FeedbackPin } from "@/lib/pin/types";
  * 임의 비율 사진에서는 레터박스 여백에도 핀이 찍히고 저장 좌표가 이미지상 위치와 어긋난다.
  * 그래서 여기서는 컨테이너를 이미지 원본 비율에 맞춰 여백 자체를 없앤다.
  */
-export function ImageCanvas({ campaign, page, pins = [], selectedId, onSelectPin, onCanvasClick, showLabels = false, labelMode = "always", children }: {
+export function ImageCanvas({ campaign, page, pins = [], selectedId, onSelectPin, onCanvasClick, showLabels = false, labelMode = "always", labelContent = "category", children }: {
   campaign: Campaign;
   page?: CampaignPage;
   pins?: FeedbackPin[];
@@ -24,6 +24,8 @@ export function ImageCanvas({ campaign, page, pins = [], selectedId, onSelectPin
   showLabels?: boolean;
   /** 피드백이 몰린 자리는 라벨끼리 겹쳐 읽을 수 없다. 많이 쌓이는 화면은 "selected" 로 둔다. */
   labelMode?: "always" | "selected";
+  /** 플레이어는 선택된 핀 옆에 유형 대신 피드백 본문을 말풍선으로 보여준다. */
+  labelContent?: "category" | "body";
   children?: ReactNode;
 }) {
   const { feedbackCategoryLabel, t } = useLanguage();
@@ -73,12 +75,13 @@ export function ImageCanvas({ campaign, page, pins = [], selectedId, onSelectPin
           </button>
           {showLabels && (labelMode === "always" || selectedId === pin.id) && (
             <button
-              className={`question-tag pin-category ${pin.category}`}
+              className={`question-tag pin-category ${pin.category} ${labelContent === "body" ? `feedback-bubble ${pin.x > 0.58 ? "to-left" : ""} ${pin.y < 0.12 ? "below" : ""}` : ""}`}
               style={{ left: `${pin.x * 100}%`, top: `${pin.y * 100}%` }}
               onClick={() => onSelectPin?.(pin.id)}
               aria-label={t("pin.image.feedbackBodyAria", { body: pin.body })}
+              title={labelContent === "body" ? pin.body : undefined}
             >
-              {feedbackCategoryLabel(pin.category)}
+              {labelContent === "body" ? pin.body : feedbackCategoryLabel(pin.category)}
             </button>
           )}
         </Fragment>

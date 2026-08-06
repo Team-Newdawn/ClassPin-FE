@@ -232,6 +232,7 @@ export default function FeedbackPresentation() {
           <span className={`status-dot ${campaign.status}`} />
           <b>{campaign.title}</b>
           <span className="pin-presentation-count">{t("pin.presentation.feedbackCount", { count: visiblePins.length })}</span>
+          {actionError && <span className="presentation-error" role="alert">{actionError}</span>}
         </div>
         <div className="presentation-top-actions">
           <LanguageSwitcher />
@@ -249,20 +250,14 @@ export default function FeedbackPresentation() {
         </div>
       </header>
 
-      {showPins && activePin ? (
+      {showPins && activePin && (
         <aside key={`${activePin.id}-${rotationCycle}`} className={`pin-presentation-feedback ${activePin.category}`} aria-live="polite">
           <div>
             <span className="pin-presentation-feedback-meta"><em className={`pin-category ${activePin.category}`}>{feedbackCategoryLabel(activePin.category)}</em><time><Clock3 />{timeAgo(activePin.createdAt)}</time></span>
             <p>{activePin.body}</p>
           </div>
         </aside>
-      ) : showPins ? <p className="pin-presentation-empty" role="status">{t("pin.presentation.empty")}</p> : null}
-
-      <footer className="presentation-footer">
-        {actionError && <span className="presentation-error" role="alert">{actionError}</span>}
-        {campaign.pages.length > 1 && <span className="presentation-page">{t("pin.pages.position", { current: activePageIndex + 1, total: campaign.pages.length })}</span>}
-        <span className="presentation-hint">{t("pin.presentation.hint")}</span>
-      </footer>
+      )}
     </main>
   );
 }

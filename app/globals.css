@@ -194,6 +194,8 @@ a.nav-item{text-decoration:none;color:inherit}
 .pin-stage{padding:16px;margin-inline:auto;display:grid;place-items:center}
 .pin-stage .pin-canvas{max-width:min(100%,880px)}
 .pin-panel-page-tools{display:flex;align-items:center;justify-content:flex-end;gap:10px;flex-wrap:wrap}
+.pin-audience-setting{margin:0 0 12px;padding:12px 14px;display:flex;align-items:center;justify-content:space-between;gap:14px;border:1px solid var(--color-border);border-radius:12px;background:var(--pin-neutral-50)}
+.pin-audience-setting b,.pin-audience-setting small{display:block}.pin-audience-setting b{font-size:12px}.pin-audience-setting small{margin-top:3px;color:var(--color-text-tertiary);font-size:10px;line-height:15px}.pin-audience-setting>div:last-child{display:flex;flex-wrap:wrap;justify-content:flex-end;gap:6px}.pin-audience-setting button{height:30px;padding:0 10px;display:flex;align-items:center;gap:5px;border:1px solid var(--color-border);border-radius:999px;background:var(--color-bg-surface);color:var(--color-text-secondary);font-size:11px;white-space:nowrap}.pin-audience-setting button.active{border-color:var(--color-brand);background:var(--color-brand-subtle);color:var(--pin-blue-700);font-weight:600}.pin-audience-setting button svg{width:13px}.pin-audience-setting button:disabled{opacity:.65}
 .pin-page-navigation{display:flex;align-items:center;justify-content:center;gap:8px}
 .pin-page-navigation button{width:34px;height:34px;padding:0;display:grid;place-items:center;border:1px solid var(--color-border);border-radius:10px;background:var(--color-bg-surface);color:var(--color-text-primary)}
 .pin-page-navigation button:hover:not(:disabled){border-color:var(--color-brand);color:var(--color-brand)}
@@ -221,8 +223,13 @@ a.nav-item{text-decoration:none;color:inherit}
 .pin-page-navigation.participant-pages button{border-color:rgba(255,255,255,.12);background:rgba(255,255,255,.08);color:var(--pin-neutral-100)}
 .pin-page-navigation.participant-pages span{color:var(--pin-neutral-100)}
 .student-guide{flex:0 0 auto;margin:0;padding:10px 18px;background:var(--pin-neutral-900);border-bottom:1px solid rgba(255,255,255,.08)}
-.student-guide b{display:block;font-size:13px;color:var(--pin-neutral-100)}
+.student-guide b{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--pin-neutral-100)}
+.student-guide b em{padding:2px 7px;border-radius:999px;background:rgba(255,255,255,.1);color:var(--pin-neutral-300);font-size:9px;font-style:normal;font-weight:600}
 .student-guide span{display:block;margin-top:3px;font-size:12px;line-height:18px;color:var(--pin-neutral-400);white-space:pre-wrap}
+.student-audience-switch{height:28px;padding:0 9px;border:1px solid var(--color-border);border-radius:999px;background:var(--color-bg-surface);color:var(--color-text-secondary);font-size:10px;white-space:nowrap}
+.audience-selection-shell{max-width:none;min-height:100dvh;background:var(--pin-neutral-50);box-shadow:none}.audience-selection-shell .student-header{background:var(--color-bg-surface)}
+.audience-selection{width:min(520px,calc(100% - 32px));margin:clamp(48px,12vh,120px) auto;padding:32px;border:1px solid var(--color-border);border-radius:24px;background:var(--color-bg-surface);box-shadow:var(--shadow-sm);text-align:center}.audience-selection .eyebrow{display:block;margin-bottom:9px}.audience-selection h1{margin:0;font-size:24px;line-height:34px}.audience-selection>p{margin:8px 0 24px;color:var(--color-text-secondary);font-size:13px;line-height:20px}.audience-selection>div{display:grid;gap:10px}.audience-option{min-height:48px;padding:10px 16px;border:1px solid var(--color-border-strong);border-radius:12px;background:var(--color-bg-surface);color:var(--color-text-primary);font-size:14px;font-weight:600}.audience-option:hover{border-color:var(--color-brand);background:var(--color-brand-subtle);color:var(--pin-blue-700)}
+@media(max-width:700px){.pin-audience-setting{align-items:stretch;flex-direction:column}.pin-audience-setting>div:last-child{justify-content:flex-start}.audience-selection{margin-top:32px;padding:26px 20px}.audience-selection h1{font-size:21px;line-height:30px}}
 .student-answer-view .btn{margin-top:22px}
 .campaign-card{cursor:pointer}
 .campaign-card:focus-visible{outline:none;border-color:var(--color-brand);box-shadow:var(--focus)}

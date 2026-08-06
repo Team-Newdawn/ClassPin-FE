@@ -11,15 +11,20 @@ import { ImageCanvas } from "@/components/pin/image-canvas";
 import { useLanguage } from "@/components/language-context";
 import { downloadPinsCsv } from "@/lib/pin/csv";
 import { CATEGORY_KEYS, categoryBreakdown, countBy, hiddenPins, hotZone, latestPinAt, sentiment, topCategory, visiblePins } from "@/lib/pin/stats";
-import type { FeedbackCategory, FeedbackPin } from "@/lib/pin/types";
+import { AUDIENCE_GROUPS, type AudienceGroup, type FeedbackCategory, type FeedbackPin } from "@/lib/pin/types";
 
 type CategoryFilter = FeedbackCategory | "all";
+const audienceLabelKey = {
+  design_sprint: "pin.audience.designSprint",
+  ai_playground: "pin.audience.aiPlayground",
+  event: "pin.audience.event",
+} as const;
 
 export default function CampaignResults() {
   const { feedbackCategoryLabel, feedbackZoneLabel, locale, t, timeAgo } = useLanguage();
   const params = useParams<{ id: string }>();
   const router = useRouter();
-  const { ready, campaigns, setPinHidden, setStatus } = useCampaigns();
+  const { ready, campaigns, setPageAudienceGroups, setPinHidden, setStatus } = useCampaigns();
   const campaign = campaigns.find((item) => item.id === params.id);
   // 같은 핀을 다시 눌러도 목록을 또 중앙으로 보내려면 매번 새 객체여야 한다.
   const [selected, setSelected] = useState<{ id: string } | null>(null);
@@ -29,6 +34,7 @@ export default function CampaignResults() {
   const [shareOpen, setShareOpen] = useState(false);
   const [copied, setCopied] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
+  const [savingAudience, setSavingAudience] = useState(false);
   const [activePageIndex, setActivePageIndex] = useState(0);
   const selectedId = selected?.id ?? null;
 
@@ -73,6 +79,24 @@ export default function CampaignResults() {
       console.error(`${message}: ${detail}`, error);
       setActionError(message);
     });
+  };
+
+  const toggleAudience = async (audienceGroup: AudienceGroup) => {
+    if (!campaign || !activePage || savingAudience) return;
+    const audienceGroups = activePage.audienceGroups.includes(audienceGroup)
+      ? activePage.audienceGroups.filter((group) => group !== audienceGroup)
+      : [...activePage.audienceGroups, audienceGroup];
+    setActionError(null);
+    setSavingAudience(true);
+    try {
+      await setPageAudienceGroups(campaign.id, activePage.id, audienceGroups);
+    } catch (error) {
+      const detail = error && typeof error === "object" && "message" in error ? String(error.message) : String(error);
+      console.error(`${t("pin.detail.audienceSaveError")}: ${detail}`, error);
+      setActionError(t("pin.detail.audienceSaveError"));
+    } finally {
+      setSavingAudience(false);
+    }
   };
 
   // 핀으로 고른 의견이 목록 밖에 있으면 두 화면의 연결이 끊긴 것처럼 보인다.
@@ -157,6 +181,12 @@ export default function CampaignResults() {
               <div><h2>{t("pin.detail.mapTitle")}</h2><p>{t("pin.detail.mapDescription")}</p></div>
               <div className="pin-panel-page-tools"><CampaignPageNavigation pageIndex={activePageIndex} pageCount={campaign.pages.length} onChange={changePage} /><span className="panel-note"><Sparkles />{t("pin.detail.mapNote")}</span></div>
             </div>
+            {activePage && <div className="pin-audience-setting">
+              <div><b>{t("pin.detail.audienceTitle")}</b><small>{activePage.audienceGroups.length ? t("pin.detail.audienceDescription") : t("pin.detail.audienceAdminOnly")}</small></div>
+              <div role="group" aria-label={t("pin.detail.audienceTitle")}>
+                {AUDIENCE_GROUPS.map((group) => <button key={group} className={activePage.audienceGroups.includes(group) ? "active" : ""} aria-pressed={activePage.audienceGroups.includes(group)} disabled={savingAudience} onClick={() => void toggleAudience(group)}>{activePage.audienceGroups.includes(group) && <Check />}{t(audienceLabelKey[group])}</button>)}
+              </div>
+            </div>}
             {/* 캔버스는 폭 100%에 원본 비율이라, 세로 사진이면 화면을 넘긴다. 비율로 폭을 눌러 높이를 잡는다. */}
             <div className="pin-stage" style={{ maxWidth: `min(100%, calc(58dvh * ${stageRatio.toFixed(3)}))` }}>
               <ImageCanvas campaign={campaign} page={activePage} pins={stagePins} selectedId={selectedId} onSelectPin={selectPin} showLabels labelMode="selected" />

@@ -13,9 +13,10 @@ import {
   submitPin,
   subscribeToCampaign,
   updateCampaign,
+  updateCampaignPageAudienceGroups as persistPageAudienceGroups,
   updatePin as persistPinUpdate
 } from "@/lib/pin/repository";
-import type { Campaign, FeedbackCategory, FeedbackPin } from "@/lib/pin/types";
+import { mergeAudiencePages, type AudienceGroup, type Campaign, type FeedbackCategory, type FeedbackPin } from "@/lib/pin/types";
 
 type Store = {
   ready: boolean;
@@ -24,8 +25,9 @@ type Store = {
   addPin: (campaignId: string, pin: Omit<FeedbackPin, "id" | "campaignId" | "authorId" | "hidden" | "createdAt">) => Promise<void>;
   updatePin: (campaignId: string, pinId: string, values: { category: FeedbackCategory; body: string }) => Promise<void>;
   setPinHidden: (campaignId: string, pinId: string, hidden: boolean) => Promise<void>;
+  setPageAudienceGroups: (campaignId: string, pageId: string, audienceGroups: AudienceGroup[]) => Promise<void>;
   setStatus: (campaignId: string, status: Campaign["status"]) => Promise<void>;
-  loadCampaignByCode: (code: string) => Promise<Campaign | null>;
+  loadCampaignByCode: (code: string, audienceGroup: AudienceGroup) => Promise<Campaign | null>;
 };
 
 const CampaignContext = createContext<Store | null>(null);
@@ -184,21 +186,34 @@ export function CampaignStore({ children }: { children: React.ReactNode }) {
         pins: campaign.pins.map((pin) => pin.id === pinId ? { ...pin, hidden } : pin)
       }));
     },
+    setPageAudienceGroups: async (campaignId, pageId, audienceGroups) => {
+      await persistPageAudienceGroups(pageId, audienceGroups);
+      updateCampaignState(campaignId, (campaign) => ({
+        ...campaign,
+        pages: campaign.pages.map((page) => page.id === pageId ? { ...page, audienceGroups } : page)
+      }));
+    },
     setStatus: async (campaignId, status) => {
       await updateCampaign(campaignId, { status });
       updateCampaignState(campaignId, (campaign) => ({ ...campaign, status }));
     },
-    loadCampaignByCode: async (code) => {
-      const key = code.toLowerCase();
-      const existing = campaigns.find((campaign) => campaign.code.toLowerCase() === key);
-      if (existing) return existing;
+    loadCampaignByCode: async (code, audienceGroup) => {
+      const key = `${code.toLowerCase()}:${audienceGroup}`;
       // campaigns 는 이 클로저가 만들어진 시점의 값이다. 같은 코드로 조회가 겹치면 (StrictMode 의
-      // 이펙트 재실행, 재진입) 위 검사를 둘 다 통과해 같은 캠페인이 두 번 붙는다. 조회를 하나로 묶는다.
+      // 이펙트 재실행, 재진입) 같은 요청이 겹친다. 유형까지 포함한 키로 조회를 하나로 묶는다.
       const inflight = lookups.current.get(key);
       if (inflight) return inflight;
-      const lookup = fetchLiveCampaign(code)
+      const lookup = fetchLiveCampaign(code, audienceGroup)
         .then((remote) => {
-          if (remote) setCampaigns((current) => current.some((campaign) => campaign.id === remote.id) ? current : [remote, ...current]);
+          if (remote) setCampaigns((current) => {
+            const existing = current.find((campaign) => campaign.id === remote.id);
+            if (!existing) return [remote, ...current];
+            return current.map((campaign) => campaign.id === remote.id ? {
+              ...campaign,
+              ...remote,
+              pages: mergeAudiencePages(campaign.pages, remote.pages, audienceGroup)
+            } : campaign);
+          });
           return remote;
         })
         .finally(() => lookups.current.delete(key));

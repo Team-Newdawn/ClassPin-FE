@@ -5,7 +5,7 @@ import { NextResponse } from "next/server";
 import { resolveDocumentBinary } from "@/lib/server/document-binaries";
 import { getPdfPageCount, renderPdfPages } from "@/lib/server/pdf-render";
 import { getSupabaseClientForToken } from "@/lib/supabase/server";
-import type { CampaignPage } from "@/lib/pin/types";
+import { AUDIENCE_GROUPS, type CampaignPage } from "@/lib/pin/types";
 
 export const runtime = "nodejs";
 
@@ -115,6 +115,7 @@ export async function POST(request: Request) {
             imageUrl: bucket.getPublicUrl(imagePath).data.publicUrl,
             imageWidth: size.width,
             imageHeight: size.height,
+            audienceGroups: [...AUDIENCE_GROUPS],
           } satisfies CampaignPage;
         }));
         pages.push(...settled.filter((result): result is PromiseFulfilledResult<CampaignPage> => result.status === "fulfilled").map((result) => result.value));

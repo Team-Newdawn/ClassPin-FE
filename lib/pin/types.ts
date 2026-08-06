@@ -4,6 +4,12 @@
  */
 export type FeedbackCategory = "praise" | "improve" | "confusing" | "bug" | "idea";
 
+export const AUDIENCE_GROUPS = ["design_sprint", "ai_playground", "event"] as const;
+export type AudienceGroup = typeof AUDIENCE_GROUPS[number];
+
+export const isAudienceGroup = (value: string | null): value is AudienceGroup =>
+  AUDIENCE_GROUPS.includes(value as AudienceGroup);
+
 export const feedbackCategoryLabel = {
   praise: "좋아요",
   improve: "아쉬워요",
@@ -39,6 +45,17 @@ export interface CampaignPage {
   imagePath: string;
   imageWidth: number;
   imageHeight: number;
+  audienceGroups: AudienceGroup[];
+}
+
+export const pagesForAudience = (pages: CampaignPage[], audienceGroup: AudienceGroup) =>
+  pages.filter((page) => page.audienceGroups.includes(audienceGroup));
+
+/** 한 참여 유형의 최신 응답만 교체해, 관리자 전체 목록과 이미 조회한 다른 유형을 보존한다. */
+export function mergeAudiencePages(current: CampaignPage[], incoming: CampaignPage[], audienceGroup: AudienceGroup) {
+  const retained = current.filter((page) => !page.audienceGroups.includes(audienceGroup));
+  return [...new Map([...retained, ...incoming].map((page) => [page.id, page])).values()]
+    .sort((a, b) => a.pageIndex - b.pageIndex);
 }
 
 export interface Campaign {

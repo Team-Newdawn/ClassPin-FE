@@ -1,7 +1,7 @@
 import type { RealtimeChannel } from "@supabase/supabase-js";
 import { ensureAnonymousUser, getAudienceSupabaseClient, getSessionUser, getSupabaseClient } from "@/lib/supabase/client";
 import { isPdfFile, renderPdfPages } from "@/lib/pin/pdf-reference";
-import type { Campaign, CampaignPage, FeedbackCategory, FeedbackPin } from "@/lib/pin/types";
+import { AUDIENCE_GROUPS, isAudienceGroup, type AudienceGroup, type Campaign, type CampaignPage, type FeedbackCategory, type FeedbackPin } from "@/lib/pin/types";
 
 const BUCKET = "campaign-images";
 
@@ -37,10 +37,11 @@ type CampaignPageRow = {
   image_path: string;
   image_width: number;
   image_height: number;
+  audience_groups: AudienceGroup[];
 };
 
 const CAMPAIGN_COLUMNS = "id, title, guide_text, join_code, image_path, image_width, image_height, status, created_at";
-const PAGE_COLUMNS = "id, campaign_id, page_index, image_path, image_width, image_height";
+const PAGE_COLUMNS = "id, campaign_id, page_index, image_path, image_width, image_height, audience_groups";
 const PIN_COLUMNS = "id, campaign_id, author_id, page_index, x, y, category, body, hidden, created_at";
 
 /** 캠페인 개설·숨김 처리 같은 관리자 전용 쓰기는 구글 로그인 세션을 요구한다. */
@@ -101,6 +102,7 @@ function toPage(row: CampaignPageRow): CampaignPage {
     imageUrl: publicImageUrl(row.image_path) ?? "",
     imageWidth: row.image_width,
     imageHeight: row.image_height,
+    audienceGroups: row.audience_groups,
   };
 }
 
@@ -114,6 +116,7 @@ function legacyPage(row: CampaignRow): CampaignPage[] {
     imageUrl: publicImageUrl(row.image_path) ?? "",
     imageWidth: row.image_width,
     imageHeight: row.image_height,
+    audienceGroups: [...AUDIENCE_GROUPS],
   }];
 }
 
@@ -175,6 +178,7 @@ export async function createCampaign(input: { id: string; code: string; title: s
       imageUrl: client.storage.from(BUCKET).getPublicUrl(imagePath).data.publicUrl,
       imageWidth: size.width,
       imageHeight: size.height,
+      audienceGroups: [...AUDIENCE_GROUPS],
     }];
   }
 
@@ -207,6 +211,7 @@ export async function createCampaign(input: { id: string; code: string; title: s
       image_path: page.imagePath,
       image_width: page.imageWidth,
       image_height: page.imageHeight,
+      audience_groups: page.audienceGroups,
     })));
     if (pagesError) throw pagesError;
     return toCampaign(data as CampaignRow, [], pages);
@@ -249,7 +254,7 @@ export async function fetchOwnedCampaigns(): Promise<Campaign[]> {
  * 테이블 select 는 "내가 의견을 남긴 캠페인"만 열어 주므로, 첫 진입은 코드를 대조하는
  * definer 함수를 거친다. 코드를 모르면 남의 캠페인을 열거할 수 없다.
  */
-export async function fetchLiveCampaign(code: string): Promise<Campaign | null> {
+export async function fetchLiveCampaign(code: string, audienceGroup: AudienceGroup): Promise<Campaign | null> {
   const { client } = await participantContext();
   const { data, error } = await client.rpc("find_live_campaign", { target_code: code });
   if (error) throw error;
@@ -257,7 +262,7 @@ export async function fetchLiveCampaign(code: string): Promise<Campaign | null> 
   if (!row) return null;
   const [{ data: pinData, error: pinError }, { data: pageData, error: pageError }] = await Promise.all([
     client.from("feedback_pins").select(PIN_COLUMNS).eq("campaign_id", row.id).order("created_at", { ascending: false }),
-    client.rpc("find_campaign_pages", { target_code: code }),
+    client.rpc("find_campaign_pages", { target_code: code, target_audience_group: audienceGroup }),
   ]);
   if (pinError) throw pinError;
   if (pageError) throw pageError;
@@ -314,6 +319,22 @@ export async function updateCampaign(campaignId: string, values: { status?: "liv
     .update({ ...values, updated_at: new Date().toISOString() })
     .eq("id", campaignId);
   if (error) throw error;
+}
+
+export async function updateCampaignPageAudienceGroups(pageId: string, audienceGroups: AudienceGroup[]) {
+  if (new Set(audienceGroups).size !== audienceGroups.length || !audienceGroups.every(isAudienceGroup)) {
+    throw new Error("참여 유형이 올바르지 않습니다.");
+  }
+  const client = getSupabaseClient();
+  if (!client) return;
+  await requireOwnerUser();
+  const { data, error } = await client.from("campaign_pages")
+    .update({ audience_groups: audienceGroups })
+    .eq("id", pageId)
+    .select("id")
+    .maybeSingle();
+  if (error) throw error;
+  if (!data) throw new Error("공개 범위를 바꿀 페이지를 찾지 못했습니다.");
 }
 
 export function subscribeToCampaign(campaignId: string, onRefresh: () => void, asAudience = false): RealtimeChannel | null {

@@ -8,6 +8,7 @@ import {
 
 test("허용된 이모지 페이로드만 플레이어에 전달한다", () => {
   assert.deepEqual(parseCampaignReaction({ id: "reaction-1", emoji: "👏" }), { id: "reaction-1", emoji: "👏" });
+  assert.equal(parseCampaignReaction({ id: "reaction-2", emoji: "👍" }), null);
   assert.equal(parseCampaignReaction({ id: "reaction-2", emoji: "🔥" }), null);
   assert.equal(parseCampaignReaction({ id: "", emoji: "👏" }), null);
 });

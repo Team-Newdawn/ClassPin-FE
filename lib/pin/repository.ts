@@ -1,7 +1,7 @@
 import type { RealtimeChannel } from "@supabase/supabase-js";
 import { ensureAnonymousUser, getAudienceSupabaseClient, getSessionUser, getSupabaseClient } from "@/lib/supabase/client";
 import { isPdfFile, renderPdfPages } from "@/lib/pin/pdf-reference";
-import { acceptsFeedbackCategory, isAudienceGroupName, isSessionFolderName, isValidFeedbackCategorySettings, normalizeAudienceGroups, normalizeFeedbackCategorySettings, type Campaign, type CampaignPage, type FeedbackCategory, type FeedbackCategorySettings, type FeedbackPin, type SessionFolder } from "@/lib/pin/types";
+import { acceptsFeedbackCategory, isAudienceGroupName, isFeedbackPinMarker, isSessionFolderName, isValidFeedbackCategorySettings, normalizeAudienceGroups, normalizeFeedbackCategorySettings, normalizeFeedbackPinMarker, normalizeFeedbackPinReactionCount, type Campaign, type CampaignPage, type FeedbackCategory, type FeedbackCategorySettings, type FeedbackPin, type FeedbackPinMarker, type SessionFolder } from "@/lib/pin/types";
 
 const BUCKET = "campaign-images";
 
@@ -38,6 +38,9 @@ type PinRow = {
   y: number | string;
   category: FeedbackCategory;
   body: string;
+  marker?: unknown;
+  reaction_count?: unknown;
+  reacted_by_me?: unknown;
   hidden: boolean;
   created_at: string;
 };
@@ -61,7 +64,7 @@ type CampaignPlayerPayload = {
 const CAMPAIGN_COLUMNS = "id, folder_id, title, guide_text, join_code, image_path, image_width, image_height, status, show_presentation_qr, presentation_qr_position, show_presentation_pin_status, presentation_pin_status_position, audience_groups, feedback_categories, created_at";
 const SESSION_FOLDER_COLUMNS = "id, name";
 const PAGE_COLUMNS = "id, campaign_id, page_index, image_path, image_width, image_height, audience_groups";
-const PIN_COLUMNS = "id, campaign_id, author_id, page_index, x, y, category, body, hidden, created_at";
+const PIN_COLUMNS = "id, campaign_id, author_id, page_index, x, y, category, body, marker, reaction_count, hidden, created_at";
 
 /** 캠페인 개설·숨김 처리 같은 관리자 전용 쓰기는 구글 로그인 세션을 요구한다. */
 async function requireOwnerUser() {
@@ -107,6 +110,9 @@ function toPin(row: PinRow): FeedbackPin {
     y: toNumber(row.y),
     category: row.category,
     body: row.body,
+    marker: normalizeFeedbackPinMarker(row.marker),
+    reactionCount: normalizeFeedbackPinReactionCount(row.reaction_count),
+    reactedByMe: row.reacted_by_me === true,
     hidden: row.hidden,
     createdAt: row.created_at
   };
@@ -391,11 +397,11 @@ export async function fetchLiveCampaign(code: string, audienceGroup: string | nu
   return toCampaign(row, ((pinData ?? []) as PinRow[]).map(toPin), ((pageData ?? []) as CampaignPageRow[]).map(toPage));
 }
 
-/** 공개 플레이어용 스냅샷. 작성자 식별자와 숨긴 핀은 RPC에서부터 제외한다. */
-export async function fetchCampaignPlayer(campaignId: string): Promise<Campaign | null> {
-  const client = getAudienceSupabaseClient();
+/** 작성자 식별자·숨긴 핀을 제외한다. 참여자 화면은 공감 쓰기와 같은 세션으로 조회한다. */
+export async function fetchCampaignPlayer(campaignId: string, asParticipant = false): Promise<Campaign | null> {
+  const client = asParticipant ? (await participantContext()).client : getAudienceSupabaseClient();
   if (!client) return null;
-  await ensureAnonymousUser();
+  if (!asParticipant) await ensureAnonymousUser();
   const { data, error } = await client.rpc("find_campaign_player", { target_campaign_id: campaignId });
   if (error) throw error;
   const payload = data as CampaignPlayerPayload | null;
@@ -406,6 +412,7 @@ export async function fetchCampaignPlayer(campaignId: string): Promise<Campaign 
 /** 실제로 기록된 작성자 id 를 돌려준다. 참여자 화면이 "내 피드백"을 가리는 기준이 된다. */
 export async function submitPin(campaign: Campaign, pin: FeedbackPin): Promise<string | null> {
   if (!acceptsFeedbackCategory(campaign.feedbackCategories, pin.category)) throw new Error("현재 선택할 수 없는 피드백 유형입니다.");
+  if (!isFeedbackPinMarker(pin.marker)) throw new Error("선택할 수 없는 PIN 모양입니다.");
   const { client, user } = await participantContext();
   const { error } = await client.from("feedback_pins").insert({
     id: pin.id,
@@ -417,23 +424,38 @@ export async function submitPin(campaign: Campaign, pin: FeedbackPin): Promise<s
     y: pin.y,
     category: pin.category,
     body: pin.body,
+    marker: pin.marker,
     hidden: false
   });
   if (error) throw error;
   return user.id;
 }
 
-export async function updatePin(campaign: Campaign, pinId: string, values: { category: FeedbackCategory; body: string }) {
+export async function updatePin(campaign: Campaign, pinId: string, values: { category: FeedbackCategory; body: string; marker: FeedbackPinMarker }) {
   if (!acceptsFeedbackCategory(campaign.feedbackCategories, values.category)) throw new Error("현재 선택할 수 없는 피드백 유형입니다.");
+  if (!isFeedbackPinMarker(values.marker)) throw new Error("선택할 수 없는 PIN 모양입니다.");
   const { client } = await participantContext();
   const { data, error } = await client.from("feedback_pins")
-    .update({ category: values.category, body: values.body, updated_at: new Date().toISOString() })
+    .update({ category: values.category, body: values.body, marker: values.marker, updated_at: new Date().toISOString() })
     .eq("id", pinId)
     .eq("hidden", false)
     .select("id")
     .maybeSingle();
   if (error) throw error;
   if (!data) throw new Error("고칠 수 있는 피드백을 찾지 못했습니다.");
+}
+
+/** 반응 행은 공개하지 않고 desired-state RPC로만 한 사람당 한 공감을 설정한다. */
+export async function setPinReaction(pinId: string, reacted: boolean): Promise<boolean> {
+  if (typeof reacted !== "boolean") throw new Error("공감 상태가 올바르지 않습니다.");
+  const { client } = await participantContext();
+  const { data, error } = await client.rpc("set_feedback_pin_reaction", {
+    target_pin_id: pinId,
+    target_reacted: reacted,
+  });
+  if (error) throw error;
+  if (typeof data !== "boolean") throw new Error("공감 상태를 확인하지 못했습니다.");
+  return data;
 }
 
 /** 제외·되돌리기는 관리자만 통과한다(RLS). 삭제가 아니라 표시 여부만 바꾼다. */

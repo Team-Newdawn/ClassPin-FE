@@ -16,6 +16,7 @@ import {
   moveCampaignToFolder as persistCampaignFolder,
   renameSessionFolder as persistSessionFolderName,
   setPinHidden as persistPinHidden,
+  setPinReaction as persistPinReaction,
   submitPin,
   subscribeToCampaign,
   updateCampaign,
@@ -23,7 +24,8 @@ import {
   updateCampaignPageAudienceGroups as persistPageAudienceGroups,
   updatePin as persistPinUpdate
 } from "@/lib/pin/repository";
-import { mergeAudiencePages, type Campaign, type FeedbackCategory, type FeedbackCategorySettings, type FeedbackPin, type SessionFolder } from "@/lib/pin/types";
+import { mergeAudiencePages, type Campaign, type FeedbackCategory, type FeedbackCategorySettings, type FeedbackPin, type FeedbackPinMarker, type SessionFolder } from "@/lib/pin/types";
+import { withPinReaction } from "@/lib/pin/empathy";
 
 type Store = {
   ready: boolean;
@@ -35,8 +37,9 @@ type Store = {
   renameFolder: (folderId: string, name: string) => Promise<void>;
   deleteFolder: (folderId: string) => Promise<void>;
   moveCampaign: (campaignId: string, folderId: string | null) => Promise<void>;
-  addPin: (campaignId: string, pin: Omit<FeedbackPin, "id" | "campaignId" | "authorId" | "hidden" | "createdAt">) => Promise<void>;
-  updatePin: (campaignId: string, pinId: string, values: { category: FeedbackCategory; body: string }) => Promise<void>;
+  addPin: (campaignId: string, pin: Omit<FeedbackPin, "id" | "campaignId" | "authorId" | "reactionCount" | "reactedByMe" | "hidden" | "createdAt">) => Promise<void>;
+  updatePin: (campaignId: string, pinId: string, values: { category: FeedbackCategory; body: string; marker: FeedbackPinMarker }) => Promise<void>;
+  setPinReaction: (campaignId: string, pinId: string, reacted: boolean) => Promise<boolean>;
   setPinHidden: (campaignId: string, pinId: string, hidden: boolean) => Promise<void>;
   setAudienceGroups: (campaignId: string, audienceGroups: string[]) => Promise<void>;
   setPageAudienceGroups: (campaignId: string, pageId: string, audienceGroups: string[]) => Promise<void>;
@@ -216,7 +219,7 @@ export function CampaignStore({ children }: { children: React.ReactNode }) {
     addPin: async (campaignId, input) => {
       const campaign = campaigns.find((item) => item.id === campaignId);
       if (!campaign) throw new Error("피드백을 남길 세션을 찾지 못했습니다.");
-      const draft: FeedbackPin = { ...input, id: crypto.randomUUID(), campaignId, authorId: null, hidden: false, createdAt: new Date().toISOString() };
+      const draft: FeedbackPin = { ...input, id: crypto.randomUUID(), campaignId, authorId: null, reactionCount: 0, reactedByMe: false, hidden: false, createdAt: new Date().toISOString() };
       // 익명 세션은 제출 시점에 만들어질 수 있어, 실제 기록된 작성자 id 를 받아서 넣는다.
       const pin: FeedbackPin = { ...draft, authorId: await submitPin(campaign, draft) };
       updateCampaignState(campaignId, (current) => ({
@@ -241,6 +244,15 @@ export function CampaignStore({ children }: { children: React.ReactNode }) {
         ...campaign,
         pins: campaign.pins.map((pin) => pin.id === pinId ? { ...pin, hidden } : pin)
       }));
+    },
+    setPinReaction: async (campaignId, pinId, reacted) => {
+      if (!campaigns.some((campaign) => campaign.id === campaignId)) throw new Error("공감할 세션을 찾지 못했습니다.");
+      const reactedByMe = await persistPinReaction(pinId, reacted);
+      updateCampaignState(campaignId, (campaign) => ({
+        ...campaign,
+        pins: campaign.pins.map((pin) => pin.id === pinId ? withPinReaction(pin, reactedByMe) : pin)
+      }));
+      return reactedByMe;
     },
     setAudienceGroups: async (campaignId, audienceGroups) => {
       await persistAudienceGroups(campaignId, audienceGroups);

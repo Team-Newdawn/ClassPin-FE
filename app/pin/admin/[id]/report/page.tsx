@@ -31,12 +31,6 @@ export default function CampaignReport() {
   const signals = buildReportSignals(campaign?.pins ?? []);
   const praise = visible.filter((pin) => pin.category === "praise");
   const pagesWithFeedback = new Set(visible.map((pin) => pin.pageIndex)).size;
-  const pinNumber = new Map<string, number>();
-  campaign?.pages.forEach((page) => {
-    visible.filter((pin) => pin.pageIndex === page.pageIndex)
-      .forEach((pin, index) => pinNumber.set(pin.id, index + 1));
-  });
-
   if (!ready) return <div className="loading-screen"><span className="spinner dark" /></div>;
   if (!campaign) return <div className="empty-state"><h1>{t("pin.detail.notFound")}</h1><p>{t("pin.detail.notFoundDescription")}</p><Link className="btn primary" href="/pin/admin">{t("pin.detail.campaignList")}</Link></div>;
 
@@ -104,7 +98,7 @@ export default function CampaignReport() {
           <section className="panel">
             <div className="panel-head"><div><h2>{t("pin.report.keep")}</h2><p>{t("pin.report.keepDescription")}</p></div></div>
             {praise.length ? <ul className="pin-report-quote-list">
-              {praise.slice(0, 5).map((pin) => <li key={pin.id}><span>{t("pin.report.pinReference", { page: pin.pageIndex + 1, number: pinNumber.get(pin.id) ?? 0 })}</span><p>{pin.body}</p></li>)}
+              {praise.slice(0, 5).map((pin) => <li key={pin.id}><span>{t("pin.pages.position", { current: pin.pageIndex + 1, total: campaign.pages.length })}</span><p>{pin.body}</p></li>)}
             </ul> : <ReportEmpty title={t("pin.report.noPraise")} body={t("pin.report.noPraiseHint")} />}
           </section>
         </div>
@@ -120,7 +114,7 @@ export default function CampaignReport() {
                   <span className="pin-report-signal-meta"><em className={`pin-category ${categoryClass(signal.key)}`}>{categoryLabel(signal.key)}</em>{t("pin.report.signalCount", { count: signal.pins.length, percent: signal.share })}</span>
                   <h3>{copy.title}</h3>
                   <p>{copy.body}</p>
-                  <ul>{signal.pins.slice(0, 3).map((pin) => <li key={pin.id}><b>{t("pin.report.pinReference", { page: pin.pageIndex + 1, number: pinNumber.get(pin.id) ?? 0 })}</b>{pin.body}</li>)}</ul>
+                  <ul>{signal.pins.slice(0, 3).map((pin) => <li key={pin.id}><b>{t("pin.pages.position", { current: pin.pageIndex + 1, total: campaign.pages.length })}</b>{pin.body}</li>)}</ul>
                 </div>
               </li>;
             })}
@@ -136,7 +130,7 @@ export default function CampaignReport() {
               return <section key={category ?? "none"}>
                 <h3><em className={`pin-category ${categoryClass(category)}`}>{categoryLabel(category)}</em><span>{t("pin.report.feedbackCount", { count: matching.length })}</span></h3>
                 <ol>{matching.map((pin) => <li key={pin.id}>
-                  <span>{t("pin.report.pinReference", { page: pin.pageIndex + 1, number: pinNumber.get(pin.id) ?? 0 })}</span>
+                  <span>{t("pin.pages.position", { current: pin.pageIndex + 1, total: campaign.pages.length })}</span>
                   <p>{pin.body}</p>
                 </li>)}</ol>
               </section>;

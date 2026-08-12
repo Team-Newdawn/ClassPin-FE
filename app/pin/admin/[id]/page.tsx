@@ -57,10 +57,8 @@ export default function CampaignResults() {
     const keyword = query.trim().toLowerCase();
     return pagePins.filter((pin) => (activeFilter === "all" || pin.category === activeFilter) && (!keyword || pin.body.toLowerCase().includes(keyword)));
   }, [activeFilter, pagePins, query]);
-  // 이미지와 목록이 같은 배열을 나눠 써야 핀 번호와 목록 번호가 어긋나지 않는다.
   const stagePins = useMemo(() => matched.filter((pin) => !pin.hidden), [matched]);
   const hiddenMatched = useMemo(() => matched.filter((pin) => pin.hidden), [matched]);
-  // 숨긴 의견은 번호가 없으므로 언제나 뒤로 몰아, 목록·CSV 순번이 이미지 번호와 같아진다.
   const orderedMatched = useMemo(() => [...stagePins, ...hiddenMatched], [hiddenMatched, stagePins]);
   const listPins = showHidden ? orderedMatched : stagePins;
 
@@ -341,11 +339,10 @@ export default function CampaignResults() {
               <div><h2>{t("pin.detail.listTitle")}</h2><p>{latest ? t("pin.detail.listSummaryLatest", { count: listPins.length, time: timeAgo(latest) }) : t("pin.detail.listSummary", { count: listPins.length })}</p></div>
             </div>
             <div className="pin-feed" ref={listRef}>
-              {listPins.length ? listPins.map((pin, index) => (
+              {listPins.length ? listPins.map((pin) => (
                 <PinItem
                   key={pin.id}
                   pin={pin}
-                  number={pin.hidden ? null : index + 1}
                   selected={selectedId === pin.id}
                   onSelect={() => selectPin(pin.id)}
                   onToggleHidden={() => toggleHidden(pin)}
@@ -473,12 +470,11 @@ function FeedbackCategoryManager({ campaignId, initialSettings, usedCategories, 
   </section>;
 }
 
-function PinItem({ pin, number, selected, onSelect, onToggleHidden, categoryLabel, categoryClass }: { pin: FeedbackPin; number: number | null; selected: boolean; onSelect: () => void; onToggleHidden: () => void; categoryLabel: (category: FeedbackCategory) => string; categoryClass: (category: FeedbackCategory) => string }) {
+function PinItem({ pin, selected, onSelect, onToggleHidden, categoryLabel, categoryClass }: { pin: FeedbackPin; selected: boolean; onSelect: () => void; onToggleHidden: () => void; categoryLabel: (category: FeedbackCategory) => string; categoryClass: (category: FeedbackCategory) => string }) {
   const { t, timeAgo } = useLanguage();
   return (
     <div className={`question-card pin-item ${selected ? "selected" : ""}`} data-pin-id={pin.id}>
       <button className="pin-item-main" onClick={onSelect} aria-pressed={selected}>
-        <span className={`pin-number ${pin.hidden ? "hidden" : ""}`}>{pin.hidden ? t("pin.detail.excluded") : number}</span>
         <span className="question-meta">
           <span className="question-copy">
             <em className={`pin-category ${categoryClass(pin.category)}`}>{categoryLabel(pin.category)}</em>

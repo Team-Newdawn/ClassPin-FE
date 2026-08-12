@@ -8,7 +8,7 @@ import { LanguageSwitcher, useLanguage } from "@/components/language-context";
 import { ImageCanvas } from "@/components/pin/image-canvas";
 import { useCampaignReactions } from "@/components/pin/use-campaign-reactions";
 import { fetchCampaignPlayer, subscribeToCampaign } from "@/lib/pin/repository";
-import { advancePinBatch, createSpatialPinBatches, rectanglesOverlap, resolvePinDisplayPositions } from "@/lib/pin/presentation-rotation";
+import { advancePinPlayback, crossedPinMilestone, rectanglesOverlap, resolvePinDisplayPositions } from "@/lib/pin/presentation-rotation";
 import type { Campaign } from "@/lib/pin/types";
 import { getAudienceSupabaseClient } from "@/lib/supabase/client";
 
@@ -17,6 +17,7 @@ const FEEDBACK_REVEAL_DELAY = 1000;
 const PAGE_ROTATION_DELAY = 12000;
 const PLAYER_REFRESH_DELAY = 2000;
 const LIVE_PIN_HIGHLIGHT_DELAY = 1000;
+const PIN_MILESTONE_DISPLAY_DELAY = 3000;
 const EMPTY_PLAYBACK = { shownPinIds: [] as string[], activePinId: null as string | null };
 
 export default function FeedbackPresentation() {
@@ -33,6 +34,9 @@ export default function FeedbackPresentation() {
   const presentationCanvasRef = useRef<HTMLDivElement>(null);
   const visiblePinIdsRef = useRef<string[]>([]);
   const campaignIdRef = useRef<string | null>(null);
+  const milestoneCampaignIdRef = useRef<string | null>(null);
+  const highestVisiblePinCountRef = useRef<number | null>(null);
+  const milestoneTimerRef = useRef<number | null>(null);
   const hideTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [controlsVisible, setControlsVisible] = useState(true);
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -42,6 +46,7 @@ export default function FeedbackPresentation() {
   const [canvasSize, setCanvasSize] = useState<{ width: number; height: number } | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [activePageIndex, setActivePageIndex] = useState(0);
+  const [pinMilestone, setPinMilestone] = useState<number | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -81,6 +86,40 @@ export default function FeedbackPresentation() {
     };
   }, []);
 
+  useEffect(() => {
+    const currentCampaignId = campaign?.id;
+    if (!currentCampaignId) return;
+    const currentCount = visiblePins.length;
+    if (milestoneCampaignIdRef.current !== currentCampaignId) {
+      milestoneCampaignIdRef.current = currentCampaignId;
+      highestVisiblePinCountRef.current = currentCount;
+      setPinMilestone(null);
+      if (milestoneTimerRef.current) {
+        window.clearTimeout(milestoneTimerRef.current);
+        milestoneTimerRef.current = null;
+      }
+      return;
+    }
+
+    // 최초 스냅샷보다 낮아졌다가 같은 구간을 다시 넘어도 한 번 본 이정표는 재생하지 않는다.
+    const highestCount = highestVisiblePinCountRef.current;
+    if (highestCount === null) return;
+    highestVisiblePinCountRef.current = Math.max(highestCount, currentCount);
+    const milestone = crossedPinMilestone(highestCount, currentCount);
+    if (milestone === null) return;
+
+    setPinMilestone(milestone);
+    if (milestoneTimerRef.current) window.clearTimeout(milestoneTimerRef.current);
+    milestoneTimerRef.current = window.setTimeout(() => {
+      setPinMilestone((current) => current === milestone ? null : current);
+      milestoneTimerRef.current = null;
+    }, PIN_MILESTONE_DISPLAY_DELAY);
+  }, [campaign?.id, visiblePins.length]);
+
+  useEffect(() => () => {
+    if (milestoneTimerRef.current) window.clearTimeout(milestoneTimerRef.current);
+  }, []);
+
   // 새 스냅샷에 핀이 들어오면 자동 재생 차례를 기다리지 않고 해당 페이지로 이동한다.
   // 첫 스냅샷은 새 핀으로 보지 않아 플레이어가 항상 첫 페이지부터 시작한다.
   useEffect(() => {
@@ -97,7 +136,10 @@ export default function FeedbackPresentation() {
     if (incomingPin) {
       setActivePageIndex(incomingPin.pageIndex);
       setLivePinId(incomingPin.id);
-      setStoredPlayback({ shownPinIds: [incomingPin.id], activePinId: incomingPin.id });
+      setStoredPlayback((current) => ({
+        shownPinIds: current.shownPinIds.includes(incomingPin.id) ? current.shownPinIds : [...current.shownPinIds, incomingPin.id],
+        activePinId: incomingPin.id
+      }));
     }
     // id 집합이 같으면 본문 수정만으로 순환 타이머를 다시 시작하지 않는다.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -114,7 +156,6 @@ export default function FeedbackPresentation() {
     () => visiblePins.filter((pin) => pin.pageIndex === (activePage?.pageIndex ?? 0)),
     [activePage?.pageIndex, visiblePins]
   );
-  const pageBatches = useMemo(() => createSpatialPinBatches(pagePins), [pagePins]);
   const playback = useMemo(() => {
     const validIds = new Set(pagePins.map((pin) => pin.id));
     const shownPinIds = storedPlayback.shownPinIds.filter((id) => validIds.has(id));
@@ -122,26 +163,22 @@ export default function FeedbackPresentation() {
       shownPinIds,
       activePinId: shownPinIds.includes(storedPlayback.activePinId ?? "") ? storedPlayback.activePinId : shownPinIds.at(-1) ?? null
     };
-    const firstPinId = pageBatches[0]?.[0]?.id ?? null;
+    const firstPinId = pagePins[0]?.id ?? null;
     return { shownPinIds: firstPinId ? [firstPinId] : [], activePinId: firstPinId };
-  }, [pageBatches, pagePins, storedPlayback]);
+  }, [pagePins, storedPlayback]);
   const shownPagePins = useMemo(
     () => pagePins.filter((pin) => playback.shownPinIds.includes(pin.id) || pin.id === livePinId),
     [livePinId, pagePins, playback.shownPinIds]
   );
   const pinDisplayPositions = useMemo(() => {
     if (!canvasSize) return undefined;
-    const priorityId = livePinId ?? playback.activePinId;
-    const orderedPins = priorityId
-      ? [...shownPagePins.filter((pin) => pin.id === priorityId), ...shownPagePins.filter((pin) => pin.id !== priorityId)]
-      : shownPagePins;
-    return resolvePinDisplayPositions(orderedPins, canvasSize.width, canvasSize.height);
-  }, [canvasSize, livePinId, playback.activePinId, shownPagePins]);
-  const pageBatchesRef = useRef(pageBatches);
+    return resolvePinDisplayPositions(pagePins, canvasSize.width, canvasSize.height);
+  }, [canvasSize, pagePins]);
+  const pagePinsRef = useRef(pagePins);
 
   useEffect(() => {
-    pageBatchesRef.current = pageBatches;
-  }, [pageBatches]);
+    pagePinsRef.current = pagePins;
+  }, [pagePins]);
 
   useLayoutEffect(() => {
     const canvas = presentationCanvasRef.current;
@@ -157,13 +194,12 @@ export default function FeedbackPresentation() {
 
   const rotateFeedback = useCallback(() => {
     setStoredPlayback((current) => {
-      const batches = pageBatchesRef.current;
-      const validIds = new Set(batches.flat().map((pin) => pin.id));
+      const pins = pagePinsRef.current;
+      const validIds = new Set(pins.map((pin) => pin.id));
       const storedIds = current.shownPinIds.filter((id) => validIds.has(id));
-      const firstPinId = batches[0]?.[0]?.id;
+      const firstPinId = pins[0]?.id;
       const shownPinIds = storedIds.length ? storedIds : firstPinId ? [firstPinId] : [];
-      const next = advancePinBatch(batches, shownPinIds);
-      return next ?? current;
+      return advancePinPlayback(pins, shownPinIds);
     });
   }, []);
 
@@ -225,12 +261,12 @@ export default function FeedbackPresentation() {
   useEffect(() => {
     const pageCount = campaign?.pages.length ?? 0;
     if (pageCount < 2) return;
-    const interval = window.setInterval(
+    const timeout = window.setTimeout(
       () => changePage((activePageIndex + 1) % pageCount, false),
-      PAGE_ROTATION_DELAY
+      Math.max(PAGE_ROTATION_DELAY, pagePins.length * FEEDBACK_REVEAL_DELAY) + FEEDBACK_REVEAL_DELAY / 2
     );
-    return () => window.clearInterval(interval);
-  }, [activePageIndex, campaign?.pages.length, changePage]);
+    return () => window.clearTimeout(timeout);
+  }, [activePageIndex, campaign?.pages.length, changePage, pagePins.length]);
 
   const toggleFullscreen = useCallback(async () => {
     setActionError(null);
@@ -312,6 +348,7 @@ export default function FeedbackPresentation() {
           style={{ left: `${reaction.left}%`, animationDelay: `${reaction.delay}ms` }}
         >{reaction.emoji}</span>)}
       </div>
+      {pinMilestone !== null && <output className="pin-presentation-milestone" role="status" aria-live="polite" aria-atomic="true">{pinMilestone}!</output>}
 
       <button className="presentation-side-control previous" onClick={() => changePage(activePageIndex - 1)} disabled={activePageIndex <= 0} aria-label={t("pin.pages.previous")}><ChevronLeft /></button>
       <button className="presentation-side-control next" onClick={() => changePage(activePageIndex + 1)} disabled={activePageIndex >= campaign.pages.length - 1} aria-label={t("pin.pages.next")}><ChevronRight /></button>

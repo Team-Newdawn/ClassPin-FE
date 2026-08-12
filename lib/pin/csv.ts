@@ -9,7 +9,6 @@ const categoryLabel = (locale: Locale, settings: FeedbackCategorySettings, categ
   );
 
 const headers = (locale: Locale) => [
-  translate(locale, "pin.csv.order"),
   translate(locale, "pin.csv.page"),
   "x",
   "y",
@@ -37,8 +36,7 @@ const coord = (value: number) => value.toFixed(4);
 export const buildPinsCsv = (pins: FeedbackPin[], locale: Locale = "ko", settings = defaultFeedbackCategorySettings()) =>
   [
     headers(locale).map(escapeCell).join(","),
-    ...pins.map((pin, index) => [
-      String(index + 1),
+    ...pins.map((pin) => [
       String(pin.pageIndex + 1),
       coord(pin.x),
       coord(pin.y),

@@ -1,5 +1,5 @@
 export const CAMPAIGN_REACTION_EVENT = "emoji";
-export const CAMPAIGN_REACTION_EMOJIS = ["👍", "❤️", "👏", "😂"] as const;
+export const CAMPAIGN_REACTION_EMOJIS = ["❤️", "👏", "😂"] as const;
 export const CAMPAIGN_REACTION_DURATION_MS = 1_800;
 export const CAMPAIGN_REACTION_LANES = [8, 92, 32, 68, 50, 20, 80, 44] as const;
 

@@ -141,6 +141,23 @@ export interface SessionFolder {
 /** 긍정으로 집계하는 카테고리. 나머지는 개선 신호로 본다. */
 export const positiveCategories: readonly FeedbackCategory[] = ["praise"];
 
+export const FEEDBACK_PIN_MARKERS = ["pin", "question", "smile", "idea"] as const;
+export type FeedbackPinMarker = typeof FEEDBACK_PIN_MARKERS[number];
+
+export const isFeedbackPinMarker = (value: unknown): value is FeedbackPinMarker =>
+  typeof value === "string" && (FEEDBACK_PIN_MARKERS as readonly string[]).includes(value);
+
+export const normalizeFeedbackPinMarker = (value: unknown): FeedbackPinMarker =>
+  isFeedbackPinMarker(value) ? value : "pin";
+
+export const feedbackPinMarkerEmoji = (marker: FeedbackPinMarker): string | null =>
+  marker === "question" ? "❓" : marker === "smile" ? "🙂" : marker === "idea" ? "💡" : null;
+
+export const normalizeFeedbackPinReactionCount = (value: unknown) => {
+  const count = typeof value === "number" || typeof value === "string" ? Number(value) : 0;
+  return Number.isSafeInteger(count) && count >= 0 ? count : 0;
+};
+
 export interface FeedbackPin {
   id: string;
   campaignId: string;
@@ -153,6 +170,10 @@ export interface FeedbackPin {
   y: number;
   category: FeedbackCategory;
   body: string;
+  /** 기본 물방울 핀 또는 작성자가 고른 이모지 핀. */
+  marker: FeedbackPinMarker;
+  reactionCount: number;
+  reactedByMe: boolean;
   hidden: boolean;
   createdAt: string;
 }

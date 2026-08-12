@@ -12,6 +12,7 @@ import { CampaignPageNavigation } from "@/components/pin/campaign-page-navigatio
 import { useCampaigns } from "@/components/pin/campaign-store";
 import { useCampaignReactions } from "@/components/pin/use-campaign-reactions";
 import { clampImageZoom, imageZoomFromPinch } from "@/lib/pin/image-zoom";
+import { initialEmpathyCounts, receivedEmpathyCount, withPinReaction } from "@/lib/pin/empathy";
 import {
   CAMPAIGN_REACTION_EMOJIS,
   CAMPAIGN_REACTION_EVENT,
@@ -24,11 +25,14 @@ import {
   acceptsFeedbackCategory,
   configuredFeedbackCategoryLabel,
   enabledFeedbackCategories,
+  FEEDBACK_PIN_MARKERS,
+  feedbackPinMarkerEmoji,
   feedbackCategoryClass,
   isLegacyFeedbackCategory,
   pagesForAudience,
   type FeedbackCategory,
-  type FeedbackPin
+  type FeedbackPin,
+  type FeedbackPinMarker
 } from "@/lib/pin/types";
 
 // DB 가 body 를 1~200자로 강제한다(feedback_pins CHECK).
@@ -39,6 +43,7 @@ type DraftPin = {
   y: number;
   category: FeedbackCategory;
   body: string;
+  marker: FeedbackPinMarker;
 };
 
 export default function JoinCampaign() {
@@ -49,7 +54,7 @@ export default function JoinCampaign() {
   const primaryUserId = user && !user.is_anonymous ? user.id : null;
   const [audienceUserId, setAudienceUserId] = useState<string | null>(null);
   const userId = primaryUserId ?? audienceUserId;
-  const { campaigns, ready, addPin, updatePin, loadCampaignByCode } = useCampaigns();
+  const { campaigns, ready, addPin, updatePin, setPinReaction, loadCampaignByCode } = useCampaigns();
   const campaign = useMemo(() => campaigns.find((item) => item.code.toLowerCase() === params.code.toLowerCase()), [params.code, campaigns]);
   const { reactions: liveReactions, addReaction } = useCampaignReactions(campaign?.id ?? null);
   // 캠페인은 기준 이미지가 1장이라 draft 도 하나면 된다.
@@ -69,6 +74,9 @@ export default function JoinCampaign() {
   const [selectedFeedbackId, setSelectedFeedbackId] = useState<string | null>(null);
   const [activeTool, setActiveTool] = useState<"pin" | "emoji">("pin");
   const [reactionError, setReactionError] = useState<string | null>(null);
+  const [pinReactionError, setPinReactionError] = useState<string | null>(null);
+  const [pendingPinIds, setPendingPinIds] = useState<ReadonlySet<string>>(new Set());
+  const [empathyNotificationCount, setEmpathyNotificationCount] = useState(0);
   const [imageZoom, setImageZoom] = useState(1);
   const pinDragged = useRef(false);
   const pinDragStart = useRef<{ x: number; y: number } | null>(null);
@@ -76,6 +84,15 @@ export default function JoinCampaign() {
   const imagePinchStart = useRef<{ distance: number; zoom: number } | null>(null);
   const blockCanvasClick = useRef(false);
   const canvasClickResetTimer = useRef<number | null>(null);
+  const publicPinsRef = useRef<FeedbackPin[]>([]);
+  const publicPinsCampaignIdRef = useRef<string | null>(null);
+  const publicPinsGenerationRef = useRef(0);
+  const initialCampaignPinsRef = useRef<FeedbackPin[]>([]);
+  const latestCampaignPinsRef = useRef<FeedbackPin[]>([]);
+  const capturedCampaignIdRef = useRef<string | null>(null);
+  const pendingPinIdsRef = useRef(new Set<string>());
+  const publicReactionCounts = useRef<Map<string, number> | null>(null);
+  const empathyNotificationTimer = useRef<number | null>(null);
   const storageKey = `pin-audience:${params.code.toLowerCase()}`;
   const metadataRequestKey = params.code.toLowerCase();
   const selectedAudience = campaign?.audienceGroups.includes(audienceGroup ?? "") ? audienceGroup : null;
@@ -136,20 +153,71 @@ export default function JoinCampaign() {
   }, [audienceLookupKey, audienceRequestKey, campaign, loadCampaignByCode, metadataLookupKey, metadataRequestKey, params.code, selectedAudience]);
 
   useEffect(() => {
+    latestCampaignPinsRef.current = campaign?.pins ?? [];
+    if (!campaign?.id || capturedCampaignIdRef.current === campaign.id) return;
+    capturedCampaignIdRef.current = campaign.id;
+    initialCampaignPinsRef.current = campaign.pins;
+  }, [campaign?.id, campaign?.pins]);
+
+  useEffect(() => {
     if (!campaign?.id) return;
     let active = true;
+    let pollTimer: number | null = null;
     const refresh = async () => {
+      const generation = publicPinsGenerationRef.current;
       try {
-        const snapshot = await fetchCampaignPlayer(campaign.id);
-        if (active) setPublicPins(snapshot?.pins ?? []);
+        const snapshot = await fetchCampaignPlayer(campaign.id, true);
+        if (active && generation === publicPinsGenerationRef.current) {
+          const nextPins = snapshot?.pins ?? [];
+          const mergedPins = nextPins.map((pin) => pendingPinIdsRef.current.has(pin.id)
+            ? withPinReaction(pin, publicPinsRef.current.find((current) => current.id === pin.id)?.reactedByMe ?? pin.reactedByMe)
+            : pin);
+          if (publicPinsCampaignIdRef.current !== campaign.id) {
+            publicPinsCampaignIdRef.current = campaign.id;
+            publicReactionCounts.current = initialEmpathyCounts(initialCampaignPinsRef.current, latestCampaignPinsRef.current, mergedPins);
+          }
+          publicPinsRef.current = mergedPins;
+          setPublicPins(mergedPins);
+        }
       } catch (error) {
         console.error("Audience feedback list refresh failed", error);
+      } finally {
+        if (active) pollTimer = window.setTimeout(() => void refresh(), 2_000);
       }
     };
     void refresh();
-    const interval = window.setInterval(() => void refresh(), 2_000);
-    return () => { active = false; window.clearInterval(interval); };
+    return () => {
+      active = false;
+      if (pollTimer !== null) window.clearTimeout(pollTimer);
+    };
   }, [campaign?.id]);
+
+  useEffect(() => {
+    if (!campaign?.id) return;
+    if (publicPinsCampaignIdRef.current !== campaign.id) return;
+    const currentCounts = new Map(publicPins.map((pin) => [pin.id, pin.reactionCount]));
+    if (publicReactionCounts.current === null) {
+      publicReactionCounts.current = currentCounts;
+      return;
+    }
+
+    const myPinIds = new Set(campaign.pins.filter((pin) => pin.authorId === userId).map((pin) => pin.id));
+    const received = receivedEmpathyCount(publicReactionCounts.current, publicPins, myPinIds);
+    const nextCounts = new Map(publicReactionCounts.current);
+    currentCounts.forEach((count, pinId) => nextCounts.set(pinId, count));
+    publicReactionCounts.current = nextCounts;
+    if (!received) return;
+    setEmpathyNotificationCount((current) => current + received);
+    if (empathyNotificationTimer.current) window.clearTimeout(empathyNotificationTimer.current);
+    empathyNotificationTimer.current = window.setTimeout(() => {
+      setEmpathyNotificationCount(0);
+      empathyNotificationTimer.current = null;
+    }, 4_000);
+  }, [campaign?.id, campaign?.pins, publicPins, userId]);
+
+  useEffect(() => () => {
+    if (empathyNotificationTimer.current) window.clearTimeout(empathyNotificationTimer.current);
+  }, []);
 
   const selectAudience = (next: string | null) => {
     if (next) sessionStorage.setItem(storageKey, next);
@@ -191,7 +259,12 @@ export default function JoinCampaign() {
   const categoryClass = (category: FeedbackCategory) => feedbackCategoryClass(campaign.feedbackCategories, category);
   // 공개 핀은 목록에 모두 보여주고, 이미지에는 내 핀과 목록에서 선택한 핀만 보여준다.
   // 관리자가 숨긴 핀도 여기서 뺀다 — 지운 것처럼 보이는 게 반쯤 살아 있는 것보다 정직하다.
-  const pagePins = [...new Map([...publicPins, ...campaign.pins].map((pin) => [pin.id, pin])).values()]
+  const storedPinsById = new Map(campaign.pins.map((pin) => [pin.id, pin]));
+  const pagePins = [...new Map([...campaign.pins, ...publicPins].map((pin) => [pin.id, pin])).values()]
+    .map((pin) => {
+      const storedPin = storedPinsById.get(pin.id);
+      return storedPin ? { ...pin, ...storedPin, reactionCount: pin.reactionCount, reactedByMe: pin.reactedByMe } : pin;
+    })
     .filter((pin) => pin.campaignId === campaign.id && pin.pageIndex === (activePage?.pageIndex ?? 0) && !pin.hidden)
     .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
   const myPins = pagePins.filter((pin) => pin.authorId && pin.authorId === userId);
@@ -201,6 +274,15 @@ export default function JoinCampaign() {
   const viewingPin = viewingPinId ? myPins.find((pin) => pin.id === viewingPinId) : null;
   const activeCategory = draft?.category ?? defaultCategory;
   const draftBody = draft?.body ?? "";
+  const draftMarker = draft?.marker ?? "pin";
+  const draftMarkerEmoji = feedbackPinMarkerEmoji(draftMarker);
+  const markerLabel = (marker: FeedbackPinMarker) => t(marker === "pin"
+    ? "pin.join.markerPin"
+    : marker === "question"
+      ? "pin.join.markerQuestion"
+      : marker === "smile"
+        ? "pin.join.markerSmile"
+        : "pin.join.markerIdea");
   const placeDraftPin = (x: number, y: number) => {
     setSelectedFeedbackId(null);
     setEditingPinId(null);
@@ -211,13 +293,17 @@ export default function JoinCampaign() {
       x,
       y,
       category: current && acceptsFeedbackCategory(campaign.feedbackCategories, current.category) ? current.category : defaultCategory,
-      body: current?.body ?? ""
+      body: current?.body ?? "",
+      marker: current?.marker ?? "pin"
     }));
     setSubmitted(false);
     setComposerOpen(true);
   };
   const selectCategory = (nextCategory: FeedbackCategory) => {
     setDraft((current) => current ? { ...current, category: nextCategory } : current);
+  };
+  const selectMarker = (marker: FeedbackPinMarker) => {
+    setDraft((current) => current ? { ...current, marker } : current);
   };
   const startEditingPin = (pinId: string) => {
     const pin = myPins.find((item) => item.id === pinId);
@@ -236,7 +322,8 @@ export default function JoinCampaign() {
       x: pin.x,
       y: pin.y,
       category: acceptsFeedbackCategory(campaign.feedbackCategories, pin.category) ? pin.category : defaultCategory,
-      body: pin.body
+      body: pin.body,
+      marker: pin.marker
     });
     setEditingPinId(pin.id);
     setViewingPinId(null);
@@ -250,6 +337,40 @@ export default function JoinCampaign() {
   };
   const updateDraftBody = (body: string) => {
     setDraft((current) => current ? { ...current, body } : current);
+  };
+  const togglePinReaction = async (pin: FeedbackPin) => {
+    if (pin.authorId === userId || pendingPinIdsRef.current.has(pin.id)) return;
+    const nextReacted = !pin.reactedByMe;
+    pendingPinIdsRef.current.add(pin.id);
+    publicPinsGenerationRef.current += 1;
+    setPendingPinIds(new Set(pendingPinIdsRef.current));
+    setPinReactionError(null);
+    setPublicPins((current) => {
+      const next = current.map((item) => item.id === pin.id ? withPinReaction(item, nextReacted) : item);
+      publicPinsRef.current = next;
+      return next;
+    });
+    try {
+      const reacted = await setPinReaction(campaign.id, pin.id, nextReacted);
+      publicPinsGenerationRef.current += 1;
+      setPublicPins((current) => {
+        const next = current.map((item) => item.id === pin.id ? withPinReaction(item, reacted) : item);
+        publicPinsRef.current = next;
+        return next;
+      });
+    } catch (error) {
+      publicPinsGenerationRef.current += 1;
+      console.error("Feedback pin reaction failed", error);
+      setPublicPins((current) => {
+        const next = current.map((item) => item.id === pin.id ? withPinReaction(item, pin.reactedByMe) : item);
+        publicPinsRef.current = next;
+        return next;
+      });
+      setPinReactionError(t("pin.join.empathyError"));
+    } finally {
+      pendingPinIdsRef.current.delete(pin.id);
+      setPendingPinIds(new Set(pendingPinIdsRef.current));
+    }
   };
   const clearDraft = () => setDraft(null);
   const moveDraftPin = (event: React.PointerEvent<HTMLButtonElement>) => {
@@ -282,7 +403,7 @@ export default function JoinCampaign() {
       setSubmitError(t("pin.join.bodyRequired"));
       return;
     }
-    const values = { category: draft.category, body: body || categoryLabel(draft.category) };
+    const values = { category: draft.category, body: body || categoryLabel(draft.category), marker: draft.marker };
     setSubmitError(null);
     setSubmitting(true);
     try {
@@ -406,7 +527,7 @@ export default function JoinCampaign() {
               } : undefined} showLabels labelMode="selected">
               {activeTool === "pin" && draft && !editingPinId && !submitted && <>
                 <button
-                  className="draft-pin"
+                  className={`draft-pin ${draftMarkerEmoji ? "emoji-pin" : ""}`}
                   style={{ left: `${draft.x * 100}%`, top: `${draft.y * 100}%` }}
                   aria-label={t("pin.join.movePin")}
                   onPointerDown={(event) => {
@@ -423,7 +544,7 @@ export default function JoinCampaign() {
                     if (!pinDragged.current) setComposerOpen(true);
                     pinDragged.current = false;
                   }}
-                >!</button>
+                >{draftMarkerEmoji && <span aria-hidden="true">{draftMarkerEmoji}</span>}</button>
                 {draft.category !== null && <span className={`draft-tag pin-category ${categoryClass(draft.category)}`} style={{ left: `${draft.x * 100}%`, top: `${draft.y * 100}%` }}>{categoryLabel(draft.category)}</span>}
               </>}
               </ImageCanvas>
@@ -449,16 +570,35 @@ export default function JoinCampaign() {
             <span>{t("pin.detail.listSummary", { count: pagePins.length })}</span>
           </header>
           {pagePins.length ? <ul className="student-feedback-list">
-            {pagePins.map((pin, index) => <li key={pin.id} className={`question-card ${selectedFeedbackId === pin.id ? "selected" : ""}`}>
-              <button type="button" className="student-feedback-item" onClick={() => setSelectedFeedbackId(pin.id)} aria-pressed={selectedFeedbackId === pin.id}>
-                <span className="pin-number">{index + 1}</span>
+            {pagePins.map((pin) => {
+              const ownPin = pin.authorId === userId;
+              const reactionPending = pendingPinIds.has(pin.id);
+              return <li key={pin.id} className={`question-card ${selectedFeedbackId === pin.id ? "selected" : ""}`}>
+              <div className="student-feedback-row">
+                <button type="button" className="student-feedback-item" onClick={() => setSelectedFeedbackId(pin.id)} aria-pressed={selectedFeedbackId === pin.id}>
                 <span className="question-copy">
                   <em className={`pin-category ${categoryClass(pin.category)}`}>{categoryLabel(pin.category)}</em>
                   <p>{pin.body}</p>
                 </span>
-              </button>
-            </li>)}
+                </button>
+                <button
+                  type="button"
+                  className={`pin-empathy-button ${pin.reactedByMe ? "active" : ""}`}
+                  onClick={() => void togglePinReaction(pin)}
+                  aria-pressed={pin.reactedByMe}
+                  aria-label={ownPin
+                    ? t("pin.join.empathyOwn")
+                    : t(pin.reactedByMe ? "pin.join.empathyRemoveButton" : "pin.join.empathyButton", { count: pin.reactionCount })}
+                  title={ownPin ? t("pin.join.empathyOwn") : undefined}
+                  aria-disabled={ownPin}
+                  aria-busy={reactionPending}
+                  disabled={reactionPending}
+                ><span aria-hidden="true">👍</span><b>{pin.reactionCount}</b></button>
+              </div>
+            </li>;
+            })}
           </ul> : <p className="student-feedback-empty">{t("pin.detail.none")}</p>}
+          {pinReactionError && <p className="student-empathy-error" role="alert">{pinReactionError}</p>}
         </section>
       </section>
       <div className="participant-page-reactions" aria-hidden="true">
@@ -468,6 +608,7 @@ export default function JoinCampaign() {
           style={{ left: `${reaction.left}%`, animationDelay: `${reaction.delay}ms` }}
         >{reaction.emoji}</span>)}
       </div>
+      {empathyNotificationCount > 0 && <output className="pin-empathy-toast" aria-live="polite" aria-atomic="true">{t("pin.join.empathyReceived", { count: empathyNotificationCount })}</output>}
       {composerOpen && <div className="student-modal-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) closeComposer(); }}>
         <section className="student-question-modal" role="dialog" aria-modal="true" aria-labelledby="pin-modal-title">
           <button className="modal-close" onClick={closeComposer} aria-label={t("pin.join.closeComposer")}><X /></button>
@@ -478,9 +619,19 @@ export default function JoinCampaign() {
             <button className="btn primary large full" onClick={closeComposer}>{t("common.confirm")}</button>
           </div> : submitted ? <div className="submitted"><span><Check /></span><h2 id="pin-modal-title">{t(editingPinId ? "pin.join.updated" : "pin.join.submitted")}</h2><p>{t("pin.join.delivered")}</p><button className="btn primary" onClick={closeComposer}>{t(editingPinId ? "common.confirm" : "pin.join.leaveAnother")}</button></div> : <>
             <div className="student-modal-heading">
-              <span>!</span>
+              <span className={draftMarkerEmoji ? "emoji-pin" : ""}>{draftMarkerEmoji && <i aria-hidden="true">{draftMarkerEmoji}</i>}</span>
               <div><h2 id="pin-modal-title">{t(editingPinId ? "pin.join.editPrompt" : "pin.join.newPrompt")}</h2><p>{t(categoryOptions.length ? (editingPinId ? "pin.join.editDescription" : "pin.join.newDescription") : "pin.join.noCategoryDescription")}</p></div>
             </div>
+            <fieldset className="pin-marker-picker">
+              <legend>{t("pin.join.markerTitle")}</legend>
+              <div>{FEEDBACK_PIN_MARKERS.map((marker) => {
+                const emoji = feedbackPinMarkerEmoji(marker);
+                return <button key={marker} type="button" className={draftMarker === marker ? "active" : ""} onClick={() => selectMarker(marker)} aria-pressed={draftMarker === marker} aria-label={markerLabel(marker)}>
+                  <span className={emoji ? "emoji-pin" : ""} aria-hidden="true">{emoji}</span>
+                  <b>{markerLabel(marker)}</b>
+                </button>;
+              })}</div>
+            </fieldset>
             {categoryOptions.length > 0 && <div className="category-scroll">{categoryOptions.map((item) => <button key={item} className={activeCategory === item ? "active" : ""} onClick={() => selectCategory(item)}>{categoryLabel(item)}</button>)}</div>}
             <div className="textarea-wrap"><textarea value={draftBody} onChange={(event) => updateDraftBody(event.target.value)} maxLength={BODY_MAX} placeholder={activeCategory && isLegacyFeedbackCategory(activeCategory) ? feedbackCategoryHint(activeCategory) : t("pin.join.feedbackPlaceholder")} /><span>{draftBody.length}/{BODY_MAX}</span></div>
             {submitError && <div className="student-submit-error" role="alert">{submitError}</div>}

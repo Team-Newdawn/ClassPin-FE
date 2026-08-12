@@ -1,74 +1,47 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { advancePinBatch, createSpatialPinBatches, rectanglesOverlap, resolvePinDisplayPositions } from "./presentation-rotation.ts";
+import { advancePinPlayback, crossedPinMilestone, rectanglesOverlap, resolvePinDisplayPositions } from "./presentation-rotation.ts";
 
-test("PIN을 최대 10개씩 묶고 첫 배치를 서로 다른 화면 구역에서 고른다", () => {
-  const pins = Array.from({ length: 12 }, (_, index) => ({
-    id: `${index}`,
-    x: ((index % 4) + 0.5) / 4,
-    y: (Math.floor(index / 4) + 0.5) / 3
-  }));
-  const batches = createSpatialPinBatches(pins);
-
-  assert.deepEqual(batches.map((batch) => batch.length), [10, 2]);
-  assert.equal(new Set(batches[0].map((pin) => `${Math.floor(pin.x * 4)}:${Math.floor(pin.y * 3)}`)).size, 10);
-  assert.deepEqual(batches.flat().map((pin) => pin.id).sort(), pins.map((pin) => pin.id).sort());
+test("PIN 총합이 새 10단위를 넘으면 건너뛴 구간 중 가장 높은 값을 고른다", () => {
+  assert.equal(crossedPinMilestone(9, 10), 10);
+  assert.equal(crossedPinMilestone(9, 31), 30);
+  assert.equal(crossedPinMilestone(20, 29), null);
+  assert.equal(crossedPinMilestone(10, 10), null);
+  assert.equal(crossedPinMilestone(31, 29), null);
 });
 
-test("10개 미만이거나 마지막에 남은 PIN만 실제 개수로 묶는다", () => {
-  const pins = Array.from({ length: 17 }, (_, index) => ({ id: `${index}`, x: 0.5, y: 0.5 }));
-
-  assert.deepEqual(createSpatialPinBatches(pins).map((batch) => batch.length), [10, 7]);
-  assert.deepEqual(createSpatialPinBatches(pins.slice(0, 6)).map((batch) => batch.length), [6]);
-});
-
-test("한 묶음을 하나씩 누적한 뒤 기존 묶음을 지우고 다음 묶음을 시작한다", () => {
-  const batches = [
-    Array.from({ length: 10 }, (_, index) => ({ id: `first-${index}`, x: index / 10, y: 0 })),
-    Array.from({ length: 3 }, (_, index) => ({ id: `second-${index}`, x: index / 3, y: 1 }))
-  ];
+test("공감 여부와 관계없이 모든 PIN을 하나씩 누적한 뒤 첫 PIN부터 다시 시작한다", () => {
+  const pins = Array.from({ length: 13 }, (_, index) => ({ id: `${index}`, x: (index % 4) / 4, y: Math.floor(index / 4) / 4, reactionCount: index < 5 ? 5 : 0 }));
   let state = { shownPinIds: [] as string[], activePinId: null as string | null };
 
-  for (let count = 1; count <= 10; count += 1) {
-    state = advancePinBatch(batches, state.shownPinIds) ?? state;
+  for (let count = 1; count <= pins.length; count += 1) {
+    state = advancePinPlayback(pins, state.shownPinIds);
     assert.equal(state.shownPinIds.length, count);
-    assert.equal(state.shownPinIds.every((id) => id.startsWith("first-")), true);
   }
+  assert.deepEqual(new Set(state.shownPinIds), new Set(pins.map((pin) => pin.id)));
 
-  state = advancePinBatch(batches, state.shownPinIds) ?? state;
-  assert.deepEqual(state.shownPinIds, ["second-0"]);
-});
-
-test("한 이미지에 PIN이 10개 이하면 모두 나온 뒤 그대로 유지한다", () => {
-  const batches = [[
-    { id: "first", x: 0.2, y: 0.2 },
-    { id: "second", x: 0.8, y: 0.8 }
-  ]];
-  const first = advancePinBatch(batches, []);
-  const second = advancePinBatch(batches, first?.shownPinIds ?? []);
-
-  assert.deepEqual(second?.shownPinIds, ["first", "second"]);
-  assert.equal(advancePinBatch(batches, second?.shownPinIds ?? []), null);
+  state = advancePinPlayback(pins, state.shownPinIds);
+  assert.deepEqual(state.shownPinIds, [pins[0].id]);
 });
 
 test("현재 표시된 PIN과 가장 멀리 떨어진 PIN을 다음으로 고른다", () => {
-  const batch = [[
+  const pins = [
     { id: "center", x: 0.5, y: 0.5 },
     { id: "near", x: 0.55, y: 0.5 },
     { id: "far", x: 0.05, y: 0.05 }
-  ]];
+  ];
 
-  assert.equal(advancePinBatch(batch, ["center"])?.activePinId, "far");
+  assert.equal(advancePinPlayback(pins, ["center"]).activePinId, "far");
 });
 
-test("중앙이나 가장자리에 겹친 PIN 10개를 화면 안의 겹치지 않는 위치로 펼친다", () => {
+test("중앙이나 가장자리에 겹친 PIN 30개를 화면 안의 겹치지 않는 위치로 펼친다", () => {
   const width = 800;
   const height = 450;
   for (const [x, y] of [[0.5, 0.5], [0, 0], [1, 1]]) {
-    const pins = Array.from({ length: 10 }, (_, index) => ({ id: `${index}`, x, y }));
+    const pins = Array.from({ length: 30 }, (_, index) => ({ id: `${index}`, x, y }));
     const positions = [...resolvePinDisplayPositions(pins, width, height).values()];
 
-    assert.equal(positions.length, 10);
+    assert.equal(positions.length, pins.length);
     positions.forEach((position, index) => {
       assert.ok(position.x >= 0 && position.x <= 1);
       assert.ok(position.y >= 0 && position.y <= 1);

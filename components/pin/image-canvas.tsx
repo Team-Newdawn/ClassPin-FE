@@ -3,7 +3,7 @@
 
 import { Fragment, useState, type ReactNode } from "react";
 import { useLanguage } from "@/components/language-context";
-import { configuredFeedbackCategoryLabel, feedbackCategoryClass, type Campaign, type CampaignPage, type FeedbackPin } from "@/lib/pin/types";
+import { configuredFeedbackCategoryLabel, feedbackCategoryClass, feedbackPinMarkerEmoji, type Campaign, type CampaignPage, type FeedbackPin } from "@/lib/pin/types";
 
 /**
  * 기준 이미지 위에 핀을 얹는 캔버스.
@@ -76,30 +76,38 @@ export function ImageCanvas({ campaign, page, pins = [], visiblePinIds, pinDispl
           return <line key={pin.id} x1={pin.x * 100} y1={pin.y * 100} x2={position.x * 100} y2={position.y * 100} />;
         })}
       </svg>}
-      {pins.map((pin, index) => {
+      {pins.map((pin) => {
         const position = pinDisplayPositions?.get(pin.id) ?? pin;
+        const markerEmoji = feedbackPinMarkerEmoji(pin.marker);
+        const reactionCount = pin.reactionCount;
         return <Fragment key={pin.id}>
           {/* 핀 자체를 유형 색으로 칠하면 라벨 없이도 지도가 한눈에 읽힌다. */}
           <button
-            className={`question-pin pin-mark ${categoryClass(pin.category)} ${selectedId === pin.id ? "selected" : ""} ${livePinId === pin.id ? "live" : ""}`}
+            className={`question-pin pin-mark ${categoryClass(pin.category)} ${markerEmoji ? "emoji-pin" : ""} ${selectedId === pin.id ? "selected" : ""} ${livePinId === pin.id ? "live" : ""}`}
             style={{ left: `${position.x * 100}%`, top: `${position.y * 100}%` }}
             data-feedback-pin-id={pin.id}
             hidden={visiblePinIds ? !visiblePinIds.has(pin.id) : undefined}
             onClick={() => onSelectPin?.(pin.id)}
             aria-label={t("pin.image.feedbackAria", { category: categoryLabel(pin.category), body: pin.body })}
           >
-            {index + 1}
+            {markerEmoji && <span aria-hidden="true">{markerEmoji}</span>}
           </button>
           {showLabels && (labelMode === "always" || selectedId === pin.id) && (
             <button
-              className={`question-tag pin-category ${categoryClass(pin.category)} ${livePinId === pin.id ? "live" : ""} ${labelContent === "body" ? `feedback-bubble ${position.x > 0.58 ? "to-left" : ""} ${position.y < 0.12 ? "below" : ""}` : ""}`}
+              className={`question-tag pin-category ${categoryClass(pin.category)} ${livePinId === pin.id ? "live" : ""} ${labelContent === "body" ? `feedback-bubble ${reactionCount >= 5 ? "empathy-fire" : ""} ${position.x > 0.58 ? "to-left" : ""} ${position.y < 0.12 ? "below" : ""}` : ""}`}
               style={{ left: `${position.x * 100}%`, top: `${position.y * 100}%` }}
               data-feedback-label-id={pin.id}
               onClick={() => onSelectPin?.(pin.id)}
-              aria-label={t("pin.image.feedbackBodyAria", { body: pin.body })}
+              aria-label={reactionCount > 0 && labelContent === "body"
+                ? t("pin.image.feedbackBodyWithEmpathyAria", { body: pin.body, count: reactionCount })
+                : t("pin.image.feedbackBodyAria", { body: pin.body })}
               title={labelContent === "body" ? pin.body : undefined}
             >
-              {labelContent === "body" ? pin.body : categoryLabel(pin.category)}
+              {labelContent === "body" ? <>
+                <span className="feedback-bubble-body">{pin.body}</span>
+                {reactionCount > 0 && <span className="pin-empathy-count" aria-label={t("pin.image.empathyCount", { count: reactionCount })}>👍 {reactionCount}</span>}
+                {reactionCount >= 5 && <span className="pin-fire-effect" aria-hidden="true">🔥🔥🔥</span>}
+              </> : categoryLabel(pin.category)}
             </button>
           )}
         </Fragment>

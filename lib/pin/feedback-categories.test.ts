@@ -21,6 +21,9 @@ const pin = (category: FeedbackPin["category"]): FeedbackPin => ({
   y: 0.5,
   category,
   body: "feedback",
+  marker: "pin",
+  reactionCount: 0,
+  reactedByMe: false,
   hidden: false,
   createdAt: "2026-08-08T00:00:00.000Z",
 });

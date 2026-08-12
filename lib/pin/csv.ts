@@ -1,8 +1,12 @@
 import { translate, type Locale, type TranslationKey } from "@/lib/i18n";
-import type { Campaign, FeedbackPin } from "./types";
+import { configuredFeedbackCategoryLabel, defaultFeedbackCategorySettings, type Campaign, type FeedbackCategorySettings, type FeedbackPin } from "./types";
 
-const categoryLabel = (locale: Locale, category: FeedbackPin["category"]) =>
-  translate(locale, `pin.category.${category}` as TranslationKey);
+const categoryLabel = (locale: Locale, settings: FeedbackCategorySettings, category: FeedbackPin["category"]) =>
+  configuredFeedbackCategoryLabel(
+    settings,
+    category,
+    (key) => translate(locale, `pin.category.${key}` as TranslationKey)
+  );
 
 const headers = (locale: Locale) => [
   translate(locale, "pin.csv.order"),
@@ -30,7 +34,7 @@ const formatTime = (value: string) => {
 const coord = (value: number) => value.toFixed(4);
 
 /** 좌표와 내용이 반드시 같은 행에 있어야 분석 도구에서 "어디의 무슨 피드백"으로 읽힌다. */
-export const buildPinsCsv = (pins: FeedbackPin[], locale: Locale = "ko") =>
+export const buildPinsCsv = (pins: FeedbackPin[], locale: Locale = "ko", settings = defaultFeedbackCategorySettings()) =>
   [
     headers(locale).map(escapeCell).join(","),
     ...pins.map((pin, index) => [
@@ -38,7 +42,7 @@ export const buildPinsCsv = (pins: FeedbackPin[], locale: Locale = "ko") =>
       String(pin.pageIndex + 1),
       coord(pin.x),
       coord(pin.y),
-      categoryLabel(locale, pin.category),
+      categoryLabel(locale, settings, pin.category),
       pin.body,
       translate(locale, pin.hidden ? "pin.csv.excluded" : "pin.csv.visible"),
       formatTime(pin.createdAt)
@@ -55,7 +59,7 @@ const fileName = (campaign: Campaign, locale: Locale) => {
 const BOM = "﻿";
 
 export function downloadPinsCsv(campaign: Campaign, pins: FeedbackPin[], locale: Locale = "ko") {
-  const blob = new Blob([BOM + buildPinsCsv(pins, locale)], { type: "text/csv;charset=utf-8;" });
+  const blob = new Blob([BOM + buildPinsCsv(pins, locale, campaign.feedbackCategories)], { type: "text/csv;charset=utf-8;" });
   const url = URL.createObjectURL(blob);
   const anchor = document.createElement("a");
   anchor.href = url;

@@ -22,7 +22,7 @@ export default function SessionAdmin() {
   const params = useParams<{ id: string }>();
   const search = useSearchParams();
   const router = useRouter();
-  const { sessions, ready, appendSlides, deleteSlide, answerQuestion, resolveQuestion, setCurrentSlide, setStatus, setShowQuestionPins, setPresentationQrPosition, updateSlideNote } = useSessions();
+  const { sessions, ready, appendSlides, deleteSlide, answerQuestion, resolveQuestion, setCurrentSlide, setStatus, setShowQuestionPins, setShowPresentationQr, setPresentationQrPosition, updateSlideNote } = useSessions();
   const session = sessions.find((item) => item.id === params.id);
   const [tab, setTab] = useState<Tab>(search.get("tab") === "questions" ? "questions" : "live");
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -307,6 +307,23 @@ export default function SessionAdmin() {
                 <div className="qr-position-heading">
                   <span><QrCode /></span>
                   <div><b id="qr-position-title">{t("session.qrPosition")}</b><small>{t("session.qrPositionHint")}</small></div>
+                  <div className="panel-heading-actions">
+                    <span className="pin-toggle-label">{t("presentation.showQr")}</span>
+                    <button
+                      type="button"
+                      className={`pin-toggle ${session.showPresentationQr ? "on" : ""}`}
+                      role="switch"
+                      aria-checked={session.showPresentationQr}
+                      aria-label={session.showPresentationQr ? t("presentation.turnQrOff") : t("presentation.turnQrOn")}
+                      onClick={() => runAction(
+                        setShowPresentationQr(session.id, !session.showPresentationQr),
+                        t("presentation.saveQrSettingError")
+                      )}
+                    >
+                      <span className="pin-toggle-thumb" />
+                      <span className="pin-toggle-state">{session.showPresentationQr ? "ON" : "OFF"}</span>
+                    </button>
+                  </div>
                 </div>
                 <div className="qr-position-options" role="group" aria-label={t("session.qrPosition")}>
                   {qrPositions.map((position) => (

@@ -4,11 +4,17 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import { useAuth } from "@/components/auth-context";
 import { getAudienceSupabaseClient, getSupabaseClient, supabaseConfigured } from "@/lib/supabase/client";
 import {
+  createSessionFolder as persistSessionFolder,
   createCampaign as persistCampaign,
+  deleteCampaign as persistCampaignDeletion,
+  deleteSessionFolder as persistSessionFolderDeletion,
   fetchCampaignSnapshot,
   fetchCampaignStatus,
   fetchLiveCampaign,
   fetchOwnedCampaigns,
+  fetchOwnedSessionFolders,
+  moveCampaignToFolder as persistCampaignFolder,
+  renameSessionFolder as persistSessionFolderName,
   setPinHidden as persistPinHidden,
   submitPin,
   subscribeToCampaign,
@@ -17,18 +23,29 @@ import {
   updateCampaignPageAudienceGroups as persistPageAudienceGroups,
   updatePin as persistPinUpdate
 } from "@/lib/pin/repository";
-import { mergeAudiencePages, type Campaign, type FeedbackCategory, type FeedbackPin } from "@/lib/pin/types";
+import { mergeAudiencePages, type Campaign, type FeedbackCategory, type FeedbackCategorySettings, type FeedbackPin, type SessionFolder } from "@/lib/pin/types";
 
 type Store = {
   ready: boolean;
   campaigns: Campaign[];
+  folders: SessionFolder[];
   createCampaign: (input: { title: string; guideText: string; referenceFile: File }) => Promise<Campaign>;
+  deleteCampaign: (campaignId: string) => Promise<void>;
+  createFolder: (name: string) => Promise<SessionFolder>;
+  renameFolder: (folderId: string, name: string) => Promise<void>;
+  deleteFolder: (folderId: string) => Promise<void>;
+  moveCampaign: (campaignId: string, folderId: string | null) => Promise<void>;
   addPin: (campaignId: string, pin: Omit<FeedbackPin, "id" | "campaignId" | "authorId" | "hidden" | "createdAt">) => Promise<void>;
   updatePin: (campaignId: string, pinId: string, values: { category: FeedbackCategory; body: string }) => Promise<void>;
   setPinHidden: (campaignId: string, pinId: string, hidden: boolean) => Promise<void>;
   setAudienceGroups: (campaignId: string, audienceGroups: string[]) => Promise<void>;
   setPageAudienceGroups: (campaignId: string, pageId: string, audienceGroups: string[]) => Promise<void>;
   setStatus: (campaignId: string, status: Campaign["status"]) => Promise<void>;
+  setShowPresentationQr: (campaignId: string, visible: boolean) => Promise<void>;
+  setPresentationQrPosition: (campaignId: string, position: Campaign["presentationQrPosition"]) => Promise<void>;
+  setShowPresentationPinStatus: (campaignId: string, visible: boolean) => Promise<void>;
+  setPresentationPinStatusPosition: (campaignId: string, position: Campaign["presentationPinStatusPosition"]) => Promise<void>;
+  setFeedbackCategories: (campaignId: string, settings: FeedbackCategorySettings) => Promise<void>;
   loadCampaignByCode: (code: string, audienceGroup: string | null) => Promise<Campaign | null>;
 };
 
@@ -57,6 +74,7 @@ const errorDetail = (error: unknown) => {
 export function CampaignStore({ children }: { children: React.ReactNode }) {
   const { loading: authLoading, user, isAdmin } = useAuth();
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
+  const [folders, setFolders] = useState<SessionFolder[]>([]);
   const [ready, setReady] = useState(false);
   const lookups = useRef(new Map<string, Promise<Campaign | null>>());
   const ownerId = useRef<string | null>(null);
@@ -81,16 +99,18 @@ export function CampaignStore({ children }: { children: React.ReactNode }) {
     if (authUserId && !authIsAnonymous && isAdmin) {
       ownerId.current = authUserId;
       queueMicrotask(() => { if (active) setReady(false); });
-      void fetchOwnedCampaigns()
-        .then((remote) => {
+      void Promise.all([fetchOwnedCampaigns(), fetchOwnedSessionFolders()])
+        .then(([remote, remoteFolders]) => {
           if (!active) return;
           setCampaigns(dedupeById(remote));
+          setFolders(remoteFolders);
           setReady(true);
         })
         .catch((error) => {
           if (!active) return;
           console.error(`Supabase campaign load failed: ${errorDetail(error)}`, error);
           setCampaigns([]);
+          setFolders([]);
           setReady(true);
         });
       return () => { active = false; };
@@ -101,7 +121,10 @@ export function CampaignStore({ children }: { children: React.ReactNode }) {
     ownerId.current = null;
     queueMicrotask(() => {
       if (!active) return;
-      if (hadOwner) setCampaigns([]);
+      if (hadOwner) {
+        setCampaigns([]);
+        setFolders([]);
+      }
       setReady(true);
     });
     return () => { active = false; };
@@ -156,14 +179,43 @@ export function CampaignStore({ children }: { children: React.ReactNode }) {
   const value = useMemo<Store>(() => ({
     ready,
     campaigns,
+    folders,
     createCampaign: async (input) => {
       const campaign = await persistCampaign({ id: crypto.randomUUID(), code: makeCode(), ...input });
       setCampaigns((current) => dedupeById([campaign, ...current]));
       return campaign;
     },
+    deleteCampaign: async (campaignId) => {
+      const campaign = campaigns.find((item) => item.id === campaignId);
+      if (!campaign) throw new Error("삭제할 세션을 찾지 못했습니다.");
+      await persistCampaignDeletion(campaign);
+      setCampaigns((current) => current.filter((item) => item.id !== campaignId));
+    },
+    createFolder: async (name) => {
+      const folder = await persistSessionFolder(name);
+      setFolders((current) => [...current, folder]);
+      return folder;
+    },
+    renameFolder: async (folderId, name) => {
+      await persistSessionFolderName(folderId, name);
+      setFolders((current) => current.map((folder) => folder.id === folderId ? { ...folder, name } : folder));
+    },
+    deleteFolder: async (folderId) => {
+      await persistSessionFolderDeletion(folderId);
+      setFolders((current) => current.filter((folder) => folder.id !== folderId));
+      setCampaigns((current) => current.map((campaign) => campaign.folderId === folderId ? { ...campaign, folderId: null } : campaign));
+    },
+    moveCampaign: async (campaignId, folderId) => {
+      const campaign = campaigns.find((item) => item.id === campaignId);
+      if (!campaign) throw new Error("이동할 세션을 찾지 못했습니다.");
+      if (folderId !== null && !folders.some((folder) => folder.id === folderId)) throw new Error("이동할 폴더를 찾지 못했습니다.");
+      if (campaign.folderId === folderId) return;
+      await persistCampaignFolder(campaignId, folderId);
+      updateCampaignState(campaignId, (current) => ({ ...current, folderId }));
+    },
     addPin: async (campaignId, input) => {
       const campaign = campaigns.find((item) => item.id === campaignId);
-      if (!campaign) throw new Error("피드백을 남길 캠페인을 찾지 못했습니다.");
+      if (!campaign) throw new Error("피드백을 남길 세션을 찾지 못했습니다.");
       const draft: FeedbackPin = { ...input, id: crypto.randomUUID(), campaignId, authorId: null, hidden: false, createdAt: new Date().toISOString() };
       // 익명 세션은 제출 시점에 만들어질 수 있어, 실제 기록된 작성자 id 를 받아서 넣는다.
       const pin: FeedbackPin = { ...draft, authorId: await submitPin(campaign, draft) };
@@ -175,7 +227,9 @@ export function CampaignStore({ children }: { children: React.ReactNode }) {
       }));
     },
     updatePin: async (campaignId, pinId, values) => {
-      await persistPinUpdate(pinId, values);
+      const campaign = campaigns.find((item) => item.id === campaignId);
+      if (!campaign) throw new Error("피드백을 고칠 세션을 찾지 못했습니다.");
+      await persistPinUpdate(campaign, pinId, values);
       updateCampaignState(campaignId, (campaign) => ({
         ...campaign,
         pins: campaign.pins.map((pin) => pin.id === pinId ? { ...pin, ...values } : pin)
@@ -202,7 +256,7 @@ export function CampaignStore({ children }: { children: React.ReactNode }) {
     setPageAudienceGroups: async (campaignId, pageId, audienceGroups) => {
       const campaign = campaigns.find((item) => item.id === campaignId);
       if (!campaign || audienceGroups.some((group) => !campaign.audienceGroups.includes(group))) {
-        throw new Error("캠페인에 없는 참여자 그룹입니다.");
+        throw new Error("세션에 없는 참여자 그룹입니다.");
       }
       await persistPageAudienceGroups(pageId, audienceGroups);
       updateCampaignState(campaignId, (campaign) => ({
@@ -213,6 +267,26 @@ export function CampaignStore({ children }: { children: React.ReactNode }) {
     setStatus: async (campaignId, status) => {
       await updateCampaign(campaignId, { status });
       updateCampaignState(campaignId, (campaign) => ({ ...campaign, status }));
+    },
+    setShowPresentationQr: async (campaignId, visible) => {
+      await updateCampaign(campaignId, { show_presentation_qr: visible });
+      updateCampaignState(campaignId, (campaign) => ({ ...campaign, showPresentationQr: visible }));
+    },
+    setPresentationQrPosition: async (campaignId, position) => {
+      await updateCampaign(campaignId, { presentation_qr_position: position });
+      updateCampaignState(campaignId, (campaign) => ({ ...campaign, presentationQrPosition: position }));
+    },
+    setShowPresentationPinStatus: async (campaignId, visible) => {
+      await updateCampaign(campaignId, { show_presentation_pin_status: visible });
+      updateCampaignState(campaignId, (campaign) => ({ ...campaign, showPresentationPinStatus: visible }));
+    },
+    setPresentationPinStatusPosition: async (campaignId, position) => {
+      await updateCampaign(campaignId, { presentation_pin_status_position: position });
+      updateCampaignState(campaignId, (campaign) => ({ ...campaign, presentationPinStatusPosition: position }));
+    },
+    setFeedbackCategories: async (campaignId, feedbackCategories) => {
+      await updateCampaign(campaignId, { feedback_categories: feedbackCategories });
+      updateCampaignState(campaignId, (campaign) => ({ ...campaign, feedbackCategories }));
     },
     loadCampaignByCode: async (code, audienceGroup) => {
       const key = `${code.toLowerCase()}:${audienceGroup ?? "metadata"}`;
@@ -239,7 +313,7 @@ export function CampaignStore({ children }: { children: React.ReactNode }) {
       lookups.current.set(key, lookup);
       return lookup;
     }
-  }), [campaigns, ready, updateCampaignState]);
+  }), [campaigns, folders, ready, updateCampaignState]);
 
   return <CampaignContext.Provider value={value}>{children}</CampaignContext.Provider>;
 }

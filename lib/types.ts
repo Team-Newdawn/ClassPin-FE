@@ -58,6 +58,7 @@ export interface ClassSession {
   status: "live" | "ended";
   currentSlide: number;
   showQuestionPins: boolean;
+  showPresentationQr: boolean;
   presentationQrPosition: PresentationQrPosition;
   createdAt: string;
   slides: Slide[];

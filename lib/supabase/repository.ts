@@ -12,6 +12,7 @@ type LectureRow = {
   status: ClassSession["status"];
   current_page: number;
   show_question_pins: boolean;
+  show_presentation_qr: boolean;
   presentation_qr_position: ClassSession["presentationQrPosition"];
   created_at: string;
 };
@@ -121,6 +122,7 @@ export async function persistSession(session: ClassSession) {
     status: session.status,
     current_page: session.currentSlide,
     show_question_pins: session.showQuestionPins,
+    show_presentation_qr: session.showPresentationQr,
     presentation_qr_position: session.presentationQrPosition,
     started_at: new Date().toISOString()
   });
@@ -257,7 +259,7 @@ export async function fetchOwnedSessions(): Promise<ClassSession[]> {
   if (!courseIds.length) return [];
 
   const { data: lectureData, error: lectureError } = await client.from("lectures")
-    .select("id, course_id, title, join_code, status, current_page, show_question_pins, presentation_qr_position, created_at")
+    .select("id, course_id, title, join_code, status, current_page, show_question_pins, show_presentation_qr, presentation_qr_position, created_at")
     .in("course_id", courseIds)
     .neq("status", "archived")
     .order("created_at", { ascending: false });
@@ -354,6 +356,7 @@ export async function fetchOwnedSessions(): Promise<ClassSession[]> {
       status: lecture.status,
       currentSlide: lecture.current_page,
       showQuestionPins: lecture.show_question_pins,
+      showPresentationQr: lecture.show_presentation_qr,
       presentationQrPosition: lecture.presentation_qr_position,
       createdAt: lecture.created_at,
       slides,
@@ -380,7 +383,7 @@ export async function fetchLiveSession(joinCode: string): Promise<ClassSession |
   if (!client) return null;
   await ensureAnonymousUser();
   const { data: lecture, error } = await client.from("lectures")
-    .select("id, course_id, title, join_code, status, current_page, show_question_pins, presentation_qr_position, created_at")
+    .select("id, course_id, title, join_code, status, current_page, show_question_pins, show_presentation_qr, presentation_qr_position, created_at")
     .eq("join_code", joinCode.toUpperCase())
     .eq("status", "live")
     .maybeSingle();
@@ -408,6 +411,7 @@ export async function fetchLiveSession(joinCode: string): Promise<ClassSession |
     status: "live",
     currentSlide: lecture.current_page,
     showQuestionPins: lecture.show_question_pins,
+    showPresentationQr: lecture.show_presentation_qr,
     presentationQrPosition: lecture.presentation_qr_position,
     createdAt: lecture.created_at,
     slides,
@@ -501,6 +505,7 @@ export async function updateLecture(sessionId: string, values: {
   current_page?: number;
   status?: "live" | "ended";
   show_question_pins?: boolean;
+  show_presentation_qr?: boolean;
   presentation_qr_position?: ClassSession["presentationQrPosition"];
 }) {
   const client = getSupabaseClient();
@@ -556,12 +561,12 @@ export async function fetchLectureStatus(
   return (data?.status as ClassSession["status"] | undefined) ?? session.status;
 }
 
-export async function fetchLectureSnapshot(session: ClassSession, asAudience = false): Promise<Pick<ClassSession, "currentSlide" | "status" | "showQuestionPins" | "presentationQrPosition" | "questions"> | null> {
+export async function fetchLectureSnapshot(session: ClassSession, asAudience = false): Promise<Pick<ClassSession, "currentSlide" | "status" | "showQuestionPins" | "showPresentationQr" | "presentationQrPosition" | "questions"> | null> {
   const client = asAudience ? getAudienceSupabaseClient() : getSupabaseClient();
   if (!client) return null;
   if (asAudience) await ensureAnonymousUser();
   const { data: lecture, error: lectureError } = await client.from("lectures")
-    .select("current_page, status, show_question_pins, presentation_qr_position")
+    .select("current_page, status, show_question_pins, show_presentation_qr, presentation_qr_position")
     .eq("id", session.id)
     .maybeSingle();
   if (lectureError) throw lectureError;
@@ -576,6 +581,7 @@ export async function fetchLectureSnapshot(session: ClassSession, asAudience = f
     currentSlide: lecture?.current_page ?? session.currentSlide,
     status: asAudience && !lecture ? "ended" : (lecture?.status as ClassSession["status"]) ?? session.status,
     showQuestionPins: lecture?.show_question_pins ?? session.showQuestionPins,
+    showPresentationQr: lecture?.show_presentation_qr ?? session.showPresentationQr,
     presentationQrPosition: (lecture?.presentation_qr_position as ClassSession["presentationQrPosition"]) ?? session.presentationQrPosition,
     questions
   };

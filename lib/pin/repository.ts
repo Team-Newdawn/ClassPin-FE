@@ -1,12 +1,13 @@
 import type { RealtimeChannel } from "@supabase/supabase-js";
 import { ensureAnonymousUser, getAudienceSupabaseClient, getSessionUser, getSupabaseClient } from "@/lib/supabase/client";
 import { isPdfFile, renderPdfPages } from "@/lib/pin/pdf-reference";
-import { isAudienceGroupName, normalizeAudienceGroups, type Campaign, type CampaignPage, type FeedbackCategory, type FeedbackPin } from "@/lib/pin/types";
+import { acceptsFeedbackCategory, isAudienceGroupName, isSessionFolderName, isValidFeedbackCategorySettings, normalizeAudienceGroups, normalizeFeedbackCategorySettings, type Campaign, type CampaignPage, type FeedbackCategory, type FeedbackCategorySettings, type FeedbackPin, type SessionFolder } from "@/lib/pin/types";
 
 const BUCKET = "campaign-images";
 
 type CampaignRow = {
   id: string;
+  folder_id?: string | null;
   title: string;
   guide_text: string | null;
   join_code: string;
@@ -14,8 +15,18 @@ type CampaignRow = {
   image_width: number | null;
   image_height: number | null;
   status: string;
+  show_presentation_qr: boolean;
+  presentation_qr_position: Campaign["presentationQrPosition"];
+  show_presentation_pin_status: boolean;
+  presentation_pin_status_position: Campaign["presentationPinStatusPosition"];
   audience_groups: unknown;
+  feedback_categories: unknown;
   created_at: string;
+};
+
+type SessionFolderRow = {
+  id: string;
+  name: string;
 };
 
 type PinRow = {
@@ -41,7 +52,14 @@ type CampaignPageRow = {
   audience_groups: unknown;
 };
 
-const CAMPAIGN_COLUMNS = "id, title, guide_text, join_code, image_path, image_width, image_height, status, audience_groups, created_at";
+type CampaignPlayerPayload = {
+  campaign: CampaignRow;
+  pages: CampaignPageRow[];
+  pins: PinRow[];
+};
+
+const CAMPAIGN_COLUMNS = "id, folder_id, title, guide_text, join_code, image_path, image_width, image_height, status, show_presentation_qr, presentation_qr_position, show_presentation_pin_status, presentation_pin_status_position, audience_groups, feedback_categories, created_at";
+const SESSION_FOLDER_COLUMNS = "id, name";
 const PAGE_COLUMNS = "id, campaign_id, page_index, image_path, image_width, image_height, audience_groups";
 const PIN_COLUMNS = "id, campaign_id, author_id, page_index, x, y, category, body, hidden, created_at";
 
@@ -124,16 +142,27 @@ function legacyPage(row: CampaignRow): CampaignPage[] {
 function toCampaign(row: CampaignRow, pins: FeedbackPin[], pages: CampaignPage[]): Campaign {
   return {
     id: row.id,
+    folderId: row.folder_id ?? null,
     code: row.join_code,
     title: row.title,
     guideText: row.guide_text ?? "",
     status: row.status === "live" ? "live" : "ended",
+    showPresentationQr: row.show_presentation_qr ?? true,
+    presentationQrPosition: row.presentation_qr_position ?? "bottom-right",
+    showPresentationPinStatus: row.show_presentation_pin_status ?? true,
+    presentationPinStatusPosition: row.presentation_pin_status_position ?? "top-right",
     audienceGroups: normalizeAudienceGroups(row.audience_groups),
+    feedbackCategories: normalizeFeedbackCategorySettings(row.feedback_categories),
     pages: (pages.length ? pages : legacyPage(row)).sort((a, b) => a.pageIndex - b.pageIndex),
     createdAt: row.created_at,
     pins
   };
 }
+
+const toSessionFolder = (row: SessionFolderRow): SessionFolder => ({
+  id: row.id,
+  name: row.name,
+});
 
 /** 브라우저에서 이미지 원본 크기를 읽는다. 캔버스 비율을 여기에 맞춰야 좌표가 어긋나지 않는다. */
 export async function readImageSize(file: File): Promise<{ width: number; height: number }> {
@@ -225,13 +254,39 @@ export async function createCampaign(input: { id: string; code: string; title: s
   }
 }
 
+/** 캠페인 행과 cascade 데이터를 먼저 지운 뒤 더는 참조되지 않는 공개 이미지를 회수한다. */
+export async function deleteCampaign(campaign: Pick<Campaign, "id" | "pages">) {
+  const client = getSupabaseClient();
+  if (!client) throw new Error("Supabase 연결을 찾지 못했습니다.");
+  await requireOwnerUser();
+  const { data, error } = await client.from("campaigns").delete().eq("id", campaign.id).select("id").maybeSingle();
+  if (error) throw error;
+  if (!data) {
+    // DELETE 는 이미 지워진 행과 RLS 로 거부된 행을 모두 빈 결과로 돌려줄 수 있다.
+    // 행이 아직 보인다면 삭제 실패이고, 보이지 않으면 목표 상태(행 없음)는 이미 충족됐다.
+    const { data: remaining, error: lookupError } = await client.from("campaigns")
+      .select("id")
+      .eq("id", campaign.id)
+      .maybeSingle();
+    if (lookupError) throw lookupError;
+    if (remaining) throw new Error("세션을 삭제할 권한이 없습니다.");
+  }
+
+  const imagePaths = [...new Set(campaign.pages.map((page) => page.imagePath).filter(Boolean))];
+  if (!imagePaths.length) return;
+  const { error: storageError } = await client.storage.from(BUCKET).remove(imagePaths);
+  // DB 삭제는 이미 끝났다. 파일 정리 실패를 사용자에게 전체 삭제 실패로 보이면 재시도로도 복구할 수 없다.
+  if (storageError) console.error("Deleted campaign storage cleanup failed", storageError);
+}
+
 /** 현재 관리자가 소유한 캠페인 전체를 핀까지 함께 복원한다. */
 export async function fetchOwnedCampaigns(): Promise<Campaign[]> {
   const client = getSupabaseClient();
   if (!client) return [];
-  await requireOwnerUser();
+  const user = await requireOwnerUser();
   const { data, error } = await client.from("campaigns")
     .select(CAMPAIGN_COLUMNS)
+    .eq("owner_id", user.id)
     .order("created_at", { ascending: false });
   if (error) throw error;
   const rows = (data ?? []) as CampaignRow[];
@@ -250,6 +305,70 @@ export async function fetchOwnedCampaigns(): Promise<Campaign[]> {
     pins.filter((pin) => pin.campaignId === row.id),
     pages.filter((page) => page.campaignId === row.id)
   ));
+}
+
+export async function fetchOwnedSessionFolders(): Promise<SessionFolder[]> {
+  const client = getSupabaseClient();
+  if (!client) return [];
+  await requireOwnerUser();
+  const { data, error } = await client.from("session_folders")
+    .select(SESSION_FOLDER_COLUMNS)
+    .order("created_at", { ascending: true });
+  if (error) throw error;
+  return ((data ?? []) as SessionFolderRow[]).map(toSessionFolder);
+}
+
+export async function createSessionFolder(name: string): Promise<SessionFolder> {
+  if (!isSessionFolderName(name)) throw new Error("폴더 이름이 올바르지 않습니다.");
+  const client = getSupabaseClient();
+  if (!client) throw new Error("Supabase 연결을 찾지 못했습니다.");
+  const user = await requireOwnerUser();
+  const { data, error } = await client.from("session_folders")
+    .insert({ owner_id: user.id, name })
+    .select(SESSION_FOLDER_COLUMNS)
+    .single();
+  if (error) throw error;
+  return toSessionFolder(data as SessionFolderRow);
+}
+
+export async function renameSessionFolder(folderId: string, name: string): Promise<void> {
+  if (!isSessionFolderName(name)) throw new Error("폴더 이름이 올바르지 않습니다.");
+  const client = getSupabaseClient();
+  if (!client) throw new Error("Supabase 연결을 찾지 못했습니다.");
+  await requireOwnerUser();
+  const { data, error } = await client.from("session_folders")
+    .update({ name })
+    .eq("id", folderId)
+    .select("id")
+    .maybeSingle();
+  if (error) throw error;
+  if (!data) throw new Error("이름을 바꿀 폴더를 찾지 못했습니다.");
+}
+
+export async function deleteSessionFolder(folderId: string): Promise<void> {
+  const client = getSupabaseClient();
+  if (!client) throw new Error("Supabase 연결을 찾지 못했습니다.");
+  await requireOwnerUser();
+  const { data, error } = await client.from("session_folders")
+    .delete()
+    .eq("id", folderId)
+    .select("id")
+    .maybeSingle();
+  if (error) throw error;
+  if (!data) throw new Error("삭제할 폴더를 찾지 못했습니다.");
+}
+
+export async function moveCampaignToFolder(campaignId: string, folderId: string | null): Promise<void> {
+  const client = getSupabaseClient();
+  if (!client) throw new Error("Supabase 연결을 찾지 못했습니다.");
+  await requireOwnerUser();
+  const { data, error } = await client.from("campaigns")
+    .update({ folder_id: folderId, updated_at: new Date().toISOString() })
+    .eq("id", campaignId)
+    .select("id")
+    .maybeSingle();
+  if (error) throw error;
+  if (!data) throw new Error("이동할 세션을 찾지 못했습니다.");
 }
 
 /**
@@ -272,8 +391,21 @@ export async function fetchLiveCampaign(code: string, audienceGroup: string | nu
   return toCampaign(row, ((pinData ?? []) as PinRow[]).map(toPin), ((pageData ?? []) as CampaignPageRow[]).map(toPage));
 }
 
+/** 공개 플레이어용 스냅샷. 작성자 식별자와 숨긴 핀은 RPC에서부터 제외한다. */
+export async function fetchCampaignPlayer(campaignId: string): Promise<Campaign | null> {
+  const client = getAudienceSupabaseClient();
+  if (!client) return null;
+  await ensureAnonymousUser();
+  const { data, error } = await client.rpc("find_campaign_player", { target_campaign_id: campaignId });
+  if (error) throw error;
+  const payload = data as CampaignPlayerPayload | null;
+  if (!payload?.campaign) return null;
+  return toCampaign(payload.campaign, payload.pins.map(toPin), payload.pages.map(toPage));
+}
+
 /** 실제로 기록된 작성자 id 를 돌려준다. 참여자 화면이 "내 피드백"을 가리는 기준이 된다. */
 export async function submitPin(campaign: Campaign, pin: FeedbackPin): Promise<string | null> {
+  if (!acceptsFeedbackCategory(campaign.feedbackCategories, pin.category)) throw new Error("현재 선택할 수 없는 피드백 유형입니다.");
   const { client, user } = await participantContext();
   const { error } = await client.from("feedback_pins").insert({
     id: pin.id,
@@ -291,7 +423,8 @@ export async function submitPin(campaign: Campaign, pin: FeedbackPin): Promise<s
   return user.id;
 }
 
-export async function updatePin(pinId: string, values: { category: FeedbackCategory; body: string }) {
+export async function updatePin(campaign: Campaign, pinId: string, values: { category: FeedbackCategory; body: string }) {
+  if (!acceptsFeedbackCategory(campaign.feedbackCategories, values.category)) throw new Error("현재 선택할 수 없는 피드백 유형입니다.");
   const { client } = await participantContext();
   const { data, error } = await client.from("feedback_pins")
     .update({ category: values.category, body: values.body, updated_at: new Date().toISOString() })
@@ -314,14 +447,20 @@ export async function setPinHidden(pinId: string, hidden: boolean) {
   if (error) throw error;
 }
 
-export async function updateCampaign(campaignId: string, values: { status?: "live" | "ended"; title?: string; guide_text?: string }) {
+export async function updateCampaign(campaignId: string, values: { status?: "live" | "ended"; title?: string; guide_text?: string; show_presentation_qr?: boolean; presentation_qr_position?: Campaign["presentationQrPosition"]; show_presentation_pin_status?: boolean; presentation_pin_status_position?: Campaign["presentationPinStatusPosition"]; feedback_categories?: FeedbackCategorySettings }) {
+  if (values.feedback_categories && !isValidFeedbackCategorySettings(values.feedback_categories)) {
+    throw new Error("피드백 유형 설정이 올바르지 않습니다.");
+  }
   const client = getSupabaseClient();
   if (!client) return;
   await requireOwnerUser();
-  const { error } = await client.from("campaigns")
+  const { data, error } = await client.from("campaigns")
     .update({ ...values, updated_at: new Date().toISOString() })
-    .eq("id", campaignId);
+    .eq("id", campaignId)
+    .select("id")
+    .maybeSingle();
   if (error) throw error;
+  if (!data) throw new Error("설정을 바꿀 세션을 찾지 못했습니다.");
 }
 
 export async function updateCampaignPageAudienceGroups(pageId: string, audienceGroups: string[]) {
@@ -386,15 +525,31 @@ export async function fetchCampaignStatus(
   return matched?.status === "live" ? "live" : "ended";
 }
 
-export async function fetchCampaignSnapshot(campaign: Campaign, asAudience = false): Promise<Pick<Campaign, "status" | "pins"> | null> {
+export async function fetchCampaignSnapshot(campaign: Campaign, asAudience = false): Promise<Pick<Campaign, "status" | "showPresentationQr" | "presentationQrPosition" | "showPresentationPinStatus" | "presentationPinStatusPosition" | "feedbackCategories" | "pins"> | null> {
   const client = asAudience ? getAudienceSupabaseClient() : getSupabaseClient();
   if (!client) return null;
   if (asAudience) await ensureAnonymousUser();
-  const status = await fetchCampaignStatus(campaign, asAudience);
-  const { data, error } = await client.from("feedback_pins")
-    .select(PIN_COLUMNS)
-    .eq("campaign_id", campaign.id)
-    .order("created_at", { ascending: false });
-  if (error) throw error;
-  return { status, pins: ((data ?? []) as PinRow[]).map(toPin) };
+  const [{ data: directRow, error: campaignError }, { data, error: pinsError }] = await Promise.all([
+    client.from("campaigns").select("status, show_presentation_qr, presentation_qr_position, show_presentation_pin_status, presentation_pin_status_position, feedback_categories").eq("id", campaign.id).maybeSingle(),
+    client.from("feedback_pins").select(PIN_COLUMNS).eq("campaign_id", campaign.id).order("created_at", { ascending: false }),
+  ]);
+  if (campaignError) throw campaignError;
+  if (pinsError) throw pinsError;
+  let row = directRow;
+  // 첫 핀을 남기기 전 참여자는 campaigns SELECT 정책을 통과하지 못하므로 코드 RPC로 최신 설정을 받는다.
+  if (!row && asAudience) {
+    const { data: lookup, error: lookupError } = await client.rpc("find_live_campaign", { target_code: campaign.code });
+    if (lookupError) throw lookupError;
+    row = ((lookup as CampaignRow[] | null)?.[0] ?? null);
+  }
+  const status = row?.status ? row.status as Campaign["status"] : await fetchCampaignStatus(campaign, asAudience);
+  return {
+    status,
+    showPresentationQr: row?.show_presentation_qr ?? campaign.showPresentationQr,
+    presentationQrPosition: row?.presentation_qr_position ?? campaign.presentationQrPosition,
+    showPresentationPinStatus: row?.show_presentation_pin_status ?? campaign.showPresentationPinStatus,
+    presentationPinStatusPosition: row?.presentation_pin_status_position ?? campaign.presentationPinStatusPosition,
+    feedbackCategories: normalizeFeedbackCategorySettings(row?.feedback_categories ?? campaign.feedbackCategories),
+    pins: ((data ?? []) as PinRow[]).map(toPin)
+  };
 }

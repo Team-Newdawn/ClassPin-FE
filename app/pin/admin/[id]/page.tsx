@@ -3,15 +3,16 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { QRCodeSVG } from "qrcode.react";
-import { BarChart3, Check, Clock3, Copy, FileText, Link2, ListFilter, MessageCircleQuestion, MonitorUp, Pause, Play, Search, Share2, Sparkles, Users, X } from "@/components/icons";
+import { BarChart3, Check, Clock3, Copy, FileText, Link2, ListFilter, MessageCircleQuestion, MonitorUp, Pause, Play, Plus, QrCode, Search, Share2, Sparkles, Trash2, Users, X } from "@/components/icons";
 import { PinAdminShell } from "@/components/pin/admin-shell";
 import { CampaignPageNavigation } from "@/components/pin/campaign-page-navigation";
 import { useCampaigns } from "@/components/pin/campaign-store";
 import { ImageCanvas } from "@/components/pin/image-canvas";
 import { useLanguage } from "@/components/language-context";
 import { downloadPinsCsv } from "@/lib/pin/csv";
-import { CATEGORY_KEYS, categoryBreakdown, countBy, hiddenPins, hotZone, latestPinAt, sentiment, topCategory, visiblePins } from "@/lib/pin/stats";
-import type { FeedbackCategory, FeedbackPin } from "@/lib/pin/types";
+import { categoryBreakdown, countBy, hiddenPins, hotZone, latestPinAt, sentiment, topCategory, visiblePins } from "@/lib/pin/stats";
+import { analyzedFeedbackCategories, configuredFeedbackCategories, configuredFeedbackCategoryLabel, enabledFeedbackCategories, FEEDBACK_CATEGORY_LABEL_MAX, FEEDBACK_CATEGORY_MAX, feedbackCategoryClass, isValidFeedbackCategorySettings, type FeedbackCategory, type FeedbackCategorySettings, type FeedbackPin } from "@/lib/pin/types";
+import type { PresentationQrPosition } from "@/lib/types";
 
 type CategoryFilter = FeedbackCategory | "all";
 
@@ -19,7 +20,7 @@ export default function CampaignResults() {
   const { feedbackCategoryLabel, feedbackZoneLabel, locale, t, timeAgo } = useLanguage();
   const params = useParams<{ id: string }>();
   const router = useRouter();
-  const { ready, campaigns, setAudienceGroups, setPageAudienceGroups, setPinHidden, setStatus } = useCampaigns();
+  const { ready, campaigns, setAudienceGroups, setPageAudienceGroups, setPinHidden, setPresentationPinStatusPosition, setPresentationQrPosition, setShowPresentationPinStatus, setStatus, setShowPresentationQr } = useCampaigns();
   const campaign = campaigns.find((item) => item.id === params.id);
   // 같은 핀을 다시 눌러도 목록을 또 중앙으로 보내려면 매번 새 객체여야 한다.
   const [selected, setSelected] = useState<{ id: string } | null>(null);
@@ -37,6 +38,12 @@ export default function CampaignResults() {
   const pins = useMemo(() => campaign?.pins ?? [], [campaign]);
   const activePage = campaign?.pages[activePageIndex] ?? campaign?.pages[0];
   const pagePins = useMemo(() => pins.filter((pin) => pin.pageIndex === (activePage?.pageIndex ?? 0)), [activePage?.pageIndex, pins]);
+  const visible = visiblePins(pins);
+  const hidden = hiddenPins(pins);
+  const pageVisible = visible.filter((pin) => pin.pageIndex === (activePage?.pageIndex ?? 0));
+  const pageHidden = hidden.filter((pin) => pin.pageIndex === (activePage?.pageIndex ?? 0));
+  const analysisCategoryKeys = campaign ? analyzedFeedbackCategories(campaign.feedbackCategories, pins) : [];
+  const activeFilter = filter !== "all" && analysisCategoryKeys.includes(filter) ? filter : "all";
   const selectPin = (id: string) => {
     const pin = pins.find((item) => item.id === id);
     if (pin) setActivePageIndex(pin.pageIndex);
@@ -48,8 +55,8 @@ export default function CampaignResults() {
   };
   const matched = useMemo(() => {
     const keyword = query.trim().toLowerCase();
-    return pagePins.filter((pin) => (filter === "all" || pin.category === filter) && (!keyword || pin.body.toLowerCase().includes(keyword)));
-  }, [filter, pagePins, query]);
+    return pagePins.filter((pin) => (activeFilter === "all" || pin.category === activeFilter) && (!keyword || pin.body.toLowerCase().includes(keyword)));
+  }, [activeFilter, pagePins, query]);
   // 이미지와 목록이 같은 배열을 나눠 써야 핀 번호와 목록 번호가 어긋나지 않는다.
   const stagePins = useMemo(() => matched.filter((pin) => !pin.hidden), [matched]);
   const hiddenMatched = useMemo(() => matched.filter((pin) => pin.hidden), [matched]);
@@ -57,11 +64,7 @@ export default function CampaignResults() {
   const orderedMatched = useMemo(() => [...stagePins, ...hiddenMatched], [hiddenMatched, stagePins]);
   const listPins = showHidden ? orderedMatched : stagePins;
 
-  const visible = visiblePins(pins);
-  const hidden = hiddenPins(pins);
-  const pageVisible = visible.filter((pin) => pin.pageIndex === (activePage?.pageIndex ?? 0));
-  const pageHidden = hidden.filter((pin) => pin.pageIndex === (activePage?.pageIndex ?? 0));
-  const categories = categoryBreakdown(visible);
+  const categories = categoryBreakdown(visible, analysisCategoryKeys);
   const top = topCategory(visible);
   const zone = hotZone(pageVisible);
   const latest = latestPinAt(pageVisible);
@@ -151,9 +154,20 @@ export default function CampaignResults() {
   if (!campaign) return <div className="empty-state"><h1>{t("pin.detail.notFound")}</h1><p>{t("pin.detail.notFoundDescription")}</p><button className="btn primary" onClick={() => router.push("/pin/admin")}>{t("pin.detail.campaignList")}</button></div>;
 
   const stageRatio = activePage ? activePage.imageWidth / activePage.imageHeight : 16 / 9;
+  const qrPositions: PresentationQrPosition[] = ["top-left", "top-right", "bottom-left", "bottom-right"];
+  const qrPositionLabel = (position: PresentationQrPosition) => position === "top-left"
+    ? t("session.qrTopLeft")
+    : position === "top-right"
+      ? t("session.qrTopRight")
+      : position === "bottom-left"
+        ? t("session.qrBottomLeft")
+        : t("session.qrBottomRight");
   const joinUrl = typeof window === "undefined" ? "" : `${window.location.origin}/pin/join/${campaign.code}`;
   const copy = async () => { await navigator.clipboard.writeText(joinUrl); setCopied(true); setTimeout(() => setCopied(false), 1500); };
   const toggleHidden = (pin: FeedbackPin) => runAction(setPinHidden(campaign.id, pin.id, !pin.hidden), t(pin.hidden ? "pin.detail.restoreError" : "pin.detail.excludeError"));
+  const categoryLabel = (category: FeedbackCategory) =>
+    configuredFeedbackCategoryLabel(campaign.feedbackCategories, category, feedbackCategoryLabel);
+  const categoryClass = (category: FeedbackCategory) => feedbackCategoryClass(campaign.feedbackCategories, category);
   const openPlayer = () => {
     setActionError(null);
     const player = window.open(`/pin/admin/${campaign.id}/present`, `pin-feedback-player-${campaign.id}`, "popup=yes,width=1440,height=900");
@@ -176,6 +190,7 @@ export default function CampaignResults() {
             <span className={`live-badge ${campaign.status}`}><i />{t(campaign.status === "live" ? "pin.status.live" : "pin.status.ended")}</span>
             <button className="btn secondary" onClick={() => runAction(setStatus(campaign.id, campaign.status === "live" ? "ended" : "live"), t("pin.detail.saveStatusError"))}>{campaign.status === "live" ? <><Pause />{t("pin.detail.endCollection")}</> : <><Play />{t("pin.detail.reopen")}</>}</button>
             <button className="btn secondary" onClick={openPlayer}><MonitorUp />{t("pin.detail.openPlayer")}</button>
+            <button className="btn secondary" onClick={() => router.push(`/pin/admin/${campaign.id}/report`)}><BarChart3 />{t("pin.detail.viewReport")}</button>
             {/* 화면에 보이는 것과 같은 것을 내보낸다. 숨김이 "공유 대상에서 뺀다"는 뜻인데
                 내보내기에만 딸려 나오면 숨긴 의미가 없다. */}
             <button className="btn secondary" onClick={() => downloadPinsCsv(campaign, listPins, locale)} disabled={!listPins.length} title={t("pin.detail.csvTitle", { count: listPins.length })}><FileText />{t("pin.detail.csvExport")}</button>
@@ -184,21 +199,111 @@ export default function CampaignResults() {
         </div>
         {actionError && <div className="login-error" role="alert">{actionError} {t("common.tryAgain")}</div>}
 
+        <section className="qr-position-setting pin-player-qr-setting" aria-labelledby="pin-player-qr-title">
+          <div className="qr-position-heading">
+            <span><QrCode /></span>
+            <div><b id="pin-player-qr-title">{t("session.qrPosition")}</b><small>{t("session.qrPositionHint")}</small></div>
+            <div className="panel-heading-actions">
+              <span className="pin-toggle-label">{t("presentation.showQr")}</span>
+              <button
+                type="button"
+                className={`pin-toggle ${campaign.showPresentationQr ? "on" : ""}`}
+                role="switch"
+                aria-checked={campaign.showPresentationQr}
+                aria-label={campaign.showPresentationQr ? t("presentation.turnQrOff") : t("presentation.turnQrOn")}
+                onClick={() => runAction(
+                  setShowPresentationQr(campaign.id, !campaign.showPresentationQr),
+                  t("presentation.saveQrSettingError")
+                )}
+              >
+                <span className="pin-toggle-thumb" />
+                <span className="pin-toggle-state">{campaign.showPresentationQr ? "ON" : "OFF"}</span>
+              </button>
+            </div>
+          </div>
+          <div className="qr-position-options" role="group" aria-label={t("session.qrPosition")}>
+            {qrPositions.map((position) => (
+              <button
+                type="button"
+                key={position}
+                className={campaign.presentationQrPosition === position ? "active" : ""}
+                aria-pressed={campaign.presentationQrPosition === position}
+                onClick={() => runAction(
+                  setPresentationQrPosition(campaign.id, position),
+                  t("session.saveQrPositionError")
+                )}
+              >
+                <span className={`qr-corner-preview ${position}`} aria-hidden="true"><i /></span>
+                {qrPositionLabel(position)}
+              </button>
+            ))}
+          </div>
+        </section>
+
+        <section className="qr-position-setting pin-player-qr-setting" aria-labelledby="pin-player-status-title">
+          <div className="qr-position-heading">
+            <span><BarChart3 /></span>
+            <div><b id="pin-player-status-title">{t("pin.presentation.pinStatusSetting")}</b><small>{t("pin.presentation.pinStatusSettingHint")}</small></div>
+            <div className="panel-heading-actions">
+              <span className="pin-toggle-label">{t("pin.presentation.showPinStatus")}</span>
+              <button
+                type="button"
+                className={`pin-toggle ${campaign.showPresentationPinStatus ? "on" : ""}`}
+                role="switch"
+                aria-checked={campaign.showPresentationPinStatus}
+                aria-label={t(campaign.showPresentationPinStatus ? "pin.presentation.hidePinStatus" : "pin.presentation.showPinStatus")}
+                onClick={() => runAction(
+                  setShowPresentationPinStatus(campaign.id, !campaign.showPresentationPinStatus),
+                  t("pin.presentation.savePinStatusError")
+                )}
+              >
+                <span className="pin-toggle-thumb" />
+                <span className="pin-toggle-state">{campaign.showPresentationPinStatus ? "ON" : "OFF"}</span>
+              </button>
+            </div>
+          </div>
+          <div className="qr-position-options" role="group" aria-label={t("pin.presentation.pinStatusPosition")}>
+            {qrPositions.map((position) => (
+              <button
+                type="button"
+                key={position}
+                className={campaign.presentationPinStatusPosition === position ? "active" : ""}
+                aria-pressed={campaign.presentationPinStatusPosition === position}
+                onClick={() => runAction(
+                  setPresentationPinStatusPosition(campaign.id, position),
+                  t("pin.presentation.savePinStatusPositionError")
+                )}
+              >
+                <span className={`qr-corner-preview ${position}`} aria-hidden="true"><i /></span>
+                {qrPositionLabel(position)}
+              </button>
+            ))}
+          </div>
+        </section>
+
+        <FeedbackCategoryManager
+          key={JSON.stringify(campaign.feedbackCategories)}
+          campaignId={campaign.id}
+          initialSettings={campaign.feedbackCategories}
+          usedCategories={pins.map((pin) => pin.category)}
+          onError={setActionError}
+        />
+
         {/* 개선 항목만 세면 어느 행사든 "문제 투성이"로 읽힌다. 잘된 점을 같은 크기로 보여준다. */}
         <div className="kpi-grid">
           <Kpi label={t("pin.detail.collectedFeedback")} value={pins.length} hint={hidden.length ? t("pin.detail.visibleExcluded", { visible: visible.length, hidden: hidden.length }) : t("pin.detail.allVisible")} />
-          <Kpi label={t("pin.detail.positiveRate")} value={visible.length ? `${mood.positiveShare}%` : "—"}
-               hint={visible.length ? t("pin.detail.positiveHint", { positive: mood.positive, improvement: mood.improvement }) : t("pin.detail.positivePending")}
-               tone={visible.length ? (mood.positiveShare >= 50 ? "success" : undefined) : undefined} />
-          <Kpi label={t("pin.detail.topCategory")} value={top ? feedbackCategoryLabel(top.key) : "—"} hint={top ? t("pin.detail.categoryHint", { count: top.count, percent: top.share }) : t("pin.detail.noCategory")} />
+          <Kpi label={t("pin.detail.positiveRate")} value={mood.categorized ? `${mood.positiveShare}%` : "—"}
+               hint={mood.categorized ? t("pin.detail.positiveHint", { positive: mood.positive, improvement: mood.improvement }) : t("pin.detail.positivePending")}
+               tone={mood.categorized ? (mood.positiveShare >= 50 ? "success" : undefined) : undefined} />
+          <Kpi label={t("pin.detail.topCategory")} value={top ? categoryLabel(top.key) : "—"} hint={top ? t("pin.detail.categoryHint", { count: top.count, percent: top.share }) : t("pin.detail.noCategory")} />
           <Kpi label={t("pin.detail.hotZone")} value={zone ? feedbackZoneLabel(zone.index) : "—"} hint={zone ? t("pin.detail.categoryHint", { count: zone.count, percent: zone.share }) : t("pin.detail.noZone")} />
         </div>
 
         <div className="filterbar">
           <div className="searchbox"><Search /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder={t("pin.detail.searchFeedback")} /></div>
           <div className="filter-tabs">
-            <button className={filter === "all" ? "active" : ""} onClick={() => setFilter("all")}>{t("common.all")} {pageVisible.length}</button>
-            {CATEGORY_KEYS.map((key) => <button key={key} className={filter === key ? "active" : ""} onClick={() => setFilter(key)}>{feedbackCategoryLabel(key)} {countBy(pageVisible, key)}</button>)}
+            <button className={activeFilter === "all" ? "active" : ""} onClick={() => setFilter("all")}>{t("common.all")} {pageVisible.length}</button>
+            {analysisCategoryKeys.map((key) => <button key={key ?? "none"} className={activeFilter === key ? "active" : ""} onClick={() => setFilter(key)}>{categoryLabel(key)} {countBy(pageVisible, key)}</button>)}
           </div>
           <button className={`btn secondary pin-hidden-toggle ${showHidden ? "active" : ""}`} onClick={() => setShowHidden(!showHidden)} disabled={!pageHidden.length} aria-pressed={showHidden}><ListFilter />{t("pin.detail.showExcluded", { count: pageHidden.length })}</button>
         </div>
@@ -244,6 +349,8 @@ export default function CampaignResults() {
                   selected={selectedId === pin.id}
                   onSelect={() => selectPin(pin.id)}
                   onToggleHidden={() => toggleHidden(pin)}
+                  categoryLabel={categoryLabel}
+                  categoryClass={categoryClass}
                 />
               )) : (
                 <div className="panel-empty">
@@ -261,9 +368,9 @@ export default function CampaignResults() {
           {maxCategory ? (
             <ul className="cat-list">
               {categories.filter((item) => item.count).map((item) => (
-                <li key={item.key}>
-                  <span className="cat-head"><em className={`pin-category ${item.key}`}>{feedbackCategoryLabel(item.key)}</em><b>{t("pin.detail.categoryStat", { count: item.count, percent: item.share })}</b></span>
-                  <span className="cat-track"><i className={`cat-fill ${item.key}`} style={{ width: `${(item.count / maxCategory) * 100}%` }} /></span>
+                <li key={item.key ?? "none"}>
+                  <span className="cat-head"><em className={`pin-category ${categoryClass(item.key)}`}>{categoryLabel(item.key)}</em><b>{t("pin.detail.categoryStat", { count: item.count, percent: item.share })}</b></span>
+                  <span className="cat-track"><i className={`cat-fill ${categoryClass(item.key)}`} style={{ width: `${(item.count / maxCategory) * 100}%` }} /></span>
                 </li>
               ))}
             </ul>
@@ -280,15 +387,101 @@ function Kpi({ label, value, hint, tone }: { label: string; value: number | stri
   return <div className="kpi-card"><span className="kpi-label">{label}</span><b className={`kpi-value ${tone ?? ""}`}>{value}</b><small>{hint}</small></div>;
 }
 
-function PinItem({ pin, number, selected, onSelect, onToggleHidden }: { pin: FeedbackPin; number: number | null; selected: boolean; onSelect: () => void; onToggleHidden: () => void }) {
-  const { feedbackCategoryLabel, t, timeAgo } = useLanguage();
+function FeedbackCategoryManager({ campaignId, initialSettings, usedCategories, onError }: { campaignId: string; initialSettings: FeedbackCategorySettings; usedCategories: FeedbackCategory[]; onError: (message: string | null) => void }) {
+  const { feedbackCategoryLabel, t } = useLanguage();
+  const { setFeedbackCategories } = useCampaigns();
+  const [settings, setSettings] = useState(initialSettings);
+  const [newCategory, setNewCategory] = useState("");
+  const [saving, setSaving] = useState(false);
+  const categories = configuredFeedbackCategories(settings);
+  const activeCategories = enabledFeedbackCategories(settings);
+  const categoryLabel = (category: string) => configuredFeedbackCategoryLabel(settings, category, feedbackCategoryLabel);
+
+  const addCategory = () => {
+    const label = newCategory.trim();
+    if (!label) return;
+    if (categories.length >= FEEDBACK_CATEGORY_MAX) {
+      onError(t("pin.detail.categoryLimit", { count: FEEDBACK_CATEGORY_MAX }));
+      return;
+    }
+    const existing = Object.keys(settings).find((key) => categoryLabel(key).toLocaleLowerCase() === label.toLocaleLowerCase());
+    if (existing && !settings[existing].archived) {
+      onError(t("pin.detail.categoryDuplicate"));
+      return;
+    }
+    setSettings((current) => existing
+      ? { ...current, [existing]: { ...current[existing], enabled: true, archived: false } }
+      : { ...current, [`custom-${crypto.randomUUID()}`]: { label, enabled: true, archived: false } });
+    setNewCategory("");
+    onError(null);
+  };
+
+  const deleteCategory = (key: string) => {
+    setSettings((current) => {
+      if (usedCategories.includes(key)) return { ...current, [key]: { ...current[key], enabled: false, archived: true } };
+      const next = { ...current };
+      delete next[key];
+      return next;
+    });
+    onError(null);
+  };
+
+  const save = async () => {
+    if (saving) return;
+    const next = Object.fromEntries(Object.entries(settings).map(([key, setting]) => [key, { ...setting, label: setting.label.trim() }]));
+    if (!isValidFeedbackCategorySettings(next)) {
+      onError(t("pin.detail.categoryNameRequired"));
+      return;
+    }
+    onError(null);
+    setSaving(true);
+    try {
+      await setFeedbackCategories(campaignId, next);
+      setSettings(next);
+    } catch (error) {
+      const detail = error && typeof error === "object" && "message" in error ? String(error.message) : String(error);
+      console.error(`${t("pin.detail.categorySaveError")}: ${detail}`, error);
+      onError(t("pin.detail.categorySaveError"));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return <section className="pin-category-manager" aria-labelledby="pin-category-manager-title">
+    <div className="pin-category-manager-head">
+      <div><b id="pin-category-manager-title">{t("pin.detail.categoryManagerTitle")}</b><small>{t("pin.detail.categoryManagerDescription")}</small></div>
+      <button type="button" className="btn primary" onClick={() => void save()} disabled={saving}>{saving ? <span className="spinner" /> : <Check />}{t(saving ? "pin.detail.categorySaving" : "pin.detail.categorySave")}</button>
+    </div>
+    <form className="pin-category-add" onSubmit={(event) => { event.preventDefault(); addCategory(); }}>
+      <input value={newCategory} onChange={(event) => setNewCategory(event.target.value)} maxLength={FEEDBACK_CATEGORY_LABEL_MAX} placeholder={t("pin.detail.categoryAddPlaceholder")} aria-label={t("pin.detail.categoryAddPlaceholder")} disabled={saving || categories.length >= FEEDBACK_CATEGORY_MAX} />
+      <button className="btn secondary" disabled={saving || !newCategory.trim() || categories.length >= FEEDBACK_CATEGORY_MAX}><Plus />{t("pin.detail.categoryAdd")}</button>
+    </form>
+    {categories.length ? <div className="pin-category-manager-list">
+      {categories.map((key) => <div className={`pin-category-manager-row ${settings[key].enabled ? "" : "disabled"}`} key={key}>
+        <div className="pin-category-manager-row-head">
+          <span className={`pin-category ${feedbackCategoryClass(settings, key)}`}>{categoryLabel(key)}</span>
+          <label><input type="checkbox" checked={settings[key].enabled} onChange={(event) => setSettings((current) => ({ ...current, [key]: { ...current[key], enabled: event.target.checked } }))} aria-label={t("pin.detail.categoryUseAria", { category: categoryLabel(key) })} disabled={saving} />{t("pin.detail.categoryUse")}</label>
+        </div>
+        <label>
+          <span>{t("pin.detail.categoryDisplayName")}</span>
+          <input value={settings[key].label} onChange={(event) => setSettings((current) => ({ ...current, [key]: { ...current[key], label: event.target.value } }))} maxLength={FEEDBACK_CATEGORY_LABEL_MAX} placeholder={categoryLabel(key)} aria-label={t("pin.detail.categoryDisplayNameAria", { category: categoryLabel(key) })} disabled={saving} />
+        </label>
+        <button type="button" className="icon-btn category-delete" onClick={() => deleteCategory(key)} aria-label={t("pin.detail.categoryDelete", { category: categoryLabel(key) })} disabled={saving}><Trash2 /></button>
+      </div>)}
+    </div> : <div className="pin-category-none"><b>{t("pin.detail.categoryNoneTitle")}</b><span>{t("pin.detail.categoryNoneDescription")}</span></div>}
+    <p>{t(activeCategories.length ? "pin.detail.categoryEnabledHint" : "pin.detail.categoryDisabledHint")}</p>
+  </section>;
+}
+
+function PinItem({ pin, number, selected, onSelect, onToggleHidden, categoryLabel, categoryClass }: { pin: FeedbackPin; number: number | null; selected: boolean; onSelect: () => void; onToggleHidden: () => void; categoryLabel: (category: FeedbackCategory) => string; categoryClass: (category: FeedbackCategory) => string }) {
+  const { t, timeAgo } = useLanguage();
   return (
     <div className={`question-card pin-item ${selected ? "selected" : ""}`} data-pin-id={pin.id}>
       <button className="pin-item-main" onClick={onSelect} aria-pressed={selected}>
         <span className={`pin-number ${pin.hidden ? "hidden" : ""}`}>{pin.hidden ? t("pin.detail.excluded") : number}</span>
         <span className="question-meta">
           <span className="question-copy">
-            <em className={`pin-category ${pin.category}`}>{feedbackCategoryLabel(pin.category)}</em>
+            <em className={`pin-category ${categoryClass(pin.category)}`}>{categoryLabel(pin.category)}</em>
             <p>{pin.body}</p>
           </span>
           <span className="question-time"><Clock3 />{timeAgo(pin.createdAt)}</span>

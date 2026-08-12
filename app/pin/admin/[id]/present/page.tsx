@@ -1,40 +1,72 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { QRCodeSVG } from "qrcode.react";
-import { ChevronLeft, ChevronRight, Clock3, MapPin, Maximize2, Minimize2, X } from "@/components/icons";
+import { ChevronLeft, ChevronRight, MapPin, Maximize2, Minimize2, X } from "@/components/icons";
 import { LanguageSwitcher, useLanguage } from "@/components/language-context";
-import { useCampaigns } from "@/components/pin/campaign-store";
 import { ImageCanvas } from "@/components/pin/image-canvas";
-import { reconcileFeedbackRotation, shuffle } from "@/lib/pin/presentation-rotation";
+import { useCampaignReactions } from "@/components/pin/use-campaign-reactions";
+import { fetchCampaignPlayer, subscribeToCampaign } from "@/lib/pin/repository";
+import { advancePinBatch, createSpatialPinBatches, rectanglesOverlap, resolvePinDisplayPositions } from "@/lib/pin/presentation-rotation";
+import type { Campaign } from "@/lib/pin/types";
+import { getAudienceSupabaseClient } from "@/lib/supabase/client";
 
 const CONTROLS_HIDE_DELAY = 2800;
-const FEEDBACK_ROTATION_DELAY = 2000;
-const PAGE_ROTATION_DELAY = 8000;
+const FEEDBACK_REVEAL_DELAY = 1000;
+const PAGE_ROTATION_DELAY = 12000;
+const PLAYER_REFRESH_DELAY = 2000;
+const LIVE_PIN_HIGHLIGHT_DELAY = 1000;
+const EMPTY_PLAYBACK = { shownPinIds: [] as string[], activePinId: null as string | null };
 
 export default function FeedbackPresentation() {
-  const { feedbackCategoryLabel, locale, t, timeAgo } = useLanguage();
+  const { locale, t } = useLanguage();
   const params = useParams<{ id: string }>();
   const router = useRouter();
-  const { campaigns, ready } = useCampaigns();
-  const campaign = campaigns.find((item) => item.id === params.id);
+  const { reactions: liveReactions } = useCampaignReactions(params.id);
+  const [campaign, setCampaign] = useState<Campaign | null>(null);
+  const [ready, setReady] = useState(false);
   const visiblePins = useMemo(() => campaign?.pins.filter((pin) => !pin.hidden) ?? [], [campaign]);
   const visiblePinIds = useMemo(() => visiblePins.map((pin) => pin.id), [visiblePins]);
   const visiblePinKey = visiblePinIds.join("|");
   const stageRef = useRef<HTMLElement>(null);
+  const presentationCanvasRef = useRef<HTMLDivElement>(null);
   const visiblePinIdsRef = useRef<string[]>([]);
   const campaignIdRef = useRef<string | null>(null);
-  const rotationQueueRef = useRef<string[]>([]);
   const hideTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [controlsVisible, setControlsVisible] = useState(true);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [showPins, setShowPins] = useState(true);
-  const [activePinId, setActivePinId] = useState<string | null>(null);
-  const [shownPinIds, setShownPinIds] = useState<string[]>([]);
-  const [rotationCycle, setRotationCycle] = useState(0);
+  const [livePinId, setLivePinId] = useState<string | null>(null);
+  const [storedPlayback, setStoredPlayback] = useState(EMPTY_PLAYBACK);
+  const [canvasSize, setCanvasSize] = useState<{ width: number; height: number } | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [activePageIndex, setActivePageIndex] = useState(0);
+
+  useEffect(() => {
+    let active = true;
+    let channel: ReturnType<typeof subscribeToCampaign> = null;
+    const refresh = async () => {
+      try {
+        const next = await fetchCampaignPlayer(params.id);
+        if (active) setCampaign(next);
+      } catch (error) {
+        console.error("Feedback player refresh failed", error);
+      } finally {
+        if (active) setReady(true);
+      }
+    };
+    void refresh().then(() => {
+      if (active) channel = subscribeToCampaign(params.id, () => void refresh(), true);
+    });
+    const interval = window.setInterval(() => void refresh(), PLAYER_REFRESH_DELAY);
+    return () => {
+      active = false;
+      window.clearInterval(interval);
+      const client = getAudienceSupabaseClient();
+      if (client && channel) void client.removeChannel(channel);
+    };
+  }, [params.id]);
 
   const revealControls = useCallback(() => {
     setControlsVisible(true);
@@ -49,7 +81,7 @@ export default function FeedbackPresentation() {
     };
   }, []);
 
-  // Realtime 으로 새 핀이 들어오면 자동 재생 차례를 기다리지 않고 해당 페이지로 이동한다.
+  // 새 스냅샷에 핀이 들어오면 자동 재생 차례를 기다리지 않고 해당 페이지로 이동한다.
   // 첫 스냅샷은 새 핀으로 보지 않아 플레이어가 항상 첫 페이지부터 시작한다.
   useEffect(() => {
     if (!campaign) return;
@@ -57,51 +89,108 @@ export default function FeedbackPresentation() {
     visiblePinIdsRef.current = visiblePinIds;
     const firstSnapshot = campaignIdRef.current !== campaign.id;
     campaignIdRef.current = campaign.id;
-    const incomingPin = firstSnapshot ? null : shuffle(visiblePins.filter((pin) => !previousIds.includes(pin.id)))[0];
-    const nextPageIndex = incomingPin?.pageIndex ?? (firstSnapshot ? 0 : activePageIndex);
-    const pageIds = visiblePins.filter((pin) => pin.pageIndex === nextPageIndex).map((pin) => pin.id);
-    const rotation = reconcileFeedbackRotation({
-      previousIds: pageIds,
-      visibleIds: pageIds,
-      currentId: incomingPin?.id ?? (firstSnapshot ? null : activePinId)
-    });
-    const retained = firstSnapshot || (incomingPin && nextPageIndex !== activePageIndex)
-      ? []
-      : shownPinIds.filter((id) => pageIds.includes(id));
-    const nextShown = rotation.activeId && !retained.includes(rotation.activeId) ? [...retained, rotation.activeId] : retained;
-    setActivePageIndex(nextPageIndex);
-    setActivePinId(rotation.activeId);
-    setShownPinIds(nextShown);
-    rotationQueueRef.current = shuffle(pageIds.filter((id) => !nextShown.includes(id)));
-    setRotationCycle((current) => current + 1);
+    const incomingPin = firstSnapshot ? null : visiblePins.find((pin) => !previousIds.includes(pin.id));
+    if (firstSnapshot) {
+      setActivePageIndex(0);
+      setStoredPlayback(EMPTY_PLAYBACK);
+    }
+    if (incomingPin) {
+      setActivePageIndex(incomingPin.pageIndex);
+      setLivePinId(incomingPin.id);
+      setStoredPlayback({ shownPinIds: [incomingPin.id], activePinId: incomingPin.id });
+    }
     // id 집합이 같으면 본문 수정만으로 순환 타이머를 다시 시작하지 않는다.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [campaign?.id, visiblePinKey]);
+
+  useEffect(() => {
+    if (!livePinId) return;
+    const timeout = window.setTimeout(() => setLivePinId(null), LIVE_PIN_HIGHLIGHT_DELAY);
+    return () => window.clearTimeout(timeout);
+  }, [livePinId]);
 
   const activePage = campaign?.pages[activePageIndex] ?? campaign?.pages[0];
   const pagePins = useMemo(
     () => visiblePins.filter((pin) => pin.pageIndex === (activePage?.pageIndex ?? 0)),
     [activePage?.pageIndex, visiblePins]
   );
-  const pagePinIds = useMemo(() => pagePins.map((pin) => pin.id), [pagePins]);
-  const shownPagePins = useMemo(() => pagePins.filter((pin) => shownPinIds.includes(pin.id)), [pagePins, shownPinIds]);
-
-  const rotateFeedback = useCallback(() => {
-    let queue = rotationQueueRef.current.filter((id) => pagePinIds.includes(id) && id !== activePinId);
-    if (!queue.length) queue = shuffle(pagePinIds.filter((id) => id !== activePinId));
-    const next = queue.shift() ?? pagePinIds[0] ?? null;
-    rotationQueueRef.current = queue;
-    setActivePinId(next);
-    if (next) setShownPinIds((current) => current.includes(next) ? current : [...current, next]);
-    // 한 건뿐이어도 같은 태그가 다시 등장하는 애니메이션을 재생한다.
-    setRotationCycle((current) => current + 1);
-  }, [activePinId, pagePinIds]);
+  const pageBatches = useMemo(() => createSpatialPinBatches(pagePins), [pagePins]);
+  const playback = useMemo(() => {
+    const validIds = new Set(pagePins.map((pin) => pin.id));
+    const shownPinIds = storedPlayback.shownPinIds.filter((id) => validIds.has(id));
+    if (shownPinIds.length) return {
+      shownPinIds,
+      activePinId: shownPinIds.includes(storedPlayback.activePinId ?? "") ? storedPlayback.activePinId : shownPinIds.at(-1) ?? null
+    };
+    const firstPinId = pageBatches[0]?.[0]?.id ?? null;
+    return { shownPinIds: firstPinId ? [firstPinId] : [], activePinId: firstPinId };
+  }, [pageBatches, pagePins, storedPlayback]);
+  const shownPagePins = useMemo(
+    () => pagePins.filter((pin) => playback.shownPinIds.includes(pin.id) || pin.id === livePinId),
+    [livePinId, pagePins, playback.shownPinIds]
+  );
+  const pinDisplayPositions = useMemo(() => {
+    if (!canvasSize) return undefined;
+    const priorityId = livePinId ?? playback.activePinId;
+    const orderedPins = priorityId
+      ? [...shownPagePins.filter((pin) => pin.id === priorityId), ...shownPagePins.filter((pin) => pin.id !== priorityId)]
+      : shownPagePins;
+    return resolvePinDisplayPositions(orderedPins, canvasSize.width, canvasSize.height);
+  }, [canvasSize, livePinId, playback.activePinId, shownPagePins]);
+  const pageBatchesRef = useRef(pageBatches);
 
   useEffect(() => {
-    if (!pagePinIds.length) return;
-    const interval = window.setInterval(rotateFeedback, FEEDBACK_ROTATION_DELAY);
+    pageBatchesRef.current = pageBatches;
+  }, [pageBatches]);
+
+  useLayoutEffect(() => {
+    const canvas = presentationCanvasRef.current;
+    if (!canvas) return;
+    const observer = new ResizeObserver(([entry]) => {
+      const width = Math.round(entry.contentRect.width);
+      const height = Math.round(entry.contentRect.height);
+      setCanvasSize((current) => current?.width === width && current.height === height ? current : { width, height });
+    });
+    observer.observe(canvas);
+    return () => observer.disconnect();
+  }, [campaign?.id]);
+
+  const rotateFeedback = useCallback(() => {
+    setStoredPlayback((current) => {
+      const batches = pageBatchesRef.current;
+      const validIds = new Set(batches.flat().map((pin) => pin.id));
+      const storedIds = current.shownPinIds.filter((id) => validIds.has(id));
+      const firstPinId = batches[0]?.[0]?.id;
+      const shownPinIds = storedIds.length ? storedIds : firstPinId ? [firstPinId] : [];
+      const next = advancePinBatch(batches, shownPinIds);
+      return next ?? current;
+    });
+  }, []);
+
+  useEffect(() => {
+    if (pagePins.length < 2) return;
+    const interval = window.setInterval(rotateFeedback, FEEDBACK_REVEAL_DELAY);
     return () => window.clearInterval(interval);
-  }, [pagePinIds.length, rotateFeedback]);
+  }, [activePageIndex, pagePins.length, rotateFeedback]);
+
+  useLayoutEffect(() => {
+    const canvas = presentationCanvasRef.current;
+    if (!canvas || !showPins) return;
+    const labels = Array.from(canvas.querySelectorAll<HTMLElement>("[data-feedback-label-id]"));
+    const pins = Array.from(canvas.querySelectorAll<HTMLElement>("[data-feedback-pin-id]"));
+    labels.forEach((label) => { label.hidden = false; });
+    const activeLabel = labels.find((label) => label.dataset.feedbackLabelId === playback.activePinId);
+    const orderedLabels = activeLabel ? [activeLabel, ...labels.filter((label) => label !== activeLabel)] : labels;
+    const retained: DOMRect[] = [];
+    for (const label of orderedLabels) {
+      const labelId = label.dataset.feedbackLabelId;
+      const bounds = label.getBoundingClientRect();
+      const overlapsPin = pins.some((pin) => pin.dataset.feedbackPinId !== labelId && rectanglesOverlap(bounds, pin.getBoundingClientRect()));
+      const keep = label === activeLabel || (!overlapsPin && retained.every((other) => !rectanglesOverlap(bounds, other)));
+      label.hidden = !keep;
+      if (keep) retained.push(bounds);
+    }
+  }, [isFullscreen, pinDisplayPositions, playback.activePinId, showPins, shownPagePins]);
 
   useEffect(() => {
     if (!campaign) return;
@@ -119,21 +208,19 @@ export default function FeedbackPresentation() {
     return () => document.removeEventListener("fullscreenchange", onFullscreenChange);
   }, [revealControls]);
 
-  const activePin = shownPagePins.find((pin) => pin.id === activePinId) ?? null;
-
   const changePage = useCallback((pageIndex: number, showControls = true) => {
     const pageCount = campaign?.pages.length ?? 0;
     if (!pageCount) return;
     const next = Math.min(pageCount - 1, Math.max(0, pageIndex));
-    const nextPage = campaign?.pages[next];
-    const [nextPinId, ...queue] = shuffle(visiblePins.filter((pin) => pin.pageIndex === nextPage?.pageIndex).map((pin) => pin.id));
+    if (next === activePageIndex) {
+      if (showControls) revealControls();
+      return;
+    }
     setActivePageIndex(next);
-    setActivePinId(nextPinId ?? null);
-    setShownPinIds(nextPinId ? [nextPinId] : []);
-    rotationQueueRef.current = queue;
-    setRotationCycle((current) => current + 1);
+    setStoredPlayback(EMPTY_PLAYBACK);
+    setLivePinId(null);
     if (showControls) revealControls();
-  }, [campaign?.pages, revealControls, visiblePins]);
+  }, [activePageIndex, campaign?.pages.length, revealControls]);
 
   useEffect(() => {
     const pageCount = campaign?.pages.length ?? 0;
@@ -183,55 +270,65 @@ export default function FeedbackPresentation() {
   }, [activePageIndex, changePage, revealControls, toggleFullscreen]);
 
   if (!ready) return <main className="presentation-shell presentation-message"><span className="spinner" /></main>;
-  if (!campaign) return <main className="presentation-shell presentation-message"><h1>{t("pin.presentation.notFound")}</h1><button className="presentation-text-button" onClick={() => router.push("/pin/admin")}>{t("pin.detail.campaignList")}</button></main>;
+  if (!campaign) return <main className="presentation-shell presentation-message"><h1>{t("pin.presentation.notFound")}</h1><button className="presentation-text-button" onClick={() => router.push("/pin")}>{t("common.homeBack")}</button></main>;
 
   const stageRatio = activePage ? activePage.imageWidth / activePage.imageHeight : 16 / 9;
   const joinUrl = typeof window === "undefined" ? "" : `${window.location.origin}/pin/join/${campaign.code}`;
   const closePresentation = () => {
     if (window.opener && !window.opener.closed) window.close();
-    else router.push(`/pin/admin/${campaign.id}`);
+    else router.push("/pin");
   };
-
   return (
     <main
       ref={stageRef}
-      className={`presentation-shell pin-presentation-shell qr-bottom-right ${controlsVisible ? "controls-visible" : ""}`}
+      className={`presentation-shell pin-presentation-shell ${campaign.showPresentationQr ? `qr-${campaign.presentationQrPosition}` : ""} ${controlsVisible ? "controls-visible" : ""}`}
       onMouseMove={revealControls}
       onPointerDown={revealControls}
     >
       <div className="presentation-slide pin-presentation-slide" aria-label={t("pin.presentation.imageAria", { title: campaign.title })}>
-        <div className="pin-presentation-canvas" style={{ maxWidth: `min(88vw, calc((100dvh - var(--pin-presentation-safe-height)) * ${stageRatio.toFixed(3)}))` }}>
+        <div ref={presentationCanvasRef} className="pin-presentation-canvas" style={{ maxWidth: `min(100vw, ${(stageRatio * 100).toFixed(1)}dvh)` }}>
           <ImageCanvas
             campaign={campaign}
             page={activePage}
             pins={showPins ? shownPagePins : []}
-            selectedId={showPins ? activePinId : null}
+            pinDisplayPositions={showPins ? pinDisplayPositions : undefined}
+            selectedId={showPins ? playback.activePinId : null}
+            livePinId={showPins ? livePinId : null}
             onSelectPin={(id) => {
-              setActivePinId(id);
-              rotationQueueRef.current = rotationQueueRef.current.filter((queuedId) => queuedId !== id);
-              setRotationCycle((current) => current + 1);
+              setStoredPlayback((current) => ({ ...current, activePinId: id }));
+              setLivePinId(null);
               revealControls();
             }}
             showLabels
-            labelMode="selected"
+            labelMode="always"
             labelContent="body"
           />
         </div>
+      </div>
+      <div className="pin-presentation-reactions" aria-hidden="true">
+        {liveReactions.map((reaction) => <span
+          key={reaction.id}
+          className="slide-emoji-reaction campaign-live-reaction"
+          style={{ left: `${reaction.left}%`, animationDelay: `${reaction.delay}ms` }}
+        >{reaction.emoji}</span>)}
       </div>
 
       <button className="presentation-side-control previous" onClick={() => changePage(activePageIndex - 1)} disabled={activePageIndex <= 0} aria-label={t("pin.pages.previous")}><ChevronLeft /></button>
       <button className="presentation-side-control next" onClick={() => changePage(activePageIndex + 1)} disabled={activePageIndex >= campaign.pages.length - 1} aria-label={t("pin.pages.next")}><ChevronRight /></button>
 
-      <aside className="presentation-join-qr bottom-right" role="img" aria-label={`${t("pin.presentation.joinQrAria")} · ${campaign.code}`}>
+      {campaign.showPresentationQr && <aside className={`presentation-join-qr ${campaign.presentationQrPosition}`} role="img" aria-label={`${t("pin.presentation.joinQrAria")} · ${campaign.code}`}>
         <QRCodeSVG value={joinUrl} size={108} bgColor="#ffffff" fgColor="#101827" level="M" />
         <div><span>{t("pin.presentation.scanToJoin")}</span><b>{campaign.code}</b></div>
-      </aside>
+      </aside>}
+      {campaign.showPresentationPinStatus && <output
+        className={`pin-presentation-status ${campaign.presentationPinStatusPosition}`}
+        aria-label={t("pin.presentation.pinTotal", { count: visiblePins.length })}
+      ><span>PIN</span><b>{String(visiblePins.length).padStart(2, "0")}</b></output>}
 
       <header className="presentation-topbar">
         <div className="presentation-title">
           <span className={`status-dot ${campaign.status}`} />
           <b>{campaign.title}</b>
-          <span className="pin-presentation-count">{t("pin.presentation.feedbackCount", { count: visiblePins.length })}</span>
           {actionError && <span className="presentation-error" role="alert">{actionError}</span>}
         </div>
         <div className="presentation-top-actions">
@@ -249,15 +346,6 @@ export default function FeedbackPresentation() {
           <button onClick={closePresentation} aria-label={t("pin.presentation.close")} title={t("pin.presentation.close")}><X /></button>
         </div>
       </header>
-
-      {showPins && activePin && (
-        <aside key={`${activePin.id}-${rotationCycle}`} className={`pin-presentation-feedback ${activePin.category}`} aria-live="polite">
-          <div>
-            <span className="pin-presentation-feedback-meta"><em className={`pin-category ${activePin.category}`}>{feedbackCategoryLabel(activePin.category)}</em><time><Clock3 />{timeAgo(activePin.createdAt)}</time></span>
-            <p>{activePin.body}</p>
-          </div>
-        </aside>
-      )}
     </main>
   );
 }

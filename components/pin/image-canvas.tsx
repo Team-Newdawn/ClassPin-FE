@@ -3,7 +3,7 @@
 
 import { Fragment, useState, type ReactNode } from "react";
 import { useLanguage } from "@/components/language-context";
-import type { Campaign, CampaignPage, FeedbackPin } from "@/lib/pin/types";
+import { configuredFeedbackCategoryLabel, feedbackCategoryClass, type Campaign, type CampaignPage, type FeedbackPin } from "@/lib/pin/types";
 
 /**
  * 기준 이미지 위에 핀을 얹는 캔버스.
@@ -14,11 +14,15 @@ import type { Campaign, CampaignPage, FeedbackPin } from "@/lib/pin/types";
  * 임의 비율 사진에서는 레터박스 여백에도 핀이 찍히고 저장 좌표가 이미지상 위치와 어긋난다.
  * 그래서 여기서는 컨테이너를 이미지 원본 비율에 맞춰 여백 자체를 없앤다.
  */
-export function ImageCanvas({ campaign, page, pins = [], selectedId, onSelectPin, onCanvasClick, showLabels = false, labelMode = "always", labelContent = "category", children }: {
+export function ImageCanvas({ campaign, page, pins = [], visiblePinIds, pinDisplayPositions, selectedId, livePinId, onSelectPin, onCanvasClick, showLabels = false, labelMode = "always", labelContent = "category", children }: {
   campaign: Campaign;
   page?: CampaignPage;
   pins?: FeedbackPin[];
+  visiblePinIds?: ReadonlySet<string>;
+  pinDisplayPositions?: ReadonlyMap<string, { x: number; y: number }>;
   selectedId?: string | null;
+  /** 플레이어가 방금 받은 실시간 피드백에만 쓰는 일시적인 강조 표시다. */
+  livePinId?: string | null;
   onSelectPin?: (id: string) => void;
   onCanvasClick?: (x: number, y: number) => void;
   showLabels?: boolean;
@@ -29,6 +33,9 @@ export function ImageCanvas({ campaign, page, pins = [], selectedId, onSelectPin
   children?: ReactNode;
 }) {
   const { feedbackCategoryLabel, t } = useLanguage();
+  const categoryLabel = (category: FeedbackPin["category"]) =>
+    configuredFeedbackCategoryLabel(campaign.feedbackCategories, category, feedbackCategoryLabel);
+  const categoryClass = (category: FeedbackPin["category"]) => feedbackCategoryClass(campaign.feedbackCategories, category);
   // 예전 행이나 업로드 직후처럼 크기를 모를 때는 이미지가 로드되며 알려주는 값으로 메운다.
   const [measured, setMeasured] = useState<{ width: number; height: number } | null>(null);
   const activePage = page ?? campaign.pages[0];
@@ -62,30 +69,41 @@ export function ImageCanvas({ campaign, page, pins = [], selectedId, onSelectPin
             }}
           />
         : <div className="slide-placeholder">{t("pin.image.unavailable")}</div>}
-      {pins.map((pin, index) => (
-        <Fragment key={pin.id}>
+      {pinDisplayPositions && <svg className="pin-displacement-lines" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
+        {pins.map((pin) => {
+          const position = pinDisplayPositions.get(pin.id);
+          if (!position || (Math.abs(position.x - pin.x) < 0.0001 && Math.abs(position.y - pin.y) < 0.0001)) return null;
+          return <line key={pin.id} x1={pin.x * 100} y1={pin.y * 100} x2={position.x * 100} y2={position.y * 100} />;
+        })}
+      </svg>}
+      {pins.map((pin, index) => {
+        const position = pinDisplayPositions?.get(pin.id) ?? pin;
+        return <Fragment key={pin.id}>
           {/* 핀 자체를 유형 색으로 칠하면 라벨 없이도 지도가 한눈에 읽힌다. */}
           <button
-            className={`question-pin pin-mark ${pin.category} ${selectedId === pin.id ? "selected" : ""}`}
-            style={{ left: `${pin.x * 100}%`, top: `${pin.y * 100}%` }}
+            className={`question-pin pin-mark ${categoryClass(pin.category)} ${selectedId === pin.id ? "selected" : ""} ${livePinId === pin.id ? "live" : ""}`}
+            style={{ left: `${position.x * 100}%`, top: `${position.y * 100}%` }}
+            data-feedback-pin-id={pin.id}
+            hidden={visiblePinIds ? !visiblePinIds.has(pin.id) : undefined}
             onClick={() => onSelectPin?.(pin.id)}
-            aria-label={t("pin.image.feedbackAria", { category: feedbackCategoryLabel(pin.category), body: pin.body })}
+            aria-label={t("pin.image.feedbackAria", { category: categoryLabel(pin.category), body: pin.body })}
           >
             {index + 1}
           </button>
           {showLabels && (labelMode === "always" || selectedId === pin.id) && (
             <button
-              className={`question-tag pin-category ${pin.category} ${labelContent === "body" ? `feedback-bubble ${pin.x > 0.58 ? "to-left" : ""} ${pin.y < 0.12 ? "below" : ""}` : ""}`}
-              style={{ left: `${pin.x * 100}%`, top: `${pin.y * 100}%` }}
+              className={`question-tag pin-category ${categoryClass(pin.category)} ${livePinId === pin.id ? "live" : ""} ${labelContent === "body" ? `feedback-bubble ${position.x > 0.58 ? "to-left" : ""} ${position.y < 0.12 ? "below" : ""}` : ""}`}
+              style={{ left: `${position.x * 100}%`, top: `${position.y * 100}%` }}
+              data-feedback-label-id={pin.id}
               onClick={() => onSelectPin?.(pin.id)}
               aria-label={t("pin.image.feedbackBodyAria", { body: pin.body })}
               title={labelContent === "body" ? pin.body : undefined}
             >
-              {labelContent === "body" ? pin.body : feedbackCategoryLabel(pin.category)}
+              {labelContent === "body" ? pin.body : categoryLabel(pin.category)}
             </button>
           )}
         </Fragment>
-      ))}
+      })}
       {children}
     </div>
   );

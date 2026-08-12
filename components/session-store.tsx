@@ -24,6 +24,7 @@ type Store = {
   setCurrentSlide: (sessionId: string, slide: number) => Promise<void>;
   setStatus: (sessionId: string, status: ClassSession["status"]) => Promise<void>;
   setShowQuestionPins: (sessionId: string, visible: boolean) => Promise<void>;
+  setShowPresentationQr: (sessionId: string, visible: boolean) => Promise<void>;
   setPresentationQrPosition: (sessionId: string, position: PresentationQrPosition) => Promise<void>;
   updateSlideNote: (sessionId: string, slideId: string, body: string) => Promise<void>;
   loadSessionByCode: (code: string) => Promise<ClassSession | null>;
@@ -65,10 +66,11 @@ const dedupeById = (list: ClassSession[]) => {
   const seen = new Set<string>();
   const normalized = list.map((session) => {
     const showQuestionPins = session.showQuestionPins ?? true;
+    const showPresentationQr = session.showPresentationQr ?? true;
     const presentationQrPosition = session.presentationQrPosition ?? "bottom-right";
-    return showQuestionPins === session.showQuestionPins && presentationQrPosition === session.presentationQrPosition
+    return showQuestionPins === session.showQuestionPins && showPresentationQr === session.showPresentationQr && presentationQrPosition === session.presentationQrPosition
       ? session
-      : { ...session, showQuestionPins, presentationQrPosition };
+      : { ...session, showQuestionPins, showPresentationQr, presentationQrPosition };
   });
   const unique = normalized.filter((session) => {
     if (seen.has(session.id)) return false;
@@ -256,7 +258,7 @@ export function SessionStore({ children }: { children: React.ReactNode }) {
     const session: ClassSession = {
       id: crypto.randomUUID(), courseId: crypto.randomUUID(), materialId: crypto.randomUUID(), materialVersionId,
       code: makeCode(), title: input.title, fileName: input.fileName,
-      status: "live", currentSlide: 0, showQuestionPins: true, presentationQrPosition: "bottom-right",
+      status: "live", currentSlide: 0, showQuestionPins: true, showPresentationQr: true, presentationQrPosition: "bottom-right",
       createdAt: new Date().toISOString(), slides: input.slides, questions: []
     };
     if (supabaseConfigured) await persistSession(session);
@@ -396,6 +398,10 @@ export function SessionStore({ children }: { children: React.ReactNode }) {
     setShowQuestionPins: async (sessionId, visible) => {
       if (supabaseConfigured) await updateLecture(sessionId, { show_question_pins: visible });
       updateSession(sessionId, (session) => ({ ...session, showQuestionPins: visible }));
+    },
+    setShowPresentationQr: async (sessionId, visible) => {
+      if (supabaseConfigured) await updateLecture(sessionId, { show_presentation_qr: visible });
+      updateSession(sessionId, (session) => ({ ...session, showPresentationQr: visible }));
     },
     setPresentationQrPosition: async (sessionId, position) => {
       if (supabaseConfigured) await updateLecture(sessionId, { presentation_qr_position: position });

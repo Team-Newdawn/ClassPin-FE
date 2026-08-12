@@ -1,16 +1,17 @@
 "use client";
 /* eslint-disable @next/next/no-img-element */
 
-import { useEffect, useMemo, useRef, useState, type FormEvent, type KeyboardEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type DragEvent, type FormEvent } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { QRCodeSVG } from "qrcode.react";
 import { PinAdminShell } from "@/components/pin/admin-shell";
 import { useCampaigns } from "@/components/pin/campaign-store";
-import { Check, Clock3, Copy, Grid2X2, Link2, Plus, Search, Share2, Upload, Users, X } from "@/components/icons";
+import { Check, Clock3, Copy, Folder, FolderPlus, Grid2X2, Link2, Pencil, Plus, Search, Share2, Trash2, Upload, Users, X } from "@/components/icons";
 import { useLanguage } from "@/components/language-context";
 import type { TranslationKey } from "@/lib/i18n";
 import { isPdfFile } from "@/lib/pin/pdf-reference";
-import type { Campaign } from "@/lib/pin/types";
+import { isSessionFolderName, SESSION_FOLDER_NAME_MAX, type Campaign, type SessionFolder } from "@/lib/pin/types";
 
 type Filter = "all" | Campaign["status"];
 
@@ -21,6 +22,7 @@ const filterTranslationKey: Record<Filter, TranslationKey> = {
 };
 const acceptedImageTypes = new Set(["image/jpeg", "image/png", "image/webp"]);
 const maxImageBytes = 10 * 1024 * 1024;
+const ROOT_FOLDER_DROP_ID = "root";
 
 function imageValidationError(file: File, t: (key: TranslationKey) => string) {
   if (!acceptedImageTypes.has(file.type) && !isPdfFile(file)) return t("pin.admin.validationImageType");
@@ -33,11 +35,14 @@ export default function PinAdminPage() {
   const router = useRouter();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const previewUrlRef = useRef("");
-  const { ready, campaigns, createCampaign } = useCampaigns();
+  const { ready, campaigns, folders, createCampaign, createFolder, deleteCampaign, deleteFolder, moveCampaign, renameFolder } = useCampaigns();
   const [filter, setFilter] = useState<Filter>("all");
   const [query, setQuery] = useState("");
   const [createOpen, setCreateOpen] = useState(false);
   const [sharedCampaign, setSharedCampaign] = useState<Campaign | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<Campaign | null>(null);
+  const [deletingCampaign, setDeletingCampaign] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
   const [title, setTitle] = useState("");
   const [guideText, setGuideText] = useState("");
   const [referenceFile, setReferenceFile] = useState<File | null>(null);
@@ -47,6 +52,13 @@ export default function PinAdminPage() {
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  const [folderEditor, setFolderEditor] = useState<SessionFolder | "new" | null>(null);
+  const [folderName, setFolderName] = useState("");
+  const [folderSaving, setFolderSaving] = useState(false);
+  const [folderError, setFolderError] = useState<string | null>(null);
+  const [folderActionError, setFolderActionError] = useState<string | null>(null);
+  const [dragOverFolderId, setDragOverFolderId] = useState<string | null>(null);
+  const [movingCampaignId, setMovingCampaignId] = useState<string | null>(null);
 
   const visible = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
@@ -56,6 +68,19 @@ export default function PinAdminPage() {
       return matchesFilter && matchesQuery;
     });
   }, [campaigns, filter, query]);
+
+  const groupedSessions = useMemo(() => {
+    const byFolder = new Map(folders.map((folder) => [folder.id, [] as Campaign[]]));
+    const root: Campaign[] = [];
+    visible.forEach((campaign) => {
+      const group = campaign.folderId ? byFolder.get(campaign.folderId) : undefined;
+      if (group) group.push(campaign);
+      else root.push(campaign);
+    });
+    return { root, byFolder };
+  }, [folders, visible]);
+  const knownFolderIds = new Set(folders.map((folder) => folder.id));
+  const rootSessionCount = campaigns.filter((campaign) => !campaign.folderId || !knownFolderIds.has(campaign.folderId)).length;
 
   const liveCount = campaigns.filter((campaign) => campaign.status === "live").length;
   const pinCount = campaigns.reduce((sum, campaign) => sum + campaign.pins.length, 0);
@@ -138,13 +163,6 @@ export default function PinAdminPage() {
     }
   };
 
-  const openCampaign = (campaign: Campaign) => router.push(`/pin/admin/${campaign.id}`);
-  const openCampaignWithKeyboard = (event: KeyboardEvent<HTMLElement>, campaign: Campaign) => {
-    if (event.target !== event.currentTarget || (event.key !== "Enter" && event.key !== " ")) return;
-    event.preventDefault();
-    openCampaign(campaign);
-  };
-
   const joinUrl = sharedCampaign && typeof window !== "undefined"
     ? `${window.location.origin}/pin/join/${sharedCampaign.code}`
     : "";
@@ -158,15 +176,177 @@ export default function PinAdminPage() {
       console.error("Campaign join link copy failed", error);
     }
   };
+  const closeDelete = () => {
+    if (deletingCampaign) return;
+    setDeleteTarget(null);
+    setDeleteError(null);
+  };
+
+  const openFolderEditor = (folder: SessionFolder | "new") => {
+    setFolderEditor(folder);
+    setFolderName(folder === "new" ? "" : folder.name);
+    setFolderError(null);
+  };
+  const closeFolderEditor = () => {
+    if (folderSaving) return;
+    setFolderEditor(null);
+    setFolderName("");
+    setFolderError(null);
+  };
+  const saveFolder = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!folderEditor || folderSaving) return;
+    const name = folderName.trim();
+    if (!isSessionFolderName(name)) {
+      setFolderError(t("pin.admin.folderNameInvalid"));
+      return;
+    }
+    if (folders.some((folder) => folder.id !== (folderEditor === "new" ? null : folderEditor.id) && folder.name.toLocaleLowerCase() === name.toLocaleLowerCase())) {
+      setFolderError(t("pin.admin.folderDuplicate"));
+      return;
+    }
+    setFolderSaving(true);
+    setFolderError(null);
+    try {
+      if (folderEditor === "new") await createFolder(name);
+      else await renameFolder(folderEditor.id, name);
+      setFolderEditor(null);
+      setFolderName("");
+    } catch (error) {
+      console.error("Session folder save failed", error);
+      setFolderError(t("pin.admin.folderSaveError"));
+    } finally {
+      setFolderSaving(false);
+    }
+  };
+  const removeFolder = async (folder: SessionFolder) => {
+    const count = campaigns.filter((campaign) => campaign.folderId === folder.id).length;
+    if (!window.confirm(t("pin.admin.folderDeleteConfirm", { folder: folder.name, count }))) return;
+    setFolderActionError(null);
+    try {
+      await deleteFolder(folder.id);
+    } catch (error) {
+      console.error("Session folder deletion failed", error);
+      setFolderActionError(t("pin.admin.folderDeleteError"));
+    }
+  };
+  const moveSession = async (campaignId: string, folderId: string | null) => {
+    const campaign = campaigns.find((item) => item.id === campaignId);
+    if (!campaign || campaign.folderId === folderId || movingCampaignId) return;
+    setMovingCampaignId(campaignId);
+    setFolderActionError(null);
+    try {
+      await moveCampaign(campaignId, folderId);
+    } catch (error) {
+      console.error("Session folder move failed", error);
+      setFolderActionError(t("pin.admin.folderMoveError"));
+    } finally {
+      setMovingCampaignId(null);
+      setDragOverFolderId(null);
+    }
+  };
+  const dropSession = (event: DragEvent<HTMLElement>, folderId: string | null) => {
+    event.preventDefault();
+    const campaignId = event.dataTransfer.getData("text/plain");
+    if (campaignId) void moveSession(campaignId, folderId);
+  };
+  const confirmDelete = async () => {
+    if (!deleteTarget || deletingCampaign) return;
+    setDeletingCampaign(true);
+    setDeleteError(null);
+    try {
+      await deleteCampaign(deleteTarget.id);
+      setDeleteTarget(null);
+    } catch (error) {
+      console.error("Campaign deletion failed", error);
+      setDeleteError(t("pin.admin.deleteError"));
+    } finally {
+      setDeletingCampaign(false);
+    }
+  };
 
   if (!ready) return <div className="loading-screen"><span className="spinner dark" /></div>;
+
+  const renderSessionCards = (sessions: Campaign[]) => <div className="material-grid session-folder-grid">
+    {sessions.map((campaign) => (
+      <article
+        className={`material-card campaign-card ${movingCampaignId === campaign.id ? "moving" : ""}`}
+        key={campaign.id}
+        draggable={movingCampaignId !== campaign.id}
+        onDragStart={(event) => {
+          event.dataTransfer.effectAllowed = "move";
+          event.dataTransfer.setData("text/plain", campaign.id);
+        }}
+        onDragEnd={() => setDragOverFolderId(null)}
+        title={t("pin.admin.dragSessionHint")}
+      >
+        <Link className="campaign-card-link" href={`/pin/admin/${campaign.id}`} aria-label={t("pin.admin.openCampaign", { title: campaign.title })}>
+          <span className="material-thumb campaign-thumb">
+            {campaign.pages[0]?.imageUrl
+              ? <img src={campaign.pages[0].imageUrl} alt={t("pin.image.alt", { title: campaign.title })} />
+              : <span className="slide-placeholder">{t("pin.image.unavailable")}</span>}
+            <em className={`live-badge ${campaign.status}`}><i />{t(campaign.status === "live" ? "pin.status.live" : "pin.status.ended")}</em>
+          </span>
+          <span className="material-body">
+            <b>{campaign.title}</b>
+            <small><Clock3 />{t("pin.admin.created", { time: timeAgo(campaign.createdAt) })}</small>
+            <span className="material-stats">
+              <span><b>{campaign.pins.length}</b>{t("pin.admin.feedback")}</span>
+              <span><b>{campaign.code}</b>{t("pin.admin.joinCode")}</span>
+            </span>
+          </span>
+        </Link>
+        <div className="session-card-footer">
+          <label className="session-card-folder">
+            <Folder />
+            <select
+              value={campaign.folderId && knownFolderIds.has(campaign.folderId) ? campaign.folderId : ""}
+              onChange={(event) => void moveSession(campaign.id, event.target.value || null)}
+              disabled={movingCampaignId !== null}
+              aria-label={t("pin.admin.moveSession", { title: campaign.title })}
+            >
+              <option value="">{t("pin.admin.unfiled")}</option>
+              {folders.map((folder) => <option key={folder.id} value={folder.id}>{folder.name}</option>)}
+            </select>
+          </label>
+          <span className="campaign-card-actions">
+            <button
+              className="icon-btn campaign-delete-button"
+              onClick={() => {
+                setDeleteError(null);
+                setDeleteTarget(campaign);
+              }}
+              aria-label={t("pin.admin.deleteCampaign", { title: campaign.title })}
+              title={t("pin.admin.delete")}
+            >
+              <Trash2 />
+            </button>
+            <button
+              className="icon-btn campaign-share-button"
+              onClick={() => {
+                setCopied(false);
+                setSharedCampaign(campaign);
+              }}
+              aria-label={t("pin.admin.shareCampaign", { title: campaign.title })}
+              title={t("pin.admin.shareJoinLink")}
+            >
+              <Share2 />
+            </button>
+          </span>
+        </div>
+      </article>
+    ))}
+  </div>;
 
   return (
     <PinAdminShell>
       <div className="admin-page">
         <div className="page-head">
           <div><h1>{t("pin.admin.title")}</h1><p>{t("pin.admin.description")}</p></div>
-          <div className="page-actions"><button className="btn primary" onClick={() => setCreateOpen(true)}><Plus />{t("pin.admin.newCampaign")}</button></div>
+          <div className="page-actions">
+            <button className="btn secondary" onClick={() => openFolderEditor("new")}><FolderPlus />{t("pin.admin.newFolder")}</button>
+            <button className="btn primary" onClick={() => setCreateOpen(true)}><Plus />{t("pin.admin.newCampaign")}</button>
+          </div>
         </div>
 
         <div className="kpi-grid">
@@ -181,46 +361,52 @@ export default function PinAdminPage() {
           <div className="filter-tabs">{(Object.keys(filterTranslationKey) as Filter[]).map((key) => <button key={key} className={filter === key ? "active" : ""} onClick={() => setFilter(key)}>{t(filterTranslationKey[key])}</button>)}</div>
         </div>
 
-        {visible.length ? (
-          <div className="material-grid">
-            {visible.map((campaign) => (
-              <article
-                className="material-card campaign-card"
-                key={campaign.id}
-                role="link"
-                tabIndex={0}
-                onClick={() => openCampaign(campaign)}
-                onKeyDown={(event) => openCampaignWithKeyboard(event, campaign)}
-                aria-label={t("pin.admin.openCampaign", { title: campaign.title })}
+        {folderActionError && <div className="session-folder-error" role="alert">{folderActionError}</div>}
+
+        {campaigns.length || folders.length ? (
+          <div className="session-folder-list">
+            <section
+              className={`session-folder ${dragOverFolderId === ROOT_FOLDER_DROP_ID ? "drag-over" : ""}`}
+              onDragOver={(event) => {
+                event.preventDefault();
+                event.dataTransfer.dropEffect = "move";
+                setDragOverFolderId(ROOT_FOLDER_DROP_ID);
+              }}
+              onDrop={(event) => dropSession(event, null)}
+            >
+              <header className="session-folder-head">
+                <div><Folder /><span><b>{t("pin.admin.unfiled")}</b><small>{t("pin.admin.sessionCount", { count: rootSessionCount })}</small></span></div>
+              </header>
+              {groupedSessions.root.length
+                ? renderSessionCards(groupedSessions.root)
+                : <div className="session-folder-empty">{t(rootSessionCount ? "pin.admin.noFolderMatch" : "pin.admin.unfiledDropHint")}</div>}
+            </section>
+
+            {folders.map((folder) => {
+              const sessions = groupedSessions.byFolder.get(folder.id) ?? [];
+              const sessionCount = campaigns.filter((campaign) => campaign.folderId === folder.id).length;
+              return <section
+                className={`session-folder ${dragOverFolderId === folder.id ? "drag-over" : ""}`}
+                key={folder.id}
+                onDragOver={(event) => {
+                  event.preventDefault();
+                  event.dataTransfer.dropEffect = "move";
+                  setDragOverFolderId(folder.id);
+                }}
+                onDrop={(event) => dropSession(event, folder.id)}
               >
-                <span className="material-thumb campaign-thumb">
-                  {campaign.pages[0]?.imageUrl
-                    ? <img src={campaign.pages[0].imageUrl} alt={t("pin.image.alt", { title: campaign.title })} />
-                    : <span className="slide-placeholder">{t("pin.image.unavailable")}</span>}
-                  <em className={`live-badge ${campaign.status}`}><i />{t(campaign.status === "live" ? "pin.status.live" : "pin.status.ended")}</em>
-                </span>
-                <span className="material-body">
-                  <b>{campaign.title}</b>
-                  <small><Clock3 />{t("pin.admin.created", { time: timeAgo(campaign.createdAt) })}</small>
-                  <span className="material-stats">
-                    <span><b>{campaign.pins.length}</b>{t("pin.admin.feedback")}</span>
-                    <span><b>{campaign.code}</b>{t("pin.admin.joinCode")}</span>
-                    <button
-                      className="icon-btn campaign-share-button"
-                      onClick={(event) => {
-                        event.stopPropagation();
-                        setCopied(false);
-                        setSharedCampaign(campaign);
-                      }}
-                      aria-label={t("pin.admin.shareCampaign", { title: campaign.title })}
-                      title={t("pin.admin.shareJoinLink")}
-                    >
-                      <Share2 />
-                    </button>
+                <header className="session-folder-head">
+                  <div><Folder /><span><b>{folder.name}</b><small>{t("pin.admin.sessionCount", { count: sessionCount })}</small></span></div>
+                  <span className="session-folder-actions">
+                    <button className="icon-btn" onClick={() => openFolderEditor(folder)} aria-label={t("pin.admin.renameFolder", { folder: folder.name })} title={t("pin.admin.renameFolder", { folder: folder.name })}><Pencil /></button>
+                    <button className="icon-btn campaign-delete-button" onClick={() => void removeFolder(folder)} aria-label={t("pin.admin.deleteFolder", { folder: folder.name })} title={t("pin.admin.deleteFolder", { folder: folder.name })}><Trash2 /></button>
                   </span>
-                </span>
-              </article>
-            ))}
+                </header>
+                {sessions.length
+                  ? renderSessionCards(sessions)
+                  : <div className="session-folder-empty">{t(sessionCount ? "pin.admin.noFolderMatch" : "pin.admin.folderDropHint")}</div>}
+              </section>;
+            })}
           </div>
         ) : (
           <div className="panel">
@@ -277,6 +463,29 @@ export default function PinAdminPage() {
         </div>
       )}
 
+      {folderEditor && (
+        <div className="modal-backdrop" onMouseDown={closeFolderEditor}>
+          <div className="share-modal campaign-create-modal session-folder-modal" role="dialog" aria-modal="true" aria-labelledby="session-folder-editor-title" onMouseDown={(event) => event.stopPropagation()}>
+            <button className="modal-close" type="button" onClick={closeFolderEditor} disabled={folderSaving} aria-label={t("pin.admin.close")}><X /></button>
+            <div className="modal-icon">{folderEditor === "new" ? <FolderPlus /> : <Pencil />}</div>
+            <h2 id="session-folder-editor-title">{t(folderEditor === "new" ? "pin.admin.createFolderTitle" : "pin.admin.renameFolderTitle")}</h2>
+            <p>{t("pin.admin.folderDescription")}</p>
+            <form className="campaign-form" onSubmit={(event) => void saveFolder(event)}>
+              {folderError && <div className="upload-error" role="alert">{folderError}</div>}
+              <label className="campaign-field">
+                <span>{t("pin.admin.folderName")} <small>{t("pin.admin.required")}</small></span>
+                <input value={folderName} onChange={(event) => setFolderName(event.target.value)} maxLength={SESSION_FOLDER_NAME_MAX} placeholder={t("pin.admin.folderNamePlaceholder")} required autoFocus />
+                <small>{[...folderName].length}/{SESSION_FOLDER_NAME_MAX}</small>
+              </label>
+              <div className="campaign-form-actions">
+                <button className="btn secondary" type="button" onClick={closeFolderEditor} disabled={folderSaving}>{t("pin.admin.cancel")}</button>
+                <button className="btn primary" type="submit" disabled={folderSaving}>{folderSaving ? <span className="spinner" /> : folderEditor === "new" ? <FolderPlus /> : <Check />}{t(folderSaving ? "pin.admin.folderSaving" : "pin.admin.folderSave")}</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
       {sharedCampaign && (
         <div className="modal-backdrop" onMouseDown={() => setSharedCampaign(null)}>
           <div className="share-modal" role="dialog" aria-modal="true" aria-labelledby="share-campaign-title" onMouseDown={(event) => event.stopPropagation()}>
@@ -289,6 +498,24 @@ export default function PinAdminPage() {
             <div className="link-copy"><Link2 /><span>{joinUrl}</span><button onClick={() => void copyJoinUrl()} aria-label={t("pin.admin.copyJoinLink")}>{copied ? <Check /> : <Copy />}</button></div>
             <button className="btn primary large full" onClick={() => void copyJoinUrl()}>{copied ? <><Check />{t("pin.admin.copied")}</> : <><Copy />{t("pin.admin.copyJoinLink")}</>}</button>
           </div>
+        </div>
+      )}
+
+      {deleteTarget && (
+        <div className="modal-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) closeDelete(); }}>
+          <section className="delete-slide-modal campaign-delete-modal" role="alertdialog" aria-modal="true" aria-labelledby="delete-campaign-title" aria-describedby="delete-campaign-description">
+            <button type="button" className="modal-close" disabled={deletingCampaign} onClick={closeDelete} aria-label={t("pin.admin.cancel")}><X /></button>
+            <span className="delete-slide-icon"><Trash2 /></span>
+            <h2 id="delete-campaign-title">{t("pin.admin.deleteTitle")}</h2>
+            <p id="delete-campaign-description">{t("pin.admin.deleteDescription", { title: deleteTarget.title })}</p>
+            {deleteTarget.pages[0]?.imageUrl && <div className="delete-slide-preview"><img src={deleteTarget.pages[0].imageUrl} alt={t("pin.image.alt", { title: deleteTarget.title })} /></div>}
+            <div className="delete-slide-warning"><b>{t("pin.admin.deleteWarning")}</b><span>{t("pin.admin.deleteData", { pages: deleteTarget.pages.length, count: deleteTarget.pins.length })}</span></div>
+            {deleteError && <div className="login-error" role="alert">{deleteError} {t("common.tryAgain")}</div>}
+            <div className="delete-slide-actions">
+              <button type="button" className="btn secondary" disabled={deletingCampaign} onClick={closeDelete}>{t("pin.admin.cancel")}</button>
+              <button type="button" className="btn destructive" disabled={deletingCampaign} onClick={() => void confirmDelete()}>{deletingCampaign ? <><span className="spinner" />{t("pin.admin.deleting")}</> : <><Trash2 />{t("pin.admin.deleteConfirm")}</>}</button>
+            </div>
+          </section>
         </div>
       )}
     </PinAdminShell>

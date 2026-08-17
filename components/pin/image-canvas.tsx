@@ -83,7 +83,7 @@ export function ImageCanvas({ campaign, page, pins = [], visiblePinIds, pinDispl
         return <Fragment key={pin.id}>
           {/* 핀 자체를 유형 색으로 칠하면 라벨 없이도 지도가 한눈에 읽힌다. */}
           <button
-            className={`question-pin pin-mark ${categoryClass(pin.category)} ${markerEmoji ? "emoji-pin" : ""} ${selectedId === pin.id ? "selected" : ""} ${livePinId === pin.id ? "live" : ""}`}
+            className={`question-pin pin-mark marker-${pin.marker} ${categoryClass(pin.category)} ${markerEmoji ? "emoji-pin" : ""} ${selectedId === pin.id ? "selected" : ""} ${livePinId === pin.id ? "live" : ""}`}
             style={{ left: `${position.x * 100}%`, top: `${position.y * 100}%` }}
             data-feedback-pin-id={pin.id}
             hidden={visiblePinIds ? !visiblePinIds.has(pin.id) : undefined}
@@ -94,7 +94,7 @@ export function ImageCanvas({ campaign, page, pins = [], visiblePinIds, pinDispl
           </button>
           {showLabels && (labelMode === "always" || selectedId === pin.id) && (
             <button
-              className={`question-tag pin-category ${categoryClass(pin.category)} ${livePinId === pin.id ? "live" : ""} ${labelContent === "body" ? `feedback-bubble ${reactionCount >= 5 ? "empathy-fire" : ""} ${position.x > 0.58 ? "to-left" : ""} ${position.y < 0.12 ? "below" : ""}` : ""}`}
+              className={`question-tag pin-category marker-${pin.marker} ${categoryClass(pin.category)} ${livePinId === pin.id ? "live" : ""} ${labelContent === "body" ? `feedback-bubble ${reactionCount >= 5 ? "empathy-fire" : ""} ${position.x > 0.58 ? "to-left" : ""} ${position.y < 0.12 ? "below" : ""}` : ""}`}
               style={{ left: `${position.x * 100}%`, top: `${position.y * 100}%` }}
               data-feedback-label-id={pin.id}
               onClick={() => onSelectPin?.(pin.id)}

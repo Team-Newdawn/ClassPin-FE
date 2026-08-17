@@ -56,7 +56,9 @@ export default function FeedbackPresentation() {
         const next = await fetchCampaignPlayer(params.id);
         if (active) setCampaign(next);
       } catch (error) {
-        console.error("Feedback player refresh failed", error);
+        const networkFailure = typeof error === "object" && error !== null
+          && "message" in error && String(error.message).includes("Failed to fetch");
+        if (active) console[networkFailure ? "warn" : "error"]("Feedback player refresh failed", error);
       } finally {
         if (active) setReady(true);
       }

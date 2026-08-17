@@ -26,6 +26,8 @@ export interface Slide {
   imageUrl?: string;
   /** lecture-slides 버킷 안의 경로. 변환 단계에서 이미 올라간 이미지를 가리킨다. */
   imagePath?: string;
+  /** 강의자 전용 발표 메모. 청중 세션 조회에는 포함하지 않는다. */
+  speakerNote?: string;
 }
 
 export interface Question {
@@ -56,6 +58,7 @@ export interface ClassSession {
   status: "live" | "ended";
   currentSlide: number;
   showQuestionPins: boolean;
+  showPresentationQr: boolean;
   presentationQrPosition: PresentationQrPosition;
   createdAt: string;
   slides: Slide[];

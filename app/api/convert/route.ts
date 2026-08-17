@@ -1,11 +1,13 @@
 import { execFile } from "node:child_process";
 import { copyFile, mkdir, mkdtemp, readFile, readdir, rm, stat, writeFile } from "node:fs/promises";
-import { availableParallelism, homedir, tmpdir } from "node:os";
+import { availableParallelism, tmpdir } from "node:os";
 import path from "node:path";
 import { setTimeout as sleep } from "node:timers/promises";
 import { promisify } from "node:util";
 import { NextResponse } from "next/server";
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { resolveDocumentBinary } from "@/lib/server/document-binaries";
+import { getPdfPageCount, renderPdfPages } from "@/lib/server/pdf-render";
 import { getSupabaseClientForToken } from "@/lib/supabase/server";
 import type { Slide } from "@/lib/types";
 
@@ -16,7 +18,6 @@ const run = promisify(execFile);
 // 요청 제한(300초) 안에서 최대한 여유를 두되, 그보다 먼저 끝나도록 잡는다.
 const RENDER_TIMEOUT_MS = 240_000;
 const SOFFICE_TIMEOUT_MS = 180_000;
-const PROBE_TIMEOUT_MS = 20_000;
 /**
  * 페이지 구간을 나눠 동시에 렌더링할 pdftoppm 프로세스 수.
  *
@@ -34,13 +35,6 @@ const byPageNumber = (a: string, b: string) => a.localeCompare(b, undefined, { n
 /** slide-07.jpg → 6 (0-기반). pdftoppm 은 파일명에 절대 페이지 번호를 박는다. */
 const pageIndexOf = (name: string) => Number(/(\d+)\.jpg$/.exec(name)?.[1] ?? 0) - 1;
 
-async function getPageCount(pdftoppm: string, pdf: string) {
-  try {
-    const { stdout } = await run(path.join(/* turbopackIgnore: true */ path.dirname(pdftoppm), "pdfinfo"), [pdf], { timeout: 30_000 });
-    return Number(/^Pages:\s+(\d+)/m.exec(stdout)?.[1] ?? 0);
-  } catch { return 0; }
-}
-
 /**
  * PDF 를 JPEG 로 렌더링한다.
  *
@@ -48,27 +42,16 @@ async function getPageCount(pdftoppm: string, pdf: string) {
  * 동시에 돌린다. 파일명이 페이지 번호로 정해져 구간끼리 충돌하지 않는다.
  */
 function renderPages(pdftoppm: string, pdf: string, outDir: string, total: number) {
-  // DPI 로 렌더링하면 비용이 원본 페이지 규격에 끌려다닌다. 같은 16:9 슬라이드라도
-  // 1920pt 로 만든 자료는 960pt 짜리보다 네 배 비싸다 — 화면에서는 똑같이 보이는데도.
-  // 긴 변을 고정하면 규격과 무관하게 일정해지고, 앱이 슬라이드를 최대 1440 CSS px
-  // 로 그리므로 1600 이면 선명함도 남는다.
-  const args = ["-jpeg", "-scale-to", String(SLIDE_MAX_EDGE), "-jpegopt", "quality=86"];
-  const prefix = path.join(outDir, "slide");
-
-  // 워커 하나가 최소 두 장은 맡게 해서, 장수가 적을 때 프로세스 띄우는 비용이
-  // 렌더링 시간보다 커지지 않도록 한다. 워커 수를 고정하면 15 장짜리처럼 흔한
-  // 크기에서 병렬화가 통째로 꺼져 버린다.
-  const workers = Math.min(RENDER_WORKERS, Math.ceil(total / 2));
-  if (!total || workers <= 1) {
-    return run(pdftoppm, [...args, pdf, prefix], { timeout: RENDER_TIMEOUT_MS }).then(() => undefined);
-  }
-
-  const size = Math.ceil(total / workers);
-  const ranges: Array<[number, number]> = [];
-  for (let start = 1; start <= total; start += size) ranges.push([start, Math.min(start + size - 1, total)]);
-  return Promise.all(ranges.map(([first, last]) =>
-    run(pdftoppm, [...args, "-f", String(first), "-l", String(last), pdf, prefix], { timeout: RENDER_TIMEOUT_MS })
-  )).then(() => undefined);
+  return renderPdfPages({
+    pdftoppm,
+    pdf,
+    outDir,
+    total,
+    maxEdge: SLIDE_MAX_EDGE,
+    quality: 86,
+    maxWorkers: RENDER_WORKERS,
+    timeoutMs: RENDER_TIMEOUT_MS,
+  });
 }
 
 type UploadTarget = { bucket: ReturnType<SupabaseClient["storage"]["from"]>; ownerId: string; uploadId: string };
@@ -138,30 +121,6 @@ async function renderUploadStream(
   return slides;
 }
 
-async function resolveBinary(name: "pdftoppm" | "soffice") {
-  const envName = name === "pdftoppm" ? "PDFTOPPM_PATH" : "SOFFICE_PATH";
-  // LibreOffice 에는 -v 가 없다. 물어보면 사용법을 뱉으며 비정상 종료하므로,
-  // 멀쩡히 설치된 soffice 가 "없음" 으로 판정되어 PPT 변환이 통째로 막힌다.
-  const versionFlag = name === "pdftoppm" ? "-v" : "--version";
-  const pathCandidates = (process.env.PATH ?? "").split(path.delimiter).filter(Boolean).map((directory) => path.join(/* turbopackIgnore: true */ directory, name));
-  const candidates = [
-    process.env[envName],
-    ...pathCandidates,
-    `/opt/homebrew/bin/${name}`,
-    `/usr/local/bin/${name}`,
-    path.join(/* turbopackIgnore: true */ homedir(), ".cache/codex-runtimes/codex-primary-runtime/dependencies/bin/override", name),
-  ].filter((candidate): candidate is string => Boolean(candidate));
-
-  for (const candidate of candidates) {
-    try {
-      // soffice 는 첫 실행에서 프로필을 만드느라 몇 초씩 걸린다.
-      await run(candidate, [versionFlag], { timeout: PROBE_TIMEOUT_MS });
-      return candidate;
-    } catch { /* Try the next known runtime location. */ }
-  }
-  throw new Error(`${name} 실행 파일을 찾을 수 없습니다.`);
-}
-
 /**
  * 변환 진행을 NDJSON 으로 흘려보낸다. 한 줄에 한 이벤트:
  *   {"type":"meta","total":N} → {"type":"slide","slide":{…}} × N → {"type":"done"}
@@ -213,15 +172,15 @@ export async function POST(request: Request) {
     await writeFile(source, Buffer.from(await file.arrayBuffer()));
     let pdf = source;
     if (extension !== ".pdf") {
-      const soffice = await resolveBinary("soffice");
+      const soffice = await resolveDocumentBinary("soffice");
       await run(soffice, ["--headless", "--convert-to", "pdf", "--outdir", work, source], { timeout: SOFFICE_TIMEOUT_MS });
       pdf = path.join(work, "source.pdf");
     }
 
     const pages = path.join(work, "pages");
     await mkdir(pages, { recursive: true });
-    const pdftoppm = await resolveBinary("pdftoppm");
-    const total = await getPageCount(pdftoppm, pdf);
+    const pdftoppm = await resolveDocumentBinary("pdftoppm");
+    const total = await getPdfPageCount(pdftoppm, pdf);
 
     // 컨테이너 디스크는 인스턴스가 죽으면 같이 사라지고 인스턴스끼리 공유되지도
     // 않는다. 변환한 자리에서 바로 Storage 에 올려야 재접속·재배포 후에도 남는다.

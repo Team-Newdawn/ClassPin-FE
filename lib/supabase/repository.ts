@@ -2,6 +2,8 @@ import type { RealtimeChannel } from "@supabase/supabase-js";
 import type { ClassSession, NormalizedPoint, Question, Slide } from "@/lib/types";
 import { ensureAnonymousUser, getAudienceSupabaseClient, getSessionUser, getSupabaseClient } from "./client";
 
+export type PlatformExperienceSource = "lecture" | "feedback";
+
 type LectureRow = {
   id: string;
   course_id: string;
@@ -10,6 +12,7 @@ type LectureRow = {
   status: ClassSession["status"];
   current_page: number;
   show_question_pins: boolean;
+  show_presentation_qr: boolean;
   presentation_qr_position: ClassSession["presentationQrPosition"];
   created_at: string;
 };
@@ -31,6 +34,17 @@ type SlideRow = {
   material_version_id: string;
   page_index: number;
   image_path: string;
+};
+
+type SlideInstructorNoteRow = {
+  slide_id: string;
+  body: string;
+};
+
+type DeletedSlideRow = {
+  deleted_image_path: string;
+  deleted_page_index: number;
+  deleted_question_count: number;
 };
 
 type QuestionRow = {
@@ -108,6 +122,7 @@ export async function persistSession(session: ClassSession) {
     status: session.status,
     current_page: session.currentSlide,
     show_question_pins: session.showQuestionPins,
+    show_presentation_qr: session.showPresentationQr,
     presentation_qr_position: session.presentationQrPosition,
     started_at: new Date().toISOString()
   });
@@ -133,6 +148,103 @@ export async function persistSession(session: ClassSession) {
   if (slidesError) throw slidesError;
 }
 
+const APPENDABLE_SLIDE_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
+const MAX_SLIDE_IMAGE_BYTES = 10 * 1024 * 1024;
+const MAX_SLIDES_PER_APPEND = 20;
+
+/** 기존 자료 버전의 끝에 이미지 슬라이드를 원자적으로 추가한다. */
+export async function appendSessionSlides(session: ClassSession, files: File[]): Promise<Slide[]> {
+  const client = getSupabaseClient();
+  if (!client) throw new Error("Supabase 연결을 찾지 못했습니다.");
+  if (!session.materialVersionId) throw new Error("슬라이드를 추가할 자료 버전을 찾지 못했습니다.");
+  if (files.length < 1 || files.length > MAX_SLIDES_PER_APPEND) throw new Error("슬라이드는 한 번에 1~20장까지 추가할 수 있습니다.");
+  const invalidFile = files.find((file) => !APPENDABLE_SLIDE_TYPES.has(file.type) || file.size > MAX_SLIDE_IMAGE_BYTES);
+  if (invalidFile) throw new Error("10MB 이하의 PNG, JPG, WebP 이미지만 추가할 수 있습니다.");
+
+  const user = await requireOwnerUser();
+  const uploadedPaths: string[] = [];
+  try {
+    const newSlides = [];
+    for (const file of files) {
+      const id = crypto.randomUUID();
+      const extension = file.type === "image/png" ? "png" : file.type === "image/webp" ? "webp" : "jpg";
+      const imagePath = `${user.id}/${session.id}/appended/${id}.${extension}`;
+      const { error: uploadError } = await client.storage.from("lecture-slides").upload(imagePath, file, {
+        contentType: file.type,
+        upsert: false
+      });
+      if (uploadError) throw uploadError;
+      uploadedPaths.push(imagePath);
+      newSlides.push({ id, image_path: imagePath });
+    }
+
+    const { data, error } = await client.rpc("append_lecture_slides", {
+      target_material_version_id: session.materialVersionId,
+      new_slides: newSlides
+    });
+    if (error) throw error;
+    return ((data ?? []) as SlideRow[])
+      .sort((a, b) => a.page_index - b.page_index)
+      .map((slide) => ({
+        id: slide.id,
+        pageIndex: slide.page_index,
+        title: `Slide ${slide.page_index + 1}`,
+        imagePath: slide.image_path,
+        imageUrl: client.storage.from("lecture-slides").getPublicUrl(slide.image_path).data.publicUrl,
+        speakerNote: ""
+      }));
+  } catch (error) {
+    if (uploadedPaths.length) await client.storage.from("lecture-slides").remove(uploadedPaths);
+    throw error;
+  }
+}
+
+/** 슬라이드와 연결 데이터를 DB에서 삭제한 뒤 공개 Storage 객체를 회수한다. */
+export async function deleteSessionSlide(slideId: string): Promise<DeletedSlideRow> {
+  const client = getSupabaseClient();
+  if (!client) throw new Error("Supabase 연결을 찾지 못했습니다.");
+  await requireOwnerUser();
+  const { data, error } = await client.rpc("delete_lecture_slide", { target_slide_id: slideId });
+  if (error) throw error;
+  const deleted = ((data ?? []) as DeletedSlideRow[])[0];
+  if (!deleted) throw new Error("삭제된 슬라이드 정보를 받지 못했습니다.");
+  const { error: storageError } = await client.storage.from("lecture-slides").remove([deleted.deleted_image_path]);
+  if (storageError) console.error("Deleted slide storage cleanup failed", storageError);
+  return deleted;
+}
+
+/** Realtime INSERT 뒤 현재 자료 버전의 전체 슬라이드를 다시 읽는다. */
+export async function fetchSessionSlides(session: ClassSession, asAudience = false): Promise<Slide[]> {
+  if (!session.materialVersionId) return session.slides;
+  const client = asAudience ? getAudienceSupabaseClient() : getSupabaseClient();
+  if (!client) return session.slides;
+  if (asAudience) await ensureAnonymousUser();
+
+  const { data, error } = await client.from("slides")
+    .select("id, material_version_id, page_index, image_path")
+    .eq("material_version_id", session.materialVersionId)
+    .order("page_index", { ascending: true });
+  if (error) throw error;
+  const rows = (data ?? []) as SlideRow[];
+  const noteBySlide = new Map<string, string>();
+  if (!asAudience && rows.length) {
+    await requireOwnerUser();
+    const { data: noteData, error: noteError } = await client.from("slide_instructor_notes")
+      .select("slide_id, body")
+      .in("slide_id", rows.map((slide) => slide.id));
+    if (noteError) throw noteError;
+    ((noteData ?? []) as SlideInstructorNoteRow[]).forEach((note) => noteBySlide.set(note.slide_id, note.body));
+  }
+  return rows.map((slide) => ({
+    id: slide.id,
+    pageIndex: slide.page_index,
+    title: `Slide ${slide.page_index + 1}`,
+    imagePath: slide.image_path,
+    imageUrl: client.storage.from("lecture-slides").getPublicUrl(slide.image_path).data.publicUrl,
+    ...(asAudience ? {} : { speakerNote: noteBySlide.get(slide.id) ?? "" })
+  }));
+}
+
 /** 현재 Google 강사가 소유한 강의 전체를 DB에서 복원한다. */
 export async function fetchOwnedSessions(): Promise<ClassSession[]> {
   const client = getSupabaseClient();
@@ -147,7 +259,7 @@ export async function fetchOwnedSessions(): Promise<ClassSession[]> {
   if (!courseIds.length) return [];
 
   const { data: lectureData, error: lectureError } = await client.from("lectures")
-    .select("id, course_id, title, join_code, status, current_page, show_question_pins, presentation_qr_position, created_at")
+    .select("id, course_id, title, join_code, status, current_page, show_question_pins, show_presentation_qr, presentation_qr_position, created_at")
     .in("course_id", courseIds)
     .neq("status", "archived")
     .order("created_at", { ascending: false });
@@ -192,6 +304,14 @@ export async function fetchOwnedSessions(): Promise<ClassSession[]> {
     if (error) throw error;
     slideRows.push(...((data ?? []) as SlideRow[]));
   }
+  const noteBySlide = new Map<string, string>();
+  if (slideRows.length) {
+    const { data, error } = await client.from("slide_instructor_notes")
+      .select("slide_id, body")
+      .in("slide_id", slideRows.map((slide) => slide.id));
+    if (error) throw error;
+    ((data ?? []) as SlideInstructorNoteRow[]).forEach((note) => noteBySlide.set(note.slide_id, note.body));
+  }
   const slidesByVersion = new Map<string, Slide[]>();
   slideRows.forEach((slide) => {
     const rows = slidesByVersion.get(slide.material_version_id) ?? [];
@@ -200,7 +320,8 @@ export async function fetchOwnedSessions(): Promise<ClassSession[]> {
       pageIndex: slide.page_index,
       title: `Slide ${slide.page_index + 1}`,
       imagePath: slide.image_path,
-      imageUrl: client.storage.from("lecture-slides").getPublicUrl(slide.image_path).data.publicUrl
+      imageUrl: client.storage.from("lecture-slides").getPublicUrl(slide.image_path).data.publicUrl,
+      speakerNote: noteBySlide.get(slide.id) ?? ""
     });
     slidesByVersion.set(slide.material_version_id, rows);
   });
@@ -235,6 +356,7 @@ export async function fetchOwnedSessions(): Promise<ClassSession[]> {
       status: lecture.status,
       currentSlide: lecture.current_page,
       showQuestionPins: lecture.show_question_pins,
+      showPresentationQr: lecture.show_presentation_qr,
       presentationQrPosition: lecture.presentation_qr_position,
       createdAt: lecture.created_at,
       slides,
@@ -243,12 +365,25 @@ export async function fetchOwnedSessions(): Promise<ClassSession[]> {
   });
 }
 
+/** 현재 강사가 소유한 슬라이드의 발표 메모만 생성하거나 갱신한다. */
+export async function saveSlideInstructorNote(slideId: string, body: string) {
+  const client = getSupabaseClient();
+  if (!client) throw new Error("Supabase 연결을 찾지 못했습니다.");
+  await requireOwnerUser();
+  const { error } = await client.from("slide_instructor_notes").upsert({
+    slide_id: slideId,
+    body,
+    updated_at: new Date().toISOString()
+  }, { onConflict: "slide_id" });
+  if (error) throw error;
+}
+
 export async function fetchLiveSession(joinCode: string): Promise<ClassSession | null> {
   const client = getAudienceSupabaseClient();
   if (!client) return null;
   await ensureAnonymousUser();
   const { data: lecture, error } = await client.from("lectures")
-    .select("id, course_id, title, join_code, status, current_page, show_question_pins, presentation_qr_position, created_at")
+    .select("id, course_id, title, join_code, status, current_page, show_question_pins, show_presentation_qr, presentation_qr_position, created_at")
     .eq("join_code", joinCode.toUpperCase())
     .eq("status", "live")
     .maybeSingle();
@@ -276,6 +411,7 @@ export async function fetchLiveSession(joinCode: string): Promise<ClassSession |
     status: "live",
     currentSlide: lecture.current_page,
     showQuestionPins: lecture.show_question_pins,
+    showPresentationQr: lecture.show_presentation_qr,
     presentationQrPosition: lecture.presentation_qr_position,
     createdAt: lecture.created_at,
     slides,
@@ -346,10 +482,30 @@ export async function markQuestionResolved(questionId: string) {
   if (error) throw error;
 }
 
+export async function submitPlatformExperienceResponse(
+  source: PlatformExperienceSource,
+  code: string,
+  experience: string,
+  improvement: string
+) {
+  const client = getAudienceSupabaseClient();
+  if (!client) throw new Error("Supabase 연결을 찾지 못했습니다.");
+  const user = await ensureAnonymousUser();
+  if (!user) throw new Error("참여 세션을 만들지 못했습니다.");
+  const { error } = await client.rpc("submit_platform_experience_response", {
+    target_platform: source,
+    target_code: code,
+    target_experience: experience,
+    target_improvement: improvement
+  });
+  if (error) throw error;
+}
+
 export async function updateLecture(sessionId: string, values: {
   current_page?: number;
   status?: "live" | "ended";
   show_question_pins?: boolean;
+  show_presentation_qr?: boolean;
   presentation_qr_position?: ClassSession["presentationQrPosition"];
 }) {
   const client = getSupabaseClient();
@@ -359,26 +515,61 @@ export async function updateLecture(sessionId: string, values: {
   if (error) throw error;
 }
 
-export function subscribeToLecture(sessionId: string, onRefresh: () => void, asAudience = false): RealtimeChannel | null {
+export function subscribeToLecture(
+  sessionId: string,
+  materialVersionId: string | undefined,
+  onRefresh: () => void,
+  onSlidesRefresh: () => void,
+  asAudience = false
+): RealtimeChannel | null {
   const client = asAudience ? getAudienceSupabaseClient() : getSupabaseClient();
   if (!client) return null;
   // Realtime reuses an existing channel with the same topic. React effects can
   // reconnect before an asynchronous removeChannel() has finished, so give
   // every subscription its own topic to avoid mutating a subscribed channel.
-  return client.channel(`lecture:${sessionId}:${crypto.randomUUID()}`)
+  let channel = client.channel(`lecture:${sessionId}:${crypto.randomUUID()}`)
     .on("postgres_changes", { event: "*", schema: "public", table: "questions", filter: `lecture_id=eq.${sessionId}` }, onRefresh)
-    .on("postgres_changes", { event: "UPDATE", schema: "public", table: "lectures", filter: `id=eq.${sessionId}` }, onRefresh)
-    .subscribe();
+    .on("postgres_changes", { event: "UPDATE", schema: "public", table: "lectures", filter: `id=eq.${sessionId}` }, onRefresh);
+  if (materialVersionId) {
+    channel = channel.on("postgres_changes", {
+      event: "*",
+      schema: "public",
+      table: "slides",
+      filter: `material_version_id=eq.${materialVersionId}`
+    }, onSlidesRefresh);
+  }
+  return channel.subscribe();
 }
 
-export async function fetchLectureSnapshot(session: ClassSession, asAudience = false): Promise<Pick<ClassSession, "currentSlide" | "status" | "showQuestionPins" | "presentationQrPosition" | "questions"> | null> {
+/**
+ * 참여자는 종료된 강의 행을 RLS로 읽을 수 없다. 이미 참여 중이던 강의가 조회되지 않으면
+ * 종료된 것으로 보고, 짧은 폴링으로 Realtime 이벤트가 필터링되는 경우까지 보완한다.
+ */
+export async function fetchLectureStatus(
+  session: Pick<ClassSession, "id" | "status">,
+  asAudience = false
+): Promise<ClassSession["status"]> {
+  const client = asAudience ? getAudienceSupabaseClient() : getSupabaseClient();
+  if (!client) return session.status;
+  if (asAudience) await ensureAnonymousUser();
+  const { data, error } = await client.from("lectures")
+    .select("status")
+    .eq("id", session.id)
+    .maybeSingle();
+  if (error) throw error;
+  if (asAudience && !data) return "ended";
+  return (data?.status as ClassSession["status"] | undefined) ?? session.status;
+}
+
+export async function fetchLectureSnapshot(session: ClassSession, asAudience = false): Promise<Pick<ClassSession, "currentSlide" | "status" | "showQuestionPins" | "showPresentationQr" | "presentationQrPosition" | "questions"> | null> {
   const client = asAudience ? getAudienceSupabaseClient() : getSupabaseClient();
   if (!client) return null;
   if (asAudience) await ensureAnonymousUser();
-  const { data: lecture } = await client.from("lectures")
-    .select("current_page, status, show_question_pins, presentation_qr_position")
+  const { data: lecture, error: lectureError } = await client.from("lectures")
+    .select("current_page, status, show_question_pins, show_presentation_qr, presentation_qr_position")
     .eq("id", session.id)
     .maybeSingle();
+  if (lectureError) throw lectureError;
   const { data, error } = await client.from("questions")
     .select("id, slide_id, category, raw_text, status, created_at, region_anchors(kind, coords), answers(body, created_at)")
     .eq("lecture_id", session.id)
@@ -388,8 +579,9 @@ export async function fetchLectureSnapshot(session: ClassSession, asAudience = f
     .map((row) => toQuestion({ ...row, lecture_id: session.id }, session.id, session.slides));
   return {
     currentSlide: lecture?.current_page ?? session.currentSlide,
-    status: (lecture?.status as ClassSession["status"]) ?? session.status,
+    status: asAudience && !lecture ? "ended" : (lecture?.status as ClassSession["status"]) ?? session.status,
     showQuestionPins: lecture?.show_question_pins ?? session.showQuestionPins,
+    showPresentationQr: lecture?.show_presentation_qr ?? session.showPresentationQr,
     presentationQrPosition: (lecture?.presentation_qr_position as ClassSession["presentationQrPosition"]) ?? session.presentationQrPosition,
     questions
   };

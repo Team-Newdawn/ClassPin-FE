@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import Link from "next/link";
 import { useParams } from "next/navigation";
 import { Check, ChevronLeft, ChevronRight, MapPin, MessageCircleQuestion, Pencil, Send, Smile, Trash2, X } from "@/components/icons";
 import { LanguageSwitcher, useLanguage } from "@/components/language-context";
@@ -34,6 +35,7 @@ const MIN_PATH_LENGTH_PX = 12;
 export default function JoinSession() {
   const { t, categoryLabel, timeAgo } = useLanguage();
   const params = useParams<{ code: string }>();
+  const finalHref = `/join/${encodeURIComponent(params.code)}/final`;
   const { sessions, ready, addQuestion, updateQuestion, loadSessionByCode } = useSessions();
   const session = useMemo(() => sessions.find((item) => item.code.toLowerCase() === params.code.toLowerCase()), [params.code, sessions]);
   const [tab, setTab] = useState<StudentTab>("slide");
@@ -76,6 +78,7 @@ export default function JoinSession() {
 
   if (!ready || (!session && !lookupDone)) return <div className="loading-screen"><span className="spinner dark" /></div>;
   if (!session) return <div className="student-empty"><PinLogo /><LanguageSwitcher /><h1>{t("student.sessionNotFound")}</h1><p>{t("student.checkLink")}</p></div>;
+  if (session.status !== "live") return <div className="student-empty"><PinLogo /><LanguageSwitcher /><h1>{t("student.sessionEndedTitle")}</h1><p>{t("student.sessionEndedDescription")}</p><Link className="btn primary" href={finalHref}>{t("experience.complete")}</Link></div>;
   const effectiveTool = !session.showQuestionPins && activeTool === "emoji" ? "pin" : activeTool;
   const slide = session.slides[current];
   const submittedQuestions = session.questions.filter((question) => question.slideIndex === current);
@@ -355,7 +358,7 @@ export default function JoinSession() {
   };
   return (
     <main className="student-shell student-slide-shell">
-      <header className="student-header"><PinLogo /><div className="student-header-actions"><LanguageSwitcher /><span className="student-live-status"><i />{session.status === "live" ? "LIVE" : t("student.endedSession")}</span></div></header>
+      <header className="student-header"><PinLogo /><div className="student-header-actions"><Link className="student-complete-button" href={finalHref}>{t("experience.complete")}</Link><LanguageSwitcher /><span className="student-live-status"><i />{session.status === "live" ? "LIVE" : t("student.endedSession")}</span></div></header>
       <nav className="student-view-tabs" role="tablist" aria-label={t("student.lectureView")}>
         <button
           type="button"

@@ -148,7 +148,7 @@ export default function SessionPresentation() {
   return (
     <main
       ref={stageRef}
-      className={`presentation-shell qr-${session.presentationQrPosition} ${controlsVisible ? "controls-visible" : ""}`}
+      className={`presentation-shell ${session.showPresentationQr ? `qr-${session.presentationQrPosition}` : ""} ${controlsVisible ? "controls-visible" : ""}`}
       onMouseMove={revealControls}
       onPointerDown={revealControls}
     >
@@ -162,14 +162,14 @@ export default function SessionPresentation() {
         />
       </div>
 
-      <aside
+      {session.showPresentationQr && <aside
         className={`presentation-join-qr ${session.presentationQrPosition}`}
         role="img"
         aria-label={`${t("presentation.joinQrAria")} · ${session.code}`}
       >
         <QRCodeSVG value={joinUrl} size={108} bgColor="#ffffff" fgColor="#101827" level="M" />
         <div><span>{t("presentation.scanToJoin")}</span><b>{session.code}</b></div>
-      </aside>
+      </aside>}
 
       <header className="presentation-topbar">
         <div className="presentation-title"><span className={`status-dot ${session.status}`} /><b>{session.title}</b></div>

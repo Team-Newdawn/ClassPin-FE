@@ -2,7 +2,7 @@
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import { categoryLabel as getCategoryLabel, type Locale, statusLabel as getStatusLabel, timeAgo as getTimeAgo, translate, type TranslationKey } from "@/lib/i18n";
-import type { FeedbackCategory } from "@/lib/pin/types";
+import type { FeedbackCategoryLabelKey, LegacyFeedbackCategory } from "@/lib/pin/types";
 import type { QuestionCategory, QuestionStatus } from "@/lib/types";
 
 const STORAGE_KEY = "pin-class-locale";
@@ -12,47 +12,60 @@ type LanguageContextValue = {
   setLocale: (locale: Locale) => void;
   t: (key: TranslationKey, values?: Record<string, string | number>) => string;
   categoryLabel: (category: QuestionCategory) => string;
-  feedbackCategoryLabel: (category: FeedbackCategory) => string;
-  feedbackCategoryHint: (category: FeedbackCategory) => string;
+  feedbackCategoryLabel: (category: FeedbackCategoryLabelKey) => string;
+  feedbackCategoryHint: (category: LegacyFeedbackCategory) => string;
   feedbackZoneLabel: (index: number) => string;
   statusLabel: (status: QuestionStatus) => string;
   timeAgo: (value: string) => string;
 };
 
 const LanguageContext = createContext<LanguageContextValue | null>(null);
+const systemLocale = (): Locale => navigator.language.toLowerCase().startsWith("ko") ? "ko" : "en";
 
 export function LanguageProvider({ children }: { children: React.ReactNode }) {
-  const [locale, setLocale] = useState<Locale>("ko");
-  const [initialized, setInitialized] = useState(false);
+  const [locale, setActiveLocale] = useState<Locale>("ko");
 
   useEffect(() => {
     const stored = window.localStorage.getItem(STORAGE_KEY);
     const preferred: Locale = stored === "ko" || stored === "en"
       ? stored
-      : navigator.language.toLowerCase().startsWith("ko") ? "ko" : "en";
+      : systemLocale();
     let active = true;
     queueMicrotask(() => {
       if (!active) return;
-      setLocale(preferred);
-      setInitialized(true);
+      setActiveLocale(preferred);
     });
-    return () => { active = false; };
+
+    // 수동 선택이 없을 때만 실행 중 시스템 언어 변경도 따라간다.
+    const followSystemLocale = () => {
+      const manual = window.localStorage.getItem(STORAGE_KEY);
+      if (manual !== "ko" && manual !== "en") setActiveLocale(systemLocale());
+    };
+    window.addEventListener("languagechange", followSystemLocale);
+    return () => {
+      active = false;
+      window.removeEventListener("languagechange", followSystemLocale);
+    };
   }, []);
 
   useEffect(() => {
     document.documentElement.lang = locale;
     document.documentElement.dataset.locale = locale;
-    if (initialized) window.localStorage.setItem(STORAGE_KEY, locale);
-  }, [initialized, locale]);
+  }, [locale]);
+
+  const setLocale = useCallback((nextLocale: Locale) => {
+    window.localStorage.setItem(STORAGE_KEY, nextLocale);
+    setActiveLocale(nextLocale);
+  }, []);
 
   const t = useCallback((key: TranslationKey, values?: Record<string, string | number>) => translate(locale, key, values), [locale]);
   const categoryLabel = useCallback((category: QuestionCategory) => getCategoryLabel(locale, category), [locale]);
-  const feedbackCategoryLabel = useCallback((category: FeedbackCategory) => translate(locale, `pin.category.${category}` as TranslationKey), [locale]);
-  const feedbackCategoryHint = useCallback((category: FeedbackCategory) => translate(locale, `pin.categoryHint.${category}` as TranslationKey), [locale]);
+  const feedbackCategoryLabel = useCallback((category: FeedbackCategoryLabelKey) => translate(locale, `pin.category.${category}` as TranslationKey), [locale]);
+  const feedbackCategoryHint = useCallback((category: LegacyFeedbackCategory) => translate(locale, `pin.categoryHint.${category}` as TranslationKey), [locale]);
   const feedbackZoneLabel = useCallback((index: number) => translate(locale, `pin.zone.${index}` as TranslationKey), [locale]);
   const statusLabel = useCallback((status: QuestionStatus) => getStatusLabel(locale, status), [locale]);
   const timeAgo = useCallback((value: string) => getTimeAgo(locale, value), [locale]);
-  const value = useMemo(() => ({ locale, setLocale, t, categoryLabel, feedbackCategoryLabel, feedbackCategoryHint, feedbackZoneLabel, statusLabel, timeAgo }), [categoryLabel, feedbackCategoryHint, feedbackCategoryLabel, feedbackZoneLabel, locale, statusLabel, t, timeAgo]);
+  const value = useMemo(() => ({ locale, setLocale, t, categoryLabel, feedbackCategoryLabel, feedbackCategoryHint, feedbackZoneLabel, statusLabel, timeAgo }), [categoryLabel, feedbackCategoryHint, feedbackCategoryLabel, feedbackZoneLabel, locale, setLocale, statusLabel, t, timeAgo]);
 
   return <LanguageContext.Provider value={value}>{children}</LanguageContext.Provider>;
 }

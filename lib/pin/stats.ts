@@ -1,7 +1,4 @@
-import { feedbackCategoryLabel, positiveCategories, type FeedbackCategory, type FeedbackPin } from "./types";
-
-/** 카테고리 고정 순서. 필터 탭은 건수로 정렬하면 자리가 바뀌어 다시 찾아야 한다. */
-export const CATEGORY_KEYS = Object.keys(feedbackCategoryLabel) as FeedbackCategory[];
+import { isLegacyFeedbackCategory, positiveCategories, type FeedbackCategory, type FeedbackPin } from "./types";
 
 /** 숨김은 삭제가 아니라 표시 제외다. 집계·이미지·기본 목록은 모두 이 결과만 본다. */
 export const visiblePins = (pins: FeedbackPin[]) => pins.filter((pin) => !pin.hidden);
@@ -14,24 +11,24 @@ const share = (count: number, total: number) => (total ? Math.round((count / tot
 
 export interface CategoryCount {
   key: FeedbackCategory;
-  label: string;
   count: number;
   /** 전체 대비 비율(%) */
   share: number;
 }
 
-/** 5종을 항상 모두 돌려준다. 0건도 남아야 "이 유형은 없다"가 읽힌다. */
-export const categoryBreakdown = (pins: FeedbackPin[]): CategoryCount[] =>
-  CATEGORY_KEYS
+/** 설정·과거 데이터에 있는 동적 카테고리를 집계한다. */
+export const categoryBreakdown = (pins: FeedbackPin[], categories: FeedbackCategory[] = [...new Set(pins.map((pin) => pin.category))]): CategoryCount[] =>
+  categories
     .map((key) => {
       const count = countBy(pins, key);
-      return { key, label: feedbackCategoryLabel[key], count, share: share(count, pins.length) };
+      return { key, count, share: share(count, pins.length) };
     })
     .sort((a, b) => b.count - a.count);
 
 export const topCategory = (pins: FeedbackPin[]): CategoryCount | null => categoryBreakdown(pins).find((item) => item.count > 0) ?? null;
 
 export interface Sentiment {
+  categorized: number;
   positive: number;
   improvement: number;
   /** 긍정 비율(%) */
@@ -43,8 +40,9 @@ export interface Sentiment {
  * 회차를 비교할 때 나아졌는지 나빠졌는지도 알 수 없다.
  */
 export const sentiment = (pins: FeedbackPin[]): Sentiment => {
-  const positive = pins.filter((pin) => positiveCategories.includes(pin.category)).length;
-  return { positive, improvement: pins.length - positive, positiveShare: share(positive, pins.length) };
+  const categorized = pins.filter((pin) => pin.category !== null && isLegacyFeedbackCategory(pin.category));
+  const positive = categorized.filter((pin) => positiveCategories.includes(pin.category)).length;
+  return { categorized: categorized.length, positive, improvement: categorized.length - positive, positiveShare: share(positive, categorized.length) };
 };
 
 const ZONE_LABELS = ["좌측 상단", "상단 중앙", "우측 상단", "좌측 중앙", "정중앙", "우측 중앙", "좌측 하단", "하단 중앙", "우측 하단"] as const;

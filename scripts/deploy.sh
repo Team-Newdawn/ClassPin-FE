@@ -39,16 +39,18 @@ gcloud builds submit \
 echo "==> Cloud Run 배포: ${SERVICE} (${REGION})"
 # 변환 한 건이 vCPU 수만큼 pdftoppm 을 띄우므로 동시성을 2 로 묶는다. 기본값(80)
 # 이면 서로 CPU 를 뺏어 한 건당 시간이 오히려 늘고, 메모리도 수백 MB 씩 겹친다.
-# 8 vCPU 는 Cloud Run 이 4GiB 이상을 요구한다.
+# 4 vCPU × 최대 3개면 리전 CPU 할당량 안에서 롤링 배포 여유도 남는다.
 exec gcloud run deploy "$SERVICE" \
   --project "$PROJECT" \
   --region "$REGION" \
   --image "$IMAGE" \
   --allow-unauthenticated \
   --memory 4Gi \
-  --cpu 8 \
+  --cpu 4 \
+  --no-cpu-boost \
   --timeout 300 \
   --concurrency 2 \
+  --max 3 \
   --max-instances 3 \
   --set-env-vars "^@^NEXT_PUBLIC_APP_URL=${APP_URL}@NEXT_PUBLIC_SUPABASE_URL=${NEXT_PUBLIC_SUPABASE_URL}@NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=${NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY}@NEXT_PUBLIC_DATA_MODE=${DATA_MODE}" \
   "$@"

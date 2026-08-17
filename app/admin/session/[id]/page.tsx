@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { QRCodeSVG } from "qrcode.react";
-import { Check, ChevronLeft, ChevronRight, Clock3, Copy, Link2, ListFilter, MessageCircleQuestion, MonitorUp, Pause, Play, QrCode, Search, Share2, Users, X } from "@/components/icons";
+import { Check, ChevronLeft, ChevronRight, Clock3, Copy, FileText, Link2, ListFilter, MessageCircleQuestion, MonitorUp, Pause, Play, Plus, QrCode, Search, Share2, Trash2, Users, X } from "@/components/icons";
 import { AdminSidebar } from "@/components/admin-shell";
 import { useLanguage } from "@/components/language-context";
 import { QuestionDetailDialog } from "@/components/question-detail-dialog";
@@ -11,16 +11,18 @@ import { SlideCanvas } from "@/components/slide-canvas";
 import { StatusBadge } from "@/components/status-badge";
 import { useHorizontalSlideWheel } from "@/components/use-horizontal-slide-wheel";
 import { useSessions } from "@/components/session-store";
+import { createTextSlideFile } from "@/lib/text-slide";
 import type { PresentationQrPosition, Question, QuestionStatus } from "@/lib/types";
 
 type Tab = "live" | "questions";
+type LivePanel = "questions" | "notes";
 
 export default function SessionAdmin() {
   const { t, categoryLabel, timeAgo } = useLanguage();
   const params = useParams<{ id: string }>();
   const search = useSearchParams();
   const router = useRouter();
-  const { sessions, ready, answerQuestion, resolveQuestion, setCurrentSlide, setStatus, setShowQuestionPins, setPresentationQrPosition } = useSessions();
+  const { sessions, ready, appendSlides, deleteSlide, answerQuestion, resolveQuestion, setCurrentSlide, setStatus, setShowQuestionPins, setShowPresentationQr, setPresentationQrPosition, updateSlideNote } = useSessions();
   const session = sessions.find((item) => item.id === params.id);
   const [tab, setTab] = useState<Tab>(search.get("tab") === "questions" ? "questions" : "live");
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -32,7 +34,21 @@ export default function SessionAdmin() {
   const [copied, setCopied] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
   const [presentationError, setPresentationError] = useState<string | null>(null);
+  const [livePanel, setLivePanel] = useState<LivePanel>("questions");
+  const [noteDrafts, setNoteDrafts] = useState<Record<string, string>>({});
+  const [noteSavingSlideId, setNoteSavingSlideId] = useState<string | null>(null);
+  const [noteSavedSlideId, setNoteSavedSlideId] = useState<string | null>(null);
   const presentationWindowRef = useRef<Window | null>(null);
+  const slideInputRef = useRef<HTMLInputElement | null>(null);
+  const [addingSlides, setAddingSlides] = useState(false);
+  const [textSlideOpen, setTextSlideOpen] = useState(false);
+  const [textSlideTitle, setTextSlideTitle] = useState("");
+  const [textSlideBody, setTextSlideBody] = useState("");
+  const [creatingTextSlide, setCreatingTextSlide] = useState(false);
+  const [textSlideError, setTextSlideError] = useState<string | null>(null);
+  const [deleteSlideId, setDeleteSlideId] = useState<string | null>(null);
+  const [deletingSlide, setDeletingSlide] = useState(false);
+  const [deleteSlideError, setDeleteSlideError] = useState<string | null>(null);
 
   const visibleQuestions = useMemo(() => session?.questions.filter((q) => (filter === "all" || q.status === filter) && q.text.toLowerCase().includes(query.toLowerCase())) ?? [], [filter, query, session]);
   const runAction = (action: Promise<void>, message: string) => {
@@ -85,6 +101,8 @@ export default function SessionAdmin() {
   const slideQuestions = session.questions.filter((q) => q.slideIndex === session.currentSlide);
   const selected = session.questions.find((q) => q.id === selectedId) ?? slideQuestions[0];
   const detailQuestion = session.questions.find((q) => q.id === detailQuestionId);
+  const noteDraft = slide ? noteDrafts[slide.id] ?? slide.speakerNote ?? "" : "";
+  const noteDirty = Boolean(slide && noteDraft !== (slide.speakerNote ?? ""));
   const qrPositions: PresentationQrPosition[] = ["top-left", "top-right", "bottom-left", "bottom-right"];
   const qrPositionLabel = (position: PresentationQrPosition) => position === "top-left"
     ? t("session.qrTopLeft")
@@ -110,6 +128,88 @@ export default function SessionAdmin() {
         console.error(`Answer save failed: ${detail}`, error);
         setActionError(t("session.saveAnswerError"));
       });
+  };
+  const saveCurrentSlideNote = () => {
+    if (!slide || !noteDirty || noteSavingSlideId === slide.id) return;
+    const slideId = slide.id;
+    const body = noteDraft;
+    setActionError(null);
+    setNoteSavingSlideId(slideId);
+    setNoteSavedSlideId(null);
+    void updateSlideNote(session.id, slideId, body)
+      .then(() => {
+        setNoteSavedSlideId(slideId);
+        window.setTimeout(() => setNoteSavedSlideId((current) => current === slideId ? null : current), 1800);
+      })
+      .catch((error) => {
+        const detail = error && typeof error === "object" && "message" in error ? String(error.message) : String(error);
+        console.error(`Speaker note save failed: ${detail}`, error);
+        setActionError(t("session.saveSpeakerNotesError"));
+      })
+      .finally(() => setNoteSavingSlideId((current) => current === slideId ? null : current));
+  };
+  const addSlideImages = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(event.currentTarget.files ?? []);
+    event.currentTarget.value = "";
+    if (!files.length || addingSlides) return;
+    setActionError(null);
+    setAddingSlides(true);
+    try {
+      await appendSlides(session.id, files);
+    } catch (error) {
+      const detail = error && typeof error === "object" && "message" in error ? String(error.message) : String(error);
+      console.error(`Slide append failed: ${detail}`, error);
+      setActionError(t("session.addSlidesError"));
+    } finally {
+      setAddingSlides(false);
+    }
+  };
+  const closeTextSlide = () => {
+    if (creatingTextSlide) return;
+    setTextSlideOpen(false);
+    setTextSlideError(null);
+  };
+  const addTextSlide = async () => {
+    if (creatingTextSlide || (!textSlideTitle.trim() && !textSlideBody.trim())) return;
+    setTextSlideError(null);
+    setCreatingTextSlide(true);
+    try {
+      const file = await createTextSlideFile({ title: textSlideTitle, body: textSlideBody });
+      await appendSlides(session.id, [file]);
+      setTextSlideTitle("");
+      setTextSlideBody("");
+      setTextSlideOpen(false);
+    } catch (error) {
+      const detail = error && typeof error === "object" && "message" in error ? String(error.message) : String(error);
+      console.error(`Text slide creation failed: ${detail}`, error);
+      setTextSlideError(t("session.createTextSlideError"));
+    } finally {
+      setCreatingTextSlide(false);
+    }
+  };
+  const deleteTarget = deleteSlideId ? session.slides.find((item) => item.id === deleteSlideId) : null;
+  const deleteTargetQuestionCount = deleteTarget
+    ? session.questions.filter((question) => question.slideIndex === deleteTarget.pageIndex).length
+    : 0;
+  const closeDeleteSlide = () => {
+    if (deletingSlide) return;
+    setDeleteSlideId(null);
+    setDeleteSlideError(null);
+  };
+  const confirmDeleteSlide = async () => {
+    if (!deleteTarget || deletingSlide) return;
+    setDeleteSlideError(null);
+    setDeletingSlide(true);
+    try {
+      await deleteSlide(session.id, deleteTarget.id);
+      setDeleteSlideId(null);
+    } catch (error) {
+      const detail = error && typeof error === "object" && "message" in error ? String(error.message) : String(error);
+      console.error(`Slide deletion failed: ${detail}`, error);
+      setDeleteSlideError(t("session.deleteSlideError"));
+    } finally {
+      setDeletingSlide(false);
+    }
   };
   const openPresentation = () => {
     setActionError(null);
@@ -153,13 +253,36 @@ export default function SessionAdmin() {
         {tab === "live" ? (
           <div className="player-workspace">
             <section className="player-stage">
-              <div className="stage-toolbar"><div><span className="status-dot" /><b>{session.title}</b>{t("session.syncing")}</div><span>{session.currentSlide + 1} / {session.slides.length}</span></div>
+              <div className="stage-toolbar">
+                <div><span className="status-dot" /><b>{session.title}</b>{t("session.syncing")}</div>
+                <div className="stage-toolbar-actions">
+                  <span>{session.currentSlide + 1} / {session.slides.length}</span>
+                  <input ref={slideInputRef} type="file" accept=".png,.jpg,.jpeg,.webp,image/png,image/jpeg,image/webp" multiple hidden onChange={addSlideImages} />
+                  <button type="button" className="stage-add-slides" disabled={addingSlides || creatingTextSlide} onClick={() => { setTextSlideError(null); setTextSlideOpen(true); }} title={t("session.createTextSlideHint")}>
+                    <FileText />
+                    <span>{t("session.createTextSlide")}</span>
+                  </button>
+                  <button type="button" className="stage-add-slides" disabled={addingSlides} onClick={() => slideInputRef.current?.click()} title={t("session.addSlidesHint")}>
+                    {addingSlides ? <span className="spinner" /> : <Plus />}
+                    <span>{t(addingSlides ? "session.addingSlides" : "session.addSlides")}</span>
+                  </button>
+                  <button type="button" className="stage-add-slides stage-delete-slide" disabled={session.slides.length <= 1 || addingSlides || creatingTextSlide} onClick={() => { setDeleteSlideError(null); setDeleteSlideId(slide.id); }} title={t(session.slides.length <= 1 ? "session.deleteLastSlideHint" : "session.deleteSlideHint")}>
+                    <Trash2 />
+                    <span>{t("session.deleteSlide")}</span>
+                  </button>
+                </div>
+              </div>
               <div className="stage-canvas-wrap" onWheel={handleSlideWheel}><SlideCanvas slide={slide} questions={slideQuestions} selectedId={selected?.id} onSelectPin={openQuestionDetail} showPins={session.showQuestionPins} /></div>
               <div className="player-controls"><button className="icon-btn" disabled={session.currentSlide === 0} onClick={() => runAction(setCurrentSlide(session.id, session.currentSlide - 1), t("session.saveSlideError"))} aria-label={t("session.previousSlide")}><ChevronLeft /></button><div className="slide-dots">{session.slides.map((_, i) => <button key={i} className={i === session.currentSlide ? "active" : ""} onClick={() => runAction(setCurrentSlide(session.id, i), t("session.saveSlideError"))} aria-label={t("common.slideNumber", { number: i + 1 })} />)}</div><button className="icon-btn" disabled={session.currentSlide === session.slides.length - 1} onClick={() => runAction(setCurrentSlide(session.id, session.currentSlide + 1), t("session.saveSlideError"))} aria-label={t("session.nextSlide")}><ChevronRight /></button></div>
               <div className="filmstrip" ref={filmstripRef}>{session.slides.map((item, index) => <button key={item.id} className={index === session.currentSlide ? "active" : ""} onClick={() => runAction(setCurrentSlide(session.id, index), t("session.saveSlideError"))}><SlideCanvas slide={item} compact /><span>{index + 1}</span>{session.questions.some((q) => q.slideIndex === index) && <i>{session.questions.filter((q) => q.slideIndex === index).length}</i>}</button>)}</div>
             </section>
             <aside className="live-questions">
-              <div className="panel-heading">
+              <div className="live-panel-tabs" role="tablist" aria-label={t("session.livePlayer")}>
+                <button type="button" role="tab" aria-selected={livePanel === "questions"} className={livePanel === "questions" ? "active" : ""} onClick={() => setLivePanel("questions")}><MessageCircleQuestion />{t("session.panelQuestions")}<span>{slideQuestions.length}</span></button>
+                <button type="button" role="tab" aria-selected={livePanel === "notes"} className={livePanel === "notes" ? "active" : ""} onClick={() => setLivePanel("notes")}><FileText />{t("session.speakerNotes")}{slide.speakerNote?.trim() && <i aria-hidden="true" />}</button>
+              </div>
+              {livePanel === "questions" ? <>
+                <div className="panel-heading">
                 <div><h2>{t("session.liveQuestions")}</h2><p>{t("common.currentQuestionsCount", { count: slideQuestions.length })}</p></div>
                 <div className="panel-heading-actions">
                   <span className="pin-toggle-label">{t("session.showPins")}</span>
@@ -179,11 +302,28 @@ export default function SessionAdmin() {
                   </button>
                   <span className="pulse-dot" aria-hidden="true" />
                 </div>
-              </div>
-              <section className="qr-position-setting" aria-labelledby="qr-position-title">
+                </div>
+                <section className="qr-position-setting" aria-labelledby="qr-position-title">
                 <div className="qr-position-heading">
                   <span><QrCode /></span>
                   <div><b id="qr-position-title">{t("session.qrPosition")}</b><small>{t("session.qrPositionHint")}</small></div>
+                  <div className="panel-heading-actions">
+                    <span className="pin-toggle-label">{t("presentation.showQr")}</span>
+                    <button
+                      type="button"
+                      className={`pin-toggle ${session.showPresentationQr ? "on" : ""}`}
+                      role="switch"
+                      aria-checked={session.showPresentationQr}
+                      aria-label={session.showPresentationQr ? t("presentation.turnQrOff") : t("presentation.turnQrOn")}
+                      onClick={() => runAction(
+                        setShowPresentationQr(session.id, !session.showPresentationQr),
+                        t("presentation.saveQrSettingError")
+                      )}
+                    >
+                      <span className="pin-toggle-thumb" />
+                      <span className="pin-toggle-state">{session.showPresentationQr ? "ON" : "OFF"}</span>
+                    </button>
+                  </div>
                 </div>
                 <div className="qr-position-options" role="group" aria-label={t("session.qrPosition")}>
                   {qrPositions.map((position) => (
@@ -202,14 +342,44 @@ export default function SessionAdmin() {
                     </button>
                   ))}
                 </div>
-              </section>
-              <div className="question-stack">{slideQuestions.length ? slideQuestions.map((q) => <QuestionCard key={q.id} question={q} selected={selected?.id === q.id} onClick={() => openQuestionDetail(q.id)} />) : <div className="no-questions"><MessageCircleQuestion /><b>{t("session.noQuestions")}</b><span>{t("session.noQuestionsHint1")}<br />{t("session.noQuestionsHint2")}</span></div>}</div>
-              {selected && <div className="answer-box">
+                </section>
+                <div className="question-stack">{slideQuestions.length ? slideQuestions.map((q) => <QuestionCard key={q.id} question={q} selected={selected?.id === q.id} onClick={() => openQuestionDetail(q.id)} />) : <div className="no-questions"><MessageCircleQuestion /><b>{t("session.noQuestions")}</b><span>{t("session.noQuestionsHint1")}<br />{t("session.noQuestionsHint2")}</span></div>}</div>
+                {selected && <div className="answer-box">
                 {selected.answer && <div className="saved-answer"><span>{t("session.latestAnswer")}</span><p>{selected.answer}</p></div>}
                 <label htmlFor="answer">{selected.answer ? t("session.additionalAnswer") : t("session.quickAnswer")}</label>
                 <textarea id="answer" value={answer} onChange={(e) => setAnswer(e.target.value)} placeholder={t("session.answerPlaceholder")} />
                 <div className="answer-actions"><button className="btn tertiary" onClick={() => runAction(resolveQuestion(session.id, selected.id), t("session.saveQuestionError"))}><Check />{t("session.resolve")}</button><button className="btn primary" onClick={submitAnswer}>{t("session.sendAnswer")}</button></div>
-              </div>}
+                </div>}
+              </> : <>
+                <div className="panel-heading speaker-note-heading">
+                  <div><h2>{t("session.speakerNotesTitle")}</h2><p>{t("common.slideLabel", { number: session.currentSlide + 1 })}</p></div>
+                  <FileText aria-hidden="true" />
+                </div>
+                <section className="speaker-note-editor" aria-labelledby="speaker-note-label">
+                  <div className="speaker-note-private"><Check aria-hidden="true" /><span>{t("session.speakerNotesPrivate")}</span></div>
+                  <label id="speaker-note-label" htmlFor="speaker-note">{t("session.speakerNotesSlide", { number: session.currentSlide + 1 })}</label>
+                  <textarea
+                    id="speaker-note"
+                    value={noteDraft}
+                    maxLength={10000}
+                    placeholder={t("session.speakerNotesHint")}
+                    onChange={(event) => {
+                      setNoteDrafts((current) => ({ ...current, [slide.id]: event.target.value }));
+                      setNoteSavedSlideId(null);
+                    }}
+                    onKeyDown={(event) => {
+                      if ((event.metaKey || event.ctrlKey) && event.key === "Enter") {
+                        event.preventDefault();
+                        saveCurrentSlideNote();
+                      }
+                    }}
+                  />
+                  <div className="speaker-note-meta"><span>{noteDraft.length.toLocaleString()} / 10,000</span><span>{t("session.speakerNotesShortcut")}</span></div>
+                  <button type="button" className="btn primary speaker-note-save" disabled={!noteDirty || noteSavingSlideId === slide.id} onClick={saveCurrentSlideNote}>
+                    {noteSavingSlideId === slide.id ? <><span className="spinner" />{t("session.speakerNotesSaving")}</> : noteSavedSlideId === slide.id && !noteDirty ? <><Check />{t("session.speakerNotesSaved")}</> : <><FileText />{t("session.speakerNotesSave")}</>}
+                  </button>
+                </section>
+              </>}
             </aside>
           </div>
         ) : (
@@ -222,6 +392,51 @@ export default function SessionAdmin() {
       </main>
 
       {detailQuestion && <QuestionDetailDialog question={detailQuestion} onClose={() => setDetailQuestionId(null)} />}
+      {textSlideOpen && <div className="modal-backdrop text-slide-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) closeTextSlide(); }}>
+        <section className="text-slide-modal" role="dialog" aria-modal="true" aria-labelledby="text-slide-title">
+          <button type="button" className="modal-close" disabled={creatingTextSlide} onClick={closeTextSlide} aria-label={t("session.textSlideCancel")}><X /></button>
+          <div className="text-slide-modal-heading"><span><FileText /></span><div><h2 id="text-slide-title">{t("session.textSlideTitle")}</h2><p>{t("session.textSlideDescription")}</p></div></div>
+          <div className="text-slide-grid">
+            <div className="text-slide-fields">
+              <label htmlFor="text-slide-heading">{t("session.textSlideTitleLabel")}</label>
+              <span className="text-slide-count">{textSlideTitle.length} / 120</span>
+              <input id="text-slide-heading" value={textSlideTitle} maxLength={120} autoFocus onChange={(event) => setTextSlideTitle(event.target.value)} placeholder={t("session.textSlideTitlePlaceholder")} />
+              <label htmlFor="text-slide-body">{t("session.textSlideBodyLabel")}</label>
+              <span className="text-slide-count">{textSlideBody.length.toLocaleString()} / 1,000</span>
+              <textarea id="text-slide-body" value={textSlideBody} maxLength={1000} onChange={(event) => setTextSlideBody(event.target.value)} placeholder={t("session.textSlideBodyPlaceholder")} />
+            </div>
+            <div className="text-slide-preview-wrap">
+              <span>{t("session.textSlidePreview")}</span>
+              <div className="text-slide-preview">
+                <div>{textSlideTitle.trim() && <h3>{textSlideTitle}</h3>}{textSlideBody.trim() && <p>{textSlideBody}</p>}</div>
+                <small>CLASS PIN</small>
+              </div>
+            </div>
+          </div>
+          {textSlideError && <div className="login-error text-slide-error" role="alert">{textSlideError} {t("common.tryAgain")}</div>}
+          <div className="text-slide-actions">
+            <button type="button" className="btn secondary" disabled={creatingTextSlide} onClick={closeTextSlide}>{t("session.textSlideCancel")}</button>
+            <button type="button" className="btn primary" disabled={creatingTextSlide || (!textSlideTitle.trim() && !textSlideBody.trim())} onClick={addTextSlide}>
+              {creatingTextSlide ? <><span className="spinner" />{t("session.creatingTextSlide")}</> : <><Plus />{t("session.addTextSlideToDeck")}</>}
+            </button>
+          </div>
+        </section>
+      </div>}
+      {deleteTarget && <div className="modal-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) closeDeleteSlide(); }}>
+        <section className="delete-slide-modal" role="alertdialog" aria-modal="true" aria-labelledby="delete-slide-title" aria-describedby="delete-slide-description">
+          <button type="button" className="modal-close" disabled={deletingSlide} onClick={closeDeleteSlide} aria-label={t("session.textSlideCancel")}><X /></button>
+          <span className="delete-slide-icon"><Trash2 /></span>
+          <h2 id="delete-slide-title">{t("session.deleteSlideTitle")}</h2>
+          <p id="delete-slide-description">{t("session.deleteSlideDescription", { number: deleteTarget.pageIndex + 1 })}</p>
+          <div className="delete-slide-preview"><SlideCanvas slide={deleteTarget} compact /><span>{deleteTarget.pageIndex + 1}</span></div>
+          <div className="delete-slide-warning"><b>{t("session.deleteSlideWarning")}</b>{deleteTargetQuestionCount > 0 && <span>{t("session.deleteSlideQuestions", { count: deleteTargetQuestionCount })}</span>}</div>
+          {deleteSlideError && <div className="login-error" role="alert">{deleteSlideError} {t("common.tryAgain")}</div>}
+          <div className="delete-slide-actions">
+            <button type="button" className="btn secondary" disabled={deletingSlide} onClick={closeDeleteSlide}>{t("session.textSlideCancel")}</button>
+            <button type="button" className="btn destructive" disabled={deletingSlide} onClick={confirmDeleteSlide}>{deletingSlide ? <><span className="spinner" />{t("session.deletingSlide")}</> : <><Trash2 />{t("session.deleteSlideConfirm")}</>}</button>
+          </div>
+        </section>
+      </div>}
       {shareOpen && <div className="modal-backdrop" onMouseDown={() => setShareOpen(false)}><div className="share-modal" onMouseDown={(e) => e.stopPropagation()}><button className="modal-close" onClick={() => setShareOpen(false)} aria-label={t("question.closeDetail")}><X /></button><div className="modal-icon"><Users /></div><h2>{t("session.inviteTitle")}</h2><p>{t("session.inviteDescription1")}<br />{t("session.inviteDescription2")}</p><div className="qr-frame"><QRCodeSVG value={joinUrl} size={180} fgColor="#171D26" /></div><div className="session-code"><span>{t("session.joinCode")}</span><b>{session.code}</b></div><div className="link-copy"><Link2 /><span>{joinUrl}</span><button onClick={copy} aria-label={t("session.copyJoinLink")}>{copied ? <Check /> : <Copy />}</button></div><button className="btn primary large full" onClick={copy}>{copied ? <><Check />{t("session.copied")}</> : <><Copy />{t("session.copyJoinLink")}</>}</button></div></div>}
     </div>
   );

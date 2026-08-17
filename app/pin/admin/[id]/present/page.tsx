@@ -135,7 +135,7 @@ export default function FeedbackPresentation() {
       setActivePageIndex(0);
       setStoredPlayback(EMPTY_PLAYBACK);
     }
-    if (incomingPin) {
+    if (incomingPin && campaign.presentationAutoplay) {
       setActivePageIndex(incomingPin.pageIndex);
       setLivePinId(incomingPin.id);
       setStoredPlayback((current) => ({
@@ -145,7 +145,7 @@ export default function FeedbackPresentation() {
     }
     // id 집합이 같으면 본문 수정만으로 순환 타이머를 다시 시작하지 않는다.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [campaign?.id, visiblePinKey]);
+  }, [campaign?.id, campaign?.presentationAutoplay, visiblePinKey]);
 
   useEffect(() => {
     if (!livePinId) return;
@@ -206,10 +206,10 @@ export default function FeedbackPresentation() {
   }, []);
 
   useEffect(() => {
-    if (pagePins.length < 2) return;
+    if (!campaign?.presentationAutoplay || pagePins.length < 2) return;
     const interval = window.setInterval(rotateFeedback, FEEDBACK_REVEAL_DELAY);
     return () => window.clearInterval(interval);
-  }, [activePageIndex, pagePins.length, rotateFeedback]);
+  }, [activePageIndex, campaign?.presentationAutoplay, pagePins.length, rotateFeedback]);
 
   useLayoutEffect(() => {
     const canvas = presentationCanvasRef.current;
@@ -262,13 +262,13 @@ export default function FeedbackPresentation() {
 
   useEffect(() => {
     const pageCount = campaign?.pages.length ?? 0;
-    if (pageCount < 2) return;
+    if (!campaign?.presentationAutoplay || pageCount < 2) return;
     const timeout = window.setTimeout(
       () => changePage((activePageIndex + 1) % pageCount, false),
       Math.max(PAGE_ROTATION_DELAY, pagePins.length * FEEDBACK_REVEAL_DELAY) + FEEDBACK_REVEAL_DELAY / 2
     );
     return () => window.clearTimeout(timeout);
-  }, [activePageIndex, campaign?.pages.length, changePage, pagePins.length]);
+  }, [activePageIndex, campaign?.pages.length, campaign?.presentationAutoplay, changePage, pagePins.length]);
 
   const toggleFullscreen = useCallback(async () => {
     setActionError(null);

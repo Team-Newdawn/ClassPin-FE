@@ -17,6 +17,7 @@ type CampaignRow = {
   status: string;
   show_presentation_qr: boolean;
   presentation_qr_position: Campaign["presentationQrPosition"];
+  presentation_autoplay: boolean;
   show_presentation_pin_status: boolean;
   presentation_pin_status_position: Campaign["presentationPinStatusPosition"];
   audience_groups: unknown;
@@ -61,7 +62,7 @@ type CampaignPlayerPayload = {
   pins: PinRow[];
 };
 
-const CAMPAIGN_COLUMNS = "id, folder_id, title, guide_text, join_code, image_path, image_width, image_height, status, show_presentation_qr, presentation_qr_position, show_presentation_pin_status, presentation_pin_status_position, audience_groups, feedback_categories, created_at";
+const CAMPAIGN_COLUMNS = "id, folder_id, title, guide_text, join_code, image_path, image_width, image_height, status, show_presentation_qr, presentation_qr_position, presentation_autoplay, show_presentation_pin_status, presentation_pin_status_position, audience_groups, feedback_categories, created_at";
 const SESSION_FOLDER_COLUMNS = "id, name";
 const PAGE_COLUMNS = "id, campaign_id, page_index, image_path, image_width, image_height, audience_groups";
 const PIN_COLUMNS = "id, campaign_id, author_id, page_index, x, y, category, body, marker, reaction_count, hidden, created_at";
@@ -155,6 +156,7 @@ function toCampaign(row: CampaignRow, pins: FeedbackPin[], pages: CampaignPage[]
     status: row.status === "live" ? "live" : "ended",
     showPresentationQr: row.show_presentation_qr ?? true,
     presentationQrPosition: row.presentation_qr_position ?? "bottom-right",
+    presentationAutoplay: row.presentation_autoplay ?? true,
     showPresentationPinStatus: row.show_presentation_pin_status ?? true,
     presentationPinStatusPosition: row.presentation_pin_status_position ?? "top-right",
     audienceGroups: normalizeAudienceGroups(row.audience_groups),
@@ -469,7 +471,7 @@ export async function setPinHidden(pinId: string, hidden: boolean) {
   if (error) throw error;
 }
 
-export async function updateCampaign(campaignId: string, values: { status?: "live" | "ended"; title?: string; guide_text?: string; show_presentation_qr?: boolean; presentation_qr_position?: Campaign["presentationQrPosition"]; show_presentation_pin_status?: boolean; presentation_pin_status_position?: Campaign["presentationPinStatusPosition"]; feedback_categories?: FeedbackCategorySettings }) {
+export async function updateCampaign(campaignId: string, values: { status?: "live" | "ended"; title?: string; guide_text?: string; show_presentation_qr?: boolean; presentation_qr_position?: Campaign["presentationQrPosition"]; presentation_autoplay?: boolean; show_presentation_pin_status?: boolean; presentation_pin_status_position?: Campaign["presentationPinStatusPosition"]; feedback_categories?: FeedbackCategorySettings }) {
   if (values.feedback_categories && !isValidFeedbackCategorySettings(values.feedback_categories)) {
     throw new Error("피드백 유형 설정이 올바르지 않습니다.");
   }
@@ -547,12 +549,12 @@ export async function fetchCampaignStatus(
   return matched?.status === "live" ? "live" : "ended";
 }
 
-export async function fetchCampaignSnapshot(campaign: Campaign, asAudience = false): Promise<Pick<Campaign, "status" | "showPresentationQr" | "presentationQrPosition" | "showPresentationPinStatus" | "presentationPinStatusPosition" | "feedbackCategories" | "pins"> | null> {
+export async function fetchCampaignSnapshot(campaign: Campaign, asAudience = false): Promise<Pick<Campaign, "status" | "showPresentationQr" | "presentationQrPosition" | "presentationAutoplay" | "showPresentationPinStatus" | "presentationPinStatusPosition" | "feedbackCategories" | "pins"> | null> {
   const client = asAudience ? getAudienceSupabaseClient() : getSupabaseClient();
   if (!client) return null;
   if (asAudience) await ensureAnonymousUser();
   const [{ data: directRow, error: campaignError }, { data, error: pinsError }] = await Promise.all([
-    client.from("campaigns").select("status, show_presentation_qr, presentation_qr_position, show_presentation_pin_status, presentation_pin_status_position, feedback_categories").eq("id", campaign.id).maybeSingle(),
+    client.from("campaigns").select("status, show_presentation_qr, presentation_qr_position, presentation_autoplay, show_presentation_pin_status, presentation_pin_status_position, feedback_categories").eq("id", campaign.id).maybeSingle(),
     client.from("feedback_pins").select(PIN_COLUMNS).eq("campaign_id", campaign.id).order("created_at", { ascending: false }),
   ]);
   if (campaignError) throw campaignError;
@@ -569,6 +571,7 @@ export async function fetchCampaignSnapshot(campaign: Campaign, asAudience = fal
     status,
     showPresentationQr: row?.show_presentation_qr ?? campaign.showPresentationQr,
     presentationQrPosition: row?.presentation_qr_position ?? campaign.presentationQrPosition,
+    presentationAutoplay: row?.presentation_autoplay ?? campaign.presentationAutoplay,
     showPresentationPinStatus: row?.show_presentation_pin_status ?? campaign.showPresentationPinStatus,
     presentationPinStatusPosition: row?.presentation_pin_status_position ?? campaign.presentationPinStatusPosition,
     feedbackCategories: normalizeFeedbackCategorySettings(row?.feedback_categories ?? campaign.feedbackCategories),

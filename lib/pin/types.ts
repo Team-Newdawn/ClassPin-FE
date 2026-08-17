@@ -209,6 +209,7 @@ export interface Campaign {
   status: "live" | "ended";
   showPresentationQr: boolean;
   presentationQrPosition: PresentationQrPosition;
+  presentationAutoplay: boolean;
   showPresentationPinStatus: boolean;
   presentationPinStatusPosition: PresentationQrPosition;
   /** 관리자가 캠페인별로 만든 참여자 분기 이름. 비어 있으면 분기를 사용하지 않는다. */

@@ -20,7 +20,7 @@ export default function CampaignResults() {
   const { feedbackCategoryLabel, feedbackZoneLabel, locale, t, timeAgo } = useLanguage();
   const params = useParams<{ id: string }>();
   const router = useRouter();
-  const { ready, campaigns, setAudienceGroups, setPageAudienceGroups, setPinHidden, setPresentationPinStatusPosition, setPresentationQrPosition, setShowPresentationPinStatus, setStatus, setShowPresentationQr } = useCampaigns();
+  const { ready, campaigns, setAudienceGroups, setPageAudienceGroups, setPinHidden, setPresentationAutoplay, setPresentationPinStatusPosition, setPresentationQrPosition, setShowPresentationPinStatus, setStatus, setShowPresentationQr } = useCampaigns();
   const campaign = campaigns.find((item) => item.id === params.id);
   // 같은 핀을 다시 눌러도 목록을 또 중앙으로 보내려면 매번 새 객체여야 한다.
   const [selected, setSelected] = useState<{ id: string } | null>(null);
@@ -196,6 +196,30 @@ export default function CampaignResults() {
           </div>
         </div>
         {actionError && <div className="login-error" role="alert">{actionError} {t("common.tryAgain")}</div>}
+
+        <section className="qr-position-setting pin-player-qr-setting pin-player-autoplay-setting" aria-labelledby="pin-player-autoplay-title">
+          <div className="qr-position-heading">
+            <span><Play /></span>
+            <div><b id="pin-player-autoplay-title">{t("pin.presentation.autoplaySetting")}</b><small>{t("pin.presentation.autoplaySettingHint")}</small></div>
+            <div className="panel-heading-actions">
+              <span className="pin-toggle-label">{t("pin.presentation.autoplay")}</span>
+              <button
+                type="button"
+                className={`pin-toggle ${campaign.presentationAutoplay ? "on" : ""}`}
+                role="switch"
+                aria-checked={campaign.presentationAutoplay}
+                aria-label={t(campaign.presentationAutoplay ? "pin.presentation.disableAutoplay" : "pin.presentation.enableAutoplay")}
+                onClick={() => runAction(
+                  setPresentationAutoplay(campaign.id, !campaign.presentationAutoplay),
+                  t("pin.presentation.saveAutoplayError")
+                )}
+              >
+                <span className="pin-toggle-thumb" />
+                <span className="pin-toggle-state">{campaign.presentationAutoplay ? "ON" : "OFF"}</span>
+              </button>
+            </div>
+          </div>
+        </section>
 
         <section className="qr-position-setting pin-player-qr-setting" aria-labelledby="pin-player-qr-title">
           <div className="qr-position-heading">

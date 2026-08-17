@@ -46,6 +46,7 @@ type Store = {
   setStatus: (campaignId: string, status: Campaign["status"]) => Promise<void>;
   setShowPresentationQr: (campaignId: string, visible: boolean) => Promise<void>;
   setPresentationQrPosition: (campaignId: string, position: Campaign["presentationQrPosition"]) => Promise<void>;
+  setPresentationAutoplay: (campaignId: string, enabled: boolean) => Promise<void>;
   setShowPresentationPinStatus: (campaignId: string, visible: boolean) => Promise<void>;
   setPresentationPinStatusPosition: (campaignId: string, position: Campaign["presentationPinStatusPosition"]) => Promise<void>;
   setFeedbackCategories: (campaignId: string, settings: FeedbackCategorySettings) => Promise<void>;
@@ -287,6 +288,10 @@ export function CampaignStore({ children }: { children: React.ReactNode }) {
     setPresentationQrPosition: async (campaignId, position) => {
       await updateCampaign(campaignId, { presentation_qr_position: position });
       updateCampaignState(campaignId, (campaign) => ({ ...campaign, presentationQrPosition: position }));
+    },
+    setPresentationAutoplay: async (campaignId, enabled) => {
+      await updateCampaign(campaignId, { presentation_autoplay: enabled });
+      updateCampaignState(campaignId, (campaign) => ({ ...campaign, presentationAutoplay: enabled }));
     },
     setShowPresentationPinStatus: async (campaignId, visible) => {
       await updateCampaign(campaignId, { show_presentation_pin_status: visible });

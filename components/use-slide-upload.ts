@@ -26,7 +26,7 @@ function insertByPage(list: Slide[], slide: Slide): Slide[] {
  * 올라간 뒤(서버 렌더링)에는 진행률을 알 수 없어 부정 진행(processing) 상태로 둔다.
  * 렌더링이 2초를 넘기면 완성된 슬라이드를 도착하는 대로 미리 보여준다.
  */
-export function useSlideUpload() {
+export function useSlideUpload(folderId: string | null = null) {
   const router = useRouter();
   const { locale, t } = useLanguage();
   const { createSession } = useSessions();
@@ -66,7 +66,7 @@ export function useSlideUpload() {
         onSlide: (slide) => setSlides((prev) => insertByPage(prev, slide)),
       });
       clearTimer();
-      const session = await createSession({ title: file.name.replace(/\.(pdf|pptx?)$/i, ""), fileName: file.name, slides: result });
+      const session = await createSession({ folderId, title: file.name.replace(/\.(pdf|pptx?)$/i, ""), fileName: file.name, slides: result });
       router.push(`/admin/session/${session.id}`);
     } catch (cause) {
       clearTimer();
@@ -74,7 +74,7 @@ export function useSlideUpload() {
       setPhase("idle");
       setShowPreview(false);
     }
-  }, [createSession, locale, router, t]);
+  }, [createSession, folderId, locale, router, t]);
 
   return { phase, uploadPct, error, slides, total, showPreview, busy: phase !== "idle", start };
 }

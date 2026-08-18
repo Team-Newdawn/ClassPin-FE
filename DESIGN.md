@@ -235,6 +235,79 @@ components:
 
 > 원본: `Pin_디자인시스템_정의서_v1.0.html` (v1.0 · 2026.07.14 · 근거 문서: 01_DESIGN_SYSTEM_SPEC.md, 02_CLAUDE_DESIGN_MASTER_PROMPT.md). 브랜드명은 Taglow → Pin으로 통일. Elevation shadow 값은 정의서에서 확정된 값.
 
+## Project brief (Weak Harness)
+
+Pin Class는 강사가 여러 강의 자료를 폴더로 정리하고, 각 자료를 실시간 발표하며,
+수강생이 슬라이드의 정확한 위치에 남긴 질문을 처리하는 웹 앱이다. 첫 화면은 제품
+소개나 업로드가 아니라 Google 로그인이다. 인증 후의 첫 정보 구조는 **폴더 -> 강의
+자료 -> 라이브 플레이어**이며, 인사이트는 자료 목록과 같은 페이지의 탭으로 접근한다.
+
+### Primary journey
+
+1. `/` 진입 시 미인증 사용자는 `/login`, 인증된 강사는 `/admin/dashboard`로 이동한다.
+2. 대시보드는 폴더 카드와 폴더 이름 검색을 우선 노출한다. 폴더 카드에는 대표 썸네일,
+   자료 수, 질문 수, 최근 갱신 정보를 보여주고 카드 전체를 클릭 대상으로 사용한다.
+3. `/admin/folders/[id]`는 폴더 이름과 뒤로가기, `자료 | 인사이트` 탭, 검색, 업로드,
+   grid/list 보기 전환을 제공한다. 인사이트 안에서는 chip으로 폴더 전체와 개별 자료
+   범위를 바꾼다. 이 화면에는 영구 사이드바를 두지 않는다.
+4. 자료를 열면 `/admin/session/[id]` 라이브 워크스페이스로 이동한다. 왼쪽 폴더 레일은
+   접을 수 있고, 가운데는 슬라이드/필름스트립/발표 메모, 오른쪽은 폭 조절 가능한
+   실시간 질문 패널이다.
+
+### Live workspace geometry
+
+```text
++----------------------+--------------------------------+----------------------+
+| collapsible folder   | slide stage                    | resizable questions  |
+| rail                 | visible horizontal filmstrip  | min 300 / max 560px  |
+| 240px or 56px        | speaker notes below slide     |                      |
++----------------------+--------------------------------+----------------------+
+```
+
+- 상단 상태는 점만으로 의미를 전달하지 않는다. `LIVE`/`STOPPED` 텍스트와 고대비 상태
+  배지, 시작/종료 동작을 함께 제공한다.
+- 오른쪽 패널 폭은 CSS custom property와 native Pointer Events로 조절하고, 최소/최대
+  값을 제한한다. 900px 초과 화면에서는 stage를 최소 400px 남기고 패널 최대폭을
+  가용 공간에 맞춰 줄인다. 별도 resize 패키지를 추가하지 않는다.
+- 슬라이드 필름스트립은 `overflow-x: auto`와 항상 보이는 스크롤바를 사용한다.
+- 필름스트립의 현재 슬라이드는 error-red 테두리로 다른 썸네일과 구분한다.
+- 문서 레벨 `ArrowLeft`/`ArrowRight`는 슬라이드를 이동하지만 input, textarea, select,
+  contenteditable, dialog 안의 조작이나 Alt/Ctrl/Cmd 조합키를 가로채지 않는다.
+- 발표 메모는 현재 슬라이드 아래에 두고 native 세로 resize를 허용하며, 수강생 데이터
+  경로에는 절대 포함하지 않는다.
+- 질문 패널 폭이 바뀌어도 stage toolbar는 최소 높이를 유지한다. 제목/동기화 문구는
+  줄임표로 줄일 수 있지만 슬라이드나 상단 액션과 겹치지 않는다.
+
+### Folder model
+
+- 폴더는 소유 강사에 귀속되며 이름은 trim된 1–80자다.
+- 한 강의 자료는 폴더 하나에 속하거나 미분류 상태일 수 있다. 폴더 삭제 시 강의 자료를
+  삭제하지 않고 미분류로 돌린다.
+- DB는 기존 `session_folders` 소유권/RLS를 재사용하고, 기존 `owner_id`와 직접 복합
+  소유권 FK를 구성할 수 있는 `courses.folder_id`만 추가한다.
+  UI와 저장소에서는 Pin Class 타입을 사용해 `/pin` 캠페인 모델과 결합하지 않는다.
+- demo 모드도 같은 동작을 제공하되 localStorage에만 저장한다.
+
+### Local Supabase
+
+- 로컬 기능 개발과 마이그레이션 검증은 Supabase CLI가 Docker로 띄우는 Postgres 17,
+  Auth, Storage, Realtime, Studio를 사용한다. 원격 운영 DB에서 개발하지 않는다.
+- Google OAuth의 로컬 콜백은 `http://127.0.0.1:55321/auth/v1/callback`이고, 앱 콜백은
+  `http://localhost:3000/auth/callback`이다.
+- Google Client ID/Secret은 루트 `.env`에서 `config.toml`의 `env()`로 주입한다.
+  service-role/secret key는 브라우저용 `NEXT_PUBLIC_*` 변수에 넣지 않는다.
+- 새 migration은 `supabase migration new <name>`으로 만든 뒤, `supabase db reset
+  --local`이 처음부터 끝까지 성공하는 것으로 재현성을 증명한다.
+
+### Responsive behavior
+
+- 1180px 아래에서는 라이브 폴더 레일을 기본 접힘 상태로 만들 수 있지만 사용자가 다시
+  열 수 있어야 한다.
+- 900px 아래에서는 자료 grid를 1열로 줄이고, 목록의 부가 통계를 줄여도 핵심 제목과
+  상태는 유지한다.
+- 오른쪽 질문 패널은 작은 화면에서 전체 폭 하단 영역으로 흐르게 하며 resize handle은
+  숨긴다. 기능을 숨기지 않는다.
+
 ## Overview
 
 **컨셉: Clear Spatial Intelligence.** Pin은 데이터를 많이 보여주는 서비스가 아니라, 어디에서 어떤 문제가 발생했으며 무엇부터 처리해야 하는지 이해시키는 서비스다. 학교·기업·공공기관이 사용하는 Desktop-first B2B SaaS 관리자 웹이며, 서체는 Pretendard, 접근성 기준은 WCAG 대비 4.5:1이다.

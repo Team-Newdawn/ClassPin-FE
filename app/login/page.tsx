@@ -22,7 +22,8 @@ function LoginContent() {
   const { t } = useLanguage();
   const router = useRouter();
   const params = useSearchParams();
-  const next = params.get("next") || "/";
+  const requestedNext = params.get("next");
+  const next = requestedNext?.startsWith("/") && !requestedNext.startsWith("//") ? requestedNext : "/admin/dashboard";
   const { configured, loading, isAdmin, signIn } = useAuth();
   const [error, setError] = useState<string | null>(null);
   const [redirecting, setRedirecting] = useState(false);
@@ -56,7 +57,7 @@ function LoginContent() {
         ) : (
           <>
             <p className="login-note">{t("login.demoNote")}</p>
-            <Link className="btn primary large full" href="/">{t("common.homeGo")}</Link>
+            <Link className="btn primary large full" href="/admin/dashboard">{t("login.continueDemo")}</Link>
           </>
         )}
         {error && <div className="login-error" role="alert">{error}</div>}

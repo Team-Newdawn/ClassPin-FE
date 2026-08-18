@@ -20,9 +20,10 @@ function CallbackContent() {
 
   useEffect(() => {
     if (oauthError) return;
-    const next = params.get("next") || "/";
+    const requestedNext = params.get("next");
+    const next = requestedNext?.startsWith("/") && !requestedNext.startsWith("//") ? requestedNext : "/admin/dashboard";
     const client = getSupabaseClient();
-    if (!client) { router.replace("/"); return; }
+    if (!client) { router.replace("/admin/dashboard"); return; }
     let done = false;
     const finish = () => {
       if (done) return;

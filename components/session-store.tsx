@@ -2,19 +2,24 @@
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { useAuth } from "@/components/auth-context";
-import type { ClassSession, PresentationQrPosition, Question, Slide } from "@/lib/types";
+import { normalizeClassFolderName, type ClassFolder, type ClassSession, type PresentationQrPosition, type Question, type Slide } from "@/lib/types";
 import { getAudienceSupabaseClient, getSupabaseClient, supabaseConfigured } from "@/lib/supabase/client";
-import { appendSessionSlides, deleteSessionSlide, fetchLectureSnapshot, fetchLectureStatus, fetchLiveSession, fetchOwnedSessions, fetchSessionSlides, markQuestionResolved, persistSession, postAnswer, saveSlideInstructorNote, submitQuestion, subscribeToLecture, updateLecture, updateQuestion as persistQuestionUpdate } from "@/lib/supabase/repository";
+import { appendSessionSlides, createClassFolder as persistClassFolder, deleteSessionSlide, fetchLectureSnapshot, fetchLectureStatus, fetchLiveSession, fetchOwnedClassFolders, fetchOwnedSessions, fetchSessionSlides, markQuestionResolved, moveSessionToFolder as persistSessionFolder, persistSession, postAnswer, saveSlideInstructorNote, submitQuestion, subscribeToLecture, updateLecture, updateQuestion as persistQuestionUpdate } from "@/lib/supabase/repository";
 
 const STORAGE_KEY = "pin-class-sessions-v1";
+const FOLDER_STORAGE_KEY = "pin-class-folders-v1";
 const SUPABASE_CACHE_PREFIX = "pin-class-sessions-cache-v2";
+const SUPABASE_FOLDER_CACHE_PREFIX = "pin-class-folders-cache-v1";
 // 예전 빌드가 시드로 심어 둔 데모 세션. 저장본에 남아 있으면 첫 로드에서 걷어낸다.
 const DEMO_SESSION_ID = "demo-session";
 
 type Store = {
   ready: boolean;
   sessions: ClassSession[];
-  createSession: (input: { title: string; fileName: string; slides: Slide[] }) => Promise<ClassSession>;
+  folders: ClassFolder[];
+  createFolder: (name: string) => Promise<ClassFolder>;
+  moveSessionToFolder: (sessionId: string, folderId: string | null) => Promise<void>;
+  createSession: (input: { folderId: string | null; title: string; fileName: string; slides: Slide[] }) => Promise<ClassSession>;
   appendSlides: (sessionId: string, files: File[]) => Promise<void>;
   deleteSlide: (sessionId: string, slideId: string) => Promise<void>;
   addQuestion: (sessionId: string, question: Omit<Question, "id" | "sessionId" | "createdAt" | "status">) => Promise<void>;
@@ -34,6 +39,7 @@ const SessionContext = createContext<Store | null>(null);
 
 const makeCode = () => `PIN${Math.floor(100 + Math.random() * 900)}`;
 const cacheKey = (userId: string) => `${SUPABASE_CACHE_PREFIX}:${userId}`;
+const folderCacheKey = (userId: string) => `${SUPABASE_FOLDER_CACHE_PREFIX}:${userId}`;
 const APPENDABLE_SLIDE_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
 const MAX_SLIDE_IMAGE_BYTES = 10 * 1024 * 1024;
 const PARTICIPANT_STATUS_POLL_MS = 2_000;
@@ -59,18 +65,29 @@ const readCachedSessions = (userId: string) => {
   }
 };
 
+const readFolders = (key: string) => {
+  try {
+    const stored = window.localStorage.getItem(key);
+    const folders = stored ? JSON.parse(stored) : [];
+    return Array.isArray(folders) ? folders as ClassFolder[] : [];
+  } catch {
+    return [];
+  }
+};
+
 // 같은 id 가 두 번 들어오면 목록마다 React key 가 충돌한다. 한 번 섞이면 localStorage 로 계속
 // 살아남으므로, 밖에서 들어오는 배열은 모두 이 문을 지나게 해서 저장본까지 스스로 낫게 한다.
 // 중복이 없으면 원본 배열을 그대로 돌려줘 헛도는 리렌더를 만들지 않는다.
 const dedupeById = (list: ClassSession[]) => {
   const seen = new Set<string>();
   const normalized = list.map((session) => {
+    const folderId = session.folderId ?? null;
     const showQuestionPins = session.showQuestionPins ?? true;
     const showPresentationQr = session.showPresentationQr ?? true;
     const presentationQrPosition = session.presentationQrPosition ?? "bottom-right";
-    return showQuestionPins === session.showQuestionPins && showPresentationQr === session.showPresentationQr && presentationQrPosition === session.presentationQrPosition
+    return folderId === session.folderId && showQuestionPins === session.showQuestionPins && showPresentationQr === session.showPresentationQr && presentationQrPosition === session.presentationQrPosition
       ? session
-      : { ...session, showQuestionPins, showPresentationQr, presentationQrPosition };
+      : { ...session, folderId, showQuestionPins, showPresentationQr, presentationQrPosition };
   });
   const unique = normalized.filter((session) => {
     if (seen.has(session.id)) return false;
@@ -83,6 +100,7 @@ const dedupeById = (list: ClassSession[]) => {
 export function SessionStore({ children }: { children: React.ReactNode }) {
   const { loading: authLoading, user, isAdmin } = useAuth();
   const [sessions, setSessions] = useState<ClassSession[]>([]);
+  const [folders, setFolders] = useState<ClassFolder[]>([]);
   const [ready, setReady] = useState(false);
   const lookups = useRef(new Map<string, Promise<ClassSession | null>>());
   const slideWrites = useRef(new Map<string, Promise<void>>());
@@ -103,6 +121,7 @@ export function SessionStore({ children }: { children: React.ReactNode }) {
     queueMicrotask(() => {
       const restored: ClassSession[] = stored ? JSON.parse(stored) : [];
       setSessions(dedupeById(restored).filter((session) => session.id !== DEMO_SESSION_ID));
+      setFolders(readFolders(FOLDER_STORAGE_KEY));
       setReady(true);
     });
   }, []);
@@ -120,16 +139,19 @@ export function SessionStore({ children }: { children: React.ReactNode }) {
       ownerId.current = authUserId;
       queueMicrotask(() => { if (active) setReady(false); });
       const cached = readCachedSessions(authUserId);
-      void fetchOwnedSessions()
-        .then((remote) => {
+      const cachedFolders = readFolders(folderCacheKey(authUserId));
+      void Promise.all([fetchOwnedSessions(), fetchOwnedClassFolders()])
+        .then(([remote, remoteFolders]) => {
           if (!active) return;
           setSessions(dedupeById(remote));
+          setFolders(remoteFolders);
           setReady(true);
         })
         .catch((error) => {
           if (!active) return;
           console.error(`Supabase session load failed: ${errorDetail(error)}`, error);
           setSessions(cached);
+          setFolders(cachedFolders);
           setReady(true);
         });
       return () => { active = false; };
@@ -140,7 +162,10 @@ export function SessionStore({ children }: { children: React.ReactNode }) {
     ownerId.current = null;
     queueMicrotask(() => {
       if (!active) return;
-      if (hadOwner) setSessions([]);
+      if (hadOwner) {
+        setSessions([]);
+        setFolders([]);
+      }
       setReady(true);
     });
     return () => { active = false; };
@@ -240,6 +265,15 @@ export function SessionStore({ children }: { children: React.ReactNode }) {
   }, [sessions, ready]);
 
   useEffect(() => {
+    if (!ready) return;
+    if (supabaseConfigured) {
+      if (ownerId.current) window.localStorage.setItem(folderCacheKey(ownerId.current), JSON.stringify(folders));
+      return;
+    }
+    window.localStorage.setItem(FOLDER_STORAGE_KEY, JSON.stringify(folders));
+  }, [folders, ready]);
+
+  useEffect(() => {
     if (supabaseConfigured) return;
     const channel = new BroadcastChannel("pin-class-live");
     channel.onmessage = (event) => setSessions((current) => {
@@ -248,15 +282,29 @@ export function SessionStore({ children }: { children: React.ReactNode }) {
     });
     const onStorage = (event: StorageEvent) => {
       if (event.key === STORAGE_KEY && event.newValue) setSessions(dedupeById(JSON.parse(event.newValue)));
+      if (event.key === FOLDER_STORAGE_KEY) setFolders(readFolders(FOLDER_STORAGE_KEY));
     };
     window.addEventListener("storage", onStorage);
     return () => { channel.close(); window.removeEventListener("storage", onStorage); };
   }, []);
 
-  const createSession = useCallback(async (input: { title: string; fileName: string; slides: Slide[] }) => {
+  const createFolder = useCallback(async (name: string) => {
+    const normalizedName = normalizeClassFolderName(name);
+    const folder = supabaseConfigured
+      ? await persistClassFolder(normalizedName)
+      : { id: crypto.randomUUID(), name: normalizedName, createdAt: new Date().toISOString() };
+    setFolders((current) => [...current, folder]);
+    return folder;
+  }, []);
+
+  const createSession = useCallback(async (input: { folderId: string | null; title: string; fileName: string; slides: Slide[] }) => {
+    if (input.folderId !== null && !folders.some((folder) => folder.id === input.folderId)) {
+      throw new Error("강의 자료를 추가할 폴더를 찾지 못했습니다.");
+    }
     const materialVersionId = crypto.randomUUID();
     const session: ClassSession = {
       id: crypto.randomUUID(), courseId: crypto.randomUUID(), materialId: crypto.randomUUID(), materialVersionId,
+      folderId: input.folderId,
       code: makeCode(), title: input.title, fileName: input.fileName,
       status: "live", currentSlide: 0, showQuestionPins: true, showPresentationQr: true, presentationQrPosition: "bottom-right",
       createdAt: new Date().toISOString(), slides: input.slides, questions: []
@@ -264,7 +312,7 @@ export function SessionStore({ children }: { children: React.ReactNode }) {
     if (supabaseConfigured) await persistSession(session);
     setSessions((current) => [session, ...current]);
     return session;
-  }, []);
+  }, [folders]);
 
   const updateSession = useCallback((id: string, fn: (session: ClassSession) => ClassSession) => {
     setSessions((current) => current.map((session) => session.id === id ? fn(session) : session));
@@ -273,6 +321,19 @@ export function SessionStore({ children }: { children: React.ReactNode }) {
   const value = useMemo<Store>(() => ({
     ready,
     sessions,
+    folders,
+    createFolder,
+    moveSessionToFolder: async (sessionId, folderId) => {
+      const session = sessions.find((item) => item.id === sessionId);
+      if (!session) throw new Error("이동할 강의 자료를 찾지 못했습니다.");
+      if (folderId !== null && !folders.some((folder) => folder.id === folderId)) throw new Error("이동할 폴더를 찾지 못했습니다.");
+      if (session.folderId === folderId) return;
+      if (supabaseConfigured) {
+        if (!session.courseId) throw new Error("강의 자료의 저장 정보를 찾지 못했습니다.");
+        await persistSessionFolder(session.courseId, folderId);
+      }
+      updateSession(sessionId, (current) => ({ ...current, folderId }));
+    },
     createSession,
     appendSlides: async (sessionId, files) => {
       const session = sessions.find((item) => item.id === sessionId);
@@ -432,7 +493,7 @@ export function SessionStore({ children }: { children: React.ReactNode }) {
       lookups.current.set(key, lookup);
       return lookup;
     }
-  }), [createSession, ready, sessions, updateSession]);
+  }), [createFolder, createSession, folders, ready, sessions, updateSession]);
 
   return <SessionContext.Provider value={value}>{children}</SessionContext.Provider>;
 }

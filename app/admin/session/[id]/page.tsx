@@ -1,28 +1,32 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import Link from "next/link";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { QRCodeSVG } from "qrcode.react";
-import { Check, ChevronLeft, ChevronRight, Clock3, Copy, FileText, Link2, ListFilter, MessageCircleQuestion, MonitorUp, Pause, Play, Plus, QrCode, Search, Share2, Trash2, Users, X } from "@/components/icons";
-import { AdminSidebar } from "@/components/admin-shell";
+import { ArrowLeft, Check, ChevronLeft, ChevronRight, Clock3, Copy, FileText, FolderOpen, GripVertical, Link2, ListFilter, MessageCircleQuestion, MonitorUp, PanelLeftClose, PanelLeftOpen, Pause, Play, Plus, QrCode, Search, Share2, Trash2, Users, X } from "@/components/icons";
 import { useLanguage } from "@/components/language-context";
 import { QuestionDetailDialog } from "@/components/question-detail-dialog";
 import { SlideCanvas } from "@/components/slide-canvas";
 import { StatusBadge } from "@/components/status-badge";
 import { useHorizontalSlideWheel } from "@/components/use-horizontal-slide-wheel";
 import { useSessions } from "@/components/session-store";
-import { createTextSlideFile } from "@/lib/text-slide";
 import type { PresentationQrPosition, Question, QuestionStatus } from "@/lib/types";
 
 type Tab = "live" | "questions";
-type LivePanel = "questions" | "notes";
+const MIN_QUESTION_PANEL = 300;
+const MAX_QUESTION_PANEL = 560;
+const MIN_STAGE_WIDTH = 400;
+
+const clampQuestionPanel = (width: number, workspaceWidth = MIN_STAGE_WIDTH + MAX_QUESTION_PANEL) =>
+  Math.min(MAX_QUESTION_PANEL, Math.max(MIN_QUESTION_PANEL, Math.min(width, workspaceWidth - MIN_STAGE_WIDTH)));
 
 export default function SessionAdmin() {
   const { t, categoryLabel, timeAgo } = useLanguage();
   const params = useParams<{ id: string }>();
   const search = useSearchParams();
   const router = useRouter();
-  const { sessions, ready, appendSlides, deleteSlide, answerQuestion, resolveQuestion, setCurrentSlide, setStatus, setShowQuestionPins, setShowPresentationQr, setPresentationQrPosition, updateSlideNote } = useSessions();
+  const { folders, sessions, ready, appendSlides, deleteSlide, answerQuestion, resolveQuestion, setCurrentSlide, setStatus, setShowQuestionPins, setShowPresentationQr, setPresentationQrPosition, updateSlideNote } = useSessions();
   const session = sessions.find((item) => item.id === params.id);
   const [tab, setTab] = useState<Tab>(search.get("tab") === "questions" ? "questions" : "live");
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -34,18 +38,16 @@ export default function SessionAdmin() {
   const [copied, setCopied] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
   const [presentationError, setPresentationError] = useState<string | null>(null);
-  const [livePanel, setLivePanel] = useState<LivePanel>("questions");
+  const [folderRailOpen, setFolderRailOpen] = useState(true);
+  const [questionPanelWidth, setQuestionPanelWidth] = useState(380);
+  const playerWorkspaceRef = useRef<HTMLDivElement | null>(null);
+  const resizeStart = useRef<{ x: number; width: number } | null>(null);
   const [noteDrafts, setNoteDrafts] = useState<Record<string, string>>({});
   const [noteSavingSlideId, setNoteSavingSlideId] = useState<string | null>(null);
   const [noteSavedSlideId, setNoteSavedSlideId] = useState<string | null>(null);
   const presentationWindowRef = useRef<Window | null>(null);
   const slideInputRef = useRef<HTMLInputElement | null>(null);
   const [addingSlides, setAddingSlides] = useState(false);
-  const [textSlideOpen, setTextSlideOpen] = useState(false);
-  const [textSlideTitle, setTextSlideTitle] = useState("");
-  const [textSlideBody, setTextSlideBody] = useState("");
-  const [creatingTextSlide, setCreatingTextSlide] = useState(false);
-  const [textSlideError, setTextSlideError] = useState<string | null>(null);
   const [deleteSlideId, setDeleteSlideId] = useState<string | null>(null);
   const [deletingSlide, setDeletingSlide] = useState(false);
   const [deleteSlideError, setDeleteSlideError] = useState<string | null>(null);
@@ -94,10 +96,43 @@ export default function SessionAdmin() {
     if (Number.isInteger(index) && index >= 0 && index < session.slides.length) setCurrentSlide(session.id, index);
   }, [search, session, setCurrentSlide]);
 
+  useEffect(() => {
+    if (!session || tab !== "live" || detailQuestionId || shareOpen || deleteSlideId) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
+      if (event.altKey || event.ctrlKey || event.metaKey) return;
+      const target = event.target instanceof HTMLElement ? event.target : null;
+      if (target?.closest("input, textarea, select, [contenteditable]:not([contenteditable='false']), dialog, [role='dialog'], [role='alertdialog'], [role='separator']")) return;
+      const next = session.currentSlide + (event.key === "ArrowRight" ? 1 : -1);
+      if (next < 0 || next >= session.slides.length) return;
+      event.preventDefault();
+      void setCurrentSlide(session.id, next).catch((error) => {
+        console.error("Keyboard slide navigation failed", error);
+        setActionError(t("session.saveSlideError"));
+      });
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [deleteSlideId, detailQuestionId, session, setCurrentSlide, shareOpen, t, tab]);
+
+  useEffect(() => {
+    if (tab !== "live") return;
+    const fitQuestionPanel = () => {
+      if (window.innerWidth <= 900 || !playerWorkspaceRef.current) return;
+      setQuestionPanelWidth((width) => clampQuestionPanel(width, playerWorkspaceRef.current?.clientWidth));
+    };
+    fitQuestionPanel();
+    window.addEventListener("resize", fitQuestionPanel);
+    return () => window.removeEventListener("resize", fitQuestionPanel);
+  }, [tab]);
+
   if (!ready) return <div className="loading-screen"><span className="spinner dark" /></div>;
   if (!session) return <div className="empty-state"><h1>{t("session.notFound")}</h1><button className="btn primary" onClick={() => router.push("/")}>{t("common.home")}</button></div>;
 
   const slide = session.slides[session.currentSlide];
+  const folder = folders.find((item) => item.id === session.folderId);
+  const folderHref = `/admin/folders/${folder?.id ?? "unfiled"}`;
+  const folderSessions = sessions.filter((item) => item.folderId === (session.folderId ?? null));
   const slideQuestions = session.questions.filter((q) => q.slideIndex === session.currentSlide);
   const selected = session.questions.find((q) => q.id === selectedId) ?? slideQuestions[0];
   const detailQuestion = session.questions.find((q) => q.id === detailQuestionId);
@@ -164,29 +199,6 @@ export default function SessionAdmin() {
       setAddingSlides(false);
     }
   };
-  const closeTextSlide = () => {
-    if (creatingTextSlide) return;
-    setTextSlideOpen(false);
-    setTextSlideError(null);
-  };
-  const addTextSlide = async () => {
-    if (creatingTextSlide || (!textSlideTitle.trim() && !textSlideBody.trim())) return;
-    setTextSlideError(null);
-    setCreatingTextSlide(true);
-    try {
-      const file = await createTextSlideFile({ title: textSlideTitle, body: textSlideBody });
-      await appendSlides(session.id, [file]);
-      setTextSlideTitle("");
-      setTextSlideBody("");
-      setTextSlideOpen(false);
-    } catch (error) {
-      const detail = error && typeof error === "object" && "message" in error ? String(error.message) : String(error);
-      console.error(`Text slide creation failed: ${detail}`, error);
-      setTextSlideError(t("session.createTextSlideError"));
-    } finally {
-      setCreatingTextSlide(false);
-    }
-  };
   const deleteTarget = deleteSlideId ? session.slides.find((item) => item.id === deleteSlideId) : null;
   const deleteTargetQuestionCount = deleteTarget
     ? session.questions.filter((question) => question.slideIndex === deleteTarget.pageIndex).length
@@ -210,6 +222,10 @@ export default function SessionAdmin() {
     } finally {
       setDeletingSlide(false);
     }
+  };
+  const resizeQuestionPanel = (event: React.PointerEvent<HTMLDivElement>) => {
+    if (!resizeStart.current) return;
+    setQuestionPanelWidth(clampQuestionPanel(resizeStart.current.width + resizeStart.current.x - event.clientX, playerWorkspaceRef.current?.clientWidth));
   };
   const openPresentation = () => {
     setActionError(null);
@@ -238,35 +254,45 @@ export default function SessionAdmin() {
   };
 
   return (
-    <div className="app-shell">
-      <AdminSidebar />
-      <main className="admin-main">
+    <div
+      className={`session-admin-shell ${folderRailOpen ? "" : "folder-rail-collapsed"}`}
+      style={{ "--question-panel-width": `${questionPanelWidth}px` } as React.CSSProperties}
+    >
+      <aside className="session-folder-rail">
+        <div className="folder-rail-head">
+          {folderRailOpen && <Link href={folderHref}><ArrowLeft />{t("session.backToFolder")}</Link>}
+          <button type="button" onClick={() => setFolderRailOpen((open) => !open)} aria-label={t(folderRailOpen ? "session.collapseFolders" : "session.expandFolders")} title={t(folderRailOpen ? "session.collapseFolders" : "session.expandFolders")}>{folderRailOpen ? <PanelLeftClose /> : <PanelLeftOpen />}</button>
+        </div>
+        {folderRailOpen && <>
+          <div className="folder-rail-title"><FolderOpen /><span><small>{t("session.folderMaterials")}</small><b>{folder?.name ?? t("folders.unfiled")}</b></span></div>
+          <nav aria-label={t("session.folderMaterials")}>
+            {folderSessions.map((item) => <Link key={item.id} href={`/admin/session/${item.id}`} className={item.id === session.id ? "active" : ""} aria-current={item.id === session.id ? "page" : undefined}><span className="folder-rail-thumb"><SlideCanvas slide={item.slides[0]} compact /></span><span><b>{item.title}</b><small>{item.slides.length} {t("common.slide")}</small></span></Link>)}
+          </nav>
+        </>}
+      </aside>
+      <main className="session-admin-main">
         <div className="workspace-tabs">
           <button className={tab === "live" ? "active" : ""} onClick={() => setTab("live")}><Play />{t("session.livePlayer")}<span>{session.questions.filter((q) => q.status === "unanswered").length}</span></button>
           <button className={tab === "questions" ? "active" : ""} onClick={() => setTab("questions")}><MessageCircleQuestion />{t("session.questionList")}<span>{session.questions.length}</span></button>
-          <div className="top-actions"><span className={`live-badge ${session.status}`}><i />{session.status === "live" ? t("common.live") : t("common.ended")}</span><button className="btn secondary" onClick={() => runAction(setStatus(session.id, session.status === "live" ? "ended" : "live"), t("session.saveLectureError"))}>{session.status === "live" ? <><Pause />{t("session.end")}</> : <><Play />{t("session.restart")}</>}</button><button className="btn secondary" onClick={() => setShareOpen(true)}><Share2 />{t("session.joinLink")}</button><button className="btn primary presentation-launch" onClick={openPresentation} title={t("session.openSlideshow")}><MonitorUp />{t("session.slideshow")}</button></div>
+          <div className="top-actions"><span className={`session-state-badge ${session.status}`}><i />{t(session.status === "live" ? "session.liveLabel" : "session.stoppedLabel")}</span><button className="btn secondary" onClick={() => runAction(setStatus(session.id, session.status === "live" ? "ended" : "live"), t("session.saveLectureError"))}>{session.status === "live" ? <><Pause />{t("session.end")}</> : <><Play />{t("session.restart")}</>}</button><button className="btn secondary" onClick={() => setShareOpen(true)}><Share2 />{t("session.joinLink")}</button><button className="btn primary presentation-launch" onClick={openPresentation} title={t("session.openSlideshow")}><MonitorUp />{t("session.slideshow")}</button></div>
         </div>
         {presentationError
           ? <div className="login-error" role="alert">{presentationError}</div>
           : actionError && <div className="login-error" role="alert">{actionError} {t("common.tryAgain")}</div>}
 
         {tab === "live" ? (
-          <div className="player-workspace">
+          <div className="player-workspace" ref={playerWorkspaceRef}>
             <section className="player-stage">
               <div className="stage-toolbar">
-                <div><span className="status-dot" /><b>{session.title}</b>{t("session.syncing")}</div>
+                <div className="stage-toolbar-status"><span className={`status-dot ${session.status}`} /><b title={session.title}>{session.title}</b><span className="stage-sync-label">{t(session.status === "live" ? "session.syncing" : "session.stoppedLabel")}</span></div>
                 <div className="stage-toolbar-actions">
                   <span>{session.currentSlide + 1} / {session.slides.length}</span>
                   <input ref={slideInputRef} type="file" accept=".png,.jpg,.jpeg,.webp,image/png,image/jpeg,image/webp" multiple hidden onChange={addSlideImages} />
-                  <button type="button" className="stage-add-slides" disabled={addingSlides || creatingTextSlide} onClick={() => { setTextSlideError(null); setTextSlideOpen(true); }} title={t("session.createTextSlideHint")}>
-                    <FileText />
-                    <span>{t("session.createTextSlide")}</span>
-                  </button>
                   <button type="button" className="stage-add-slides" disabled={addingSlides} onClick={() => slideInputRef.current?.click()} title={t("session.addSlidesHint")}>
                     {addingSlides ? <span className="spinner" /> : <Plus />}
                     <span>{t(addingSlides ? "session.addingSlides" : "session.addSlides")}</span>
                   </button>
-                  <button type="button" className="stage-add-slides stage-delete-slide" disabled={session.slides.length <= 1 || addingSlides || creatingTextSlide} onClick={() => { setDeleteSlideError(null); setDeleteSlideId(slide.id); }} title={t(session.slides.length <= 1 ? "session.deleteLastSlideHint" : "session.deleteSlideHint")}>
+                  <button type="button" className="stage-add-slides stage-delete-slide" disabled={session.slides.length <= 1 || addingSlides} onClick={() => { setDeleteSlideError(null); setDeleteSlideId(slide.id); }} title={t(session.slides.length <= 1 ? "session.deleteLastSlideHint" : "session.deleteSlideHint")}>
                     <Trash2 />
                     <span>{t("session.deleteSlide")}</span>
                   </button>
@@ -274,14 +300,53 @@ export default function SessionAdmin() {
               </div>
               <div className="stage-canvas-wrap" onWheel={handleSlideWheel}><SlideCanvas slide={slide} questions={slideQuestions} selectedId={selected?.id} onSelectPin={openQuestionDetail} showPins={session.showQuestionPins} /></div>
               <div className="player-controls"><button className="icon-btn" disabled={session.currentSlide === 0} onClick={() => runAction(setCurrentSlide(session.id, session.currentSlide - 1), t("session.saveSlideError"))} aria-label={t("session.previousSlide")}><ChevronLeft /></button><div className="slide-dots">{session.slides.map((_, i) => <button key={i} className={i === session.currentSlide ? "active" : ""} onClick={() => runAction(setCurrentSlide(session.id, i), t("session.saveSlideError"))} aria-label={t("common.slideNumber", { number: i + 1 })} />)}</div><button className="icon-btn" disabled={session.currentSlide === session.slides.length - 1} onClick={() => runAction(setCurrentSlide(session.id, session.currentSlide + 1), t("session.saveSlideError"))} aria-label={t("session.nextSlide")}><ChevronRight /></button></div>
-              <div className="filmstrip" ref={filmstripRef}>{session.slides.map((item, index) => <button key={item.id} className={index === session.currentSlide ? "active" : ""} onClick={() => runAction(setCurrentSlide(session.id, index), t("session.saveSlideError"))}><SlideCanvas slide={item} compact /><span>{index + 1}</span>{session.questions.some((q) => q.slideIndex === index) && <i>{session.questions.filter((q) => q.slideIndex === index).length}</i>}</button>)}</div>
+              <div className="filmstrip" ref={filmstripRef}>{session.slides.map((item, index) => <button key={item.id} className={index === session.currentSlide ? "active" : ""} aria-current={index === session.currentSlide ? "page" : undefined} onClick={() => runAction(setCurrentSlide(session.id, index), t("session.saveSlideError"))}><SlideCanvas slide={item} compact /><span>{index + 1}</span>{session.questions.some((q) => q.slideIndex === index) && <i>{session.questions.filter((q) => q.slideIndex === index).length}</i>}</button>)}</div>
+              <section className="stage-speaker-note" aria-labelledby="speaker-note-label">
+                <div className="stage-speaker-note-head"><span><FileText /><b id="speaker-note-label">{t("session.speakerNotesSlide", { number: session.currentSlide + 1 })}</b></span><small><Check />{t("session.speakerNotesPrivate")}</small></div>
+                <textarea
+                  id="speaker-note"
+                  aria-labelledby="speaker-note-label"
+                  value={noteDraft}
+                  maxLength={10000}
+                  placeholder={t("session.speakerNotesHint")}
+                  onChange={(event) => {
+                    setNoteDrafts((current) => ({ ...current, [slide.id]: event.target.value }));
+                    setNoteSavedSlideId(null);
+                  }}
+                  onKeyDown={(event) => {
+                    if ((event.metaKey || event.ctrlKey) && event.key === "Enter") {
+                      event.preventDefault();
+                      saveCurrentSlideNote();
+                    }
+                  }}
+                />
+                <div className="stage-speaker-note-actions"><span>{noteDraft.length.toLocaleString()} / 10,000 · {t("session.speakerNotesShortcut")}</span><button type="button" className="btn primary speaker-note-save" disabled={!noteDirty || noteSavingSlideId === slide.id} onClick={saveCurrentSlideNote}>{noteSavingSlideId === slide.id ? <><span className="spinner" />{t("session.speakerNotesSaving")}</> : noteSavedSlideId === slide.id && !noteDirty ? <><Check />{t("session.speakerNotesSaved")}</> : <><FileText />{t("session.speakerNotesSave")}</>}</button></div>
+              </section>
             </section>
             <aside className="live-questions">
-              <div className="live-panel-tabs" role="tablist" aria-label={t("session.livePlayer")}>
-                <button type="button" role="tab" aria-selected={livePanel === "questions"} className={livePanel === "questions" ? "active" : ""} onClick={() => setLivePanel("questions")}><MessageCircleQuestion />{t("session.panelQuestions")}<span>{slideQuestions.length}</span></button>
-                <button type="button" role="tab" aria-selected={livePanel === "notes"} className={livePanel === "notes" ? "active" : ""} onClick={() => setLivePanel("notes")}><FileText />{t("session.speakerNotes")}{slide.speakerNote?.trim() && <i aria-hidden="true" />}</button>
-              </div>
-              {livePanel === "questions" ? <>
+              <div
+                className="question-panel-resizer"
+                role="separator"
+                aria-orientation="vertical"
+                aria-label={t("session.resizeQuestions")}
+                aria-valuemin={MIN_QUESTION_PANEL}
+                aria-valuemax={MAX_QUESTION_PANEL}
+                aria-valuenow={questionPanelWidth}
+                tabIndex={0}
+                onPointerDown={(event) => {
+                  resizeStart.current = { x: event.clientX, width: event.currentTarget.parentElement?.clientWidth ?? questionPanelWidth };
+                  event.currentTarget.setPointerCapture(event.pointerId);
+                }}
+                onPointerMove={resizeQuestionPanel}
+                onPointerUp={(event) => { resizeStart.current = null; event.currentTarget.releasePointerCapture(event.pointerId); }}
+                onPointerCancel={() => { resizeStart.current = null; }}
+                onKeyDown={(event) => {
+                  if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
+                  event.preventDefault();
+                  const renderedWidth = event.currentTarget.parentElement?.clientWidth ?? questionPanelWidth;
+                  setQuestionPanelWidth(clampQuestionPanel(renderedWidth + (event.key === "ArrowLeft" ? 20 : -20), playerWorkspaceRef.current?.clientWidth));
+                }}
+              ><GripVertical /></div>
                 <div className="panel-heading">
                 <div><h2>{t("session.liveQuestions")}</h2><p>{t("common.currentQuestionsCount", { count: slideQuestions.length })}</p></div>
                 <div className="panel-heading-actions">
@@ -350,36 +415,6 @@ export default function SessionAdmin() {
                 <textarea id="answer" value={answer} onChange={(e) => setAnswer(e.target.value)} placeholder={t("session.answerPlaceholder")} />
                 <div className="answer-actions"><button className="btn tertiary" onClick={() => runAction(resolveQuestion(session.id, selected.id), t("session.saveQuestionError"))}><Check />{t("session.resolve")}</button><button className="btn primary" onClick={submitAnswer}>{t("session.sendAnswer")}</button></div>
                 </div>}
-              </> : <>
-                <div className="panel-heading speaker-note-heading">
-                  <div><h2>{t("session.speakerNotesTitle")}</h2><p>{t("common.slideLabel", { number: session.currentSlide + 1 })}</p></div>
-                  <FileText aria-hidden="true" />
-                </div>
-                <section className="speaker-note-editor" aria-labelledby="speaker-note-label">
-                  <div className="speaker-note-private"><Check aria-hidden="true" /><span>{t("session.speakerNotesPrivate")}</span></div>
-                  <label id="speaker-note-label" htmlFor="speaker-note">{t("session.speakerNotesSlide", { number: session.currentSlide + 1 })}</label>
-                  <textarea
-                    id="speaker-note"
-                    value={noteDraft}
-                    maxLength={10000}
-                    placeholder={t("session.speakerNotesHint")}
-                    onChange={(event) => {
-                      setNoteDrafts((current) => ({ ...current, [slide.id]: event.target.value }));
-                      setNoteSavedSlideId(null);
-                    }}
-                    onKeyDown={(event) => {
-                      if ((event.metaKey || event.ctrlKey) && event.key === "Enter") {
-                        event.preventDefault();
-                        saveCurrentSlideNote();
-                      }
-                    }}
-                  />
-                  <div className="speaker-note-meta"><span>{noteDraft.length.toLocaleString()} / 10,000</span><span>{t("session.speakerNotesShortcut")}</span></div>
-                  <button type="button" className="btn primary speaker-note-save" disabled={!noteDirty || noteSavingSlideId === slide.id} onClick={saveCurrentSlideNote}>
-                    {noteSavingSlideId === slide.id ? <><span className="spinner" />{t("session.speakerNotesSaving")}</> : noteSavedSlideId === slide.id && !noteDirty ? <><Check />{t("session.speakerNotesSaved")}</> : <><FileText />{t("session.speakerNotesSave")}</>}
-                  </button>
-                </section>
-              </>}
             </aside>
           </div>
         ) : (
@@ -392,39 +427,9 @@ export default function SessionAdmin() {
       </main>
 
       {detailQuestion && <QuestionDetailDialog question={detailQuestion} onClose={() => setDetailQuestionId(null)} />}
-      {textSlideOpen && <div className="modal-backdrop text-slide-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) closeTextSlide(); }}>
-        <section className="text-slide-modal" role="dialog" aria-modal="true" aria-labelledby="text-slide-title">
-          <button type="button" className="modal-close" disabled={creatingTextSlide} onClick={closeTextSlide} aria-label={t("session.textSlideCancel")}><X /></button>
-          <div className="text-slide-modal-heading"><span><FileText /></span><div><h2 id="text-slide-title">{t("session.textSlideTitle")}</h2><p>{t("session.textSlideDescription")}</p></div></div>
-          <div className="text-slide-grid">
-            <div className="text-slide-fields">
-              <label htmlFor="text-slide-heading">{t("session.textSlideTitleLabel")}</label>
-              <span className="text-slide-count">{textSlideTitle.length} / 120</span>
-              <input id="text-slide-heading" value={textSlideTitle} maxLength={120} autoFocus onChange={(event) => setTextSlideTitle(event.target.value)} placeholder={t("session.textSlideTitlePlaceholder")} />
-              <label htmlFor="text-slide-body">{t("session.textSlideBodyLabel")}</label>
-              <span className="text-slide-count">{textSlideBody.length.toLocaleString()} / 1,000</span>
-              <textarea id="text-slide-body" value={textSlideBody} maxLength={1000} onChange={(event) => setTextSlideBody(event.target.value)} placeholder={t("session.textSlideBodyPlaceholder")} />
-            </div>
-            <div className="text-slide-preview-wrap">
-              <span>{t("session.textSlidePreview")}</span>
-              <div className="text-slide-preview">
-                <div>{textSlideTitle.trim() && <h3>{textSlideTitle}</h3>}{textSlideBody.trim() && <p>{textSlideBody}</p>}</div>
-                <small>CLASS PIN</small>
-              </div>
-            </div>
-          </div>
-          {textSlideError && <div className="login-error text-slide-error" role="alert">{textSlideError} {t("common.tryAgain")}</div>}
-          <div className="text-slide-actions">
-            <button type="button" className="btn secondary" disabled={creatingTextSlide} onClick={closeTextSlide}>{t("session.textSlideCancel")}</button>
-            <button type="button" className="btn primary" disabled={creatingTextSlide || (!textSlideTitle.trim() && !textSlideBody.trim())} onClick={addTextSlide}>
-              {creatingTextSlide ? <><span className="spinner" />{t("session.creatingTextSlide")}</> : <><Plus />{t("session.addTextSlideToDeck")}</>}
-            </button>
-          </div>
-        </section>
-      </div>}
       {deleteTarget && <div className="modal-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) closeDeleteSlide(); }}>
         <section className="delete-slide-modal" role="alertdialog" aria-modal="true" aria-labelledby="delete-slide-title" aria-describedby="delete-slide-description">
-          <button type="button" className="modal-close" disabled={deletingSlide} onClick={closeDeleteSlide} aria-label={t("session.textSlideCancel")}><X /></button>
+          <button type="button" className="modal-close" disabled={deletingSlide} onClick={closeDeleteSlide} aria-label={t("common.cancel")}><X /></button>
           <span className="delete-slide-icon"><Trash2 /></span>
           <h2 id="delete-slide-title">{t("session.deleteSlideTitle")}</h2>
           <p id="delete-slide-description">{t("session.deleteSlideDescription", { number: deleteTarget.pageIndex + 1 })}</p>
@@ -432,7 +437,7 @@ export default function SessionAdmin() {
           <div className="delete-slide-warning"><b>{t("session.deleteSlideWarning")}</b>{deleteTargetQuestionCount > 0 && <span>{t("session.deleteSlideQuestions", { count: deleteTargetQuestionCount })}</span>}</div>
           {deleteSlideError && <div className="login-error" role="alert">{deleteSlideError} {t("common.tryAgain")}</div>}
           <div className="delete-slide-actions">
-            <button type="button" className="btn secondary" disabled={deletingSlide} onClick={closeDeleteSlide}>{t("session.textSlideCancel")}</button>
+            <button type="button" className="btn secondary" disabled={deletingSlide} onClick={closeDeleteSlide}>{t("common.cancel")}</button>
             <button type="button" className="btn destructive" disabled={deletingSlide} onClick={confirmDeleteSlide}>{deletingSlide ? <><span className="spinner" />{t("session.deletingSlide")}</> : <><Trash2 />{t("session.deleteSlideConfirm")}</>}</button>
           </div>
         </section>

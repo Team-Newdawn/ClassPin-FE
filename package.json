@@ -4,9 +4,14 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
+    "dev:local": "supabase start && next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint ."
+    "lint": "eslint .",
+    "supabase:start": "supabase start",
+    "supabase:status": "supabase status -o env",
+    "supabase:stop": "supabase stop",
+    "supabase:reset": "supabase db reset --local"
   },
   "dependencies": {
     "@supabase/supabase-js": "2.110.8",
@@ -22,6 +27,7 @@
     "@types/react-dom": "19.2.3",
     "eslint": "9.22.0",
     "eslint-config-next": "16.2.11",
+    "supabase": "2.105.0",
     "typescript": "5.8.2"
   },
   "overrides": {

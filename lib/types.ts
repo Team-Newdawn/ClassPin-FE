@@ -19,6 +19,23 @@ export interface Profile {
   avatarUrl: string | null;
 }
 
+export const CLASS_FOLDER_NAME_MAX = 80;
+
+export function normalizeClassFolderName(value: string) {
+  const name = value.trim();
+  const length = [...name].length;
+  if (length < 1 || length > CLASS_FOLDER_NAME_MAX) {
+    throw new Error(`폴더 이름은 1~${CLASS_FOLDER_NAME_MAX}자로 입력해 주세요.`);
+  }
+  return name;
+}
+
+export interface ClassFolder {
+  id: string;
+  name: string;
+  createdAt: string;
+}
+
 export interface Slide {
   id: string;
   pageIndex: number;
@@ -49,6 +66,7 @@ export interface Question {
 
 export interface ClassSession {
   id: string;
+  folderId: string | null;
   courseId?: string;
   materialId?: string;
   materialVersionId?: string;

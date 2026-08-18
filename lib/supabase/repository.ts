@@ -1,5 +1,5 @@
 import type { RealtimeChannel } from "@supabase/supabase-js";
-import type { ClassSession, NormalizedPoint, Question, Slide } from "@/lib/types";
+import { normalizeClassFolderName, type ClassFolder, type ClassSession, type NormalizedPoint, type Question, type Slide } from "@/lib/types";
 import { ensureAnonymousUser, getAudienceSupabaseClient, getSessionUser, getSupabaseClient } from "./client";
 
 export type PlatformExperienceSource = "lecture" | "feedback";
@@ -14,6 +14,17 @@ type LectureRow = {
   show_question_pins: boolean;
   show_presentation_qr: boolean;
   presentation_qr_position: ClassSession["presentationQrPosition"];
+  created_at: string;
+};
+
+type CourseRow = {
+  id: string;
+  folder_id: string | null;
+};
+
+type ClassFolderRow = {
+  id: string;
+  name: string;
   created_at: string;
 };
 
@@ -112,7 +123,7 @@ export async function persistSession(session: ClassSession) {
   if (!client) throw new Error("Supabase 연결을 찾지 못했습니다.");
   if (!session.courseId || !session.materialId || !session.materialVersionId) throw new Error("강의 저장 정보가 완전하지 않습니다.");
   const user = await requireOwnerUser();
-  const { error: courseError } = await client.from("courses").insert({ id: session.courseId, owner_id: user.id, title: session.title, visibility: "link" });
+  const { error: courseError } = await client.from("courses").insert({ id: session.courseId, owner_id: user.id, folder_id: session.folderId, title: session.title, visibility: "link" });
   if (courseError) throw courseError;
   const { error: lectureError } = await client.from("lectures").insert({
     id: session.id,
@@ -146,6 +157,50 @@ export async function persistSession(session: ClassSession) {
   }
   const { error: slidesError } = await client.from("slides").insert(slideRows);
   if (slidesError) throw slidesError;
+}
+
+export async function fetchOwnedClassFolders(): Promise<ClassFolder[]> {
+  const client = getSupabaseClient();
+  if (!client) return [];
+  const user = await requireOwnerUser();
+  const { data, error } = await client.from("session_folders")
+    .select("id, name, created_at")
+    .eq("owner_id", user.id)
+    .order("created_at", { ascending: true });
+  if (error) throw error;
+  return ((data ?? []) as ClassFolderRow[]).map((folder) => ({
+    id: folder.id,
+    name: folder.name,
+    createdAt: folder.created_at
+  }));
+}
+
+export async function createClassFolder(name: string): Promise<ClassFolder> {
+  const normalizedName = normalizeClassFolderName(name);
+  const client = getSupabaseClient();
+  if (!client) throw new Error("Supabase 연결을 찾지 못했습니다.");
+  const user = await requireOwnerUser();
+  const { data, error } = await client.from("session_folders")
+    .insert({ owner_id: user.id, name: normalizedName })
+    .select("id, name, created_at")
+    .single();
+  if (error) throw error;
+  const folder = data as ClassFolderRow;
+  return { id: folder.id, name: folder.name, createdAt: folder.created_at };
+}
+
+export async function moveSessionToFolder(courseId: string, folderId: string | null): Promise<void> {
+  const client = getSupabaseClient();
+  if (!client) throw new Error("Supabase 연결을 찾지 못했습니다.");
+  const user = await requireOwnerUser();
+  const { data, error } = await client.from("courses")
+    .update({ folder_id: folderId })
+    .eq("id", courseId)
+    .eq("owner_id", user.id)
+    .select("id")
+    .maybeSingle();
+  if (error) throw error;
+  if (!data) throw new Error("이동할 강의 자료를 찾지 못했습니다.");
 }
 
 const APPENDABLE_SLIDE_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
@@ -252,10 +307,12 @@ export async function fetchOwnedSessions(): Promise<ClassSession[]> {
   const user = await requireOwnerUser();
 
   const { data: courseRows, error: courseError } = await client.from("courses")
-    .select("id")
+    .select("id, folder_id")
     .eq("owner_id", user.id);
   if (courseError) throw courseError;
-  const courseIds = (courseRows ?? []).map((course) => course.id);
+  const courses = (courseRows ?? []) as CourseRow[];
+  const courseIds = courses.map((course) => course.id);
+  const folderByCourse = new Map(courses.map((course) => [course.id, course.folder_id]));
   if (!courseIds.length) return [];
 
   const { data: lectureData, error: lectureError } = await client.from("lectures")
@@ -347,6 +404,7 @@ export async function fetchOwnedSessions(): Promise<ClassSession[]> {
     const slides = slidesByVersion.get(version.id) ?? [];
     return [{
       id: lecture.id,
+      folderId: folderByCourse.get(lecture.course_id) ?? null,
       code: lecture.join_code,
       courseId: lecture.course_id,
       materialId: material.id,
@@ -402,6 +460,7 @@ export async function fetchLiveSession(joinCode: string): Promise<ClassSession |
   }));
   const session: ClassSession = {
     id: lecture.id,
+    folderId: null,
     code: lecture.join_code,
     courseId: lecture.course_id,
     materialId: material.id,

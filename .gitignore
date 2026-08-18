@@ -9,3 +9,4 @@ public/generated/*
 .DS_Store
 .claude/settings.local.json
 supabase/.temp/
+supabase/.branches/

@@ -2,7 +2,7 @@
 
 import { useRef, useState } from "react";
 import Link from "next/link";
-import { Folder, FolderPlus, Plus, Search, Upload, X } from "@/components/icons";
+import { Copy, Folder, FolderPlus, Plus, Search, Upload, X } from "@/components/icons";
 import { useLanguage } from "@/components/language-context";
 import { SlideCanvas } from "@/components/slide-canvas";
 import { useSessions } from "@/components/session-store";
@@ -10,19 +10,23 @@ import { SlidePreview } from "@/components/slide-preview";
 import { UploadProgress } from "@/components/upload-progress";
 import { useSlideUpload } from "@/components/use-slide-upload";
 import { WorkspaceHeader } from "@/components/workspace-header";
+import { supabaseConfigured } from "@/lib/supabase/client";
 import type { ClassSession } from "@/lib/types";
 
 const UNFILED_ID = "unfiled";
 
 export default function DashboardPage() {
   const { t, timeAgo } = useLanguage();
-  const { folders, sessions, createFolder, ready } = useSessions();
+  const { folders, sessions, createFolder, importPinFeedbackMaterials, ready } = useSessions();
   const inputRef = useRef<HTMLInputElement>(null);
   const [folderModalOpen, setFolderModalOpen] = useState(false);
   const [folderName, setFolderName] = useState("");
   const [query, setQuery] = useState("");
   const [folderError, setFolderError] = useState<string | null>(null);
   const [creatingFolder, setCreatingFolder] = useState(false);
+  const [importing, setImporting] = useState(false);
+  const [importMessage, setImportMessage] = useState<string | null>(null);
+  const [importError, setImportError] = useState<string | null>(null);
   const { phase, uploadPct, error: uploadError, slides, total, showPreview, busy, start } = useSlideUpload(null);
 
   if (!ready) return <div className="loading-screen"><span className="spinner dark" /></div>;
@@ -54,6 +58,21 @@ export default function DashboardPage() {
     }
   };
 
+  const importPinFeedback = async () => {
+    setImportMessage(null);
+    setImportError(null);
+    setImporting(true);
+    try {
+      const count = await importPinFeedbackMaterials();
+      setImportMessage(count ? t("folders.importPinFeedbackSuccess", { count }) : t("folders.importPinFeedbackNone"));
+    } catch (error) {
+      console.error(t("folders.importPinFeedbackError"), error);
+      setImportError(t("folders.importPinFeedbackError"));
+    } finally {
+      setImporting(false);
+    }
+  };
+
   return (
     <main className="folder-workspace">
       <WorkspaceHeader />
@@ -63,12 +82,15 @@ export default function DashboardPage() {
         <div className="page-head">
           <div><h1>{t("folders.dashboardTitle")}</h1><p>{t("folders.dashboardDescription")}</p></div>
           <div className="page-actions">
+            {supabaseConfigured && <button type="button" className="btn secondary" onClick={() => void importPinFeedback()} disabled={busy || importing}>{importing ? <span className="spinner dark" /> : <Copy />}{t(importing ? "folders.importingPinFeedback" : "folders.importPinFeedback")}</button>}
             <button type="button" className="btn secondary" onClick={() => inputRef.current?.click()} disabled={busy}><Upload />{t("folders.uploadUnfiled")}</button>
             <button type="button" className="btn primary" onClick={() => { setFolderError(null); setFolderModalOpen(true); }}><FolderPlus />{t("folders.newFolder")}</button>
           </div>
         </div>
 
         {uploadError && <div className="upload-error" role="alert">{uploadError}</div>}
+        {importError && <div className="upload-error" role="alert">{importError}</div>}
+        {importMessage && <div className="import-status" role="status">{importMessage}</div>}
         {busy && <UploadProgress phase={phase} uploadPct={uploadPct} done={slides.length} total={total} />}
         {showPreview && <SlidePreview slides={slides} total={total} />}
 

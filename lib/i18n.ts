@@ -1,4 +1,4 @@
-import type { QuestionCategory, QuestionStatus } from "@/lib/types";
+import { PIN_FEEDBACK_QUESTION_CATEGORY_KEYS, type QuestionCategory, type QuestionStatus } from "@/lib/types";
 
 export type Locale = "ko" | "en";
 type Values = Record<string, string | number>;
@@ -117,6 +117,11 @@ const ko = {
   "folders.moveError": "자료를 이동하지 못했습니다. 잠시 후 다시 시도해 주세요.",
   "folders.insightScope": "인사이트 범위",
   "folders.insightAll": "폴더 전체",
+  "folders.importPinFeedback": "PinFeedback 자료 복사",
+  "folders.importingPinFeedback": "PinFeedback 자료 복사 중…",
+  "folders.importPinFeedbackSuccess": ({ count: value }) => `PinFeedback 자료 ${value}개를 원본은 그대로 두고 복사했습니다.`,
+  "folders.importPinFeedbackNone": "복사할 새 PinFeedback 자료가 없습니다.",
+  "folders.importPinFeedbackError": "PinFeedback 자료를 복사하지 못했습니다. 잠시 후 다시 시도해 주세요.",
 
   "dashboard.description": "지금 답해야 할 질문과 강의별 상태를 한 화면에서 확인하세요.",
   "dashboard.openInsights": "인사이트 열기",
@@ -226,6 +231,13 @@ const ko = {
   "session.speakerNotesShortcut": "⌘/Ctrl + Enter로 저장",
   "session.saveSpeakerNotesError": "발표 메모를 저장하지 못했습니다.",
   "session.showPins": "핀 표시",
+  "session.presentationMode": "슬라이드쇼 상호작용",
+  "session.presentationModeHint": "OFF는 강의자료만, ON은 PIN 순환·실시간 강조·공감·불꽃·이모지를 표시합니다.",
+  "session.interactiveMode": "상호작용",
+  "session.slidesOnlyMode": "강의자료만",
+  "session.disableInteractions": "슬라이드쇼 상호작용 끄기",
+  "session.enableInteractions": "슬라이드쇼 상호작용 켜기",
+  "session.savePresentationModeError": "슬라이드쇼 모드를 저장하지 못했습니다.",
   "session.turnPinsOff": "슬라이드 핀 표시 끄기",
   "session.turnPinsOn": "슬라이드 핀 표시 켜기",
   "session.qrPosition": "슬라이드쇼 QR 위치",
@@ -246,6 +258,22 @@ const ko = {
   "session.questionsDescription": "슬라이드별 질문을 한눈에 확인하고 답변 상태를 관리하세요.",
   "session.totalQuestions": "전체 질문",
   "session.searchQuestions": "질문 내용 검색",
+  "session.questionCategoryTitle": "질문 카테고리",
+  "session.questionCategoryDescription": "참여자가 선택할 질문 유형을 추가하거나 이름과 사용 여부를 설정하세요.",
+  "session.questionCategoryAdd": "카테고리 추가",
+  "session.questionCategoryPlaceholder": "새 카테고리 이름",
+  "session.questionCategoryDelete": ({ category }) => `${category} 카테고리 삭제`,
+  "session.questionCategoryDuplicate": "같은 이름의 카테고리가 이미 있습니다.",
+  "session.questionCategoryLimit": ({ count }) => `카테고리는 최대 ${count}개까지 사용할 수 있습니다.`,
+  "session.questionCategoryDisplayName": "표시 이름",
+  "session.questionCategoryDisplayNameAria": ({ category }) => `${category} 카테고리의 표시 이름`,
+  "session.questionCategoryUse": "사용",
+  "session.questionCategoryUseAria": ({ category }) => `${category} 카테고리 사용`,
+  "session.questionCategoryEnabledHint": "사용 중인 카테고리만 참여자 질문 화면에 표시됩니다.",
+  "session.questionCategorySave": "카테고리 저장",
+  "session.questionCategorySaving": "저장 중…",
+  "session.questionCategoryInvalid": "참여자가 선택할 카테고리를 하나 이상 켜 주세요.",
+  "session.questionCategorySaveError": "질문 카테고리를 저장하지 못했습니다.",
   "session.inviteTitle": "수강생을 초대하세요",
   "session.inviteDescription1": "QR 코드를 보여주거나 참여 링크를 공유하세요.",
   "session.inviteDescription2": "로그인 없이 바로 질문을 남길 수 있어요.",
@@ -279,6 +307,8 @@ const ko = {
   "presentation.joinQrAria": "청중 참여 QR 코드",
   "presentation.syncDelay": "슬라이드 동기화가 지연되고 있어요.",
   "presentation.fullscreenError": "전체화면을 시작하지 못했어요. 브라우저의 전체화면 권한을 확인해 주세요.",
+  "presentation.pinTotal": ({ count: value }) => `총 PIN ${value}개`,
+  "question.empathyCount": ({ count: value }) => `공감 ${value}개`,
 
   "question.closeDetail": "질문 상세 닫기",
   "question.questionAndAnswer": "질문과 답변",
@@ -316,6 +346,15 @@ const ko = {
   "student.emojiHint": "이모지를 눌러 반응을 보내보세요",
   "student.questionsTitle": "이 슬라이드의 질문",
   "student.questionsDescription": "슬라이드에 남긴 질문과 답변을 모두 확인할 수 있어요.",
+  "student.feedbackGuide": "슬라이드에 PIN이나 영역 질문을 남기고, 공감과 이모지로 함께 반응해 보세요.",
+  "student.feedbackListTitle": "실시간 질문",
+  "student.feedbackCount": ({ count: value }) => `공감순 · ${value}개`,
+  "student.feedbackEmpty": "이 슬라이드에 아직 질문이 없어요. 첫 PIN을 남겨보세요.",
+  "student.empathyAdd": ({ count: value }) => `공감하기, 현재 ${value}개`,
+  "student.empathyRemove": ({ count: value }) => `공감 취소, 현재 ${value}개`,
+  "student.empathyOwn": "내 질문에는 공감할 수 없어요.",
+  "student.empathyError": "공감 상태를 바꾸지 못했어요. 잠시 후 다시 시도해 주세요.",
+  "student.reactionError": "이모지 반응을 보내지 못했어요. 다시 시도해 주세요.",
   "student.chooseQuestionSlide": "질문을 확인할 슬라이드 선택",
   "student.previousSlideQuestions": "이전 슬라이드 질문",
   "student.nextSlideQuestions": "다음 슬라이드 질문",
@@ -843,6 +882,11 @@ const en: Record<TranslationKey, Message> = {
   "folders.moveError": "Could not move the material. Please try again in a moment.",
   "folders.insightScope": "Insight scope",
   "folders.insightAll": "Entire folder",
+  "folders.importPinFeedback": "Copy PinFeedback materials",
+  "folders.importingPinFeedback": "Copying PinFeedback materials…",
+  "folders.importPinFeedbackSuccess": ({ count: value }) => `Copied ${value} PinFeedback material${Number(value) === 1 ? "" : "s"} while preserving the originals.`,
+  "folders.importPinFeedbackNone": "There are no new PinFeedback materials to copy.",
+  "folders.importPinFeedbackError": "Could not copy PinFeedback materials. Please try again in a moment.",
 
   "dashboard.description": "See the questions that need answers and every lecture's status at a glance.",
   "dashboard.openInsights": "Open insights",
@@ -952,6 +996,13 @@ const en: Record<TranslationKey, Message> = {
   "session.speakerNotesShortcut": "Press ⌘/Ctrl + Enter to save",
   "session.saveSpeakerNotesError": "Could not save the speaker notes.",
   "session.showPins": "Show pins",
+  "session.presentationMode": "Slideshow interactions",
+  "session.presentationModeHint": "Off shows slides only. On enables PIN rotation, live highlights, empathy, fire, and emoji reactions.",
+  "session.interactiveMode": "Interactive",
+  "session.slidesOnlyMode": "Slides only",
+  "session.disableInteractions": "Turn slideshow interactions off",
+  "session.enableInteractions": "Turn slideshow interactions on",
+  "session.savePresentationModeError": "Could not save the slideshow mode.",
   "session.turnPinsOff": "Hide question pins on the slide",
   "session.turnPinsOn": "Show question pins on the slide",
   "session.qrPosition": "Slideshow QR position",
@@ -972,6 +1023,22 @@ const en: Record<TranslationKey, Message> = {
   "session.questionsDescription": "Review questions by slide and manage their answer status.",
   "session.totalQuestions": "Total questions",
   "session.searchQuestions": "Search questions",
+  "session.questionCategoryTitle": "Question categories",
+  "session.questionCategoryDescription": "Add question types or customize the names and availability shown to participants.",
+  "session.questionCategoryAdd": "Add category",
+  "session.questionCategoryPlaceholder": "New category name",
+  "session.questionCategoryDelete": ({ category }) => `Delete ${category} category`,
+  "session.questionCategoryDuplicate": "A category with that name already exists.",
+  "session.questionCategoryLimit": ({ count }) => `You can use up to ${count} categories.`,
+  "session.questionCategoryDisplayName": "Display name",
+  "session.questionCategoryDisplayNameAria": ({ category }) => `Display name for ${category}`,
+  "session.questionCategoryUse": "Use",
+  "session.questionCategoryUseAria": ({ category }) => `Use ${category} category`,
+  "session.questionCategoryEnabledHint": "Only enabled categories appear in the participant question form.",
+  "session.questionCategorySave": "Save categories",
+  "session.questionCategorySaving": "Saving…",
+  "session.questionCategoryInvalid": "Enable at least one category for participants.",
+  "session.questionCategorySaveError": "Could not save the question categories.",
   "session.inviteTitle": "Invite your students",
   "session.inviteDescription1": "Show the QR code or share the join link.",
   "session.inviteDescription2": "Students can ask questions right away without signing in.",
@@ -1005,6 +1072,8 @@ const en: Record<TranslationKey, Message> = {
   "presentation.joinQrAria": "Audience join QR code",
   "presentation.syncDelay": "Slide syncing is delayed.",
   "presentation.fullscreenError": "Could not enter full screen. Check your browser's full-screen permission.",
+  "presentation.pinTotal": ({ count: value }) => `${value} PINs in total`,
+  "question.empathyCount": ({ count: value }) => `${value} empathy reactions`,
 
   "question.closeDetail": "Close question details",
   "question.questionAndAnswer": "Question and answer",
@@ -1042,6 +1111,15 @@ const en: Record<TranslationKey, Message> = {
   "student.emojiHint": "Tap an emoji to send a reaction",
   "student.questionsTitle": "Questions on this slide",
   "student.questionsDescription": "See every question and answer left on this slide.",
+  "student.feedbackGuide": "Place a PIN or area question on the slide, then respond together with empathy and emoji reactions.",
+  "student.feedbackListTitle": "Live questions",
+  "student.feedbackCount": ({ count: value }) => `By empathy · ${count({ count: value }, "question")}`,
+  "student.feedbackEmpty": "No questions on this slide yet. Add the first PIN.",
+  "student.empathyAdd": ({ count: value }) => `Add empathy, currently ${value}`,
+  "student.empathyRemove": ({ count: value }) => `Remove empathy, currently ${value}`,
+  "student.empathyOwn": "You cannot empathize with your own question.",
+  "student.empathyError": "Could not update empathy. Please try again in a moment.",
+  "student.reactionError": "Could not send the emoji reaction. Please try again.",
   "student.chooseQuestionSlide": "Choose a slide to review questions",
   "student.previousSlideQuestions": "Questions on previous slide",
   "student.nextSlideQuestions": "Questions on next slide",
@@ -1466,8 +1544,11 @@ export const translate = (locale: Locale, key: TranslationKey, values: Values = 
 
 export const categoryKeys: QuestionCategory[] = ["concept", "why", "example", "error", "important"];
 
-export const categoryLabel = (locale: Locale, category: QuestionCategory) =>
-  translate(locale, `category.${category}` as TranslationKey);
+export const categoryLabel = (locale: Locale, category: QuestionCategory) => {
+  if ((categoryKeys as string[]).includes(category)) return translate(locale, `category.${category}` as TranslationKey);
+  if ((PIN_FEEDBACK_QUESTION_CATEGORY_KEYS as readonly string[]).includes(category)) return translate(locale, `pin.category.${category}` as TranslationKey);
+  return category;
+};
 
 export const statusLabel = (locale: Locale, status: QuestionStatus) =>
   translate(locale, `status.${status}` as TranslationKey);

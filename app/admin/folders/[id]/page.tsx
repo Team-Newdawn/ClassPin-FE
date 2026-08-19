@@ -13,7 +13,7 @@ import { UploadProgress } from "@/components/upload-progress";
 import { useSlideUpload } from "@/components/use-slide-upload";
 import { WorkspaceHeader } from "@/components/workspace-header";
 import { categoryBreakdown, countBy, heatLevel, pinRate, resolveRate, slideHeatmap } from "@/lib/stats";
-import type { ClassSession } from "@/lib/types";
+import { defaultQuestionCategorySettings, questionCategoryClass, questionCategoryLabel, questionMarkerEmoji, type ClassSession, type QuestionCategory } from "@/lib/types";
 
 type PageTab = "materials" | "insights";
 type View = "grid" | "list";
@@ -153,11 +153,13 @@ function MaterialCard({ session, folders, moving, onMove }: { session: ClassSess
 }
 
 function FolderInsights({ sessions }: { sessions: ClassSession[] }) {
-  const { t, categoryLabel, timeAgo } = useLanguage();
+  const { t, categoryLabel: defaultCategoryLabel, timeAgo } = useLanguage();
   const [scope, setScope] = useState("all");
   const selectedScope = scope === "all" || sessions.some((session) => session.id === scope) ? scope : "all";
   const selectedSessions = selectedScope === "all" ? sessions : sessions.filter((session) => session.id === selectedScope);
   const questions = selectedSessions.flatMap((session) => session.questions);
+  const settingsFor = (category: QuestionCategory) => selectedSessions.find((session) => category in session.questionCategories)?.questionCategories ?? defaultQuestionCategorySettings();
+  const categoryLabel = (category: QuestionCategory) => questionCategoryLabel(settingsFor(category), category, defaultCategoryLabel);
   const unanswered = countBy(questions, "unanswered");
   const hotspots = slideHeatmap(selectedSessions);
   const maxHeat = hotspots[0]?.count ?? 0;
@@ -208,8 +210,8 @@ function FolderInsights({ sessions }: { sessions: ClassSession[] }) {
             <ul className="cat-list">
               {categories.map((item) => (
                 <li key={item.key}>
-                  <span className="cat-head"><em className={`category ${item.key}`}>{item.label}</em><b>{item.count}</b></span>
-                  <span className="cat-track"><i className={`cat-fill ${item.key}`} style={{ width: `${maxCategory ? (item.count / maxCategory) * 100 : 0}%` }} /></span>
+                  <span className="cat-head"><em className={`category ${questionCategoryClass(settingsFor(item.key), item.key)}`}>{item.label}</em><b>{item.count}</b></span>
+                  <span className="cat-track"><i className={`cat-fill ${questionCategoryClass(settingsFor(item.key), item.key)}`} style={{ width: `${maxCategory ? (item.count / maxCategory) * 100 : 0}%` }} /></span>
                 </li>
               ))}
             </ul>
@@ -226,7 +228,7 @@ function FolderInsights({ sessions }: { sessions: ClassSession[] }) {
               <Link className="table-row" key={question.id} href={`/admin/session/${session.id}?tab=questions`}>
                 <span className="slide-cell"><b>{question.slideIndex + 1}</b><small>{session.title}</small></span>
                 <span className="question-text">{question.text}</span>
-                <span><em className={`category ${question.category}`}>{categoryLabel(question.category)}</em></span>
+                <span><em className={`category ${questionCategoryClass(session.questionCategories, question.category)}`}>{questionMarkerEmoji(question.marker) && <i aria-hidden="true">{questionMarkerEmoji(question.marker)}</i>}{categoryLabel(question.category)}</em></span>
                 <span><StatusBadge status={question.status} /></span>
                 <span className="muted">{timeAgo(question.createdAt)}</span>
                 <span><ArrowRight /></span>

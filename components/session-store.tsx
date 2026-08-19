@@ -5,7 +5,7 @@ import { useAuth } from "@/components/auth-context";
 import { defaultQuestionCategorySettings, isQuestionMarker, normalizeClassFolderName, normalizeQuestionCategorySettings, type ClassFolder, type ClassSession, type PresentationQrPosition, type Question, type QuestionCategorySettings, type Slide } from "@/lib/types";
 import { withQuestionReaction } from "@/lib/question-reactions";
 import { getAudienceSupabaseClient, getSupabaseClient, supabaseConfigured } from "@/lib/supabase/client";
-import { appendSessionSlides, createClassFolder as persistClassFolder, deleteSessionSlide, fetchLectureSnapshot, fetchLiveSession, fetchOwnedClassFolders, fetchOwnedSessions, fetchSessionSlides, importOwnedFeedbackCampaigns, markQuestionResolved, moveSessionToFolder as persistSessionFolder, persistSession, postAnswer, saveSlideInstructorNote, setQuestionReaction as persistQuestionReaction, submitQuestion, subscribeToLecture, updateLecture, updateQuestion as persistQuestionUpdate } from "@/lib/supabase/repository";
+import { appendSessionSlides, createClassFolder as persistClassFolder, deleteClassFolder as persistClassFolderDeletion, deleteClassSession as persistSessionDeletion, deleteSessionSlide, fetchLectureSnapshot, fetchLiveSession, fetchOwnedClassFolders, fetchOwnedSessions, fetchSessionSlides, importOwnedFeedbackCampaigns, markQuestionResolved, moveSessionToFolder as persistSessionFolder, persistSession, postAnswer, saveSlideInstructorNote, setQuestionReaction as persistQuestionReaction, submitQuestion, subscribeToLecture, updateLecture, updateQuestion as persistQuestionUpdate } from "@/lib/supabase/repository";
 
 const STORAGE_KEY = "pin-class-sessions-v1";
 const FOLDER_STORAGE_KEY = "pin-class-folders-v1";
@@ -19,9 +19,11 @@ type Store = {
   sessions: ClassSession[];
   folders: ClassFolder[];
   createFolder: (name: string) => Promise<ClassFolder>;
+  deleteFolder: (folderId: string) => Promise<void>;
   importPinFeedbackMaterials: () => Promise<number>;
   moveSessionToFolder: (sessionId: string, folderId: string | null) => Promise<void>;
   createSession: (input: { folderId: string | null; title: string; fileName: string; slides: Slide[] }) => Promise<ClassSession>;
+  deleteSession: (sessionId: string) => Promise<void>;
   appendSlides: (sessionId: string, files: File[]) => Promise<void>;
   deleteSlide: (sessionId: string, slideId: string) => Promise<void>;
   addQuestion: (sessionId: string, question: Omit<Question, "id" | "sessionId" | "createdAt" | "status" | "isMine" | "reactionCount" | "reactedByMe">) => Promise<void>;
@@ -346,6 +348,12 @@ export function SessionStore({ children }: { children: React.ReactNode }) {
     sessions,
     folders,
     createFolder,
+    deleteFolder: async (folderId) => {
+      if (!folders.some((folder) => folder.id === folderId)) throw new Error("삭제할 폴더를 찾지 못했습니다.");
+      if (supabaseConfigured) await persistClassFolderDeletion(folderId);
+      setFolders((current) => current.filter((folder) => folder.id !== folderId));
+      setSessions((current) => current.map((session) => session.folderId === folderId ? { ...session, folderId: null } : session));
+    },
     importPinFeedbackMaterials,
     moveSessionToFolder: async (sessionId, folderId) => {
       const session = sessions.find((item) => item.id === sessionId);
@@ -359,6 +367,15 @@ export function SessionStore({ children }: { children: React.ReactNode }) {
       updateSession(sessionId, (current) => ({ ...current, folderId }));
     },
     createSession,
+    deleteSession: async (sessionId) => {
+      const session = sessions.find((item) => item.id === sessionId);
+      if (!session) throw new Error("삭제할 강의 자료를 찾지 못했습니다.");
+      if (supabaseConfigured) {
+        if (!session.courseId) throw new Error("강의 자료의 저장 정보를 찾지 못했습니다.");
+        await persistSessionDeletion(session.courseId);
+      }
+      setSessions((current) => current.filter((item) => item.id !== sessionId));
+    },
     appendSlides: async (sessionId, files) => {
       const session = sessions.find((item) => item.id === sessionId);
       if (!session) throw new Error("슬라이드를 추가할 강의를 찾지 못했습니다.");

@@ -303,6 +303,20 @@ export async function createClassFolder(name: string): Promise<ClassFolder> {
   return { id: folder.id, name: folder.name, createdAt: folder.created_at };
 }
 
+export async function deleteClassFolder(folderId: string): Promise<void> {
+  const client = getSupabaseClient();
+  if (!client) throw new Error("Supabase 연결을 찾지 못했습니다.");
+  const user = await requireOwnerUser();
+  const { data, error } = await client.from("session_folders")
+    .delete()
+    .eq("id", folderId)
+    .eq("owner_id", user.id)
+    .select("id")
+    .maybeSingle();
+  if (error) throw error;
+  if (!data) throw new Error("삭제할 폴더를 찾지 못했습니다.");
+}
+
 export async function moveSessionToFolder(courseId: string, folderId: string | null): Promise<void> {
   const client = getSupabaseClient();
   if (!client) throw new Error("Supabase 연결을 찾지 못했습니다.");
@@ -315,6 +329,56 @@ export async function moveSessionToFolder(courseId: string, folderId: string | n
     .maybeSingle();
   if (error) throw error;
   if (!data) throw new Error("이동할 강의 자료를 찾지 못했습니다.");
+}
+
+/** 코스와 cascade 데이터를 지운 뒤 더는 참조되지 않는 원본·렌더 이미지를 회수한다. */
+export async function deleteClassSession(courseId: string): Promise<void> {
+  const client = getSupabaseClient();
+  if (!client) throw new Error("Supabase 연결을 찾지 못했습니다.");
+  const user = await requireOwnerUser();
+  const { data: materialData, error: materialError } = await client.from("materials")
+    .select("id")
+    .eq("course_id", courseId);
+  if (materialError) throw materialError;
+  const materialIds = (materialData ?? []).map((material) => material.id as string);
+
+  let sourcePaths: string[] = [];
+  let imagePaths: string[] = [];
+  if (materialIds.length) {
+    const { data: versionData, error: versionError } = await client.from("material_versions")
+      .select("id, source_path")
+      .in("material_id", materialIds);
+    if (versionError) throw versionError;
+    const versions = (versionData ?? []) as Array<{ id: string; source_path: string }>;
+    sourcePaths = [...new Set(versions.map((version) => version.source_path).filter((path) => path.startsWith(`${user.id}/`)))];
+    const versionIds = versions.map((version) => version.id);
+    if (versionIds.length) {
+      const { data: slideData, error: slideError } = await client.from("slides")
+        .select("image_path")
+        .in("material_version_id", versionIds);
+      if (slideError) throw slideError;
+      imagePaths = [...new Set((slideData ?? []).map((slide) => slide.image_path as string).filter((path) => path.startsWith(`${user.id}/`)))];
+    }
+  }
+
+  const { data, error } = await client.from("courses")
+    .delete()
+    .eq("id", courseId)
+    .eq("owner_id", user.id)
+    .select("id")
+    .maybeSingle();
+  if (error) throw error;
+  if (!data) throw new Error("삭제할 강의 자료를 찾지 못했습니다.");
+
+  const cleanup = [
+    sourcePaths.length ? client.storage.from("course-materials").remove(sourcePaths) : null,
+    imagePaths.length ? client.storage.from("lecture-slides").remove(imagePaths) : null
+  ].filter((request): request is NonNullable<typeof request> => request !== null);
+  const results = await Promise.all(cleanup);
+  results.forEach(({ error: storageError }) => {
+    // DB 삭제는 이미 끝났다. 재시도로 복구할 수 없는 전체 실패로 보이지 않는다.
+    if (storageError) console.error("Deleted class material storage cleanup failed", storageError);
+  });
 }
 
 const APPENDABLE_SLIDE_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);

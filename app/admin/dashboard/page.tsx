@@ -2,7 +2,7 @@
 
 import { useRef, useState } from "react";
 import Link from "next/link";
-import { Copy, Folder, FolderPlus, Plus, Search, Upload, X } from "@/components/icons";
+import { Folder, FolderPlus, Plus, Search, Trash2, Upload, X } from "@/components/icons";
 import { useLanguage } from "@/components/language-context";
 import { SlideCanvas } from "@/components/slide-canvas";
 import { useSessions } from "@/components/session-store";
@@ -10,23 +10,21 @@ import { SlidePreview } from "@/components/slide-preview";
 import { UploadProgress } from "@/components/upload-progress";
 import { useSlideUpload } from "@/components/use-slide-upload";
 import { WorkspaceHeader } from "@/components/workspace-header";
-import { supabaseConfigured } from "@/lib/supabase/client";
 import type { ClassSession } from "@/lib/types";
 
 const UNFILED_ID = "unfiled";
 
 export default function DashboardPage() {
   const { t, timeAgo } = useLanguage();
-  const { folders, sessions, createFolder, importPinFeedbackMaterials, ready } = useSessions();
+  const { folders, sessions, createFolder, deleteFolder, ready } = useSessions();
   const inputRef = useRef<HTMLInputElement>(null);
   const [folderModalOpen, setFolderModalOpen] = useState(false);
   const [folderName, setFolderName] = useState("");
   const [query, setQuery] = useState("");
   const [folderError, setFolderError] = useState<string | null>(null);
   const [creatingFolder, setCreatingFolder] = useState(false);
-  const [importing, setImporting] = useState(false);
-  const [importMessage, setImportMessage] = useState<string | null>(null);
-  const [importError, setImportError] = useState<string | null>(null);
+  const [deletingFolderId, setDeletingFolderId] = useState<string | null>(null);
+  const [folderActionError, setFolderActionError] = useState<string | null>(null);
   const { phase, uploadPct, error: uploadError, slides, total, showPreview, busy, start } = useSlideUpload(null);
 
   if (!ready) return <div className="loading-screen"><span className="spinner dark" /></div>;
@@ -58,18 +56,17 @@ export default function DashboardPage() {
     }
   };
 
-  const importPinFeedback = async () => {
-    setImportMessage(null);
-    setImportError(null);
-    setImporting(true);
+  const removeFolder = async (folder: { id: string; name: string; sessions: ClassSession[] }) => {
+    if (deletingFolderId || !window.confirm(t("folders.deleteConfirm", { name: folder.name, count: folder.sessions.length }))) return;
+    setDeletingFolderId(folder.id);
+    setFolderActionError(null);
     try {
-      const count = await importPinFeedbackMaterials();
-      setImportMessage(count ? t("folders.importPinFeedbackSuccess", { count }) : t("folders.importPinFeedbackNone"));
+      await deleteFolder(folder.id);
     } catch (error) {
-      console.error(t("folders.importPinFeedbackError"), error);
-      setImportError(t("folders.importPinFeedbackError"));
+      console.error("Class folder deletion failed", error);
+      setFolderActionError(t("folders.deleteError"));
     } finally {
-      setImporting(false);
+      setDeletingFolderId(null);
     }
   };
 
@@ -82,15 +79,13 @@ export default function DashboardPage() {
         <div className="page-head">
           <div><h1>{t("folders.dashboardTitle")}</h1><p>{t("folders.dashboardDescription")}</p></div>
           <div className="page-actions">
-            {supabaseConfigured && <button type="button" className="btn secondary" onClick={() => void importPinFeedback()} disabled={busy || importing}>{importing ? <span className="spinner dark" /> : <Copy />}{t(importing ? "folders.importingPinFeedback" : "folders.importPinFeedback")}</button>}
             <button type="button" className="btn secondary" onClick={() => inputRef.current?.click()} disabled={busy}><Upload />{t("folders.uploadUnfiled")}</button>
             <button type="button" className="btn primary" onClick={() => { setFolderError(null); setFolderModalOpen(true); }}><FolderPlus />{t("folders.newFolder")}</button>
           </div>
         </div>
 
         {uploadError && <div className="upload-error" role="alert">{uploadError}</div>}
-        {importError && <div className="upload-error" role="alert">{importError}</div>}
-        {importMessage && <div className="import-status" role="status">{importMessage}</div>}
+        {folderActionError && <div className="session-folder-error" role="alert">{folderActionError}</div>}
         {busy && <UploadProgress phase={phase} uploadPct={uploadPct} done={slides.length} total={total} />}
         {showPreview && <SlidePreview slides={slides} total={total} />}
 
@@ -101,7 +96,7 @@ export default function DashboardPage() {
           </div>
           {visibleSummaries.length ? (
             <div className="folder-grid">
-              {visibleSummaries.map((folder) => <FolderCard key={folder.id} folder={folder} timeAgo={timeAgo} />)}
+              {visibleSummaries.map((folder) => <FolderCard key={folder.id} folder={folder} timeAgo={timeAgo} deleting={deletingFolderId === folder.id} onDelete={folder.id === UNFILED_ID ? undefined : () => void removeFolder(folder)} />)}
               <button type="button" className="folder-card folder-card-create" onClick={() => { setFolderError(null); setFolderModalOpen(true); }}>
                 <span className="folder-card-create-icon"><Plus /></span>
                 <b>{t("folders.newFolder")}</b>
@@ -137,7 +132,7 @@ export default function DashboardPage() {
   );
 }
 
-function FolderCard({ folder, timeAgo }: { folder: { id: string; name: string; createdAt: string; sessions: ClassSession[] }; timeAgo: (date: string) => string }) {
+function FolderCard({ folder, timeAgo, deleting, onDelete }: { folder: { id: string; name: string; createdAt: string; sessions: ClassSession[] }; timeAgo: (date: string) => string; deleting: boolean; onDelete?: () => void }) {
   const { t } = useLanguage();
   const slideCount = folder.sessions.reduce((sum, session) => sum + session.slides.length, 0);
   const questionCount = folder.sessions.reduce((sum, session) => sum + session.questions.length, 0);
@@ -145,19 +140,22 @@ function FolderCard({ folder, timeAgo }: { folder: { id: string; name: string; c
   const latest = folder.sessions.reduce((value, session) => Math.max(value, new Date(session.createdAt).getTime()), folder.createdAt ? new Date(folder.createdAt).getTime() : 0);
 
   return (
-    <Link className="folder-card" href={`/admin/folders/${folder.id}`} aria-label={t("folders.openFolder", { name: folder.name })}>
-      <span className={`folder-card-cover ${cover ? "" : "empty"}`}>
-        {cover ? <SlideCanvas slide={cover} compact /> : <Folder />}
-      </span>
-      <span className="folder-card-body">
-        <span className="folder-card-title"><Folder /><b>{folder.name}</b></span>
-        <span className="folder-card-stats">
-          <span><b>{folder.sessions.length}</b>{t("folders.materials")}</span>
-          <span><b>{slideCount}</b>{t("common.slide")}</span>
-          <span><b>{questionCount}</b>{t("common.question")}</span>
+    <article className="folder-card">
+      <Link className="folder-card-link" href={`/admin/folders/${folder.id}`} aria-label={t("folders.openFolder", { name: folder.name })}>
+        <span className={`folder-card-cover ${cover ? "" : "empty"}`}>
+          {cover ? <SlideCanvas slide={cover} compact /> : <Folder />}
         </span>
-        <small className="folder-card-meta">{latest ? t("folders.updated", { time: timeAgo(new Date(latest).toISOString()) }) : t("folders.empty")}</small>
-      </span>
-    </Link>
+        <span className="folder-card-body">
+          <span className="folder-card-title"><Folder /><b>{folder.name}</b></span>
+          <span className="folder-card-stats">
+            <span><b>{folder.sessions.length}</b>{t("folders.materials")}</span>
+            <span><b>{slideCount}</b>{t("common.slide")}</span>
+            <span><b>{questionCount}</b>{t("common.question")}</span>
+          </span>
+          <small className="folder-card-meta">{latest ? t("folders.updated", { time: timeAgo(new Date(latest).toISOString()) }) : t("folders.empty")}</small>
+        </span>
+      </Link>
+      {onDelete && <button type="button" className="icon-btn folder-card-delete" onClick={onDelete} disabled={deleting} aria-label={t("folders.deleteFolder", { name: folder.name })} title={t("folders.deleteFolder", { name: folder.name })}>{deleting ? <span className="spinner dark" /> : <Trash2 />}</button>}
+    </article>
   );
 }

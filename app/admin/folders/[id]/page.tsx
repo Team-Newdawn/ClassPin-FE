@@ -3,7 +3,7 @@
 import { useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { ArrowLeft, ArrowRight, BarChart3, FileText, Folder, Grid2X2, List, MessageCircleQuestion, Search, Upload } from "@/components/icons";
+import { ArrowLeft, ArrowRight, BarChart3, FileText, Folder, Grid2X2, List, MessageCircleQuestion, Search, Trash2, Upload, X } from "@/components/icons";
 import { useLanguage } from "@/components/language-context";
 import { SlideCanvas } from "@/components/slide-canvas";
 import { SlidePreview } from "@/components/slide-preview";
@@ -22,13 +22,16 @@ export default function FolderPage() {
   const { id } = useParams<{ id: string }>();
   const folderId = id === "unfiled" ? null : id;
   const { t } = useLanguage();
-  const { folders, sessions, moveSessionToFolder, ready } = useSessions();
+  const { folders, sessions, deleteSession, moveSessionToFolder, ready } = useSessions();
   const inputRef = useRef<HTMLInputElement>(null);
   const [tab, setTab] = useState<PageTab>("materials");
   const [view, setView] = useState<View>("grid");
   const [query, setQuery] = useState("");
   const [movingId, setMovingId] = useState<string | null>(null);
   const [moveError, setMoveError] = useState<string | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<ClassSession | null>(null);
+  const [deletingSession, setDeletingSession] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
   const { phase, uploadPct, error: uploadError, slides, total, showPreview, busy, start } = useSlideUpload(folderId);
 
   const folder = folderId === null ? { id: "unfiled", name: t("folders.unfiled") } : folders.find((item) => item.id === folderId);
@@ -69,6 +72,27 @@ export default function FolderPage() {
     }
   };
 
+  const closeDelete = () => {
+    if (deletingSession) return;
+    setDeleteTarget(null);
+    setDeleteError(null);
+  };
+
+  const confirmDelete = async () => {
+    if (!deleteTarget || deletingSession) return;
+    setDeletingSession(true);
+    setDeleteError(null);
+    try {
+      await deleteSession(deleteTarget.id);
+      setDeleteTarget(null);
+    } catch (error) {
+      console.error("Class material deletion failed", error);
+      setDeleteError(t("materials.deleteError"));
+    } finally {
+      setDeletingSession(false);
+    }
+  };
+
   return (
     <main className="folder-workspace">
       <WorkspaceHeader />
@@ -105,7 +129,7 @@ export default function FolderPage() {
             {visibleSessions.length ? (
               <div className={`folder-materials ${view}`}>
                 {visibleSessions.map((session) => (
-                  <MaterialCard key={session.id} session={session} folders={folders} moving={movingId === session.id} onMove={(nextFolderId) => void move(session.id, nextFolderId)} />
+                  <MaterialCard key={session.id} session={session} folders={folders} moving={movingId === session.id} onMove={(nextFolderId) => void move(session.id, nextFolderId)} onDelete={() => { setDeleteError(null); setDeleteTarget(session); }} />
                 ))}
               </div>
             ) : (
@@ -121,11 +145,29 @@ export default function FolderPage() {
           <FolderInsights key={scopedSessions.map((session) => session.id).join("|")} sessions={scopedSessions} />
         )}
       </div>
+
+      {deleteTarget && (
+        <div className="modal-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) closeDelete(); }}>
+          <section className="delete-slide-modal" role="alertdialog" aria-modal="true" aria-labelledby="delete-material-title" aria-describedby="delete-material-description" onKeyDown={(event) => { if (event.key === "Escape") closeDelete(); }}>
+            <button type="button" className="modal-close" disabled={deletingSession} onClick={closeDelete} aria-label={t("folders.cancel")}><X /></button>
+            <span className="delete-slide-icon"><Trash2 /></span>
+            <h2 id="delete-material-title">{t("materials.deleteTitle")}</h2>
+            <p id="delete-material-description">{t("materials.deleteDescription", { title: deleteTarget.title })}</p>
+            {deleteTarget.slides[0] && <div className="delete-slide-preview"><SlideCanvas slide={deleteTarget.slides[0]} compact /><span>{deleteTarget.fileName}</span></div>}
+            <div className="delete-slide-warning"><b>{t("materials.deleteWarning")}</b><span>{t("materials.deleteData", { slides: deleteTarget.slides.length, questions: deleteTarget.questions.length })}</span></div>
+            {deleteError && <div className="login-error" role="alert">{deleteError} {t("common.tryAgain")}</div>}
+            <div className="delete-slide-actions">
+              <button type="button" className="btn secondary" disabled={deletingSession} onClick={closeDelete}>{t("folders.cancel")}</button>
+              <button type="button" className="btn destructive" disabled={deletingSession} onClick={() => void confirmDelete()}>{deletingSession ? <><span className="spinner" />{t("materials.deleting")}</> : <><Trash2 />{t("materials.deleteConfirm")}</>}</button>
+            </div>
+          </section>
+        </div>
+      )}
     </main>
   );
 }
 
-function MaterialCard({ session, folders, moving, onMove }: { session: ClassSession; folders: { id: string; name: string }[]; moving: boolean; onMove: (folderId: string) => void }) {
+function MaterialCard({ session, folders, moving, onMove, onDelete }: { session: ClassSession; folders: { id: string; name: string }[]; moving: boolean; onMove: (folderId: string) => void; onDelete: () => void }) {
   const { t } = useLanguage();
   const unanswered = countBy(session.questions, "unanswered");
 
@@ -139,15 +181,18 @@ function MaterialCard({ session, folders, moving, onMove }: { session: ClassSess
           <span className="material-stats"><span><b>{session.slides.length}</b>{t("common.slide")}</span><span><b>{session.questions.length}</b>{t("common.question")}</span><span className={unanswered ? "alert" : ""}><b>{unanswered}</b>{t("status.unanswered")}</span></span>
         </span>
       </Link>
-      <label className="material-move">
-        <Folder />
-        <span>{t("folders.moveTo")}</span>
-        <select value={session.folderId ?? ""} aria-label={t("folders.moveMaterial", { title: session.title })} disabled={moving} onChange={(event) => onMove(event.target.value)}>
-          <option value="">{t("folders.unfiled")}</option>
-          {folders.map((folder) => <option key={folder.id} value={folder.id}>{folder.name}</option>)}
-        </select>
-        {moving && <span className="spinner dark" aria-label={t("folders.moving")} />}
-      </label>
+      <div className="material-card-footer">
+        <label className="material-move">
+          <Folder />
+          <span>{t("folders.moveTo")}</span>
+          <select value={session.folderId ?? ""} aria-label={t("folders.moveMaterial", { title: session.title })} disabled={moving} onChange={(event) => onMove(event.target.value)}>
+            <option value="">{t("folders.unfiled")}</option>
+            {folders.map((folder) => <option key={folder.id} value={folder.id}>{folder.name}</option>)}
+          </select>
+          {moving && <span className="spinner dark" aria-label={t("folders.moving")} />}
+        </label>
+        <button type="button" className="icon-btn material-delete-button" onClick={onDelete} aria-label={t("materials.deleteMaterial", { title: session.title })} title={t("materials.deleteMaterial", { title: session.title })}><Trash2 /></button>
+      </div>
     </article>
   );
 }

@@ -1,4 +1,4 @@
-import type { PresentationQrPosition } from "@/lib/types";
+import { QUESTION_MARKERS, questionMarkerEmoji, type PresentationQrPosition, type QuestionMarker } from "../types.ts";
 
 /**
  * 민원이 아니라 피드백을 받는다. 문제만 모으면 민원함이 되므로 긍정(praise)을 1급으로 둔다.
@@ -141,8 +141,8 @@ export interface SessionFolder {
 /** 긍정으로 집계하는 카테고리. 나머지는 개선 신호로 본다. */
 export const positiveCategories: readonly FeedbackCategory[] = ["praise"];
 
-export const FEEDBACK_PIN_MARKERS = ["pin", "question", "smile", "idea"] as const;
-export type FeedbackPinMarker = typeof FEEDBACK_PIN_MARKERS[number];
+export const FEEDBACK_PIN_MARKERS = QUESTION_MARKERS;
+export type FeedbackPinMarker = QuestionMarker;
 
 export const isFeedbackPinMarker = (value: unknown): value is FeedbackPinMarker =>
   typeof value === "string" && (FEEDBACK_PIN_MARKERS as readonly string[]).includes(value);
@@ -150,8 +150,7 @@ export const isFeedbackPinMarker = (value: unknown): value is FeedbackPinMarker 
 export const normalizeFeedbackPinMarker = (value: unknown): FeedbackPinMarker =>
   isFeedbackPinMarker(value) ? value : "pin";
 
-export const feedbackPinMarkerEmoji = (marker: FeedbackPinMarker): string | null =>
-  marker === "question" ? "❓" : marker === "smile" ? "🙂" : marker === "idea" ? "💡" : null;
+export const feedbackPinMarkerEmoji = questionMarkerEmoji;
 
 export const normalizeFeedbackPinReactionCount = (value: unknown) => {
   const count = typeof value === "number" || typeof value === "string" ? Number(value) : 0;

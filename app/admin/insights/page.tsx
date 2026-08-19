@@ -8,15 +8,18 @@ import { ArrowRight, MessageCircleQuestion, Sparkles } from "@/components/icons"
 import { useSessions } from "@/components/session-store";
 import { StatusBadge } from "@/components/status-badge";
 import { categoryBreakdown, countBy, heatLevel, pinRate, resolveRate, slideHeatmap } from "@/lib/stats";
+import { defaultQuestionCategorySettings, questionCategoryClass, questionCategoryLabel, questionMarkerEmoji, type QuestionCategory } from "@/lib/types";
 
 export default function InsightsPage() {
-  const { t, categoryLabel, timeAgo } = useLanguage();
+  const { t, categoryLabel: defaultCategoryLabel, timeAgo } = useLanguage();
   const { sessions, ready } = useSessions();
   const [scope, setScope] = useState<string>("all");
   if (!ready) return <div className="loading-screen"><span className="spinner dark" /></div>;
 
   const scoped = scope === "all" ? sessions : sessions.filter((session) => session.id === scope);
   const questions = scoped.flatMap((session) => session.questions);
+  const settingsFor = (category: QuestionCategory) => scoped.find((session) => category in session.questionCategories)?.questionCategories ?? defaultQuestionCategorySettings();
+  const categoryLabel = (category: QuestionCategory) => questionCategoryLabel(settingsFor(category), category, defaultCategoryLabel);
   const unanswered = countBy(questions, "unanswered");
   const hotspots = slideHeatmap(scoped);
   const maxHeat = hotspots[0]?.count ?? 0;
@@ -69,8 +72,8 @@ export default function InsightsPage() {
               <ul className="cat-list">
                 {categories.map((item) => (
                   <li key={item.key}>
-                    <span className="cat-head"><em className={`category ${item.key}`}>{item.label}</em><b>{item.count}</b></span>
-                    <span className="cat-track"><i className={`cat-fill ${item.key}`} style={{ width: `${maxCategory ? (item.count / maxCategory) * 100 : 0}%` }} /></span>
+                    <span className="cat-head"><em className={`category ${questionCategoryClass(settingsFor(item.key), item.key)}`}>{item.label}</em><b>{item.count}</b></span>
+                    <span className="cat-track"><i className={`cat-fill ${questionCategoryClass(settingsFor(item.key), item.key)}`} style={{ width: `${maxCategory ? (item.count / maxCategory) * 100 : 0}%` }} /></span>
                   </li>
                 ))}
               </ul>
@@ -103,7 +106,7 @@ export default function InsightsPage() {
                 <Link className="table-row" key={question.id} href={`/admin/session/${session.id}?tab=questions`}>
                   <span className="slide-cell"><b>{question.slideIndex + 1}</b><small>{session.title}</small></span>
                   <span className="question-text">{question.text}</span>
-                  <span><em className={`category ${question.category}`}>{categoryLabel(question.category)}</em></span>
+                  <span><em className={`category ${questionCategoryClass(session.questionCategories, question.category)}`}>{questionMarkerEmoji(question.marker) && <i aria-hidden="true">{questionMarkerEmoji(question.marker)}</i>}{categoryLabel(question.category)}</em></span>
                   <span><StatusBadge status={question.status} /></span>
                   <span className="muted">{timeAgo(question.createdAt)}</span>
                   <span><ArrowRight /></span>

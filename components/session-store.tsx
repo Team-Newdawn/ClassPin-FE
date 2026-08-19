@@ -2,9 +2,10 @@
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { useAuth } from "@/components/auth-context";
-import { normalizeClassFolderName, type ClassFolder, type ClassSession, type PresentationQrPosition, type Question, type Slide } from "@/lib/types";
+import { defaultQuestionCategorySettings, isQuestionMarker, normalizeClassFolderName, normalizeQuestionCategorySettings, type ClassFolder, type ClassSession, type PresentationQrPosition, type Question, type QuestionCategorySettings, type Slide } from "@/lib/types";
+import { withQuestionReaction } from "@/lib/question-reactions";
 import { getAudienceSupabaseClient, getSupabaseClient, supabaseConfigured } from "@/lib/supabase/client";
-import { appendSessionSlides, createClassFolder as persistClassFolder, deleteSessionSlide, fetchLectureSnapshot, fetchLectureStatus, fetchLiveSession, fetchOwnedClassFolders, fetchOwnedSessions, fetchSessionSlides, markQuestionResolved, moveSessionToFolder as persistSessionFolder, persistSession, postAnswer, saveSlideInstructorNote, submitQuestion, subscribeToLecture, updateLecture, updateQuestion as persistQuestionUpdate } from "@/lib/supabase/repository";
+import { appendSessionSlides, createClassFolder as persistClassFolder, deleteSessionSlide, fetchLectureSnapshot, fetchLiveSession, fetchOwnedClassFolders, fetchOwnedSessions, fetchSessionSlides, importOwnedFeedbackCampaigns, markQuestionResolved, moveSessionToFolder as persistSessionFolder, persistSession, postAnswer, saveSlideInstructorNote, setQuestionReaction as persistQuestionReaction, submitQuestion, subscribeToLecture, updateLecture, updateQuestion as persistQuestionUpdate } from "@/lib/supabase/repository";
 
 const STORAGE_KEY = "pin-class-sessions-v1";
 const FOLDER_STORAGE_KEY = "pin-class-folders-v1";
@@ -18,19 +19,23 @@ type Store = {
   sessions: ClassSession[];
   folders: ClassFolder[];
   createFolder: (name: string) => Promise<ClassFolder>;
+  importPinFeedbackMaterials: () => Promise<number>;
   moveSessionToFolder: (sessionId: string, folderId: string | null) => Promise<void>;
   createSession: (input: { folderId: string | null; title: string; fileName: string; slides: Slide[] }) => Promise<ClassSession>;
   appendSlides: (sessionId: string, files: File[]) => Promise<void>;
   deleteSlide: (sessionId: string, slideId: string) => Promise<void>;
-  addQuestion: (sessionId: string, question: Omit<Question, "id" | "sessionId" | "createdAt" | "status">) => Promise<void>;
-  updateQuestion: (sessionId: string, questionId: string, values: Pick<Question, "category" | "text">) => Promise<void>;
+  addQuestion: (sessionId: string, question: Omit<Question, "id" | "sessionId" | "createdAt" | "status" | "isMine" | "reactionCount" | "reactedByMe">) => Promise<void>;
+  updateQuestion: (sessionId: string, questionId: string, values: Pick<Question, "category" | "marker" | "text">) => Promise<void>;
+  reactToQuestion: (sessionId: string, questionId: string, reacted: boolean) => Promise<void>;
   answerQuestion: (sessionId: string, questionId: string, answer: string) => Promise<void>;
   resolveQuestion: (sessionId: string, questionId: string) => Promise<void>;
   setCurrentSlide: (sessionId: string, slide: number) => Promise<void>;
   setStatus: (sessionId: string, status: ClassSession["status"]) => Promise<void>;
+  setPresentationInteractions: (sessionId: string, enabled: boolean) => Promise<void>;
   setShowQuestionPins: (sessionId: string, visible: boolean) => Promise<void>;
   setShowPresentationQr: (sessionId: string, visible: boolean) => Promise<void>;
   setPresentationQrPosition: (sessionId: string, position: PresentationQrPosition) => Promise<void>;
+  setQuestionCategories: (sessionId: string, settings: QuestionCategorySettings) => Promise<void>;
   updateSlideNote: (sessionId: string, slideId: string, body: string) => Promise<void>;
   loadSessionByCode: (code: string) => Promise<ClassSession | null>;
 };
@@ -82,12 +87,26 @@ const dedupeById = (list: ClassSession[]) => {
   const seen = new Set<string>();
   const normalized = list.map((session) => {
     const folderId = session.folderId ?? null;
+    const presentationInteractions = session.presentationInteractions ?? true;
     const showQuestionPins = session.showQuestionPins ?? true;
     const showPresentationQr = session.showPresentationQr ?? true;
     const presentationQrPosition = session.presentationQrPosition ?? "bottom-right";
-    return folderId === session.folderId && showQuestionPins === session.showQuestionPins && showPresentationQr === session.showPresentationQr && presentationQrPosition === session.presentationQrPosition
+    const normalizedQuestionCategories = normalizeQuestionCategorySettings(session.questionCategories);
+    const questionCategories = JSON.stringify(normalizedQuestionCategories) === JSON.stringify(session.questionCategories)
+      ? session.questionCategories
+      : normalizedQuestionCategories;
+    const questions = session.questions.map((question) => {
+      const isMine = question.isMine ?? true;
+      const reactionCount = Math.max(0, question.reactionCount ?? 0);
+      const reactedByMe = question.reactedByMe ?? false;
+      const marker = isQuestionMarker(question.marker) ? question.marker : "pin";
+      return isMine === question.isMine && reactionCount === question.reactionCount && reactedByMe === question.reactedByMe && marker === question.marker
+        ? question
+        : { ...question, isMine, reactionCount, reactedByMe, marker };
+    });
+    return folderId === session.folderId && presentationInteractions === session.presentationInteractions && showQuestionPins === session.showQuestionPins && showPresentationQr === session.showPresentationQr && presentationQrPosition === session.presentationQrPosition && questionCategories === session.questionCategories && questions.every((question, index) => question === session.questions[index])
       ? session
-      : { ...session, folderId, showQuestionPins, showPresentationQr, presentationQrPosition };
+      : { ...session, folderId, presentationInteractions, showQuestionPins, showPresentationQr, presentationQrPosition, questionCategories, questions };
   });
   const unique = normalized.filter((session) => {
     if (seen.has(session.id)) return false;
@@ -232,13 +251,9 @@ export function SessionStore({ children }: { children: React.ReactNode }) {
     if (asAudience) {
       statusPoll = setInterval(() => {
         tracked.forEach((session) => {
-          const latestSession = sessionsRef.current.find((item) => item.id === session.id) ?? session;
-          void fetchLectureStatus(latestSession, true)
-            .then((status) => {
-              if (!active) return;
-              setSessions((current) => current.map((item) => item.id === session.id && item.status !== status ? { ...item, status } : item));
-            })
-            .catch((error) => console.error("Supabase lecture status refresh failed", error));
+          // 다른 작성자의 questions 행은 RLS 때문에 Postgres Changes 이벤트가 오지
+          // 않을 수 있다. 공개 RPC 스냅샷으로 공감 순서와 종료 상태를 함께 보정한다.
+          void refresh(sessionsRef.current.find((item) => item.id === session.id) ?? session);
         });
       }, PARTICIPANT_STATUS_POLL_MS);
     }
@@ -306,13 +321,21 @@ export function SessionStore({ children }: { children: React.ReactNode }) {
       id: crypto.randomUUID(), courseId: crypto.randomUUID(), materialId: crypto.randomUUID(), materialVersionId,
       folderId: input.folderId,
       code: makeCode(), title: input.title, fileName: input.fileName,
-      status: "live", currentSlide: 0, showQuestionPins: true, showPresentationQr: true, presentationQrPosition: "bottom-right",
+      status: "live", currentSlide: 0, presentationInteractions: true, showQuestionPins: true, showPresentationQr: true, presentationQrPosition: "bottom-right",
+      questionCategories: defaultQuestionCategorySettings(),
       createdAt: new Date().toISOString(), slides: input.slides, questions: []
     };
     if (supabaseConfigured) await persistSession(session);
     setSessions((current) => [session, ...current]);
     return session;
   }, [folders]);
+
+  const importPinFeedbackMaterials = useCallback(async () => {
+    if (!supabaseConfigured) throw new Error("PinFeedback 자료 복사는 Supabase 모드에서만 사용할 수 있습니다.");
+    const imported = await importOwnedFeedbackCampaigns();
+    if (imported) setSessions(dedupeById(await fetchOwnedSessions()));
+    return imported;
+  }, []);
 
   const updateSession = useCallback((id: string, fn: (session: ClassSession) => ClassSession) => {
     setSessions((current) => current.map((session) => session.id === id ? fn(session) : session));
@@ -323,6 +346,7 @@ export function SessionStore({ children }: { children: React.ReactNode }) {
     sessions,
     folders,
     createFolder,
+    importPinFeedbackMaterials,
     moveSessionToFolder: async (sessionId, folderId) => {
       const session = sessions.find((item) => item.id === sessionId);
       if (!session) throw new Error("이동할 강의 자료를 찾지 못했습니다.");
@@ -390,7 +414,16 @@ export function SessionStore({ children }: { children: React.ReactNode }) {
     addQuestion: async (sessionId, input) => {
       const session = sessions.find((item) => item.id === sessionId);
       if (!session) throw new Error("질문을 남길 강의를 찾지 못했습니다.");
-      const question: Question = { ...input, id: crypto.randomUUID(), sessionId, status: "unanswered", createdAt: new Date().toISOString() };
+      const question: Question = {
+        ...input,
+        id: crypto.randomUUID(),
+        sessionId,
+        status: "unanswered",
+        isMine: true,
+        reactionCount: 0,
+        reactedByMe: false,
+        createdAt: new Date().toISOString()
+      };
       if (supabaseConfigured) await submitQuestion(session, question);
       updateSession(sessionId, (current) => ({
         ...current,
@@ -405,6 +438,25 @@ export function SessionStore({ children }: { children: React.ReactNode }) {
         ...session,
         questions: session.questions.map((question) => question.id === questionId ? { ...question, ...values } : question)
       }));
+    },
+    reactToQuestion: async (sessionId, questionId, reacted) => {
+      const question = sessions.find((session) => session.id === sessionId)?.questions.find((item) => item.id === questionId);
+      if (!question || question.isMine || question.reactedByMe === reacted) return;
+      updateSession(sessionId, (session) => ({
+        ...session,
+        questions: session.questions.map((item) => item.id === questionId ? withQuestionReaction(item, reacted) : item)
+      }));
+      try {
+        if (supabaseConfigured) await persistQuestionReaction(questionId, reacted);
+      } catch (error) {
+        updateSession(sessionId, (session) => ({
+          ...session,
+          questions: session.questions.map((item) => item.id === questionId && item.reactedByMe === reacted
+            ? withQuestionReaction(item, !reacted)
+            : item)
+        }));
+        throw error;
+      }
     },
     answerQuestion: async (sessionId, questionId, answer) => {
       if (supabaseConfigured) await postAnswer(questionId, answer);
@@ -456,6 +508,10 @@ export function SessionStore({ children }: { children: React.ReactNode }) {
       if (supabaseConfigured) await updateLecture(sessionId, { status });
       updateSession(sessionId, (session) => ({ ...session, status }));
     },
+    setPresentationInteractions: async (sessionId, enabled) => {
+      if (supabaseConfigured) await updateLecture(sessionId, { presentation_interactions: enabled });
+      updateSession(sessionId, (session) => ({ ...session, presentationInteractions: enabled }));
+    },
     setShowQuestionPins: async (sessionId, visible) => {
       if (supabaseConfigured) await updateLecture(sessionId, { show_question_pins: visible });
       updateSession(sessionId, (session) => ({ ...session, showQuestionPins: visible }));
@@ -467,6 +523,10 @@ export function SessionStore({ children }: { children: React.ReactNode }) {
     setPresentationQrPosition: async (sessionId, position) => {
       if (supabaseConfigured) await updateLecture(sessionId, { presentation_qr_position: position });
       updateSession(sessionId, (session) => ({ ...session, presentationQrPosition: position }));
+    },
+    setQuestionCategories: async (sessionId, settings) => {
+      if (supabaseConfigured) await updateLecture(sessionId, { question_categories: settings });
+      updateSession(sessionId, (session) => ({ ...session, questionCategories: settings }));
     },
     updateSlideNote: async (sessionId, slideId, body) => {
       if (supabaseConfigured) await saveSlideInstructorNote(slideId, body);
@@ -493,7 +553,7 @@ export function SessionStore({ children }: { children: React.ReactNode }) {
       lookups.current.set(key, lookup);
       return lookup;
     }
-  }), [createFolder, createSession, folders, ready, sessions, updateSession]);
+  }), [createFolder, createSession, folders, importPinFeedbackMaterials, ready, sessions, updateSession]);
 
   return <SessionContext.Provider value={value}>{children}</SessionContext.Provider>;
 }

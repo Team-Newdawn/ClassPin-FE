@@ -36,7 +36,7 @@ export const heatLevel = (count: number, max: number): "low" | "mid" | "high" | 
 };
 
 export const categoryBreakdown = (questions: Question[], getLabel: (key: QuestionCategory) => string) =>
-  (["concept", "why", "example", "error", "important"] as QuestionCategory[])
+  [...new Set(questions.map((question) => question.category))]
     .map((key) => ({ key, label: getLabel(key), count: questions.filter((q) => q.category === key).length }))
     .filter((item) => item.count > 0)
     .sort((a, b) => b.count - a.count);

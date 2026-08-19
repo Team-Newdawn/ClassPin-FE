@@ -1,5 +1,5 @@
 import type { RealtimeChannel } from "@supabase/supabase-js";
-import { normalizeClassFolderName, type ClassFolder, type ClassSession, type NormalizedPoint, type Question, type Slide } from "@/lib/types";
+import { isQuestionMarker, normalizeClassFolderName, normalizeQuestionCategorySettings, type ClassFolder, type ClassSession, type NormalizedPoint, type Question, type QuestionCategorySettings, type Slide } from "@/lib/types";
 import { ensureAnonymousUser, getAudienceSupabaseClient, getSessionUser, getSupabaseClient } from "./client";
 
 export type PlatformExperienceSource = "lecture" | "feedback";
@@ -11,9 +11,11 @@ type LectureRow = {
   join_code: string;
   status: ClassSession["status"];
   current_page: number;
+  presentation_interactions: boolean;
   show_question_pins: boolean;
   show_presentation_qr: boolean;
   presentation_qr_position: ClassSession["presentationQrPosition"];
+  question_categories: unknown;
   created_at: string;
 };
 
@@ -63,8 +65,12 @@ type QuestionRow = {
   lecture_id: string;
   slide_id: string | null;
   category: Question["category"];
+  marker?: unknown;
   raw_text: string;
   status: Question["status"];
+  reaction_count?: number;
+  reacted_by_me?: boolean;
+  is_mine?: boolean;
   created_at: string;
   region_anchors: {
     kind?: Question["anchorKind"];
@@ -74,6 +80,20 @@ type QuestionRow = {
     coords?: { x?: number; y?: number; width?: number; height?: number; points?: unknown };
   }> | null;
   answers: Array<{ body: string; created_at: string }> | null;
+};
+
+type FeedbackCampaignImportRow = {
+  id: string;
+  folder_id: string | null;
+  title: string;
+  feedback_categories: unknown;
+};
+
+type FeedbackCampaignPageImportRow = {
+  id: string;
+  campaign_id: string;
+  page_index: number;
+  image_path: string;
 };
 
 function toNormalizedPath(value: unknown): NormalizedPoint[] | null {
@@ -111,9 +131,13 @@ function toQuestion(row: QuestionRow, sessionId: string, slides: Slide[]): Quest
     height: anchor?.coords?.height ?? null,
     path,
     category: row.category,
+    marker: isQuestionMarker(row.marker) ? row.marker : "pin",
     text: row.raw_text,
     status: row.status,
     answer: answerRows[answerRows.length - 1]?.body,
+    isMine: row.is_mine ?? false,
+    reactionCount: Math.max(0, row.reaction_count ?? 0),
+    reactedByMe: row.reacted_by_me ?? false,
     createdAt: row.created_at
   };
 }
@@ -132,9 +156,11 @@ export async function persistSession(session: ClassSession) {
     join_code: session.code,
     status: session.status,
     current_page: session.currentSlide,
+    presentation_interactions: session.presentationInteractions,
     show_question_pins: session.showQuestionPins,
     show_presentation_qr: session.showPresentationQr,
     presentation_qr_position: session.presentationQrPosition,
+    question_categories: session.questionCategories,
     started_at: new Date().toISOString()
   });
   if (lectureError) throw lectureError;
@@ -157,6 +183,94 @@ export async function persistSession(session: ClassSession) {
   }
   const { error: slidesError } = await client.from("slides").insert(slideRows);
   if (slidesError) throw slidesError;
+}
+
+const feedbackImportSource = (campaignId: string) => `pin-feedback/${campaignId}`;
+const feedbackImportCode = () => `IMP${crypto.randomUUID().replaceAll("-", "").slice(0, 6).toUpperCase()}`;
+
+/** 원본 캠페인과 이미지는 그대로 두고 현재 강사의 아직 가져오지 않은 자료만 복제한다. */
+export async function importOwnedFeedbackCampaigns(): Promise<number> {
+  const client = getSupabaseClient();
+  if (!client) throw new Error("Supabase 연결을 찾지 못했습니다.");
+  const user = await requireOwnerUser();
+  const { data: campaignData, error: campaignError } = await client.from("campaigns")
+    .select("id, folder_id, title, feedback_categories")
+    .eq("owner_id", user.id)
+    .order("created_at", { ascending: true });
+  if (campaignError) throw campaignError;
+  const campaigns = (campaignData ?? []) as FeedbackCampaignImportRow[];
+  if (!campaigns.length) return 0;
+
+  const [{ data: pageData, error: pageError }, { data: versionData, error: versionError }] = await Promise.all([
+    client.from("campaign_pages")
+      .select("id, campaign_id, page_index, image_path")
+      .in("campaign_id", campaigns.map((campaign) => campaign.id))
+      .order("page_index", { ascending: true }),
+    client.from("material_versions").select("source_path").like("source_path", "pin-feedback/%")
+  ]);
+  if (pageError) throw pageError;
+  if (versionError) throw versionError;
+  const pages = (pageData ?? []) as FeedbackCampaignPageImportRow[];
+  const importedSources = new Set((versionData ?? []).map((version) => version.source_path as string));
+  let imported = 0;
+
+  for (const campaign of campaigns) {
+    const sourcePath = feedbackImportSource(campaign.id);
+    if (importedSources.has(sourcePath)) continue;
+    const campaignPages = pages.filter((page) => page.campaign_id === campaign.id);
+    if (!campaignPages.length) throw new Error(`복사할 페이지가 없는 PinFeedback 자료입니다: ${campaign.title}`);
+
+    const courseId = crypto.randomUUID();
+    const lectureId = crypto.randomUUID();
+    const materialId = crypto.randomUUID();
+    const versionId = crypto.randomUUID();
+    const uploadedPaths: string[] = [];
+    const slideMappings: Array<{ id: string; source_page_id: string; page_index: number; image_path: string }> = [];
+    try {
+      for (const page of campaignPages) {
+        const { data: image, error: downloadError } = await client.storage.from("campaign-images").download(page.image_path);
+        if (downloadError) throw downloadError;
+        const extension = page.image_path.toLowerCase().endsWith(".png") ? "png" : page.image_path.toLowerCase().endsWith(".webp") ? "webp" : "jpg";
+        const slideId = crypto.randomUUID();
+        const imagePath = `${user.id}/${lectureId}/pin-feedback/${slideId}.${extension}`;
+        const { error: uploadError } = await client.storage.from("lecture-slides").upload(imagePath, image, {
+          contentType: image.type || (extension === "png" ? "image/png" : extension === "webp" ? "image/webp" : "image/jpeg"),
+          upsert: false
+        });
+        if (uploadError) throw uploadError;
+        uploadedPaths.push(imagePath);
+        slideMappings.push({ id: slideId, source_page_id: page.id, page_index: page.page_index, image_path: imagePath });
+      }
+
+      const questionCategories: QuestionCategorySettings = normalizeQuestionCategorySettings(campaign.feedback_categories);
+      const { data: importedLectureId, error: importError } = await client.rpc("import_feedback_campaign", {
+        target_campaign_id: campaign.id,
+        target_course_id: courseId,
+        target_lecture_id: lectureId,
+        target_material_id: materialId,
+        target_version_id: versionId,
+        target_join_code: feedbackImportCode(),
+        target_slides: slideMappings,
+        target_question_categories: questionCategories
+      });
+      if (importError) throw importError;
+      if (importedLectureId !== lectureId) {
+        await client.storage.from("lecture-slides").remove(uploadedPaths);
+        importedSources.add(sourcePath);
+        continue;
+      }
+      importedSources.add(sourcePath);
+      imported += 1;
+    } catch (error) {
+      if (uploadedPaths.length) {
+        const { error: cleanupError } = await client.storage.from("lecture-slides").remove(uploadedPaths);
+        if (cleanupError) console.error("PinFeedback import cleanup failed", cleanupError);
+      }
+      throw error;
+    }
+  }
+
+  return imported;
 }
 
 export async function fetchOwnedClassFolders(): Promise<ClassFolder[]> {
@@ -316,7 +430,7 @@ export async function fetchOwnedSessions(): Promise<ClassSession[]> {
   if (!courseIds.length) return [];
 
   const { data: lectureData, error: lectureError } = await client.from("lectures")
-    .select("id, course_id, title, join_code, status, current_page, show_question_pins, show_presentation_qr, presentation_qr_position, created_at")
+    .select("id, course_id, title, join_code, status, current_page, presentation_interactions, show_question_pins, show_presentation_qr, presentation_qr_position, question_categories, created_at")
     .in("course_id", courseIds)
     .neq("status", "archived")
     .order("created_at", { ascending: false });
@@ -384,7 +498,7 @@ export async function fetchOwnedSessions(): Promise<ClassSession[]> {
   });
 
   const { data: questionData, error: questionError } = await client.from("questions")
-    .select("id, lecture_id, slide_id, category, raw_text, status, created_at, region_anchors(kind, coords), answers(body, created_at)")
+    .select("id, lecture_id, slide_id, category, marker, raw_text, status, reaction_count, created_at, region_anchors(kind, coords), answers(body, created_at)")
     .in("lecture_id", lectureIds)
     .order("created_at", { ascending: false });
   if (questionError) throw questionError;
@@ -413,9 +527,11 @@ export async function fetchOwnedSessions(): Promise<ClassSession[]> {
       fileName: material.file_name,
       status: lecture.status,
       currentSlide: lecture.current_page,
+      presentationInteractions: lecture.presentation_interactions,
       showQuestionPins: lecture.show_question_pins,
       showPresentationQr: lecture.show_presentation_qr,
       presentationQrPosition: lecture.presentation_qr_position,
+      questionCategories: normalizeQuestionCategorySettings(lecture.question_categories),
       createdAt: lecture.created_at,
       slides,
       questions: (questionsByLecture.get(lecture.id) ?? []).map((question) => toQuestion(question, lecture.id, slides))
@@ -441,7 +557,7 @@ export async function fetchLiveSession(joinCode: string): Promise<ClassSession |
   if (!client) return null;
   await ensureAnonymousUser();
   const { data: lecture, error } = await client.from("lectures")
-    .select("id, course_id, title, join_code, status, current_page, show_question_pins, show_presentation_qr, presentation_qr_position, created_at")
+    .select("id, course_id, title, join_code, status, current_page, presentation_interactions, show_question_pins, show_presentation_qr, presentation_qr_position, question_categories, created_at")
     .eq("join_code", joinCode.toUpperCase())
     .eq("status", "live")
     .maybeSingle();
@@ -469,9 +585,11 @@ export async function fetchLiveSession(joinCode: string): Promise<ClassSession |
     fileName: material.file_name,
     status: "live",
     currentSlide: lecture.current_page,
+    presentationInteractions: lecture.presentation_interactions,
     showQuestionPins: lecture.show_question_pins,
     showPresentationQr: lecture.show_presentation_qr,
     presentationQrPosition: lecture.presentation_qr_position,
+    questionCategories: normalizeQuestionCategorySettings(lecture.question_categories),
     createdAt: lecture.created_at,
     slides,
     questions: []
@@ -507,22 +625,33 @@ export async function submitQuestion(session: ClassSession, question: Question) 
     });
     if (error) throw error;
   }
-  const { error } = await client.from("questions").insert({ id: question.id, course_id: session.courseId, lecture_id: session.id, slide_id: slide.id, region_id: regionId, author_id: user.id, is_anonymous: true, category: question.category, raw_text: question.text, status: "unanswered", occurred_in: "live" });
+  const { error } = await client.from("questions").insert({ id: question.id, course_id: session.courseId, lecture_id: session.id, slide_id: slide.id, region_id: regionId, author_id: user.id, is_anonymous: true, category: question.category, marker: question.marker, raw_text: question.text, status: "unanswered", occurred_in: "live" });
   if (error) throw error;
 }
 
-export async function updateQuestion(questionId: string, values: Pick<Question, "category" | "text">) {
+export async function updateQuestion(questionId: string, values: Pick<Question, "category" | "marker" | "text">) {
   const client = getAudienceSupabaseClient();
   if (!client) return;
   await ensureAnonymousUser();
   const { data, error } = await client.from("questions")
-    .update({ category: values.category, raw_text: values.text, updated_at: new Date().toISOString() })
+    .update({ category: values.category, marker: values.marker, raw_text: values.text, updated_at: new Date().toISOString() })
     .eq("id", questionId)
     .eq("status", "unanswered")
     .select("id")
     .maybeSingle();
   if (error) throw error;
   if (!data) throw new Error("수정할 수 있는 질문을 찾지 못했습니다.");
+}
+
+export async function setQuestionReaction(questionId: string, reacted: boolean) {
+  const client = getAudienceSupabaseClient();
+  if (!client) return;
+  await ensureAnonymousUser();
+  const { error } = await client.rpc("set_question_reaction", {
+    target_question_id: questionId,
+    target_reacted: reacted
+  });
+  if (error) throw error;
 }
 
 export async function postAnswer(questionId: string, body: string) {
@@ -563,9 +692,11 @@ export async function submitPlatformExperienceResponse(
 export async function updateLecture(sessionId: string, values: {
   current_page?: number;
   status?: "live" | "ended";
+  presentation_interactions?: boolean;
   show_question_pins?: boolean;
   show_presentation_qr?: boolean;
   presentation_qr_position?: ClassSession["presentationQrPosition"];
+  question_categories?: QuestionCategorySettings;
 }) {
   const client = getSupabaseClient();
   if (!client) return;
@@ -600,48 +731,33 @@ export function subscribeToLecture(
   return channel.subscribe();
 }
 
-/**
- * 참여자는 종료된 강의 행을 RLS로 읽을 수 없다. 이미 참여 중이던 강의가 조회되지 않으면
- * 종료된 것으로 보고, 짧은 폴링으로 Realtime 이벤트가 필터링되는 경우까지 보완한다.
- */
-export async function fetchLectureStatus(
-  session: Pick<ClassSession, "id" | "status">,
-  asAudience = false
-): Promise<ClassSession["status"]> {
-  const client = asAudience ? getAudienceSupabaseClient() : getSupabaseClient();
-  if (!client) return session.status;
-  if (asAudience) await ensureAnonymousUser();
-  const { data, error } = await client.from("lectures")
-    .select("status")
-    .eq("id", session.id)
-    .maybeSingle();
-  if (error) throw error;
-  if (asAudience && !data) return "ended";
-  return (data?.status as ClassSession["status"] | undefined) ?? session.status;
-}
-
-export async function fetchLectureSnapshot(session: ClassSession, asAudience = false): Promise<Pick<ClassSession, "currentSlide" | "status" | "showQuestionPins" | "showPresentationQr" | "presentationQrPosition" | "questions"> | null> {
+export async function fetchLectureSnapshot(session: ClassSession, asAudience = false): Promise<Pick<ClassSession, "currentSlide" | "status" | "presentationInteractions" | "showQuestionPins" | "showPresentationQr" | "presentationQrPosition" | "questionCategories" | "questions"> | null> {
   const client = asAudience ? getAudienceSupabaseClient() : getSupabaseClient();
   if (!client) return null;
   if (asAudience) await ensureAnonymousUser();
   const { data: lecture, error: lectureError } = await client.from("lectures")
-    .select("current_page, status, show_question_pins, show_presentation_qr, presentation_qr_position")
+    .select("current_page, status, presentation_interactions, show_question_pins, show_presentation_qr, presentation_qr_position, question_categories")
     .eq("id", session.id)
     .maybeSingle();
   if (lectureError) throw lectureError;
-  const { data, error } = await client.from("questions")
-    .select("id, slide_id, category, raw_text, status, created_at, region_anchors(kind, coords), answers(body, created_at)")
-    .eq("lecture_id", session.id)
-    .order("created_at", { ascending: false });
+  const questionResult = asAudience
+    ? await client.rpc("find_lecture_questions", { target_lecture_id: session.id })
+    : await client.from("questions")
+      .select("id, slide_id, category, marker, raw_text, status, reaction_count, created_at, region_anchors(kind, coords), answers(body, created_at)")
+      .eq("lecture_id", session.id)
+      .order("created_at", { ascending: false });
+  const { data, error } = questionResult;
   if (error) throw error;
-  const questions = ((data ?? []) as unknown as QuestionRow[])
+  const questions = (Array.isArray(data) ? data as unknown as QuestionRow[] : [])
     .map((row) => toQuestion({ ...row, lecture_id: session.id }, session.id, session.slides));
   return {
     currentSlide: lecture?.current_page ?? session.currentSlide,
     status: asAudience && !lecture ? "ended" : (lecture?.status as ClassSession["status"]) ?? session.status,
+    presentationInteractions: lecture?.presentation_interactions ?? session.presentationInteractions,
     showQuestionPins: lecture?.show_question_pins ?? session.showQuestionPins,
     showPresentationQr: lecture?.show_presentation_qr ?? session.showPresentationQr,
     presentationQrPosition: (lecture?.presentation_qr_position as ClassSession["presentationQrPosition"]) ?? session.presentationQrPosition,
+    questionCategories: normalizeQuestionCategorySettings(lecture?.question_categories ?? session.questionCategories),
     questions
   };
 }

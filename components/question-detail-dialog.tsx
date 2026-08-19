@@ -4,13 +4,15 @@ import { useEffect, useId, useRef } from "react";
 import { X } from "@/components/icons";
 import { useLanguage } from "@/components/language-context";
 import { StatusBadge } from "@/components/status-badge";
-import type { Question } from "@/lib/types";
+import { questionCategoryClass, questionCategoryLabel, questionMarkerEmoji, type Question, type QuestionCategorySettings } from "@/lib/types";
 
-export function QuestionDetailDialog({ question, onClose }: {
+export function QuestionDetailDialog({ question, questionCategories, onClose }: {
   question: Question;
+  questionCategories: QuestionCategorySettings;
   onClose: () => void;
 }) {
-  const { t, categoryLabel, timeAgo } = useLanguage();
+  const { t, categoryLabel: defaultCategoryLabel, timeAgo } = useLanguage();
+  const categoryLabel = questionCategoryLabel(questionCategories, question.category, defaultCategoryLabel);
   const titleId = useId();
   const dialogRef = useRef<HTMLElement>(null);
   const onCloseRef = useRef(onClose);
@@ -52,7 +54,7 @@ export function QuestionDetailDialog({ question, onClose }: {
       >
         <button className="modal-close" onClick={onClose} aria-label={t("question.closeDetail")}><X /></button>
         <div className="question-detail-heading">
-          <span className={`category ${question.category}`}>{categoryLabel(question.category)}</span>
+          <span className={`category ${questionCategoryClass(questionCategories, question.category)}`}>{questionMarkerEmoji(question.marker) && <i aria-hidden="true">{questionMarkerEmoji(question.marker)}</i>}{categoryLabel}</span>
           <span>{t("common.slideLabel", { number: question.slideIndex + 1 })}</span>
         </div>
         <h2 id={titleId}>{t("question.questionAndAnswer")}</h2>

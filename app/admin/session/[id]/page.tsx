@@ -11,7 +11,7 @@ import { SlideCanvas } from "@/components/slide-canvas";
 import { StatusBadge } from "@/components/status-badge";
 import { useHorizontalSlideWheel } from "@/components/use-horizontal-slide-wheel";
 import { useSessions } from "@/components/session-store";
-import type { PresentationQrPosition, Question, QuestionStatus } from "@/lib/types";
+import { configuredQuestionCategories, enabledQuestionCategories, isValidQuestionCategorySettings, QUESTION_CATEGORY_LABEL_MAX, QUESTION_CATEGORY_MAX, questionCategoryClass, questionCategoryLabel, questionMarkerEmoji, type PresentationQrPosition, type Question, type QuestionCategory, type QuestionCategorySettings, type QuestionStatus } from "@/lib/types";
 
 type Tab = "live" | "questions";
 const MIN_QUESTION_PANEL = 300;
@@ -22,11 +22,11 @@ const clampQuestionPanel = (width: number, workspaceWidth = MIN_STAGE_WIDTH + MA
   Math.min(MAX_QUESTION_PANEL, Math.max(MIN_QUESTION_PANEL, Math.min(width, workspaceWidth - MIN_STAGE_WIDTH)));
 
 export default function SessionAdmin() {
-  const { t, categoryLabel, timeAgo } = useLanguage();
+  const { t, categoryLabel: defaultCategoryLabel, timeAgo } = useLanguage();
   const params = useParams<{ id: string }>();
   const search = useSearchParams();
   const router = useRouter();
-  const { folders, sessions, ready, appendSlides, deleteSlide, answerQuestion, resolveQuestion, setCurrentSlide, setStatus, setShowQuestionPins, setShowPresentationQr, setPresentationQrPosition, updateSlideNote } = useSessions();
+  const { folders, sessions, ready, appendSlides, deleteSlide, answerQuestion, resolveQuestion, setCurrentSlide, setStatus, setPresentationInteractions, setShowQuestionPins, setShowPresentationQr, setPresentationQrPosition, setQuestionCategories, updateSlideNote } = useSessions();
   const session = sessions.find((item) => item.id === params.id);
   const [tab, setTab] = useState<Tab>(search.get("tab") === "questions" ? "questions" : "live");
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -136,6 +136,8 @@ export default function SessionAdmin() {
   const slideQuestions = session.questions.filter((q) => q.slideIndex === session.currentSlide);
   const selected = session.questions.find((q) => q.id === selectedId) ?? slideQuestions[0];
   const detailQuestion = session.questions.find((q) => q.id === detailQuestionId);
+  const categoryLabel = (category: QuestionCategory) => questionCategoryLabel(session.questionCategories, category, defaultCategoryLabel);
+  const categoryClass = (category: QuestionCategory) => questionCategoryClass(session.questionCategories, category);
   const noteDraft = slide ? noteDrafts[slide.id] ?? slide.speakerNote ?? "" : "";
   const noteDirty = Boolean(slide && noteDraft !== (slide.speakerNote ?? ""));
   const qrPositions: PresentationQrPosition[] = ["top-left", "top-right", "bottom-left", "bottom-right"];
@@ -298,7 +300,7 @@ export default function SessionAdmin() {
                   </button>
                 </div>
               </div>
-              <div className="stage-canvas-wrap" onWheel={handleSlideWheel}><SlideCanvas slide={slide} questions={slideQuestions} selectedId={selected?.id} onSelectPin={openQuestionDetail} showPins={session.showQuestionPins} /></div>
+              <div className="stage-canvas-wrap" onWheel={handleSlideWheel}><SlideCanvas slide={slide} questions={slideQuestions} questionCategories={session.questionCategories} selectedId={selected?.id} onSelectPin={openQuestionDetail} showPins={session.showQuestionPins} /></div>
               <div className="player-controls"><button className="icon-btn" disabled={session.currentSlide === 0} onClick={() => runAction(setCurrentSlide(session.id, session.currentSlide - 1), t("session.saveSlideError"))} aria-label={t("session.previousSlide")}><ChevronLeft /></button><div className="slide-dots">{session.slides.map((_, i) => <button key={i} className={i === session.currentSlide ? "active" : ""} onClick={() => runAction(setCurrentSlide(session.id, i), t("session.saveSlideError"))} aria-label={t("common.slideNumber", { number: i + 1 })} />)}</div><button className="icon-btn" disabled={session.currentSlide === session.slides.length - 1} onClick={() => runAction(setCurrentSlide(session.id, session.currentSlide + 1), t("session.saveSlideError"))} aria-label={t("session.nextSlide")}><ChevronRight /></button></div>
               <div className="filmstrip" ref={filmstripRef}>{session.slides.map((item, index) => <button key={item.id} className={index === session.currentSlide ? "active" : ""} aria-current={index === session.currentSlide ? "page" : undefined} onClick={() => runAction(setCurrentSlide(session.id, index), t("session.saveSlideError"))}><SlideCanvas slide={item} compact /><span>{index + 1}</span>{session.questions.some((q) => q.slideIndex === index) && <i>{session.questions.filter((q) => q.slideIndex === index).length}</i>}</button>)}</div>
               <section className="stage-speaker-note" aria-labelledby="speaker-note-label">
@@ -368,6 +370,29 @@ export default function SessionAdmin() {
                   <span className="pulse-dot" aria-hidden="true" />
                 </div>
                 </div>
+                <section className="qr-position-setting" aria-labelledby="presentation-mode-title">
+                <div className="qr-position-heading">
+                  <span><MonitorUp /></span>
+                  <div><b id="presentation-mode-title">{t("session.presentationMode")}</b><small>{t("session.presentationModeHint")}</small></div>
+                  <div className="panel-heading-actions">
+                    <span className="pin-toggle-label">{t(session.presentationInteractions ? "session.interactiveMode" : "session.slidesOnlyMode")}</span>
+                    <button
+                      type="button"
+                      className={`pin-toggle ${session.presentationInteractions ? "on" : ""}`}
+                      role="switch"
+                      aria-checked={session.presentationInteractions}
+                      aria-label={session.presentationInteractions ? t("session.disableInteractions") : t("session.enableInteractions")}
+                      onClick={() => runAction(
+                        setPresentationInteractions(session.id, !session.presentationInteractions),
+                        t("session.savePresentationModeError")
+                      )}
+                    >
+                      <span className="pin-toggle-thumb" />
+                      <span className="pin-toggle-state">{session.presentationInteractions ? "ON" : "OFF"}</span>
+                    </button>
+                  </div>
+                </div>
+                </section>
                 <section className="qr-position-setting" aria-labelledby="qr-position-title">
                 <div className="qr-position-heading">
                   <span><QrCode /></span>
@@ -408,7 +433,7 @@ export default function SessionAdmin() {
                   ))}
                 </div>
                 </section>
-                <div className="question-stack">{slideQuestions.length ? slideQuestions.map((q) => <QuestionCard key={q.id} question={q} selected={selected?.id === q.id} onClick={() => openQuestionDetail(q.id)} />) : <div className="no-questions"><MessageCircleQuestion /><b>{t("session.noQuestions")}</b><span>{t("session.noQuestionsHint1")}<br />{t("session.noQuestionsHint2")}</span></div>}</div>
+                <div className="question-stack">{slideQuestions.length ? slideQuestions.map((q) => <QuestionCard key={q.id} question={q} questionCategories={session.questionCategories} selected={selected?.id === q.id} onClick={() => openQuestionDetail(q.id)} />) : <div className="no-questions"><MessageCircleQuestion /><b>{t("session.noQuestions")}</b><span>{t("session.noQuestionsHint1")}<br />{t("session.noQuestionsHint2")}</span></div>}</div>
                 {selected && <div className="answer-box">
                 {selected.answer && <div className="saved-answer"><span>{t("session.latestAnswer")}</span><p>{selected.answer}</p></div>}
                 <label htmlFor="answer">{selected.answer ? t("session.additionalAnswer") : t("session.quickAnswer")}</label>
@@ -420,13 +445,20 @@ export default function SessionAdmin() {
         ) : (
           <div className="questions-page">
             <div className="questions-header"><div><h1>{t("session.questionList")}</h1><p>{t("session.questionsDescription")}</p></div><div className="kpi-inline"><span><b>{session.questions.length}</b>{t("session.totalQuestions")}</span><span><b>{session.questions.filter((q) => q.status === "unanswered").length}</b>{t("status.unanswered")}</span><span><b>{session.questions.filter((q) => q.status === "resolved").length}</b>{t("status.resolved")}</span></div></div>
+            <QuestionCategoryManager
+              key={JSON.stringify(session.questionCategories)}
+              initialSettings={session.questionCategories}
+              usedCategories={session.questions.map((question) => question.category)}
+              onSave={(settings) => setQuestionCategories(session.id, settings)}
+              onError={setActionError}
+            />
             <div className="filterbar"><div className="searchbox"><Search /><input value={query} onChange={(e) => setQuery(e.target.value)} placeholder={t("session.searchQuestions")} /></div><div className="filter-tabs">{(["all", "unanswered", "answered", "resolved"] as const).map((item) => <button key={item} className={filter === item ? "active" : ""} onClick={() => setFilter(item)}>{item === "all" ? t("common.all") : item === "unanswered" ? t("status.unanswered") : item === "answered" ? t("status.answered") : t("status.resolved")}</button>)}</div><button className="btn secondary"><ListFilter />{t("common.filter")}</button></div>
-            <div className="question-table"><div className="table-head"><span>{t("common.slide")}</span><span>{t("common.question")}</span><span>{t("common.category")}</span><span>{t("common.status")}</span><span>{t("common.createdAt")}</span><span /></div>{visibleQuestions.map((q) => <button className="table-row" key={q.id} onClick={() => { runAction(setCurrentSlide(session.id, q.slideIndex), t("session.saveSlideError")); setSelectedId(q.id); setTab("live"); }}><span className="slide-cell"><b>{q.slideIndex + 1}</b><small>Slide {q.slideIndex + 1}</small></span><span className="question-text">{q.text}</span><span><em className={`category ${q.category}`}>{categoryLabel(q.category)}</em></span><span><StatusBadge status={q.status} /></span><span className="muted">{timeAgo(q.createdAt)}</span><span><ChevronRight /></span></button>)}</div>
+            <div className="question-table"><div className="table-head"><span>{t("common.slide")}</span><span>{t("common.question")}</span><span>{t("common.category")}</span><span>{t("common.status")}</span><span>{t("common.createdAt")}</span><span /></div>{visibleQuestions.map((q) => <button className="table-row" key={q.id} onClick={() => { runAction(setCurrentSlide(session.id, q.slideIndex), t("session.saveSlideError")); setSelectedId(q.id); setTab("live"); }}><span className="slide-cell"><b>{q.slideIndex + 1}</b><small>Slide {q.slideIndex + 1}</small></span><span className="question-text">{q.text}</span><span><em className={`category ${categoryClass(q.category)}`}>{questionMarkerEmoji(q.marker) && <i aria-hidden="true">{questionMarkerEmoji(q.marker)}</i>}{categoryLabel(q.category)}</em></span><span><StatusBadge status={q.status} /></span><span className="muted">{timeAgo(q.createdAt)}</span><span><ChevronRight /></span></button>)}</div>
           </div>
         )}
       </main>
 
-      {detailQuestion && <QuestionDetailDialog question={detailQuestion} onClose={() => setDetailQuestionId(null)} />}
+      {detailQuestion && <QuestionDetailDialog question={detailQuestion} questionCategories={session.questionCategories} onClose={() => setDetailQuestionId(null)} />}
       {deleteTarget && <div className="modal-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) closeDeleteSlide(); }}>
         <section className="delete-slide-modal" role="alertdialog" aria-modal="true" aria-labelledby="delete-slide-title" aria-describedby="delete-slide-description">
           <button type="button" className="modal-close" disabled={deletingSlide} onClick={closeDeleteSlide} aria-label={t("common.cancel")}><X /></button>
@@ -447,7 +479,95 @@ export default function SessionAdmin() {
   );
 }
 
-function QuestionCard({ question, selected, onClick }: { question: Question; selected: boolean; onClick: () => void }) {
-  const { t, categoryLabel, timeAgo } = useLanguage();
-  return <button className={`question-card ${selected ? "selected" : ""}`} onClick={onClick}><div className="question-meta"><div className="question-copy"><span className={`category ${question.category}`}>{categoryLabel(question.category)}</span><p>{question.text}</p></div><span className="question-time"><Clock3 />{timeAgo(question.createdAt)}</span></div>{question.answer && <div className="question-answer"><span>{t("session.myAnswer")}</span><p>{question.answer}</p></div>}<div><StatusBadge status={question.status} />{question.x !== null && <span className="pin-context">{question.anchorKind !== "point" ? t("session.regionQuestion") : t("session.pinQuestion")}</span>}</div></button>;
+function QuestionCard({ question, questionCategories, selected, onClick }: { question: Question; questionCategories: QuestionCategorySettings; selected: boolean; onClick: () => void }) {
+  const { t, categoryLabel: defaultCategoryLabel, timeAgo } = useLanguage();
+  const label = questionCategoryLabel(questionCategories, question.category, defaultCategoryLabel);
+  return <button className={`question-card ${selected ? "selected" : ""}`} onClick={onClick}><div className="question-meta"><div className="question-copy"><span className={`category ${questionCategoryClass(questionCategories, question.category)}`}>{questionMarkerEmoji(question.marker) && <i aria-hidden="true">{questionMarkerEmoji(question.marker)}</i>}{label}</span><p>{question.text}</p></div><span className="question-time"><Clock3 />{timeAgo(question.createdAt)}</span></div>{question.answer && <div className="question-answer"><span>{t("session.myAnswer")}</span><p>{question.answer}</p></div>}<div><StatusBadge status={question.status} />{question.x !== null && <span className="pin-context">{question.anchorKind !== "point" ? t("session.regionQuestion") : t("session.pinQuestion")}</span>}</div></button>;
+}
+
+function QuestionCategoryManager({ initialSettings, usedCategories, onSave, onError }: {
+  initialSettings: QuestionCategorySettings;
+  usedCategories: QuestionCategory[];
+  onSave: (settings: QuestionCategorySettings) => Promise<void>;
+  onError: (message: string | null) => void;
+}) {
+  const { categoryLabel: defaultCategoryLabel, t } = useLanguage();
+  const [settings, setSettings] = useState(initialSettings);
+  const [newCategory, setNewCategory] = useState("");
+  const [saving, setSaving] = useState(false);
+  const categories = configuredQuestionCategories(settings);
+  const activeCategories = enabledQuestionCategories(settings);
+  const label = (category: string) => questionCategoryLabel(settings, category, defaultCategoryLabel);
+
+  const addCategory = () => {
+    const categoryLabel = newCategory.trim();
+    if (!categoryLabel) return;
+    if (categories.length >= QUESTION_CATEGORY_MAX) {
+      onError(t("session.questionCategoryLimit", { count: QUESTION_CATEGORY_MAX }));
+      return;
+    }
+    if (categories.some((key) => label(key).toLocaleLowerCase() === categoryLabel.toLocaleLowerCase())) {
+      onError(t("session.questionCategoryDuplicate"));
+      return;
+    }
+    setSettings((current) => ({
+      ...current,
+      [`custom-${crypto.randomUUID()}`]: { label: categoryLabel, enabled: true, archived: false }
+    }));
+    setNewCategory("");
+    onError(null);
+  };
+
+  const deleteCategory = (key: string) => {
+    setSettings((current) => {
+      if (usedCategories.includes(key)) return { ...current, [key]: { ...current[key], enabled: false, archived: true } };
+      const next = { ...current };
+      delete next[key];
+      return next;
+    });
+    onError(null);
+  };
+
+  const save = async () => {
+    if (saving) return;
+    const next = Object.fromEntries(Object.entries(settings).map(([key, setting]) => [key, { ...setting, label: setting.label.trim() }]));
+    if (!isValidQuestionCategorySettings(next)) {
+      onError(t("session.questionCategoryInvalid"));
+      return;
+    }
+    onError(null);
+    setSaving(true);
+    try {
+      await onSave(next);
+      setSettings(next);
+    } catch (error) {
+      const detail = error && typeof error === "object" && "message" in error ? String(error.message) : String(error);
+      console.error(`${t("session.questionCategorySaveError")}: ${detail}`, error);
+      onError(t("session.questionCategorySaveError"));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return <section className="pin-category-manager" aria-labelledby="question-category-manager-title">
+    <div className="pin-category-manager-head">
+      <div><b id="question-category-manager-title">{t("session.questionCategoryTitle")}</b><small>{t("session.questionCategoryDescription")}</small></div>
+      <button type="button" className="btn primary" onClick={() => void save()} disabled={saving}>{saving ? <span className="spinner" /> : <Check />}{t(saving ? "session.questionCategorySaving" : "session.questionCategorySave")}</button>
+    </div>
+    <form className="pin-category-add" onSubmit={(event) => { event.preventDefault(); addCategory(); }}>
+      <input value={newCategory} onChange={(event) => setNewCategory(event.target.value)} maxLength={QUESTION_CATEGORY_LABEL_MAX} placeholder={t("session.questionCategoryPlaceholder")} aria-label={t("session.questionCategoryPlaceholder")} disabled={saving || categories.length >= QUESTION_CATEGORY_MAX} />
+      <button className="btn secondary" disabled={saving || !newCategory.trim() || categories.length >= QUESTION_CATEGORY_MAX}><Plus />{t("session.questionCategoryAdd")}</button>
+    </form>
+    <div className="pin-category-manager-list">
+      {categories.map((key) => <div className={`pin-category-manager-row ${settings[key].enabled ? "" : "disabled"}`} key={key}>
+        <div className="pin-category-manager-row-head">
+          <span className={`category ${questionCategoryClass(settings, key)}`}>{label(key)}</span>
+          <label><input type="checkbox" checked={settings[key].enabled} onChange={(event) => setSettings((current) => ({ ...current, [key]: { ...current[key], enabled: event.target.checked } }))} aria-label={t("session.questionCategoryUseAria", { category: label(key) })} disabled={saving} />{t("session.questionCategoryUse")}</label>
+        </div>
+        <label><span>{t("session.questionCategoryDisplayName")}</span><input value={settings[key].label} onChange={(event) => setSettings((current) => ({ ...current, [key]: { ...current[key], label: event.target.value } }))} maxLength={QUESTION_CATEGORY_LABEL_MAX} placeholder={label(key)} aria-label={t("session.questionCategoryDisplayNameAria", { category: label(key) })} disabled={saving} /></label>
+        <button type="button" className="icon-btn category-delete" onClick={() => deleteCategory(key)} aria-label={t("session.questionCategoryDelete", { category: label(key) })} disabled={saving}><Trash2 /></button>
+      </div>)}
+    </div>
+    <p>{t(activeCategories.length ? "session.questionCategoryEnabledHint" : "session.questionCategoryInvalid")}</p>
+  </section>;
 }

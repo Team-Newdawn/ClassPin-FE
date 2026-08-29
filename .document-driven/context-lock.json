@@ -1,5 +1,5 @@
 {
-  "created_at": "2026-08-29T09:57:01+00:00",
+  "created_at": "2026-08-29T10:36:10+00:00",
   "documents": [
     {
       "id": "prd",
@@ -21,14 +21,13 @@
     "ai-report-product"
   ],
   "task": {
-    "id": "session-folder-rail-accent",
+    "id": "session-live-tab-icon",
     "requirement_ids": [
-      "CLASS-DASH-002",
       "CLASS-DASH-003"
     ],
     "scopes": [
       "admin-report-selection-ui"
     ],
-    "summary": "Use the file list asset and folder accent colors in the live material rail"
+    "summary": "Use at-icons play in the live player tab and preserve the requested active color"
   }
 }

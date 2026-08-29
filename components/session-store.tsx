@@ -5,7 +5,7 @@ import { useAuth } from "@/components/auth-context";
 import { defaultQuestionCategorySettings, isQuestionMarker, normalizeClassFolderName, normalizeQuestionCategorySettings, type ClassFolder, type ClassSession, type PresentationQrPosition, type Question, type QuestionCategorySettings, type Slide } from "@/lib/types";
 import { withQuestionReaction } from "@/lib/question-reactions";
 import { getAudienceSupabaseClient, getSupabaseClient, supabaseConfigured } from "@/lib/supabase/client";
-import { appendSessionSlides, createClassFolder as persistClassFolder, deleteClassFolder as persistClassFolderDeletion, deleteClassSession as persistSessionDeletion, deleteSessionSlide, fetchLectureSnapshot, fetchLiveSession, fetchOwnedClassFolders, fetchOwnedSessions, fetchSessionSlides, importOwnedFeedbackCampaigns, markQuestionResolved, moveSessionToFolder as persistSessionFolder, persistSession, postAnswer, saveSlideInstructorNote, setQuestionReaction as persistQuestionReaction, submitQuestion, subscribeToLecture, updateLecture, updateQuestion as persistQuestionUpdate } from "@/lib/supabase/repository";
+import { appendSessionSlides, createClassFolder as persistClassFolder, deleteClassFolder as persistClassFolderDeletion, deleteClassSession as persistSessionDeletion, deleteSessionSlide, fetchLectureSnapshot, fetchLiveSession, fetchOwnedClassFolders, fetchOwnedSessions, fetchSessionSlides, importOwnedFeedbackCampaigns, markQuestionResolved, moveSessionToFolder as persistSessionFolder, persistSession, postAnswer, renameClassFolder as persistClassFolderName, saveSlideInstructorNote, setQuestionReaction as persistQuestionReaction, submitQuestion, subscribeToLecture, updateLecture, updateQuestion as persistQuestionUpdate, type LectureRealtimeRow } from "@/lib/supabase/repository";
 
 const STORAGE_KEY = "pin-class-sessions-v1";
 const FOLDER_STORAGE_KEY = "pin-class-folders-v1";
@@ -19,6 +19,7 @@ type Store = {
   sessions: ClassSession[];
   folders: ClassFolder[];
   createFolder: (name: string) => Promise<ClassFolder>;
+  renameFolder: (folderId: string, name: string) => Promise<void>;
   deleteFolder: (folderId: string) => Promise<void>;
   importPinFeedbackMaterials: () => Promise<number>;
   moveSessionToFolder: (sessionId: string, folderId: string | null) => Promise<void>;
@@ -44,12 +45,15 @@ type Store = {
 
 const SessionContext = createContext<Store | null>(null);
 
-const makeCode = () => `PIN${Math.floor(100 + Math.random() * 900)}`;
+const makeCode = () => `PIN${crypto.randomUUID().replaceAll("-", "").slice(0, 6).toUpperCase()}`;
 const cacheKey = (userId: string) => `${SUPABASE_CACHE_PREFIX}:${userId}`;
 const folderCacheKey = (userId: string) => `${SUPABASE_FOLDER_CACHE_PREFIX}:${userId}`;
 const APPENDABLE_SLIDE_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
 const MAX_SLIDE_IMAGE_BYTES = 10 * 1024 * 1024;
 const PARTICIPANT_STATUS_POLL_MS = 2_000;
+type LectureSettingPatch = Partial<Pick<ClassSession,
+  "status" | "presentationInteractions" | "showQuestionPins" | "showPresentationQr" | "presentationQrPosition"
+>>;
 
 const fileToDataUrl = (file: File) => new Promise<string>((resolve, reject) => {
   const reader = new FileReader();
@@ -126,6 +130,7 @@ export function SessionStore({ children }: { children: React.ReactNode }) {
   const lookups = useRef(new Map<string, Promise<ClassSession | null>>());
   const slideWrites = useRef(new Map<string, Promise<void>>());
   const slideTargets = useRef(new Map<string, number>());
+  const lectureSettingTargets = useRef(new Map<string, LectureSettingPatch>());
   const refreshSequences = useRef(new Map<string, number>());
   const slideRefreshSequences = useRef(new Map<string, number>());
   const ownerId = useRef<string | null>(null);
@@ -212,9 +217,11 @@ export function SessionStore({ children }: { children: React.ReactNode }) {
         setSessions((current) => current.map((item) => {
           if (item.id !== session.id) return item;
           const localTarget = slideTargets.current.get(session.id);
+          const localSettings = lectureSettingTargets.current.get(session.id);
           return {
             ...item,
             ...snapshot,
+            ...localSettings,
             // 발표자가 빠르게 넘기는 동안에는 DB의 중간 페이지가 낙관적 화면을
             // 되돌리지 못하게 한다. 청중은 계속 서버 페이지를 그대로 따른다.
             currentSlide: !asAudience && localTarget !== undefined
@@ -223,6 +230,20 @@ export function SessionStore({ children }: { children: React.ReactNode }) {
           };
         }));
       } catch (error) { console.error("Supabase realtime refresh failed", error); }
+    };
+    const applyLectureUpdate = (session: ClassSession, lecture: LectureRealtimeRow) => {
+      if (!active) return;
+      setSessions((current) => current.map((item) => item.id === session.id ? {
+        ...item,
+        currentSlide: !asAudience && slideTargets.current.has(session.id) ? item.currentSlide : lecture.current_page,
+        status: lecture.status,
+        presentationInteractions: lecture.presentation_interactions,
+        showQuestionPins: lecture.show_question_pins,
+        showPresentationQr: lecture.show_presentation_qr,
+        presentationQrPosition: lecture.presentation_qr_position,
+        questionCategories: normalizeQuestionCategorySettings(lecture.question_categories),
+        ...lectureSettingTargets.current.get(session.id)
+      } : item));
     };
     const refreshSlides = async (session: ClassSession) => {
       const refreshSequence = (slideRefreshSequences.current.get(session.id) ?? 0) + 1;
@@ -234,22 +255,24 @@ export function SessionStore({ children }: { children: React.ReactNode }) {
         setSessions((current) => current.map((item) => item.id === session.id ? { ...item, slides } : item));
       } catch (error) { console.error("Supabase slide refresh failed", error); }
     };
-    const connect = async () => {
+    const connect = () => {
       try {
         tracked.forEach((session) => {
           const channel = subscribeToLecture(
             session.id,
             session.materialVersionId,
             () => void refresh(session),
+            (lecture) => applyLectureUpdate(session, lecture),
             () => void refreshSlides(session),
             asAudience
           );
           if (channel) channels.push(channel);
         });
-        await Promise.all(tracked.flatMap((session) => [refresh(session), refreshSlides(session)]));
       } catch (error) { console.error("Supabase authentication failed", error); }
     };
-    void connect();
+    // fetchOwnedSessions/fetchLiveSession already returned an authoritative snapshot.
+    // Re-fetching every lecture here caused O(lecture count) duplicate REST traffic.
+    connect();
     if (asAudience) {
       statusPoll = setInterval(() => {
         tracked.forEach((session) => {
@@ -343,11 +366,42 @@ export function SessionStore({ children }: { children: React.ReactNode }) {
     setSessions((current) => current.map((session) => session.id === id ? fn(session) : session));
   }, []);
 
+  const saveLectureSettings = useCallback(async (
+    sessionId: string,
+    target: LectureSettingPatch,
+    rollback: LectureSettingPatch,
+    values: Parameters<typeof updateLecture>[1]
+  ) => {
+    lectureSettingTargets.current.set(sessionId, { ...lectureSettingTargets.current.get(sessionId), ...target });
+    updateSession(sessionId, (session) => ({ ...session, ...target }));
+    try {
+      if (supabaseConfigured) await updateLecture(sessionId, values);
+    } catch (error) {
+      updateSession(sessionId, (session) => ({ ...session, ...rollback }));
+      throw error;
+    } finally {
+      // 이미 시작된 Realtime 조회가 낙관적으로 반영한 값을 되돌리지 못하게 한다.
+      refreshSequences.current.set(sessionId, (refreshSequences.current.get(sessionId) ?? 0) + 1);
+      const remaining = { ...lectureSettingTargets.current.get(sessionId) };
+      (Object.keys(target) as Array<keyof LectureSettingPatch>).forEach((key) => {
+        if (remaining[key] === target[key]) delete remaining[key];
+      });
+      if (Object.keys(remaining).length) lectureSettingTargets.current.set(sessionId, remaining);
+      else lectureSettingTargets.current.delete(sessionId);
+    }
+  }, [updateSession]);
+
   const value = useMemo<Store>(() => ({
     ready,
     sessions,
     folders,
     createFolder,
+    renameFolder: async (folderId, name) => {
+      if (!folders.some((folder) => folder.id === folderId)) throw new Error("이름을 바꿀 폴더를 찾지 못했습니다.");
+      const normalizedName = normalizeClassFolderName(name);
+      if (supabaseConfigured) await persistClassFolderName(folderId, normalizedName);
+      setFolders((current) => current.map((folder) => folder.id === folderId ? { ...folder, name: normalizedName } : folder));
+    },
     deleteFolder: async (folderId) => {
       if (!folders.some((folder) => folder.id === folderId)) throw new Error("삭제할 폴더를 찾지 못했습니다.");
       if (supabaseConfigured) await persistClassFolderDeletion(folderId);
@@ -522,24 +576,29 @@ export function SessionStore({ children }: { children: React.ReactNode }) {
       await write;
     },
     setStatus: async (sessionId, status) => {
-      if (supabaseConfigured) await updateLecture(sessionId, { status });
-      updateSession(sessionId, (session) => ({ ...session, status }));
+      const previous = sessions.find((session) => session.id === sessionId)?.status;
+      if (!previous) throw new Error("상태를 변경할 강의를 찾지 못했습니다.");
+      await saveLectureSettings(sessionId, { status }, { status: previous }, { status });
     },
     setPresentationInteractions: async (sessionId, enabled) => {
-      if (supabaseConfigured) await updateLecture(sessionId, { presentation_interactions: enabled });
-      updateSession(sessionId, (session) => ({ ...session, presentationInteractions: enabled }));
+      const previous = sessions.find((session) => session.id === sessionId)?.presentationInteractions;
+      if (previous === undefined) throw new Error("설정을 변경할 강의를 찾지 못했습니다.");
+      await saveLectureSettings(sessionId, { presentationInteractions: enabled }, { presentationInteractions: previous }, { presentation_interactions: enabled });
     },
     setShowQuestionPins: async (sessionId, visible) => {
-      if (supabaseConfigured) await updateLecture(sessionId, { show_question_pins: visible });
-      updateSession(sessionId, (session) => ({ ...session, showQuestionPins: visible }));
+      const previous = sessions.find((session) => session.id === sessionId)?.showQuestionPins;
+      if (previous === undefined) throw new Error("설정을 변경할 강의를 찾지 못했습니다.");
+      await saveLectureSettings(sessionId, { showQuestionPins: visible }, { showQuestionPins: previous }, { show_question_pins: visible });
     },
     setShowPresentationQr: async (sessionId, visible) => {
-      if (supabaseConfigured) await updateLecture(sessionId, { show_presentation_qr: visible });
-      updateSession(sessionId, (session) => ({ ...session, showPresentationQr: visible }));
+      const previous = sessions.find((session) => session.id === sessionId)?.showPresentationQr;
+      if (previous === undefined) throw new Error("설정을 변경할 강의를 찾지 못했습니다.");
+      await saveLectureSettings(sessionId, { showPresentationQr: visible }, { showPresentationQr: previous }, { show_presentation_qr: visible });
     },
     setPresentationQrPosition: async (sessionId, position) => {
-      if (supabaseConfigured) await updateLecture(sessionId, { presentation_qr_position: position });
-      updateSession(sessionId, (session) => ({ ...session, presentationQrPosition: position }));
+      const previous = sessions.find((session) => session.id === sessionId)?.presentationQrPosition;
+      if (!previous) throw new Error("설정을 변경할 강의를 찾지 못했습니다.");
+      await saveLectureSettings(sessionId, { presentationQrPosition: position }, { presentationQrPosition: previous }, { presentation_qr_position: position });
     },
     setQuestionCategories: async (sessionId, settings) => {
       if (supabaseConfigured) await updateLecture(sessionId, { question_categories: settings });
@@ -570,7 +629,7 @@ export function SessionStore({ children }: { children: React.ReactNode }) {
       lookups.current.set(key, lookup);
       return lookup;
     }
-  }), [createFolder, createSession, folders, importPinFeedbackMaterials, ready, sessions, updateSession]);
+  }), [createFolder, createSession, folders, importPinFeedbackMaterials, ready, saveLectureSettings, sessions, updateSession]);
 
   return <SessionContext.Provider value={value}>{children}</SessionContext.Provider>;
 }

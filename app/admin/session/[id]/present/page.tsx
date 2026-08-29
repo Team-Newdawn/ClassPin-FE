@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { QRCodeSVG } from "qrcode.react";
 import { ChevronLeft, ChevronRight, Maximize2, Minimize2, X } from "@/components/icons";
@@ -9,7 +9,7 @@ import { QuestionDetailDialog } from "@/components/question-detail-dialog";
 import { SlideCanvas } from "@/components/slide-canvas";
 import { useSessions } from "@/components/session-store";
 import { useLectureReactions } from "@/components/use-lecture-reactions";
-import { advancePinPlayback, crossedPinMilestone } from "@/lib/pin/presentation-rotation";
+import { advancePinPlayback, crossedPinMilestone, rectanglesOverlap, resolvePinDisplayPositions } from "@/lib/pin/presentation-rotation";
 import type { Question } from "@/lib/types";
 
 const CONTROLS_HIDE_DELAY = 2600;
@@ -36,6 +36,7 @@ export default function SessionPresentation() {
   const positionedQuestionKey = positionedQuestionIds.join("|");
   const pageQuestions = useMemo(() => positionedQuestions.filter((question) => question.slideIndex === currentSlide), [currentSlide, positionedQuestions]);
   const stageRef = useRef<HTMLElement>(null);
+  const presentationCanvasRef = useRef<HTMLDivElement>(null);
   const currentIndexRef = useRef(0);
   const hideTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pageQuestionsRef = useRef<PositionedQuestion[]>([]);
@@ -52,6 +53,7 @@ export default function SessionPresentation() {
   const [liveQuestionId, setLiveQuestionId] = useState<string | null>(null);
   const [storedPlayback, setStoredPlayback] = useState(EMPTY_PLAYBACK);
   const [pinMilestone, setPinMilestone] = useState<number | null>(null);
+  const [canvasSize, setCanvasSize] = useState<{ width: number; height: number } | null>(null);
 
   const playback = useMemo(() => {
     if (!presentationInteractions || !showQuestionPins) return EMPTY_PLAYBACK;
@@ -69,6 +71,11 @@ export default function SessionPresentation() {
   const visibleQuestionIds = useMemo(() => liveQuestionId && !playback.shownPinIds.includes(liveQuestionId)
     ? [...playback.shownPinIds, liveQuestionId]
     : playback.shownPinIds, [liveQuestionId, playback.shownPinIds]);
+  const pinDisplayPositions = useMemo(() => {
+    if (!canvasSize) return undefined;
+    return resolvePinDisplayPositions(pageQuestions.filter((question) => question.anchorKind !== "box" && question.anchorKind !== "path"), canvasSize.width, canvasSize.height);
+  }, [canvasSize, pageQuestions]);
+  const activeQuestionId = pageQuestions.some((question) => question.id === selectedQuestionId) ? selectedQuestionId : playback.activePinId;
 
   const revealControls = useCallback(() => {
     setControlsVisible(true);
@@ -91,6 +98,37 @@ export default function SessionPresentation() {
   useEffect(() => {
     pageQuestionsRef.current = pageQuestions;
   }, [pageQuestions]);
+
+  useLayoutEffect(() => {
+    const canvas = presentationCanvasRef.current?.querySelector<HTMLElement>(".slide-canvas");
+    if (!canvas) return;
+    const observer = new ResizeObserver(([entry]) => {
+      const width = Math.round(entry.contentRect.width);
+      const height = Math.round(entry.contentRect.height);
+      setCanvasSize((current) => current?.width === width && current.height === height ? current : { width, height });
+    });
+    observer.observe(canvas);
+    return () => observer.disconnect();
+  }, [sessionId]);
+
+  useLayoutEffect(() => {
+    const canvas = presentationCanvasRef.current?.querySelector<HTMLElement>(".slide-canvas");
+    if (!canvas || !presentationInteractions || !showQuestionPins) return;
+    const labels = Array.from(canvas.querySelectorAll<HTMLElement>("[data-presentation-label-id]"));
+    const pins = Array.from(canvas.querySelectorAll<HTMLElement>("[data-presentation-pin-id]"));
+    labels.forEach((label) => { label.hidden = false; });
+    const activeLabel = labels.find((label) => label.dataset.presentationLabelId === activeQuestionId);
+    const orderedLabels = activeLabel ? [activeLabel, ...labels.filter((label) => label !== activeLabel)] : labels;
+    const retained: DOMRect[] = [];
+    for (const label of orderedLabels) {
+      const labelId = label.dataset.presentationLabelId;
+      const bounds = label.getBoundingClientRect();
+      const overlapsPin = pins.some((pin) => pin.dataset.presentationPinId !== labelId && rectanglesOverlap(bounds, pin.getBoundingClientRect()));
+      const keep = label === activeLabel || (!overlapsPin && retained.every((other) => !rectanglesOverlap(bounds, other)));
+      label.hidden = !keep;
+      if (keep) retained.push(bounds);
+    }
+  }, [activeQuestionId, isFullscreen, pinDisplayPositions, presentationInteractions, showQuestionPins, visibleQuestionIds]);
 
   // 첫 스냅샷은 새 PIN으로 보지 않는다. 이후 현재 슬라이드에 들어온 PIN만 즉시 빨강으로 강조한다.
   useEffect(() => {
@@ -266,13 +304,14 @@ export default function SessionPresentation() {
       onMouseMove={revealControls}
       onPointerDown={revealControls}
     >
-      <div className="presentation-slide pin-presentation-slide pin-presentation-canvas" aria-label={`${session.title} · ${t("common.slideNumber", { number: session.currentSlide + 1 })}`}>
+      <div ref={presentationCanvasRef} className="presentation-slide pin-presentation-slide pin-presentation-canvas" aria-label={`${session.title} · ${t("common.slideNumber", { number: session.currentSlide + 1 })}`}>
         <SlideCanvas
           slide={slide}
           questions={pageQuestions}
           questionCategories={session.questionCategories}
           visibleQuestionIds={visibleQuestionIds}
-          selectedId={pageQuestions.some((question) => question.id === selectedQuestionId) ? selectedQuestionId : playback.activePinId}
+          pinDisplayPositions={pinDisplayPositions}
+          selectedId={activeQuestionId}
           liveQuestionId={liveQuestionId}
           onSelectPin={openQuestionDetail}
           showPins={session.presentationInteractions && session.showQuestionPins}

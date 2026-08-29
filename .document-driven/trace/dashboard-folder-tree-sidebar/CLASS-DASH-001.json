@@ -1,0 +1,18 @@
+{
+  "code": [
+    "app/admin/dashboard/page.tsx",
+    "app/globals.css",
+    "components/workspace-header.tsx",
+    "assets/logo/logo.svg",
+    "assets/icons/project_icon.svg"
+  ],
+  "documents": [
+    "ai-report-product"
+  ],
+  "recorded_at": "2026-08-28T03:55:15+00:00",
+  "requirement_id": "CLASS-DASH-001",
+  "task_id": "dashboard-folder-tree-sidebar",
+  "tests": [
+    ".document-driven/evidence/dashboard-folder-tree-sidebar.md"
+  ]
+}

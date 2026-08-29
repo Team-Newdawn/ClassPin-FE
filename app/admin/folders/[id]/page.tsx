@@ -1,9 +1,13 @@
 "use client";
 
 import { useMemo, useRef, useState } from "react";
+import Image from "next/image";
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { ArrowLeft, ArrowRight, BarChart3, FileText, Folder, Grid2X2, List, MessageCircleQuestion, Search, Trash2, Upload, X } from "@/components/icons";
+import { ArrowLeft, ArrowRight, BarChart3, FileText, Folder, Grid2X2, List, MessageCircleQuestion, Trash2, X } from "@/components/icons";
+import { AdminSearch } from "@/components/admin-search";
+import { FolderMaterialCard } from "@/components/folder-material-card";
+import { FolderTreeSidebar } from "@/components/folder-tree-sidebar";
 import { useLanguage } from "@/components/language-context";
 import { SlideCanvas } from "@/components/slide-canvas";
 import { SlidePreview } from "@/components/slide-preview";
@@ -12,6 +16,7 @@ import { useSessions } from "@/components/session-store";
 import { UploadProgress } from "@/components/upload-progress";
 import { useSlideUpload } from "@/components/use-slide-upload";
 import { WorkspaceHeader } from "@/components/workspace-header";
+import { buildMaterialSearchIndex, searchMaterialIndex } from "@/lib/material-search";
 import { categoryBreakdown, countBy, heatLevel, pinRate, resolveRate, slideHeatmap } from "@/lib/stats";
 import { defaultQuestionCategorySettings, questionCategoryClass, questionCategoryLabel, questionMarkerEmoji, type ClassSession, type QuestionCategory } from "@/lib/types";
 
@@ -26,6 +31,7 @@ export default function FolderPage() {
   const inputRef = useRef<HTMLInputElement>(null);
   const [tab, setTab] = useState<PageTab>("materials");
   const [view, setView] = useState<View>("grid");
+  const [sidebarOpen, setSidebarOpen] = useState(true);
   const [query, setQuery] = useState("");
   const [movingId, setMovingId] = useState<string | null>(null);
   const [moveError, setMoveError] = useState<string | null>(null);
@@ -36,10 +42,8 @@ export default function FolderPage() {
 
   const folder = folderId === null ? { id: "unfiled", name: t("folders.unfiled") } : folders.find((item) => item.id === folderId);
   const scopedSessions = useMemo(() => sessions.filter((session) => session.folderId === folderId), [folderId, sessions]);
-  const visibleSessions = useMemo(() => {
-    const needle = query.trim().toLocaleLowerCase();
-    return needle ? scopedSessions.filter((session) => `${session.title} ${session.fileName}`.toLocaleLowerCase().includes(needle)) : scopedSessions;
-  }, [query, scopedSessions]);
+  const searchIndex = useMemo(() => buildMaterialSearchIndex(scopedSessions), [scopedSessions]);
+  const visibleSessions = useMemo(() => searchMaterialIndex(searchIndex, query), [query, searchIndex]);
 
   if (!ready) return <div className="loading-screen"><span className="spinner dark" /></div>;
 
@@ -94,16 +98,21 @@ export default function FolderPage() {
   };
 
   return (
-    <main className="folder-workspace">
-      <WorkspaceHeader />
-      <div className="admin-page folder-page">
+    <main className={`folder-workspace folder-dashboard-shell folder-detail-shell ${sidebarOpen ? "" : "sidebar-collapsed"}`}>
+      <FolderTreeSidebar folders={folders} open={sidebarOpen} activeFolderId={folderId} onToggle={() => setSidebarOpen((open) => !open)} />
+      <div className="folder-dashboard-content">
+        <WorkspaceHeader showLogo={false} />
+        <div className="admin-page folder-page">
         <input ref={inputRef} type="file" accept=".pdf,.ppt,.pptx" hidden onChange={(event) => pick(event.target.files?.[0])} />
 
         <header className="folder-page-head">
           <Link className="folder-breadcrumb" href="/admin/dashboard"><ArrowLeft />{t("folders.backDashboard")}</Link>
           <div className="page-head">
             <div><h1>{folder.name}</h1><p>{t("folders.materialCount", { count: scopedSessions.length })}</p></div>
-            <button type="button" className="btn primary" onClick={() => inputRef.current?.click()} disabled={busy}>{busy ? <span className="spinner" /> : <Upload />}{busy ? t("materials.converting") : t("materials.upload")}</button>
+            <div className="folder-detail-actions">
+              <AdminSearch className="folder-detail-search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder={t("materials.search")} />
+              <button type="button" className="btn primary folder-detail-upload-button" onClick={() => inputRef.current?.click()} disabled={busy}>{busy ? <span className="spinner" /> : <Image src="/assets/icons/upload_icon.svg" alt="" width={24} height={17} />}{busy ? t("materials.converting") : t("materials.upload")}</button>
+            </div>
           </div>
           <div className="page-tabs" role="tablist" aria-label={t("folders.pageTabs")}>
             <button type="button" id="folder-materials-tab" role="tab" aria-selected={tab === "materials"} aria-controls="folder-materials-panel" className={tab === "materials" ? "active" : ""} onClick={() => setTab("materials")}><FileText />{t("folders.materialTab")}</button>
@@ -119,7 +128,6 @@ export default function FolderPage() {
         {tab === "materials" ? (
           <section id="folder-materials-panel" role="tabpanel" aria-labelledby="folder-materials-tab">
             <div className="folder-toolbar">
-              <label className="searchbox"><Search /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder={t("materials.search")} aria-label={t("materials.search")} /></label>
               <div className="view-toggle" role="group" aria-label={t("folders.viewMode")}>
                 <button type="button" className={view === "grid" ? "active" : ""} aria-pressed={view === "grid"} title={t("folders.gridView")} onClick={() => setView("grid")}><Grid2X2 /><span>{t("folders.gridView")}</span></button>
                 <button type="button" className={view === "list" ? "active" : ""} aria-pressed={view === "list"} title={t("folders.listView")} onClick={() => setView("list")}><List /><span>{t("folders.listView")}</span></button>
@@ -129,7 +137,7 @@ export default function FolderPage() {
             {visibleSessions.length ? (
               <div className={`folder-materials ${view}`}>
                 {visibleSessions.map((session) => (
-                  <MaterialCard key={session.id} session={session} folders={folders} moving={movingId === session.id} onMove={(nextFolderId) => void move(session.id, nextFolderId)} onDelete={() => { setDeleteError(null); setDeleteTarget(session); }} />
+                  <FolderMaterialCard key={session.id} session={session} folders={folders} moving={movingId === session.id} onMove={(nextFolderId) => void move(session.id, nextFolderId)} onDelete={() => { setDeleteError(null); setDeleteTarget(session); }} />
                 ))}
               </div>
             ) : (
@@ -137,13 +145,14 @@ export default function FolderPage() {
                 <MessageCircleQuestion />
                 <b>{scopedSessions.length ? t("materials.noMatch") : t("materials.none")}</b>
                 <span>{scopedSessions.length ? t("materials.changeSearch") : t("folders.emptyFolderHint")}</span>
-                {!scopedSessions.length && <button type="button" className="btn primary" onClick={() => inputRef.current?.click()} disabled={busy}><Upload />{t("materials.upload")}</button>}
+                {!scopedSessions.length && <button type="button" className="btn primary folder-detail-upload-button" onClick={() => inputRef.current?.click()} disabled={busy}>{busy ? <span className="spinner" /> : <Image src="/assets/icons/upload_icon.svg" alt="" width={24} height={17} />}{busy ? t("materials.converting") : t("materials.upload")}</button>}
               </div>
             )}
           </section>
         ) : (
           <FolderInsights key={scopedSessions.map((session) => session.id).join("|")} sessions={scopedSessions} />
         )}
+        </div>
       </div>
 
       {deleteTarget && (
@@ -164,36 +173,6 @@ export default function FolderPage() {
         </div>
       )}
     </main>
-  );
-}
-
-function MaterialCard({ session, folders, moving, onMove, onDelete }: { session: ClassSession; folders: { id: string; name: string }[]; moving: boolean; onMove: (folderId: string) => void; onDelete: () => void }) {
-  const { t } = useLanguage();
-  const unanswered = countBy(session.questions, "unanswered");
-
-  return (
-    <article className="material-card folder-material-card">
-      <Link className="material-card-link" href={`/admin/session/${session.id}`} aria-label={t("folders.openMaterial", { title: session.title })}>
-        <span className="material-thumb"><SlideCanvas slide={session.slides[0]} compact /><em className={`live-badge ${session.status}`}><i />{session.status === "live" ? t("common.live") : t("common.ended")}</em></span>
-        <span className="material-body">
-          <b>{session.title}</b>
-          <small><FileText />{session.fileName}</small>
-          <span className="material-stats"><span><b>{session.slides.length}</b>{t("common.slide")}</span><span><b>{session.questions.length}</b>{t("common.question")}</span><span className={unanswered ? "alert" : ""}><b>{unanswered}</b>{t("status.unanswered")}</span></span>
-        </span>
-      </Link>
-      <div className="material-card-footer">
-        <label className="material-move">
-          <Folder />
-          <span>{t("folders.moveTo")}</span>
-          <select value={session.folderId ?? ""} aria-label={t("folders.moveMaterial", { title: session.title })} disabled={moving} onChange={(event) => onMove(event.target.value)}>
-            <option value="">{t("folders.unfiled")}</option>
-            {folders.map((folder) => <option key={folder.id} value={folder.id}>{folder.name}</option>)}
-          </select>
-          {moving && <span className="spinner dark" aria-label={t("folders.moving")} />}
-        </label>
-        <button type="button" className="icon-btn material-delete-button" onClick={onDelete} aria-label={t("materials.deleteMaterial", { title: session.title })} title={t("materials.deleteMaterial", { title: session.title })}><Trash2 /></button>
-      </div>
-    </article>
   );
 }
 

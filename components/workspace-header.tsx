@@ -5,14 +5,14 @@ import { useAuth } from "@/components/auth-context";
 import { LanguageSwitcher, useLanguage } from "@/components/language-context";
 import { PinLogo } from "@/components/pin-logo";
 
-export function WorkspaceHeader() {
+export function WorkspaceHeader({ showLogo = true }: { showLogo?: boolean }) {
   const { t } = useLanguage();
   const { configured, profile, signOut } = useAuth();
   const name = profile?.displayName ?? profile?.email ?? t("nav.myWorkspace");
 
   return (
-    <header className="workspace-header">
-      <PinLogo />
+    <header className={`workspace-header ${showLogo ? "" : "logo-hidden"}`}>
+      {showLogo && <PinLogo />}
       <div className="workspace-account">
         <LanguageSwitcher />
         <span className="avatar">{name.slice(0, 2).toUpperCase()}</span>

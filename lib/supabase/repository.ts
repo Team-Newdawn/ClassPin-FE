@@ -1,6 +1,6 @@
 import type { RealtimeChannel } from "@supabase/supabase-js";
 import { isQuestionMarker, normalizeClassFolderName, normalizeQuestionCategorySettings, type ClassFolder, type ClassSession, type NormalizedPoint, type Question, type QuestionCategorySettings, type Slide } from "@/lib/types";
-import { ensureAnonymousUser, getAudienceSupabaseClient, getSessionUser, getSupabaseClient } from "./client";
+import { ensureAnonymousUser, getAudienceSupabaseClient, getOwnerWriteSupabaseClient, getSessionUser, getSupabaseClient } from "./client";
 
 export type PlatformExperienceSource = "lecture" | "feedback";
 
@@ -18,6 +18,11 @@ type LectureRow = {
   question_categories: unknown;
   created_at: string;
 };
+
+export type LectureRealtimeRow = Pick<LectureRow,
+  "current_page" | "status" | "presentation_interactions" | "show_question_pins" |
+  "show_presentation_qr" | "presentation_qr_position" | "question_categories"
+>;
 
 type CourseRow = {
   id: string;
@@ -301,6 +306,21 @@ export async function createClassFolder(name: string): Promise<ClassFolder> {
   if (error) throw error;
   const folder = data as ClassFolderRow;
   return { id: folder.id, name: folder.name, createdAt: folder.created_at };
+}
+
+export async function renameClassFolder(folderId: string, name: string): Promise<void> {
+  const normalizedName = normalizeClassFolderName(name);
+  const client = getSupabaseClient();
+  if (!client) throw new Error("Supabase 연결을 찾지 못했습니다.");
+  const user = await requireOwnerUser();
+  const { data, error } = await client.from("session_folders")
+    .update({ name: normalizedName })
+    .eq("id", folderId)
+    .eq("owner_id", user.id)
+    .select("id")
+    .maybeSingle();
+  if (error) throw error;
+  if (!data) throw new Error("이름을 바꿀 폴더를 찾지 못했습니다.");
 }
 
 export async function deleteClassFolder(folderId: string): Promise<void> {
@@ -762,17 +782,23 @@ export async function updateLecture(sessionId: string, values: {
   presentation_qr_position?: ClassSession["presentationQrPosition"];
   question_categories?: QuestionCategorySettings;
 }) {
-  const client = getSupabaseClient();
+  const client = getOwnerWriteSupabaseClient();
   if (!client) return;
-  await requireOwnerUser();
-  const { error } = await client.from("lectures").update(values).eq("id", sessionId);
+  // The authenticated request is already checked by the lectures owner RLS policy.
+  // Asking PostgREST for the affected-row count keeps the write to one request
+  // without returning and decoding a row just to detect a missing/denied target.
+  const { count, error } = await client.from("lectures")
+    .update(values, { count: "exact" })
+    .eq("id", sessionId);
   if (error) throw error;
+  if (count !== 1) throw new Error("저장할 수 있는 강의를 찾지 못했습니다.");
 }
 
 export function subscribeToLecture(
   sessionId: string,
   materialVersionId: string | undefined,
-  onRefresh: () => void,
+  onQuestionsRefresh: () => void,
+  onLectureUpdate: (lecture: LectureRealtimeRow) => void,
   onSlidesRefresh: () => void,
   asAudience = false
 ): RealtimeChannel | null {
@@ -782,8 +808,10 @@ export function subscribeToLecture(
   // reconnect before an asynchronous removeChannel() has finished, so give
   // every subscription its own topic to avoid mutating a subscribed channel.
   let channel = client.channel(`lecture:${sessionId}:${crypto.randomUUID()}`)
-    .on("postgres_changes", { event: "*", schema: "public", table: "questions", filter: `lecture_id=eq.${sessionId}` }, onRefresh)
-    .on("postgres_changes", { event: "UPDATE", schema: "public", table: "lectures", filter: `id=eq.${sessionId}` }, onRefresh);
+    .on("postgres_changes", { event: "*", schema: "public", table: "questions", filter: `lecture_id=eq.${sessionId}` }, onQuestionsRefresh)
+    .on("postgres_changes", { event: "UPDATE", schema: "public", table: "lectures", filter: `id=eq.${sessionId}` }, (payload) => {
+      onLectureUpdate(payload.new as LectureRealtimeRow);
+    });
   if (materialVersionId) {
     channel = channel.on("postgres_changes", {
       event: "*",

@@ -1,0 +1,14 @@
+{
+  "code": [
+    "app/globals.css"
+  ],
+  "documents": [
+    "ai-report-product"
+  ],
+  "recorded_at": "2026-08-29T09:12:16+00:00",
+  "requirement_id": "CLASS-DASH-003",
+  "task_id": "folder-detail-search-relative-width",
+  "tests": [
+    ".document-driven/evidence/folder-detail-search-relative-width.md"
+  ]
+}

@@ -1,0 +1,34 @@
+{
+  "created_at": "2026-08-29T09:57:01+00:00",
+  "documents": [
+    {
+      "id": "prd",
+      "path": "doc/pin_class_prd.md",
+      "sha256": "2e08e4650cd5fd7baddf8b4f93abd89b9b6309964ef7ada21816d16ebdca0f46"
+    },
+    {
+      "id": "ai-report-product",
+      "path": "docs/ai-instructor-report-product.md",
+      "sha256": "983db425e870a587d4b5c8ed284709787dc824128567b2c3b63bb2995b68b36a"
+    }
+  ],
+  "manifest": {
+    "path": "docs/document-manifest.json",
+    "sha256": "86eb09d09c1892b656b0cb2a576ee94c128f44d94d4f6e50a79b06d57ef8b290"
+  },
+  "schema_version": "1.0",
+  "selected_artifact_ids": [
+    "ai-report-product"
+  ],
+  "task": {
+    "id": "session-folder-rail-accent",
+    "requirement_ids": [
+      "CLASS-DASH-002",
+      "CLASS-DASH-003"
+    ],
+    "scopes": [
+      "admin-report-selection-ui"
+    ],
+    "summary": "Use the file list asset and folder accent colors in the live material rail"
+  }
+}

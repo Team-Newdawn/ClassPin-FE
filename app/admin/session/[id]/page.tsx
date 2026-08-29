@@ -4,7 +4,8 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { QRCodeSVG } from "qrcode.react";
-import { ArrowLeft, Check, ChevronLeft, ChevronRight, Clock3, Copy, FileText, FolderOpen, GripVertical, Link2, ListFilter, MessageCircleQuestion, MonitorUp, PanelLeftClose, PanelLeftOpen, Pause, Play, Plus, QrCode, Search, Share2, Trash2, Users, X } from "@/components/icons";
+import fileListIcon from "@/assets/icons/file_list_icon.svg";
+import { ArrowLeft, Check, ChevronLeft, ChevronRight, Clock3, Copy, FileText, GripVertical, Link2, ListFilter, MessageCircleQuestion, MonitorUp, PanelLeftClose, PanelLeftOpen, Pause, Play, Plus, QrCode, Search, Share2, Trash2, Users, X } from "@/components/icons";
 import { useLanguage } from "@/components/language-context";
 import { QuestionDetailDialog } from "@/components/question-detail-dialog";
 import { SlideCanvas } from "@/components/slide-canvas";
@@ -37,6 +38,8 @@ export default function SessionAdmin() {
   const [answer, setAnswer] = useState("");
   const [copied, setCopied] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
+  const [lectureSaving, setLectureSaving] = useState(false);
+  const lectureSavingRef = useRef(false);
   const [presentationError, setPresentationError] = useState<string | null>(null);
   const [folderRailOpen, setFolderRailOpen] = useState(true);
   const [questionPanelWidth, setQuestionPanelWidth] = useState(380);
@@ -60,6 +63,22 @@ export default function SessionAdmin() {
       console.error(`${message}: ${detail}`, error);
       setActionError(message);
     });
+  };
+  const runLectureAction = (action: () => Promise<void>, message: string) => {
+    if (lectureSavingRef.current) return;
+    lectureSavingRef.current = true;
+    setActionError(null);
+    setLectureSaving(true);
+    void action()
+      .catch((error) => {
+        const detail = error && typeof error === "object" && "message" in error ? String(error.message) : String(error);
+        console.error(`${message}: ${detail}`, error);
+        setActionError(message);
+      })
+      .finally(() => {
+        lectureSavingRef.current = false;
+        setLectureSaving(false);
+      });
   };
 
   // 화살표나 점으로 슬라이드를 넘길 때 필름스트립이 따라오지 않으면, 장수가 많을수록
@@ -130,7 +149,9 @@ export default function SessionAdmin() {
   if (!session) return <div className="empty-state"><h1>{t("session.notFound")}</h1><button className="btn primary" onClick={() => router.push("/")}>{t("common.home")}</button></div>;
 
   const slide = session.slides[session.currentSlide];
-  const folder = folders.find((item) => item.id === session.folderId);
+  const folderIndex = folders.findIndex((item) => item.id === session.folderId);
+  const folder = folderIndex >= 0 ? folders[folderIndex] : undefined;
+  const folderAccentIndex = (folderIndex >= 0 ? folderIndex : folders.length) % 6;
   const folderHref = `/admin/folders/${folder?.id ?? "unfiled"}`;
   const folderSessions = sessions.filter((item) => item.folderId === (session.folderId ?? null));
   const slideQuestions = session.questions.filter((q) => q.slideIndex === session.currentSlide);
@@ -255,18 +276,20 @@ export default function SessionAdmin() {
     popup.focus();
   };
 
-  return (
+  return <>
     <div
       className={`session-admin-shell ${folderRailOpen ? "" : "folder-rail-collapsed"}`}
       style={{ "--question-panel-width": `${questionPanelWidth}px` } as React.CSSProperties}
+      inert={lectureSaving}
+      aria-busy={lectureSaving}
     >
-      <aside className="session-folder-rail">
+      <aside className={`session-folder-rail folder-accent-${folderAccentIndex}`}>
         <div className="folder-rail-head">
           {folderRailOpen && <Link href={folderHref}><ArrowLeft />{t("session.backToFolder")}</Link>}
           <button type="button" onClick={() => setFolderRailOpen((open) => !open)} aria-label={t(folderRailOpen ? "session.collapseFolders" : "session.expandFolders")} title={t(folderRailOpen ? "session.collapseFolders" : "session.expandFolders")}>{folderRailOpen ? <PanelLeftClose /> : <PanelLeftOpen />}</button>
         </div>
         {folderRailOpen && <>
-          <div className="folder-rail-title"><FolderOpen /><span><small>{t("session.folderMaterials")}</small><b>{folder?.name ?? t("folders.unfiled")}</b></span></div>
+          <div className="folder-rail-title"><span className="folder-rail-file-icon" style={{ "--folder-file-list-icon": `url(${fileListIcon.src})` } as React.CSSProperties} aria-hidden="true" /><span><small>{t("session.folderMaterials")}</small><b>{folder?.name ?? t("folders.unfiled")}</b></span></div>
           <nav aria-label={t("session.folderMaterials")}>
             {folderSessions.map((item) => <Link key={item.id} href={`/admin/session/${item.id}`} className={item.id === session.id ? "active" : ""} aria-current={item.id === session.id ? "page" : undefined}><span className="folder-rail-thumb"><SlideCanvas slide={item.slides[0]} compact /></span><span><b>{item.title}</b><small>{item.slides.length} {t("common.slide")}</small></span></Link>)}
           </nav>
@@ -276,7 +299,7 @@ export default function SessionAdmin() {
         <div className="workspace-tabs">
           <button className={tab === "live" ? "active" : ""} onClick={() => setTab("live")}><Play />{t("session.livePlayer")}<span>{session.questions.filter((q) => q.status === "unanswered").length}</span></button>
           <button className={tab === "questions" ? "active" : ""} onClick={() => setTab("questions")}><MessageCircleQuestion />{t("session.questionList")}<span>{session.questions.length}</span></button>
-          <div className="top-actions"><span className={`session-state-badge ${session.status}`}><i />{t(session.status === "live" ? "session.liveLabel" : "session.stoppedLabel")}</span><button className="btn secondary" onClick={() => runAction(setStatus(session.id, session.status === "live" ? "ended" : "live"), t("session.saveLectureError"))}>{session.status === "live" ? <><Pause />{t("session.end")}</> : <><Play />{t("session.restart")}</>}</button><button className="btn secondary" onClick={() => setShareOpen(true)}><Share2 />{t("session.joinLink")}</button><button className="btn primary presentation-launch" onClick={openPresentation} title={t("session.openSlideshow")}><MonitorUp />{t("session.slideshow")}</button></div>
+          <div className="top-actions"><span className={`session-state-badge ${session.status}`}><i />{t(session.status === "live" ? "session.liveLabel" : "session.stoppedLabel")}</span><button className="btn secondary" onClick={() => runLectureAction(() => setStatus(session.id, session.status === "live" ? "ended" : "live"), t("session.saveLectureError"))}>{session.status === "live" ? <><Pause />{t("session.end")}</> : <><Play />{t("session.restart")}</>}</button><button className="btn secondary" onClick={() => setShareOpen(true)}><Share2 />{t("session.joinLink")}</button><button className="btn primary presentation-launch" onClick={openPresentation} title={t("session.openSlideshow")}><MonitorUp />{t("session.slideshow")}</button></div>
         </div>
         {presentationError
           ? <div className="login-error" role="alert">{presentationError}</div>
@@ -359,8 +382,8 @@ export default function SessionAdmin() {
                     role="switch"
                     aria-checked={session.showQuestionPins}
                     aria-label={session.showQuestionPins ? t("session.turnPinsOff") : t("session.turnPinsOn")}
-                    onClick={() => runAction(
-                      setShowQuestionPins(session.id, !session.showQuestionPins),
+                    onClick={() => runLectureAction(
+                      () => setShowQuestionPins(session.id, !session.showQuestionPins),
                       t("session.savePinSettingError")
                     )}
                   >
@@ -382,8 +405,8 @@ export default function SessionAdmin() {
                       role="switch"
                       aria-checked={session.presentationInteractions}
                       aria-label={session.presentationInteractions ? t("session.disableInteractions") : t("session.enableInteractions")}
-                      onClick={() => runAction(
-                        setPresentationInteractions(session.id, !session.presentationInteractions),
+                      onClick={() => runLectureAction(
+                        () => setPresentationInteractions(session.id, !session.presentationInteractions),
                         t("session.savePresentationModeError")
                       )}
                     >
@@ -405,8 +428,8 @@ export default function SessionAdmin() {
                       role="switch"
                       aria-checked={session.showPresentationQr}
                       aria-label={session.showPresentationQr ? t("presentation.turnQrOff") : t("presentation.turnQrOn")}
-                      onClick={() => runAction(
-                        setShowPresentationQr(session.id, !session.showPresentationQr),
+                      onClick={() => runLectureAction(
+                        () => setShowPresentationQr(session.id, !session.showPresentationQr),
                         t("presentation.saveQrSettingError")
                       )}
                     >
@@ -422,8 +445,8 @@ export default function SessionAdmin() {
                       key={position}
                       className={session.presentationQrPosition === position ? "active" : ""}
                       aria-pressed={session.presentationQrPosition === position}
-                      onClick={() => runAction(
-                        setPresentationQrPosition(session.id, position),
+                      onClick={() => runLectureAction(
+                        () => setPresentationQrPosition(session.id, position),
                         t("session.saveQrPositionError")
                       )}
                     >
@@ -476,7 +499,7 @@ export default function SessionAdmin() {
       </div>}
       {shareOpen && <div className="modal-backdrop" onMouseDown={() => setShareOpen(false)}><div className="share-modal" onMouseDown={(e) => e.stopPropagation()}><button className="modal-close" onClick={() => setShareOpen(false)} aria-label={t("question.closeDetail")}><X /></button><div className="modal-icon"><Users /></div><h2>{t("session.inviteTitle")}</h2><p>{t("session.inviteDescription1")}<br />{t("session.inviteDescription2")}</p><div className="qr-frame"><QRCodeSVG value={joinUrl} size={180} fgColor="#171D26" /></div><div className="session-code"><span>{t("session.joinCode")}</span><b>{session.code}</b></div><div className="link-copy"><Link2 /><span>{joinUrl}</span><button onClick={copy} aria-label={t("session.copyJoinLink")}>{copied ? <Check /> : <Copy />}</button></div><button className="btn primary large full" onClick={copy}>{copied ? <><Check />{t("session.copied")}</> : <><Copy />{t("session.copyJoinLink")}</>}</button></div></div>}
     </div>
-  );
+  </>;
 }
 
 function QuestionCard({ question, questionCategories, selected, onClick }: { question: Question; questionCategories: QuestionCategorySettings; selected: boolean; onClick: () => void }) {

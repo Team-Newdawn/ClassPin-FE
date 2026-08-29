@@ -87,13 +87,21 @@ begin
   assert (select category = 'custom-speed' and marker = 'idea' and reaction_count = 1 from public.questions where lecture_id = imported_id), 'feedback fields or reactions were not preserved';
   assert (select count(*) from public.feedback_pins where campaign_id = '40000000-0000-0000-0000-000000000004') = 2, 'source feedback was modified';
   assert exists (select 1 from public.campaign_pages where id = '50000000-0000-0000-0000-000000000005'), 'source page was removed';
+  -- Restart follows this exact authenticated lecture status update path.
+  update public.lectures set status = 'live' where id = imported_id;
+  assert (select status = 'live' from public.lectures where id = imported_id), 'owner could not restart lecture';
+  begin
+    update public.lectures set question_categories = '{}'::jsonb where id = imported_id;
+    raise exception 'invalid question categories unexpectedly succeeded';
+  exception
+    when check_violation then null;
+  end;
 end;
 $$;
 
 reset role;
 update public.lectures
-set status = 'live', ended_at = null,
-    question_categories = '{"praise":{"label":"좋았어요","enabled":true,"archived":false},"custom-speed":{"label":"진행 속도","enabled":false,"archived":false}}'
+set question_categories = '{"praise":{"label":"좋았어요","enabled":true,"archived":false},"custom-speed":{"label":"진행 속도","enabled":false,"archived":false}}'
 where id = '80000000-0000-0000-0000-000000000008';
 
 set local role authenticated;

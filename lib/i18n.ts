@@ -1,4 +1,4 @@
-import { PIN_FEEDBACK_QUESTION_CATEGORY_KEYS, type QuestionCategory, type QuestionStatus } from "@/lib/types";
+import { PIN_FEEDBACK_QUESTION_CATEGORY_KEYS, type QuestionCategory, type QuestionStatus } from "./types.ts";
 
 export type Locale = "ko" | "en";
 type Values = Record<string, string | number>;
@@ -92,14 +92,22 @@ const ko = {
   "folders.create": "폴더 만들기",
   "folders.creating": "만드는 중…",
   "folders.cancel": "취소",
-  "folders.closeModal": "새 폴더 창 닫기",
+  "folders.closeModal": "폴더 편집 창 닫기",
   "folders.createError": "폴더를 만들지 못했습니다. 이름을 확인하고 다시 시도해 주세요.",
   "folders.unfiled": "미분류",
-  "folders.uploadUnfiled": "미분류로 업로드",
+  "folders.uploadUnfiled": "업로드",
   "folders.materials": "자료",
   "folders.updated": ({ time }) => `${time} 업데이트`,
   "folders.empty": "아직 자료가 없습니다.",
   "folders.openFolder": ({ name }) => `${name} 폴더 열기`,
+  "folders.folderMenu": ({ name }) => `${name} 폴더 메뉴`,
+  "folders.rename": "이름 수정",
+  "folders.delete": "폴더 삭제",
+  "folders.renameTitle": "폴더 이름 수정",
+  "folders.renameDescription": "새 폴더 이름을 입력하세요.",
+  "folders.renameSave": "저장",
+  "folders.renaming": "저장 중…",
+  "folders.renameError": "폴더 이름을 수정하지 못했습니다. 이름을 확인하고 다시 시도해 주세요.",
   "folders.deleteFolder": ({ name }) => `${name} 폴더 삭제`,
   "folders.deleteConfirm": ({ name, count: value }) => `‘${name}’ 폴더를 삭제할까요? 강의 자료 ${value}개는 삭제하지 않고 ‘미분류’로 이동합니다.`,
   "folders.deleteError": "폴더를 삭제하지 못했습니다. 잠시 후 다시 시도해 주세요.",
@@ -155,7 +163,7 @@ const ko = {
   "materials.description": "업로드한 슬라이드와 회차별 질문 현황을 관리합니다.",
   "materials.converting": "변환 중…",
   "materials.upload": "자료 업로드",
-  "materials.search": "자료 제목 · 파일명 검색",
+  "materials.search": "자료 제목 파일명 검색",
   "materials.noMatch": "조건에 맞는 자료가 없어요",
   "materials.none": "아직 업로드한 자료가 없어요",
   "materials.changeSearch": "검색어나 필터를 바꿔보세요.",
@@ -868,14 +876,22 @@ const en: Record<TranslationKey, Message> = {
   "folders.create": "Create folder",
   "folders.creating": "Creating…",
   "folders.cancel": "Cancel",
-  "folders.closeModal": "Close new folder dialog",
+  "folders.closeModal": "Close folder editor",
   "folders.createError": "Could not create the folder. Check the name and try again.",
   "folders.unfiled": "Unfiled",
-  "folders.uploadUnfiled": "Upload to Unfiled",
+  "folders.uploadUnfiled": "Upload",
   "folders.materials": "Materials",
   "folders.updated": ({ time }) => `Updated ${time}`,
   "folders.empty": "No materials yet.",
   "folders.openFolder": ({ name }) => `Open ${name} folder`,
+  "folders.folderMenu": ({ name }) => `${name} folder menu`,
+  "folders.rename": "Rename",
+  "folders.delete": "Delete folder",
+  "folders.renameTitle": "Rename folder",
+  "folders.renameDescription": "Enter a new folder name.",
+  "folders.renameSave": "Save",
+  "folders.renaming": "Saving…",
+  "folders.renameError": "Could not rename the folder. Check the name and try again.",
   "folders.deleteFolder": ({ name }) => `Delete ${name} folder`,
   "folders.deleteConfirm": ({ name, count: value }) => `Delete “${name}”? Its ${value} lecture materials will move to Unfiled instead of being deleted.`,
   "folders.deleteError": "Could not delete the folder. Please try again in a moment.",
@@ -1580,7 +1596,8 @@ export const timeAgo = (locale: Locale, value: string) => {
   const formatter = new Intl.RelativeTimeFormat(locale === "ko" ? "ko-KR" : "en-US", { numeric: "always" });
   if (seconds < 60) return formatter.format(-seconds, "second");
   if (seconds < 3600) return formatter.format(-Math.floor(seconds / 60), "minute");
-  return formatter.format(-Math.floor(seconds / 3600), "hour");
+  if (seconds < 86400) return formatter.format(-Math.floor(seconds / 3600), "hour");
+  return formatter.format(-Math.floor(seconds / 86400), "day");
 };
 
 const uploadErrorKeys: Array<[string, TranslationKey]> = [

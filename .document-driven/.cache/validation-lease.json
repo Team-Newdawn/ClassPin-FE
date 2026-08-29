@@ -1,0 +1,32 @@
+{
+  "allowed_paths": [],
+  "document_paths": [
+    "doc/pin_class_prd.md",
+    "docs/ai-instructor-report-product.md",
+    "docs/ai-instructor-report-evidence.md",
+    "docs/ai-instructor-report-system.md"
+  ],
+  "expires_at": "2026-08-29T10:02:47+00:00",
+  "issued_at": "2026-08-29T09:57:47+00:00",
+  "package_id": null,
+  "run_status": null,
+  "schema_version": "1.0",
+  "selected_artifacts": [
+    "ai-report-product"
+  ],
+  "sources": [
+    {
+      "mtime_ns": 1787760174307907469,
+      "path": "docs/document-manifest.json",
+      "sha256": "86eb09d09c1892b656b0cb2a576ee94c128f44d94d4f6e50a79b06d57ef8b290",
+      "size": 2603
+    },
+    {
+      "mtime_ns": 1787997421023327397,
+      "path": ".document-driven/context-lock.json",
+      "sha256": "1f6f56237867c6305d6337e23ab9c554cc49e36ceb19ea5bbebbcc771137aadf",
+      "size": 920
+    }
+  ],
+  "task_id": "session-folder-rail-accent"
+}

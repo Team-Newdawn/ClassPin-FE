@@ -3,7 +3,7 @@
 import { createContext, useContext, useEffect, useMemo, useState } from "react";
 import type { User } from "@supabase/supabase-js";
 import type { Profile } from "@/lib/types";
-import { fetchOwnProfile, getSupabaseClient, signInWithGoogle, signOutUser, supabaseConfigured } from "@/lib/supabase/client";
+import { fetchOwnProfile, getSupabaseClient, setOwnerAccessToken, signInWithGoogle, signOutUser, supabaseConfigured } from "@/lib/supabase/client";
 
 type AuthState = {
   /** false 면 demo 모드 — 로그인 없이 모든 화면을 쓴다. */
@@ -44,9 +44,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       } else if (active) setProfile(null);
       if (active) setLoading(false);
     };
-    void client.auth.getSession().then(({ data }) => void apply(data.session?.user ?? null));
+    void client.auth.getSession().then(({ data }) => {
+      setOwnerAccessToken(data.session?.access_token ?? null);
+      void apply(data.session?.user ?? null);
+    });
     // 콜백 안에서 바로 supabase 호출을 하면 auth 락과 엉킬 수 있어 다음 틱으로 미룬다.
     const { data: subscription } = client.auth.onAuthStateChange((_event, session) => {
+      setOwnerAccessToken(session?.access_token ?? null);
       setTimeout(() => void apply(session?.user ?? null), 0);
     });
     return () => { active = false; subscription.subscription.unsubscribe(); };

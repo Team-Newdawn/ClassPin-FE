@@ -1,0 +1,15 @@
+{
+  "code": [
+    "app/admin/dashboard/page.tsx",
+    "app/globals.css"
+  ],
+  "documents": [
+    "ai-report-product"
+  ],
+  "recorded_at": "2026-08-28T04:00:47+00:00",
+  "requirement_id": "CLASS-DASH-002",
+  "task_id": "dashboard-folder-color-stability",
+  "tests": [
+    ".document-driven/evidence/dashboard-folder-color-stability.md"
+  ]
+}

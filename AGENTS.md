@@ -42,12 +42,13 @@ flow unless a task explicitly spans both products.
 - Providers are composed in `app/layout.tsx`: language, auth, then session store.
 - Instructor path: `/login` -> Google OAuth -> `/auth/callback` -> `/admin/dashboard`.
 - Public participant path: `/join/[code]`; never place it behind the admin guard.
-- Admin guard lives in `app/admin/layout.tsx` and must fail closed when Supabase is
+- Admin guard lives in `app/(view)/admin/layout.tsx` and must fail closed when Supabase is
   configured. Local demo mode may remain available when credentials are absent.
-- `components/session-store.tsx` is the UI boundary. In Supabase mode Postgres is
+- `app/_controller/session-store.tsx` is the UI boundary. In Supabase mode Postgres is
   authoritative and localStorage is only an account-scoped failure cache. In demo
   mode localStorage + BroadcastChannel are authoritative.
-- `lib/supabase/repository.ts` owns Supabase reads/writes. Every new owner-visible
+- `app/_service/class-session-service.ts` owns Supabase reads/writes, while
+  `app/_infrastructure/supabase` owns client construction. Every new owner-visible
   table or column needs a forward-only migration and RLS-compatible access.
 - Core model: Folder -> many ClassSession records; ClassSession maps to Course ->
   Lecture -> Material -> MaterialVersion -> Slides -> Questions/Answers.
@@ -80,17 +81,21 @@ flow unless a task explicitly spans both products.
 
 ### Change map
 
-- Entry/auth: `app/page.tsx`, `app/login/page.tsx`, `app/auth/callback/page.tsx`,
-  `components/auth-context.tsx`, `app/admin/layout.tsx`.
-- Folder dashboard/detail: `app/admin/dashboard/page.tsx`,
-  `app/admin/folders/[id]/page.tsx`, `components/session-store.tsx`.
-- Live material workspace: `app/admin/session/[id]/page.tsx`.
-- Persistence: `lib/types.ts`, `lib/supabase/repository.ts`,
-  `supabase/migrations/*`.
-- Visual rules and responsive behavior: `app/globals.css`; reuse tokens from
-  `DESIGN.md`, do not introduce direct hex colors when a semantic token exists.
-- Shared statistics: `lib/stats.ts`. Keep aggregation functions pure and testable.
-- The `/pin` tree and `lib/pin/*` are a separate surface even where names overlap.
+- Entry/auth: `app/(view)/page.tsx`, `app/(view)/login/page.tsx`,
+  `app/(view)/auth/callback/page.tsx`, `app/_controller/auth-context.tsx`,
+  `app/(view)/admin/layout.tsx`.
+- Folder dashboard/detail: `app/(view)/admin/dashboard/page.tsx`,
+  `app/(view)/admin/folders/[id]/page.tsx`, `app/_controller/session-store.tsx`.
+- Live material workspace: `app/(view)/admin/session/[id]/page.tsx`.
+- Persistence: `app/_model/types.ts`, `app/_service/class-session-service.ts`,
+  `app/_infrastructure/supabase/client.ts`, `supabase/migrations/*`.
+- Visual rules and responsive behavior: route and component `*.module.css` files;
+  `app/globals.css` owns only tokens and shared primitives. Reuse tokens from
+  `DESIGN.md`, and do not introduce direct hex colors when a semantic token exists.
+- Shared statistics: `app/_model/stats.ts`. Keep aggregation functions pure and testable.
+- The retired `/pin` feedback runtime must not be restored. Its historical
+  database and Storage contracts remain migration history unless a task explicitly
+  authorizes destructive data retirement.
 
 ### Minimum completion gate
 
@@ -103,3 +108,12 @@ flow unless a task explicitly spans both products.
    in the child workspace browser.
 5. Run `ponytail-review` on the final diff, apply safe simplifications, then repeat
    the relevant checks before claiming completion.
+
+## Document-based changes
+
+Before changing product code, read the PRD and the approved documents relevant
+to the affected path in `docs/document-manifest.json`. Implement only the
+approved behavior and preserve their security, data, accessibility, and
+verification constraints. If the code requires a decision those documents do
+not cover, update and approve the document before continuing. No generated
+context lock, hook, package lock, or document-driven harness is required.

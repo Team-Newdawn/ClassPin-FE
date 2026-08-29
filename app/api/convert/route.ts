@@ -6,10 +6,10 @@ import { setTimeout as sleep } from "node:timers/promises";
 import { promisify } from "node:util";
 import { NextResponse } from "next/server";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { resolveDocumentBinary } from "@/lib/server/document-binaries";
-import { getPdfPageCount, renderPdfPages } from "@/lib/server/pdf-render";
-import { getSupabaseClientForToken } from "@/lib/supabase/server";
-import type { Slide } from "@/lib/types";
+import { resolveDocumentBinary } from "@/app/_infrastructure/server/document-binaries";
+import { getPdfPageCount, renderPdfPages } from "@/app/_infrastructure/server/pdf-render";
+import { getSupabaseClientForToken } from "@/app/_infrastructure/supabase/server";
+import type { Slide } from "@/app/_model/types";
 
 export const runtime = "nodejs";
 const run = promisify(execFile);

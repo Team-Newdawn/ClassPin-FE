@@ -1,8 +1,8 @@
 {
   "artifact_ids": [
-    "ai-report-product"
+    "class-frontend-architecture"
   ],
-  "context_lock_sha256": "83fec467504bd13eb73be4f614081367c6dc9f93173721021df627ebe0a19eac",
+  "context_lock_sha256": "9443d85e9df75531289d79116096a8ed9ad840b5cc5c8eadeb51a4def10d92a2",
   "documents": [
     {
       "id": "prd",
@@ -143,59 +143,70 @@
       ]
     },
     {
-      "id": "ai-report-product",
+      "id": "class-frontend-architecture",
       "outline": [
         {
           "line": 1,
-          "text": "# AI 강의자 리포트 제품 명세"
+          "text": "# Pin Class 프런트엔드 아키텍처 명세"
         },
         {
-          "line": 8,
-          "text": "## 1. 목적과 제품 경계"
+          "line": 11,
+          "text": "## 1. 목적, 범위와 비목표"
         },
         {
-          "line": 26,
-          "text": "## 2. 사용자와 접근 권한"
+          "line": 19,
+          "text": "## 2. 계층과 의존 방향"
         },
         {
-          "line": 34,
-          "text": "## 3. 진입과 자료 선택"
+          "line": 38,
+          "text": "## 3. 객체지향 적용 원칙"
         },
         {
-          "line": 42,
-          "text": "## 4. 생성 전 확인"
+          "line": 68,
+          "text": "## 4. CSS 소유권과 경로별 배치"
         },
         {
-          "line": 49,
-          "text": "## 5. 생성 상태"
+          "line": 81,
+          "text": "## 5. 전역 상태의 점진 축소"
         },
         {
-          "line": 57,
-          "text": "## 6. 리포트 구성과 A/B 보기"
+          "line": 89,
+          "text": "## 6. 데이터 로딩, Realtime과 성능"
         },
         {
-          "line": 66,
-          "text": "## 7. 근거와 좌표 표시"
+          "line": 102,
+          "text": "## 7. 데이터 권위, 보안과 실패 경계"
         },
         {
-          "line": 76,
-          "text": "## 8. AI 수정 요청과 revision"
+          "line": 111,
+          "text": "## 8. 구현 패키지와 롤백"
         },
         {
-          "line": 88,
-          "text": "## 9. 확정, 새 데이터, PDF"
+          "line": 121,
+          "text": "## 9. 검증과 추적성"
         },
         {
-          "line": 100,
-          "text": "## 10. 오류, 접근성, 인수 조건"
+          "line": 133,
+          "text": "## 10. 완료 조건"
         }
       ],
-      "path": "docs/ai-instructor-report-product.md",
-      "sha256": "983db425e870a587d4b5c8ed284709787dc824128567b2c3b63bb2995b68b36a",
-      "slices": []
+      "path": "docs/class-frontend-architecture.md",
+      "sha256": "96aa1f117d7db96f1b08dfc4aea6ffc1ad43be22000538fddcc72fdc35a05272",
+      "slices": [
+        {
+          "end_line": 82,
+          "requirement_ids": [
+            "CFA-032",
+            "CFA-037"
+          ],
+          "sha256": "e0d8355fa4c6f127ed2fab542c0238e06681fe9c1565582837bbcfb545144b79",
+          "start_line": 68,
+          "text": "## 4. CSS 소유권과 경로별 배치\n\n- `CFA-030` `app/globals.css`에는 font, primitive·semantic token, reset, element 기본값, selection, focus, reduced-motion과 전환 기간의 `.btn`, `.spinner`, `.sr-only`만 남긴다.\n- `CFA-031` 페이지 shell·배치·페이지 전용 반응형 규칙은 `page.tsx` 옆 `page.module.css`가 소유한다.\n- `CFA-032` 공유 컴포넌트의 내부 DOM, 상태 variant, keyframe과 반응형 규칙은 컴포넌트 옆 `<component>.module.css`가 소유한다. 페이지 CSS는 자식 컴포넌트의 내부 selector를 직접 수정하지 않는다.\n- `CFA-032A` 한 페이지 계열에서만 사용하는 컴포넌트는 해당 route의 `component/`에 둔다. 둘 이상의 독립된 페이지 계열에서 재사용하는 컴포넌트만 `app/component`에 둔다.\n- `CFA-033` 첫 전환에서는 CSS Module의 로컬 root 아래 기존 의미형 class를 `:global(...)`로 감싸 cascade를 보존한다. 공유 컴포넌트는 사용처가 이전될 때 `styles.*` hashed class로 전환한다.\n- `CFA-034` 일반 `page.css` 전역 import는 사용하지 않는다. Root layout의 global import 한 곳과 각 View·컴포넌트의 CSS Module import만 허용한다.\n- `CFA-035` 동적 상태, 카테고리, marker, QR 위치와 accent는 문자열 결합 대신 명시적 class map으로 변환한다. 알 수 없는 값은 안전한 기본 variant를 사용한다.\n- `CFA-036` 공유 selector를 페이지별로 복제하지 않는다. `SlideCanvas`, 질문 marker, status badge, 검색과 업로드 진행률은 컴포넌트 module로 한 번만 이동한다.\n- `CFA-037` 기존 semantic token과 `DESIGN.md`를 유지하며 새 직접 hex 값을 추가하지 않는다. CSS 이동 단계에서 시각값과 cascade 순서를 변경하지 않는다.\n- `CFA-038` CSS 삭제는 모든 소비자가 새 module로 이전된 뒤 `app/globals.css` 단일 소유 패키지에서 수행한다. route 작업자가 동시에 global stylesheet를 편집하지 않는다.\n\n## 5. 전역 상태의 점진 축소\n"
+        }
+      ]
     }
   ],
-  "generated_at": "2026-08-29T10:36:10+00:00",
+  "generated_at": "2026-08-29T14:03:22+00:00",
   "instructions": [
     "Use these approved requirement slices first.",
     "Open a cited full document only when the slice is ambiguous or a cross-cutting constraint is required.",
@@ -203,10 +214,12 @@
   ],
   "schema_version": "1.0",
   "task": {
-    "id": "session-live-tab-icon",
+    "id": "folder-material-thumbnail-background",
     "requirement_ids": [
-      "CLASS-DASH-003"
+      "CLASS-DASH-003",
+      "CFA-032",
+      "CFA-037"
     ],
-    "summary": "Use at-icons play in the live player tab and preserve the requested active color"
+    "summary": "Remove the square backgrounds behind folder grid thumbnail images"
   }
 }

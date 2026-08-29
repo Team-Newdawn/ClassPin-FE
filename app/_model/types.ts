@@ -1,0 +1,180 @@
+export const DEFAULT_QUESTION_CATEGORY_KEYS = ["concept", "why", "example", "error", "important"] as const;
+export const LEGACY_QUESTION_CATEGORY_KEYS = ["praise", "improve", "confusing", "bug", "idea"] as const;
+const BUILT_IN_QUESTION_CATEGORY_KEYS: readonly string[] = [...DEFAULT_QUESTION_CATEGORY_KEYS, ...LEGACY_QUESTION_CATEGORY_KEYS];
+export type DefaultQuestionCategory = typeof DEFAULT_QUESTION_CATEGORY_KEYS[number];
+export type QuestionCategory = string;
+export type QuestionStatus = "unanswered" | "answered" | "resolved";
+export type QuestionAnchorKind = "point" | "box" | "path";
+export type PresentationQrPosition = "top-left" | "top-right" | "bottom-left" | "bottom-right";
+export const QUESTION_MARKERS = ["pin", "question", "smile", "idea"] as const;
+export type QuestionMarker = typeof QUESTION_MARKERS[number];
+
+export const QUESTION_CATEGORY_LABEL_MAX = 40;
+export const QUESTION_CATEGORY_MAX = 20;
+const QUESTION_CATEGORY_STORED_MAX = 50;
+const QUESTION_CATEGORY_KEY = /^[a-z0-9][a-z0-9-]{0,63}$/;
+
+export type QuestionCategorySetting = { label: string; enabled: boolean; archived: boolean };
+export type QuestionCategorySettings = Record<string, QuestionCategorySetting>;
+
+export const defaultQuestionCategorySettings = (): QuestionCategorySettings => Object.fromEntries(
+  DEFAULT_QUESTION_CATEGORY_KEYS.map((key) => [key, { label: "", enabled: true, archived: false }])
+);
+
+export function normalizeQuestionCategorySettings(value: unknown): QuestionCategorySettings {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return defaultQuestionCategorySettings();
+  const settings: QuestionCategorySettings = {};
+  Object.entries(value as Record<string, unknown>).slice(0, QUESTION_CATEGORY_STORED_MAX).forEach(([key, item]) => {
+    if (!QUESTION_CATEGORY_KEY.test(key) || !item || typeof item !== "object" || Array.isArray(item)) return;
+    const setting = item as Record<string, unknown>;
+    const label = typeof setting.label === "string" ? [...setting.label.trim()].slice(0, QUESTION_CATEGORY_LABEL_MAX).join("") : "";
+    const builtIn = BUILT_IN_QUESTION_CATEGORY_KEYS.includes(key);
+    if (!builtIn && !label) return;
+    settings[key] = {
+      label,
+      enabled: typeof setting.enabled === "boolean" ? setting.enabled : true,
+      archived: typeof setting.archived === "boolean" ? setting.archived : false
+    };
+  });
+  if (!Object.values(settings).some((setting) => setting.enabled && !setting.archived)) {
+    Object.assign(settings, defaultQuestionCategorySettings());
+  }
+  return settings;
+}
+
+export function isValidQuestionCategorySettings(value: unknown): value is QuestionCategorySettings {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  const entries = Object.entries(value as Record<string, unknown>);
+  const active = entries.filter(([, item]) => {
+    const setting = item as Partial<QuestionCategorySetting> | null;
+    return setting?.enabled === true && setting.archived !== true;
+  });
+  return entries.length <= QUESTION_CATEGORY_STORED_MAX
+    && active.length >= 1
+    && entries.filter(([, item]) => (item as Partial<QuestionCategorySetting> | null)?.archived !== true).length <= QUESTION_CATEGORY_MAX
+    && entries.every(([key, item]) => {
+      if (!QUESTION_CATEGORY_KEY.test(key) || !item || typeof item !== "object" || Array.isArray(item)) return false;
+      const setting = item as Partial<QuestionCategorySetting>;
+      const builtIn = BUILT_IN_QUESTION_CATEGORY_KEYS.includes(key);
+      return typeof setting.label === "string"
+        && setting.label === setting.label.trim()
+        && [...setting.label].length <= QUESTION_CATEGORY_LABEL_MAX
+        && (builtIn || setting.label.length > 0)
+        && typeof setting.enabled === "boolean"
+        && typeof setting.archived === "boolean";
+    });
+}
+
+export const enabledQuestionCategories = (settings: QuestionCategorySettings) =>
+  Object.keys(settings).filter((key) => settings[key].enabled && !settings[key].archived);
+
+export const configuredQuestionCategories = (settings: QuestionCategorySettings) =>
+  Object.keys(settings).filter((key) => !settings[key].archived);
+
+export const acceptsQuestionCategory = (settings: QuestionCategorySettings, category: QuestionCategory) =>
+  enabledQuestionCategories(settings).includes(category);
+
+export const questionCategoryLabel = (
+  settings: QuestionCategorySettings,
+  category: QuestionCategory,
+  fallback: (category: QuestionCategory) => string
+) => settings[category]?.label || fallback(category);
+
+export const questionCategoryClass = (settings: QuestionCategorySettings, category: QuestionCategory) => {
+  if (BUILT_IN_QUESTION_CATEGORY_KEYS.includes(category)) return category;
+  const custom = Object.keys(settings).filter((key) => !BUILT_IN_QUESTION_CATEGORY_KEYS.includes(key));
+  return `custom-${Math.max(0, custom.indexOf(category)) % 5}`;
+};
+
+export const isQuestionMarker = (value: unknown): value is QuestionMarker =>
+  typeof value === "string" && (QUESTION_MARKERS as readonly string[]).includes(value);
+
+export const questionMarkerEmoji = (marker: QuestionMarker): string | null =>
+  marker === "question" ? "❓" : marker === "smile" ? "🙂" : marker === "idea" ? "💡" : null;
+
+export interface NormalizedPoint {
+  x: number;
+  y: number;
+}
+
+/** admin = 구글 로그인 강사, participant = QR 익명 수강생 */
+export type UserRole = "admin" | "participant";
+
+export interface Profile {
+  id: string;
+  role: UserRole;
+  email: string | null;
+  displayName: string | null;
+  avatarUrl: string | null;
+}
+
+export const CLASS_FOLDER_NAME_MAX = 80;
+
+export function normalizeClassFolderName(value: string) {
+  const name = value.trim();
+  const length = [...name].length;
+  if (length < 1 || length > CLASS_FOLDER_NAME_MAX) {
+    throw new Error(`폴더 이름은 1~${CLASS_FOLDER_NAME_MAX}자로 입력해 주세요.`);
+  }
+  return name;
+}
+
+export interface ClassFolder {
+  id: string;
+  name: string;
+  createdAt: string;
+}
+
+export interface Slide {
+  id: string;
+  pageIndex: number;
+  title: string;
+  imageUrl?: string;
+  /** lecture-slides 버킷 안의 경로. 변환 단계에서 이미 올라간 이미지를 가리킨다. */
+  imagePath?: string;
+  /** 강의자 전용 발표 메모. 청중 세션 조회에는 포함하지 않는다. */
+  speakerNote?: string;
+}
+
+export interface Question {
+  id: string;
+  sessionId: string;
+  slideIndex: number;
+  x: number | null;
+  y: number | null;
+  anchorKind?: QuestionAnchorKind;
+  width?: number | null;
+  height?: number | null;
+  path?: NormalizedPoint[] | null;
+  category: QuestionCategory;
+  marker: QuestionMarker;
+  text: string;
+  status: QuestionStatus;
+  answer?: string;
+  /** 공개 참여자 조회에서만 계산된다. 작성자 UUID 자체는 노출하지 않는다. */
+  isMine: boolean;
+  reactionCount: number;
+  reactedByMe: boolean;
+  createdAt: string;
+}
+
+export interface ClassSession {
+  id: string;
+  folderId: string | null;
+  courseId?: string;
+  materialId?: string;
+  materialVersionId?: string;
+  code: string;
+  title: string;
+  fileName: string;
+  status: "live" | "ended";
+  currentSlide: number;
+  presentationInteractions: boolean;
+  showQuestionPins: boolean;
+  showPresentationQr: boolean;
+  presentationQrPosition: PresentationQrPosition;
+  questionCategories: QuestionCategorySettings;
+  createdAt: string;
+  slides: Slide[];
+  questions: Question[];
+}

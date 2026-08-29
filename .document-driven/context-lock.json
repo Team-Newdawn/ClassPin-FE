@@ -1,5 +1,5 @@
 {
-  "created_at": "2026-08-29T10:36:10+00:00",
+  "created_at": "2026-08-29T14:03:22+00:00",
   "documents": [
     {
       "id": "prd",
@@ -7,27 +7,29 @@
       "sha256": "2e08e4650cd5fd7baddf8b4f93abd89b9b6309964ef7ada21816d16ebdca0f46"
     },
     {
-      "id": "ai-report-product",
-      "path": "docs/ai-instructor-report-product.md",
-      "sha256": "983db425e870a587d4b5c8ed284709787dc824128567b2c3b63bb2995b68b36a"
+      "id": "class-frontend-architecture",
+      "path": "docs/class-frontend-architecture.md",
+      "sha256": "96aa1f117d7db96f1b08dfc4aea6ffc1ad43be22000538fddcc72fdc35a05272"
     }
   ],
   "manifest": {
     "path": "docs/document-manifest.json",
-    "sha256": "86eb09d09c1892b656b0cb2a576ee94c128f44d94d4f6e50a79b06d57ef8b290"
+    "sha256": "ef9389fd062facf19841be55364cd6cfb9232e1856f7c8612fd668b7723421f2"
   },
   "schema_version": "1.0",
   "selected_artifact_ids": [
-    "ai-report-product"
+    "class-frontend-architecture"
   ],
   "task": {
-    "id": "session-live-tab-icon",
+    "id": "folder-material-thumbnail-background",
     "requirement_ids": [
-      "CLASS-DASH-003"
+      "CLASS-DASH-003",
+      "CFA-032",
+      "CFA-037"
     ],
     "scopes": [
-      "admin-report-selection-ui"
+      "class-route-css-colocation"
     ],
-    "summary": "Use at-icons play in the live player tab and preserve the requested active color"
+    "summary": "Remove the square backgrounds behind folder grid thumbnail images"
   }
 }

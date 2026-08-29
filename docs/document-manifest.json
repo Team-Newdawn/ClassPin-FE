@@ -67,6 +67,47 @@
         "report-operations-and-deployment"
       ],
       "status": "approved"
+    },
+    {
+      "approval": {
+        "approved_at": "2026-08-29T13:01:00+00:00",
+        "approved_by": "minchan_CTO",
+        "content_sha256": "96aa1f117d7db96f1b08dfc4aea6ffc1ad43be22000538fddcc72fdc35a05272"
+      },
+      "depends_on": [],
+      "id": "class-frontend-architecture",
+      "informed_by": [
+        "prd"
+      ],
+      "path": "docs/class-frontend-architecture.md",
+      "purpose": "Define the Pin Class frontend model-view-controller-service boundaries, object-oriented responsibility rules, route and component CSS ownership, and measurement-led data-loading performance strategy.",
+      "required_for": [
+        "class-frontend-layering",
+        "class-route-css-colocation",
+        "class-data-loading-performance"
+      ],
+      "status": "approved"
+    },
+    {
+      "approval": {
+        "approved_at": "2026-08-29T13:18:00+00:00",
+        "approved_by": "minchan_CTO",
+        "content_sha256": "7a77fb99b56c0a97912dcebc1969ee2756a95f94048000970159da5b316f18c1"
+      },
+      "depends_on": [
+        "class-frontend-architecture"
+      ],
+      "id": "pin-feedback-sunset",
+      "informed_by": [
+        "prd"
+      ],
+      "path": "docs/pin-feedback-sunset.md",
+      "purpose": "Define removal of the separate Pin Feedback runtime and source surface while relocating shared Pin Class behavior and preserving historical campaign database and Storage data.",
+      "required_for": [
+        "pin-feedback-runtime-removal",
+        "class-shared-logic-relocation"
+      ],
+      "status": "approved"
     }
   ],
   "implementation_gate": {

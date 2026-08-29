@@ -1,0 +1,14 @@
+{
+  "code": [
+    "app/(view)/admin/folders/[id]/component/folder-material-card.module.css"
+  ],
+  "documents": [
+    "class-frontend-architecture"
+  ],
+  "recorded_at": "2026-08-29T14:01:11+00:00",
+  "requirement_id": "CFA-037",
+  "task_id": "folder-material-thumbnail-padding",
+  "tests": [
+    ".document-driven/evidence/folder-material-thumbnail-padding.md"
+  ]
+}

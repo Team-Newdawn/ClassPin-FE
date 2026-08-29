@@ -1,0 +1,527 @@
+.root {
+  --presentation-qr-size: clamp(120px, 10vw, 168px);
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+  background: #05070a;
+  color: var(--pin-neutral-100);
+  user-select: none;
+}
+
+.root:not(:global(.controls-visible)) {
+  cursor: none;
+}
+
+.root :global(.presentation-slide) {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+}
+
+.root :global(.presentation-slide) :global(.slide-canvas) {
+  width: 100%;
+  height: 100%;
+  aspect-ratio: auto;
+  border-radius: 0;
+  background: #05070a;
+  box-shadow: none;
+}
+
+.root :global(.presentation-slide) :global(.slide-canvas) img {
+  object-fit: contain;
+}
+
+.root :global(.presentation-topbar),
+.root :global(.presentation-footer),
+.root :global(.presentation-side-control) {
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 180ms ease;
+}
+
+.root:global(.controls-visible) :global(.presentation-topbar),
+.root:global(.controls-visible) :global(.presentation-footer),
+.root:global(.controls-visible) :global(.presentation-side-control) {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.root :global(.presentation-topbar) {
+  position: absolute;
+  z-index: 10;
+  inset: 0 0 auto;
+  height: 76px;
+  padding: 0 24px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: linear-gradient(rgba(5, 7, 10, .8), transparent);
+}
+
+.root :global(.presentation-title) {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+
+.root :global(.presentation-title) :global(.status-dot) {
+  flex: 0 0 auto;
+}
+
+.root :global(.presentation-title) :global(.status-dot.ended) {
+  background: var(--pin-neutral-500);
+}
+
+.root :global(.presentation-title) b {
+  max-width: min(60vw, 720px);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.root :global(.presentation-top-actions) {
+  display: flex;
+  gap: 8px;
+}
+
+.root :global(.presentation-top-actions) button,
+.root :global(.presentation-side-control) {
+  border: 1px solid rgba(255, 255, 255, .16);
+  background: rgba(23, 29, 38, .72);
+  color: var(--pin-neutral-100);
+  backdrop-filter: blur(10px);
+}
+
+.root :global(.presentation-top-actions) button {
+  width: 42px;
+  height: 42px;
+  padding: 0;
+  display: grid;
+  place-items: center;
+  border-radius: 11px;
+}
+
+.root :global(.presentation-top-actions) button:hover,
+.root :global(.presentation-side-control):hover {
+  background: rgba(61, 71, 84, .9);
+}
+
+.root:global(.class-presentation-shell) :global(.presentation-top-actions) button:global(.active) {
+  border-color: rgba(91, 148, 255, .58);
+  background: rgba(40, 103, 232, .48);
+  color: #fff;
+}
+
+.root :global(.presentation-top-actions) svg {
+  width: 19px;
+}
+
+.root :global(.presentation-side-control) {
+  position: absolute;
+  z-index: 9;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 52px;
+  height: 72px;
+  display: grid;
+  place-items: center;
+  border-radius: 14px;
+}
+
+.root :global(.presentation-side-control.previous) {
+  left: 24px;
+}
+
+.root :global(.presentation-side-control.next) {
+  right: 24px;
+}
+
+.root :global(.presentation-side-control) svg {
+  width: 28px;
+}
+
+.root :global(.presentation-side-control):disabled {
+  opacity: 0 !important;
+  pointer-events: none !important;
+}
+
+.root :global(.presentation-footer) {
+  position: absolute;
+  z-index: 10;
+  inset: auto 0 0;
+  min-height: 78px;
+  padding: 22px 24px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: end;
+  background: linear-gradient(transparent, rgba(5, 7, 10, .8));
+}
+
+.root :global(.presentation-page) {
+  grid-column: 2;
+  padding: 7px 12px;
+  border: 1px solid rgba(255, 255, 255, .14);
+  border-radius: 999px;
+  background: rgba(23, 29, 38, .68);
+  font-size: 13px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  backdrop-filter: blur(10px);
+}
+
+.root :global(.presentation-hint) {
+  justify-self: end;
+  color: var(--pin-neutral-400);
+  font-size: 11px;
+}
+
+.root :global(.presentation-error) {
+  justify-self: start;
+  color: #fecaca;
+  font-size: 12px;
+}
+
+.root:global(.presentation-message) {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  text-align: center;
+}
+
+.root:global(.presentation-message) h1 {
+  margin: 0 0 16px;
+  font-size: 22px;
+}
+
+.root :global(.presentation-text-button) {
+  height: 42px;
+  padding: 0 16px;
+  border: 1px solid rgba(255, 255, 255, .2);
+  border-radius: 10px;
+  background: var(--pin-neutral-800);
+  color: var(--pin-neutral-100);
+  font-weight: 600;
+}
+
+.root :global(.presentation-join-qr) {
+  position: absolute;
+  z-index: 12;
+  width: var(--presentation-qr-size);
+  padding: 8px;
+  pointer-events: none;
+  border: 1px solid rgba(255, 255, 255, .7);
+  border-radius: 14px;
+  background: #fff;
+  color: var(--pin-neutral-900);
+  box-shadow: 0 10px 32px rgba(0, 0, 0, .28);
+}
+
+.root :global(.presentation-join-qr.top-left) {
+  left: 18px;
+  top: 18px;
+}
+
+.root :global(.presentation-join-qr.top-right) {
+  right: 18px;
+  top: 18px;
+}
+
+.root :global(.presentation-join-qr.bottom-left) {
+  left: 18px;
+  bottom: 18px;
+}
+
+.root :global(.presentation-join-qr.bottom-right) {
+  right: 18px;
+  bottom: 18px;
+}
+
+.root :global(.presentation-join-qr) svg {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.root :global(.presentation-join-qr) > div {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 5px;
+  padding: 6px 2px 0;
+}
+
+.root :global(.presentation-join-qr) span {
+  font-size: 9px;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+  white-space: nowrap;
+}
+
+.root :global(.presentation-join-qr) b {
+  font-size: 10px;
+  letter-spacing: .07em;
+}
+
+.root:global(.qr-top-left) :global(.presentation-topbar) {
+  padding-left: calc(var(--presentation-qr-size) + 48px);
+}
+
+.root:global(.qr-top-right) :global(.presentation-topbar) {
+  padding-right: calc(var(--presentation-qr-size) + 48px);
+}
+
+.root:global(.qr-bottom-left) :global(.presentation-footer) {
+  padding-left: calc(var(--presentation-qr-size) + 48px);
+}
+
+.root:global(.qr-bottom-right) :global(.presentation-footer) {
+  padding-right: calc(var(--presentation-qr-size) + 48px);
+}
+
+.root :global(.class-presentation-canvas) :global(.slide-canvas) {
+  width: min(100vw, calc(100dvh * 16 / 9));
+  height: auto;
+  aspect-ratio: 16 / 9;
+  overflow: visible;
+}
+
+.root :global(.class-presentation-reactions) {
+  position: absolute;
+  z-index: 8;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.root :global(.lecture-live-reaction) {
+  opacity: 0;
+}
+
+.root :global(.class-presentation-milestone) {
+  position: absolute;
+  z-index: 20;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  padding: .12em .32em;
+  border-radius: .3em;
+  background: rgba(5, 7, 10, .76);
+  color: #fff;
+  font-size: clamp(78px, 18vw, 260px);
+  font-weight: 900;
+  line-height: 1;
+  letter-spacing: -.08em;
+  text-shadow: 0 0 16px rgba(52, 120, 246, .9), 0 0 58px rgba(52, 120, 246, .7);
+  box-shadow: 0 0 80px rgba(52, 120, 246, .28);
+  backdrop-filter: blur(8px);
+  animation: class-presentation-milestone 3s cubic-bezier(.2, .8, .2, 1) both;
+}
+
+@keyframes class-presentation-milestone {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(.42) rotate(-7deg);
+  }
+  12%, 82% {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1) rotate(0);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(1.12);
+  }
+}
+
+.root :global(.class-presentation-status) {
+  position: absolute;
+  z-index: 11;
+  min-width: 94px;
+  height: 44px;
+  padding: 0 13px;
+  pointer-events: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  border: 1px solid rgba(255, 255, 255, .16);
+  border-radius: 12px;
+  background: rgba(23, 29, 38, .76);
+  color: #fff;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, .3);
+  backdrop-filter: blur(10px);
+  font-variant-numeric: tabular-nums;
+}
+
+.root :global(.class-presentation-status) span {
+  color: var(--pin-neutral-400);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: .08em;
+}
+
+.root :global(.class-presentation-status) b {
+  font-size: 24px;
+  line-height: 1;
+  letter-spacing: .06em;
+}
+
+.root :global(.class-presentation-status.top-left) {
+  left: 18px;
+  top: 82px;
+}
+
+.root :global(.class-presentation-status.top-right) {
+  right: 18px;
+  top: 82px;
+}
+
+.root :global(.class-presentation-status.bottom-left) {
+  left: 18px;
+  bottom: 82px;
+}
+
+.root :global(.class-presentation-status.bottom-right) {
+  right: 18px;
+  bottom: 82px;
+}
+
+.root:global(.qr-top-left) :global(.class-presentation-status.top-left),
+.root:global(.qr-top-right) :global(.class-presentation-status.top-right) {
+  top: calc(var(--presentation-qr-size) + 54px);
+}
+
+.root:global(.qr-bottom-left) :global(.class-presentation-status.bottom-left),
+.root:global(.qr-bottom-right) :global(.class-presentation-status.bottom-right) {
+  bottom: calc(var(--presentation-qr-size) + 54px);
+}
+
+@media (max-width: 600px) {
+  .root {
+    --presentation-qr-size: 104px;
+  }
+
+  .root :global(.presentation-topbar) {
+    height: 62px;
+    padding: 0 14px;
+  }
+
+  .root :global(.presentation-side-control) {
+    width: 44px;
+    height: 58px;
+  }
+
+  .root :global(.presentation-side-control.previous) {
+    left: 12px;
+  }
+
+  .root :global(.presentation-side-control.next) {
+    right: 12px;
+  }
+
+  .root :global(.presentation-footer) {
+    min-height: 66px;
+    padding: 16px 14px;
+  }
+
+  .root :global(.presentation-hint) {
+    display: none;
+  }
+
+  .root :global(.presentation-error) {
+    position: absolute;
+    left: 14px;
+    bottom: 58px;
+    max-width: calc(100vw - 28px);
+  }
+
+  .root :global(.presentation-join-qr) {
+    padding: 6px;
+    border-radius: 11px;
+  }
+
+  .root :global(.presentation-join-qr.top-left),
+  .root :global(.presentation-join-qr.bottom-left) {
+    left: 10px;
+  }
+
+  .root :global(.presentation-join-qr.top-right),
+  .root :global(.presentation-join-qr.bottom-right) {
+    right: 10px;
+  }
+
+  .root :global(.presentation-join-qr.top-left),
+  .root :global(.presentation-join-qr.top-right) {
+    top: 10px;
+  }
+
+  .root :global(.presentation-join-qr.bottom-left),
+  .root :global(.presentation-join-qr.bottom-right) {
+    bottom: 10px;
+  }
+
+  .root :global(.presentation-join-qr) span,
+  .root :global(.presentation-join-qr) b {
+    font-size: 8px;
+  }
+
+  .root:global(.qr-top-left) :global(.presentation-topbar),
+  .root:global(.qr-bottom-left) :global(.presentation-footer) {
+    padding-left: 124px;
+  }
+
+  .root:global(.qr-top-right) :global(.presentation-topbar),
+  .root:global(.qr-bottom-right) :global(.presentation-footer) {
+    padding-right: 124px;
+  }
+
+  .root :global(.class-presentation-status) {
+    min-width: 78px;
+    height: 38px;
+    padding: 0 10px;
+    gap: 7px;
+  }
+
+  .root :global(.class-presentation-status) b {
+    font-size: 20px;
+  }
+
+  .root :global(.class-presentation-status.top-left) {
+    left: 10px;
+    top: 68px;
+  }
+
+  .root :global(.class-presentation-status.top-right) {
+    right: 10px;
+    top: 68px;
+  }
+
+  .root :global(.class-presentation-status.bottom-left) {
+    left: 10px;
+    bottom: 68px;
+  }
+
+  .root :global(.class-presentation-status.bottom-right) {
+    right: 10px;
+    bottom: 68px;
+  }
+
+  .root:global(.qr-top-left) :global(.class-presentation-status.top-left),
+  .root:global(.qr-top-right) :global(.class-presentation-status.top-right) {
+    top: calc(var(--presentation-qr-size) + 34px);
+  }
+
+  .root:global(.qr-bottom-left) :global(.class-presentation-status.bottom-left),
+  .root:global(.qr-bottom-right) :global(.class-presentation-status.bottom-right) {
+    bottom: calc(var(--presentation-qr-size) + 34px);
+  }
+}
+
+
+/* Route-owned semantic rules moved from globals.css. */
+.root :global(.slide-emoji-reaction){position:absolute;z-index:20;bottom:-52px;transform:translateX(-50%);font-size:clamp(34px,4vw,58px);line-height:1;pointer-events:none;filter:drop-shadow(0 7px 12px rgba(16,24,39,.28));animation:emoji-rise 1.8s cubic-bezier(.18,.72,.26,1) forwards}@keyframes emoji-rise{0%{opacity:0;transform:translate(-50%,12px) scale(.68)}18%{opacity:1}70%{opacity:1;transform:translate(-50%,-42vh) scale(1.08) rotate(5deg)}100%{opacity:0;transform:translate(-50%,-56vh) scale(.94) rotate(-4deg)}}

@@ -5,9 +5,10 @@ import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { useHorizontalSlideWheel } from "@/app/_controller/use-horizontal-slide-wheel";
 import { useLanguage } from "@/app/_controller/language-context";
 import { useSessions } from "@/app/_controller/session-store";
-import type { PresentationQrPosition, QuestionCategorySettings, QuestionStatus } from "@/app/_model/types";
+import { CLASS_UNFILED_COLOR_INDEX, type PresentationQrPosition, type QuestionCategorySettings, type QuestionStatus } from "@/app/_model/types";
 
 type Tab = "live" | "questions";
+const PRESENTATION_QR_POSITIONS: readonly PresentationQrPosition[] = ["top-left", "top-right", "bottom-left", "bottom-right"];
 
 export const MIN_QUESTION_PANEL = 300;
 export const MAX_QUESTION_PANEL = 560;
@@ -35,10 +36,8 @@ export function useSessionAdminController() {
     resolveQuestion,
     setCurrentSlide,
     setStatus,
-    setPresentationInteractions,
     setShowQuestionPins,
-    setShowPresentationQr,
-    setPresentationQrPosition,
+    setPresentationQrPlacement,
     setQuestionCategories,
     setActiveSession,
     updateSlideNote
@@ -165,9 +164,8 @@ export function useSessionAdminController() {
   }, [tab]);
 
   const slide = session?.slides[session.currentSlide];
-  const folderIndex = folders.findIndex((item) => item.id === session?.folderId);
-  const folder = folderIndex >= 0 ? folders[folderIndex] : undefined;
-  const folderAccentIndex = (folderIndex >= 0 ? folderIndex : folders.length) % 6;
+  const folder = folders.find((item) => item.id === session?.folderId);
+  const folderAccentIndex = folder?.colorIndex ?? CLASS_UNFILED_COLOR_INDEX;
   const folderHref = `/admin/folders/${folder?.id ?? "unfiled"}`;
   const folderSessions = sessions.filter((item) => item.folderId === (session?.folderId ?? null));
   const slideQuestions = session?.questions.filter((question) => question.slideIndex === session.currentSlide) ?? [];
@@ -363,9 +361,12 @@ export function useSessionAdminController() {
     changeSlide,
     toggleStatus: () => session && runLectureAction(() => setStatus(session.id, session.status === "live" ? "ended" : "live"), t("session.saveLectureError")),
     toggleQuestionPins: () => session && runLectureAction(() => setShowQuestionPins(session.id, !session.showQuestionPins), t("session.savePinSettingError")),
-    togglePresentationInteractions: () => session && runLectureAction(() => setPresentationInteractions(session.id, !session.presentationInteractions), t("session.savePresentationModeError")),
-    togglePresentationQr: () => session && runLectureAction(() => setShowPresentationQr(session.id, !session.showPresentationQr), t("presentation.saveQrSettingError")),
-    changePresentationQrPosition: (position: PresentationQrPosition) => session && runLectureAction(() => setPresentationQrPosition(session.id, position), t("session.saveQrPositionError")),
+    changePresentationQrPlacement: (value: string) => {
+      if (!session) return;
+      const position = PRESENTATION_QR_POSITIONS.find((candidate) => candidate === value) ?? null;
+      if (value !== "hidden" && position === null) return;
+      runLectureAction(() => setPresentationQrPlacement(session.id, position), t("session.saveQrPositionError"));
+    },
     saveQuestionCategories: (settings: QuestionCategorySettings) => session ? setQuestionCategories(session.id, settings) : Promise.resolve(),
     reportActionError: setActionError,
     submitAnswer,

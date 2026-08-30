@@ -4,7 +4,7 @@ import { useMemo, useRef, useState, type FormEvent } from "react";
 import { useLanguage } from "@/app/_controller/language-context";
 import { useSessions } from "@/app/_controller/session-store";
 import { useSlideUpload } from "@/app/_controller/use-slide-upload";
-import type { ClassSession } from "@/app/_model/types";
+import { CLASS_UNFILED_COLOR_INDEX, type ClassSession } from "@/app/_model/types";
 
 export const UNFILED_ID = "unfiled";
 
@@ -24,8 +24,8 @@ export function useDashboardController() {
 
   const visibleSummaries = useMemo(() => {
     const summaries = [
-      ...folders.map((folder, colorIndex) => ({ ...folder, colorIndex: colorIndex % 6, sessions: sessions.filter((session) => session.folderId === folder.id) })),
-      { id: UNFILED_ID, name: t("folders.unfiled"), createdAt: "", colorIndex: folders.length % 6, sessions: sessions.filter((session) => session.folderId === null) }
+      ...folders.map((folder) => ({ ...folder, sessions: sessions.filter((session) => session.folderId === folder.id) })),
+      { id: UNFILED_ID, name: t("folders.unfiled"), createdAt: "", colorIndex: CLASS_UNFILED_COLOR_INDEX, sessions: sessions.filter((session) => session.folderId === null) }
     ];
     const needle = query.trim().toLocaleLowerCase();
     return needle ? summaries.filter((folder) => folder.name.toLocaleLowerCase().includes(needle)) : summaries;

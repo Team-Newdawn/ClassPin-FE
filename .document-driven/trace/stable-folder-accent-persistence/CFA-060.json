@@ -1,0 +1,17 @@
+{
+  "code": [
+    "app/_model/types.ts",
+    "app/_controller/session-store.tsx",
+    "app/_service/class-session-service.ts",
+    "supabase/migrations/20260829141150_persist_class_folder_color_index.sql"
+  ],
+  "documents": [
+    "class-frontend-architecture"
+  ],
+  "recorded_at": "2026-08-29T14:20:45+00:00",
+  "requirement_id": "CFA-060",
+  "task_id": "stable-folder-accent-persistence",
+  "tests": [
+    ".document-driven/evidence/stable-folder-accent-persistence.md"
+  ]
+}

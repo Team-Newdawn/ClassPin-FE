@@ -5,8 +5,16 @@ import { ChevronLeft, ChevronRight, Maximize2, Minimize2, X } from "@/app/compon
 import { LanguageSwitcher } from "@/app/component/language-switcher";
 import { QuestionDetailDialog } from "../component/question-detail-dialog";
 import { SlideCanvas } from "@/app/component/slide-canvas";
+import type { PresentationQrPosition } from "@/app/_model/types";
 import { useSessionPresentationController } from "./controller";
 import styles from "./page.module.css";
+
+const QR_POSITION_CLASS: Record<PresentationQrPosition, string> = {
+  "top-left": "top-left",
+  "top-right": "top-right",
+  "bottom-left": "bottom-left",
+  "bottom-right": "bottom-right"
+};
 
 export default function SessionPresentation() {
   const {
@@ -43,11 +51,12 @@ export default function SessionPresentation() {
   if (!ready) return <main className={`${styles.root} presentation-shell presentation-message`}><span className="spinner" /></main>;
   if (!session) return <main className={`${styles.root} presentation-shell presentation-message`}><h1>{t("session.notFound")}</h1><button className="presentation-text-button" onClick={goHome}>{t("common.homeBack")}</button></main>;
   if (!slide) return <main className={`${styles.root} presentation-shell presentation-message`}><h1>{t("presentation.noSlides")}</h1><button className="presentation-text-button" onClick={goBackToAdmin}>{t("presentation.backToAdmin")}</button></main>;
+  const qrPositionClass = QR_POSITION_CLASS[session.presentationQrPosition] ?? QR_POSITION_CLASS["bottom-right"];
 
   return (
     <main
       ref={stageRef}
-      className={`${styles.root} presentation-shell class-presentation-shell ${session.presentationInteractions && session.showPresentationQr ? `qr-${session.presentationQrPosition}` : ""} ${controlsVisible ? "controls-visible" : ""}`}
+      className={`${styles.root} presentation-shell class-presentation-shell ${session.showPresentationQr ? `qr-${qrPositionClass}` : ""} ${controlsVisible ? "controls-visible" : ""}`}
       onMouseMove={revealControls}
       onPointerDown={revealControls}
     >
@@ -61,14 +70,14 @@ export default function SessionPresentation() {
           selectedId={activeQuestionId}
           liveQuestionId={liveQuestionId}
           onSelectPin={openQuestionDetail}
-          showPins={session.presentationInteractions && session.showQuestionPins}
-          showQuestionLabels={session.presentationInteractions && session.showQuestionPins}
+          showPins={session.showQuestionPins}
+          showQuestionLabels={session.showQuestionPins}
           labelContent="body"
         />
       </div>
 
-      {session.presentationInteractions && session.showPresentationQr && <aside
-        className={`presentation-join-qr ${session.presentationQrPosition}`}
+      {session.showPresentationQr && <aside
+        className={`presentation-join-qr ${qrPositionClass}`}
         role="img"
         aria-label={`${t("presentation.joinQrAria")} · ${session.code}`}
       >
@@ -76,14 +85,14 @@ export default function SessionPresentation() {
         <div><span>{t("presentation.scanToJoin")}</span><b>{session.code}</b></div>
       </aside>}
 
-      {session.presentationInteractions && <>
-        <div className="class-presentation-reactions" aria-hidden="true">
-          {liveReactions.map((reaction) => <span
-            key={reaction.id}
-            className="slide-emoji-reaction lecture-live-reaction"
-            style={{ left: `${reaction.left}%`, animationDelay: `${reaction.delay}ms` }}
-          >{reaction.emoji}</span>)}
-        </div>
+      <div className="class-presentation-reactions" aria-hidden="true">
+        {liveReactions.map((reaction) => <span
+          key={reaction.id}
+          className="slide-emoji-reaction lecture-live-reaction"
+          style={{ left: `${reaction.left}%`, animationDelay: `${reaction.delay}ms` }}
+        >{reaction.emoji}</span>)}
+      </div>
+      {session.showQuestionPins && <>
         {pinMilestone !== null && <output className="class-presentation-milestone" role="status" aria-live="polite" aria-atomic="true">{pinMilestone}!</output>}
         <output className="class-presentation-status top-right" aria-label={t("presentation.pinTotal", { count: positionedQuestionCount })}><span>PIN</span><b>{String(positionedQuestionCount).padStart(2, "0")}</b></output>
       </>}
@@ -108,7 +117,7 @@ export default function SessionPresentation() {
         <span className="presentation-hint">{t("presentation.hint")}</span>
       </footer>
 
-      {session.presentationInteractions && detailQuestion && <QuestionDetailDialog question={detailQuestion} questionCategories={session.questionCategories} onClose={closeQuestionDetail} />}
+      {session.showQuestionPins && detailQuestion && <QuestionDetailDialog question={detailQuestion} questionCategories={session.questionCategories} onClose={closeQuestionDetail} />}
     </main>
   );
 }

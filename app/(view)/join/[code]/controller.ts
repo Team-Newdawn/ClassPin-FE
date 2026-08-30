@@ -7,28 +7,21 @@ import { useSessions } from "@/app/_controller/session-store";
 import { useHorizontalSlideWheel } from "@/app/_controller/use-horizontal-slide-wheel";
 import { useLectureReactions } from "@/app/_controller/use-lecture-reactions";
 import { LECTURE_REACTION_EVENT, lectureReactionTopic, type LectureReactionEmoji } from "@/app/_model/lecture-reactions";
-import { questionsByEmpathy } from "@/app/_model/question-reactions";
+import { questionsByEmpathy, questionsByNewest } from "@/app/_model/question-reactions";
 import { broadcastLocalReaction } from "@/app/_model/realtime-reactions";
 import { ensureAnonymousUser, getAudienceSupabaseClient } from "@/app/_infrastructure/supabase/client";
-import { acceptsQuestionCategory, enabledQuestionCategories, questionCategoryClass, questionCategoryLabel, questionMarkerEmoji, type NormalizedPoint, type Question, type QuestionCategory, type QuestionMarker } from "@/app/_model/types";
+import { acceptsQuestionCategory, enabledQuestionCategories, questionCategoryClass, questionCategoryLabel, questionMarkerEmoji, type Question, type QuestionCategory, type QuestionMarker } from "@/app/_model/types";
 
-type StudentTool = "pin" | "pen" | "emoji";
+type StudentTool = "pin" | "emoji";
+type QuestionSort = "empathy" | "newest";
 
 type DraftQuestion = {
-  anchorKind: "point" | "box" | "path";
   x: number;
   y: number;
-  width: number | null;
-  height: number | null;
-  path: NormalizedPoint[] | null;
   category: QuestionCategory;
   marker: QuestionMarker;
   text: string;
 };
-
-const MAX_PATH_POINTS = 512;
-const MIN_PATH_DISTANCE_PX = 2;
-const MIN_PATH_LENGTH_PX = 12;
 
 export function useJoinSessionController() {
   const { t, categoryLabel: defaultCategoryLabel, timeAgo } = useLanguage();
@@ -48,12 +41,12 @@ export function useJoinSessionController() {
   const [composerOpen, setComposerOpen] = useState(false);
   const [lookupDone, setLookupDone] = useState(false);
   const [selectedQuestionId, setSelectedQuestionId] = useState<string | null>(null);
+  const [questionSort, setQuestionSort] = useState<QuestionSort>("empathy");
   const [pendingReactionIds, setPendingReactionIds] = useState<Set<string>>(new Set());
   const [reactionError, setReactionError] = useState<string | null>(null);
   const [emojiError, setEmojiError] = useState<string | null>(null);
   const pinDragged = useRef(false);
   const pinDragStart = useRef<{ x: number; y: number } | null>(null);
-  const penPath = useRef<NormalizedPoint[]>([]);
 
   useEffect(() => {
     if (!ready || lookupDone || session) return;
@@ -66,10 +59,13 @@ export function useJoinSessionController() {
   }, [session?.id, setActiveSession]);
 
   const current = slideIndex ?? session?.currentSlide ?? 0;
-  const submittedQuestions = useMemo(() => questionsByEmpathy((session?.questions ?? []).filter((question) => question.slideIndex === current)), [current, session?.questions]);
-  const visibleQuestionIds = useMemo(() => submittedQuestions
+  const slideQuestions = useMemo(() => (session?.questions ?? []).filter((question) => question.slideIndex === current), [current, session?.questions]);
+  const submittedQuestions = useMemo(() => questionSort === "empathy"
+    ? questionsByEmpathy(slideQuestions)
+    : questionsByNewest(slideQuestions), [questionSort, slideQuestions]);
+  const visibleQuestionIds = useMemo(() => slideQuestions
     .filter((question) => question.isMine || question.id === selectedQuestionId)
-    .map((question) => question.id), [selectedQuestionId, submittedQuestions]);
+    .map((question) => question.id), [selectedQuestionId, slideQuestions]);
   const handleSlideWheel = useHorizontalSlideWheel({
     currentIndex: current,
     slideCount: session?.slides.length ?? 0,
@@ -87,7 +83,7 @@ export function useJoinSessionController() {
 
   const slide = session.slides[current];
   const draftQuestion = draftQuestions[slide.id];
-  const viewingQuestion = viewingQuestionId ? submittedQuestions.find((question) => question.id === viewingQuestionId) : null;
+  const viewingQuestion = viewingQuestionId ? slideQuestions.find((question) => question.id === viewingQuestionId) : null;
   const categoryOptions = enabledQuestionCategories(session.questionCategories);
   const defaultCategory = categoryOptions[0] ?? "concept";
   const activeCategory = draftQuestion?.category ?? defaultCategory;
@@ -113,12 +109,8 @@ export function useJoinSessionController() {
       return {
         ...currentDrafts,
         [slide.id]: {
-          anchorKind: "point",
           x,
           y,
-          width: null,
-          height: null,
-          path: null,
           category: currentDraft?.category ?? nextCategory,
           marker: currentDraft?.marker ?? "pin",
           text: currentDraft?.text ?? ""
@@ -146,7 +138,7 @@ export function useJoinSessionController() {
   };
 
   const startEditingQuestion = (questionId: string) => {
-    const question = submittedQuestions.find((item) => item.id === questionId);
+    const question = slideQuestions.find((item) => item.id === questionId);
     if (!question) return;
     setSelectedQuestionId(question.id);
     if (!question.isMine) return;
@@ -162,12 +154,8 @@ export function useJoinSessionController() {
     setDraftQuestions((currentDrafts) => ({
       ...currentDrafts,
       [slide.id]: {
-        anchorKind: question.anchorKind === "path" ? "path" : question.anchorKind === "box" ? "box" : "point",
         x: question.x!,
         y: question.y!,
-        width: question.width ?? null,
-        height: question.height ?? null,
-        path: question.path ?? null,
         category: acceptsQuestionCategory(session.questionCategories, question.category) ? question.category : defaultCategory,
         marker: question.marker,
         text: question.text
@@ -189,112 +177,12 @@ export function useJoinSessionController() {
   };
 
   const clearDraftQuestion = () => {
-    penPath.current = [];
     setDraftQuestions((currentDrafts) => {
       if (!currentDrafts[slide.id]) return currentDrafts;
       const nextDrafts = { ...currentDrafts };
       delete nextDrafts[slide.id];
       return nextDrafts;
     });
-  };
-
-  const normalizedPoint = (clientX: number, clientY: number, canvas: DOMRect): NormalizedPoint => ({
-    x: Math.min(1, Math.max(0, (clientX - canvas.left) / canvas.width)),
-    y: Math.min(1, Math.max(0, (clientY - canvas.top) / canvas.height))
-  });
-
-  const appendPenPath = (event: PointerEvent<HTMLDivElement>) => {
-    if (!event.currentTarget.hasPointerCapture(event.pointerId)) return penPath.current;
-    const canvas = event.currentTarget.getBoundingClientRect();
-    const samples = event.nativeEvent.getCoalescedEvents?.() ?? [event.nativeEvent];
-    let nextPath = [...penPath.current];
-    samples.forEach((sample) => {
-      const point = normalizedPoint(sample.clientX, sample.clientY, canvas);
-      const previous = nextPath[nextPath.length - 1];
-      if (previous && Math.hypot(
-        (point.x - previous.x) * canvas.width,
-        (point.y - previous.y) * canvas.height
-      ) < MIN_PATH_DISTANCE_PX) return;
-      if (nextPath.length >= MAX_PATH_POINTS) nextPath = nextPath.filter((_, index) => index % 2 === 0);
-      nextPath.push(point);
-    });
-    penPath.current = nextPath;
-    return nextPath;
-  };
-
-  const startPenDrawing = (event: PointerEvent<HTMLDivElement>) => {
-    if (event.button !== 0) return;
-    event.preventDefault();
-    event.stopPropagation();
-    const canvas = event.currentTarget.getBoundingClientRect();
-    const start = normalizedPoint(event.clientX, event.clientY, canvas);
-    penPath.current = [start];
-    event.currentTarget.setPointerCapture(event.pointerId);
-    setEditingQuestionId(null);
-    setViewingQuestionId(null);
-    setSubmitError(null);
-    setSubmitted(false);
-    setComposerOpen(false);
-    setDraftQuestions((currentDrafts) => {
-      const currentDraft = currentDrafts[slide.id];
-      return {
-        ...currentDrafts,
-        [slide.id]: {
-          anchorKind: "path",
-          x: start.x,
-          y: start.y,
-          width: null,
-          height: null,
-          path: [start],
-          category: currentDraft?.category ?? defaultCategory,
-          marker: currentDraft?.marker ?? "pin",
-          text: currentDraft?.text ?? ""
-        }
-      };
-    });
-  };
-
-  const movePenDrawing = (event: PointerEvent<HTMLDivElement>) => {
-    if (!event.currentTarget.hasPointerCapture(event.pointerId)) return;
-    const path = appendPenPath(event);
-    const start = path[0];
-    if (!start) return;
-    setDraftQuestions((currentDrafts) => {
-      const currentDraft = currentDrafts[slide.id];
-      if (!currentDraft) return currentDrafts;
-      return { ...currentDrafts, [slide.id]: { ...currentDraft, anchorKind: "path", x: start.x, y: start.y, path } };
-    });
-  };
-
-  const finishPenDrawing = (event: PointerEvent<HTMLDivElement>) => {
-    const path = appendPenPath(event);
-    const canvas = event.currentTarget.getBoundingClientRect();
-    if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId);
-    penPath.current = [];
-    const pathLength = path.slice(1).reduce((length, point, index) => {
-      const previous = path[index];
-      return length + Math.hypot(
-        (point.x - previous.x) * canvas.width,
-        (point.y - previous.y) * canvas.height
-      );
-    }, 0);
-    if (path.length < 2 || pathLength < MIN_PATH_LENGTH_PX) {
-      clearDraftQuestion();
-      return;
-    }
-    const start = path[0];
-    setDraftQuestions((currentDrafts) => {
-      const currentDraft = currentDrafts[slide.id];
-      if (!currentDraft) return currentDrafts;
-      return { ...currentDrafts, [slide.id]: { ...currentDraft, anchorKind: "path", x: start.x, y: start.y, path } };
-    });
-    setComposerOpen(true);
-  };
-
-  const cancelPenDrawing = (event: PointerEvent<HTMLDivElement>) => {
-    if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId);
-    penPath.current = [];
-    clearDraftQuestion();
   };
 
   const startMovingDraftTag = (event: PointerEvent<HTMLButtonElement>) => {
@@ -332,11 +220,6 @@ export function useJoinSessionController() {
     pinDragged.current = false;
   };
 
-  const openComposer = (event: MouseEvent<HTMLButtonElement>) => {
-    event.stopPropagation();
-    setComposerOpen(true);
-  };
-
   const submit = async () => {
     if (!draftQuestion || submitting) return;
     const values = {
@@ -352,12 +235,12 @@ export function useJoinSessionController() {
       } else {
         await addQuestion(session.id, {
           slideIndex: current,
-          anchorKind: draftQuestion.anchorKind,
+          anchorKind: "point",
           x: draftQuestion.x,
           y: draftQuestion.y,
-          width: draftQuestion.width,
-          height: draftQuestion.height,
-          path: draftQuestion.path,
+          width: null,
+          height: null,
+          path: null,
           ...values
         });
       }
@@ -413,6 +296,10 @@ export function useJoinSessionController() {
     setSlideIndex(null);
     setSelectedQuestionId(null);
     closeComposer();
+  };
+
+  const selectQuestionSort = (sort: string) => {
+    if (sort === "empathy" || sort === "newest") setQuestionSort(sort);
   };
 
   const toggleQuestionReaction = async (question: Question) => {
@@ -476,6 +363,8 @@ export function useJoinSessionController() {
     submitError,
     composerOpen,
     selectedQuestionId,
+    questionSort,
+    slideQuestions,
     submittedQuestions,
     visibleQuestionIds,
     pendingReactionIds,
@@ -494,10 +383,6 @@ export function useJoinSessionController() {
     selectMarker,
     startEditingQuestion,
     updateDraftText,
-    startPenDrawing,
-    movePenDrawing,
-    finishPenDrawing,
-    cancelPenDrawing,
     startMovingDraftTag,
     moveDraftTag,
     finishMovingDraftTag,
@@ -508,8 +393,8 @@ export function useJoinSessionController() {
     selectTool,
     changeSlide,
     syncToLiveSlide,
+    selectQuestionSort,
     toggleQuestionReaction,
-    sendEmojiReaction,
-    openComposer
+    sendEmojiReaction
   };
 }

@@ -109,6 +109,8 @@ export interface Profile {
 }
 
 export const CLASS_FOLDER_NAME_MAX = 80;
+export const CLASS_FOLDER_COLOR_COUNT = 6;
+export const CLASS_UNFILED_COLOR_INDEX = 2;
 
 export function normalizeClassFolderName(value: string) {
   const name = value.trim();
@@ -119,10 +121,21 @@ export function normalizeClassFolderName(value: string) {
   return name;
 }
 
+export function classFolderColorIndexForOrder(index: number) {
+  return (Number.isFinite(index) ? Math.max(0, Math.trunc(index)) : 0) % CLASS_FOLDER_COLOR_COUNT;
+}
+
+export function normalizeClassFolderColorIndex(value: unknown, fallbackIndex = 0) {
+  return typeof value === "number" && Number.isInteger(value) && value >= 0 && value < CLASS_FOLDER_COLOR_COUNT
+    ? value
+    : classFolderColorIndexForOrder(fallbackIndex);
+}
+
 export interface ClassFolder {
   id: string;
   name: string;
   createdAt: string;
+  colorIndex: number;
 }
 
 export interface Slide {
@@ -156,6 +169,24 @@ export interface Question {
   reactionCount: number;
   reactedByMe: boolean;
   createdAt: string;
+}
+
+type QuestionAnchor = Pick<Question, "anchorKind" | "x" | "y" | "width" | "height" | "path">;
+
+export type ParticipantQuestionInput = Pick<Question, "slideIndex" | "category" | "marker" | "text"> & {
+  anchorKind: "point";
+  x: number;
+  y: number;
+  width: null;
+  height: null;
+  path: null;
+};
+
+export function isParticipantPointAnchor(anchor: QuestionAnchor) {
+  return anchor.anchorKind === "point"
+    && typeof anchor.x === "number" && Number.isFinite(anchor.x) && anchor.x >= 0 && anchor.x <= 1
+    && typeof anchor.y === "number" && Number.isFinite(anchor.y) && anchor.y >= 0 && anchor.y <= 1
+    && anchor.width == null && anchor.height == null && anchor.path == null;
 }
 
 export interface ClassSession {

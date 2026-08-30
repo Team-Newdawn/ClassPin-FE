@@ -7,8 +7,12 @@ export const withQuestionReaction = (question: Question, reactedByMe: boolean): 
     reactionCount: Math.max(0, question.reactionCount + (reactedByMe ? 1 : -1)),
   };
 
+const newestFirst = (left: Question, right: Question) =>
+  right.createdAt.localeCompare(left.createdAt) || left.id.localeCompare(right.id);
+
+export const questionsByNewest = (questions: readonly Question[]) => [...questions].sort(newestFirst);
+
 export const questionsByEmpathy = (questions: readonly Question[]) => [...questions].sort((left, right) =>
   right.reactionCount - left.reactionCount
-  || right.createdAt.localeCompare(left.createdAt)
-  || left.id.localeCompare(right.id)
+  || newestFirst(left, right)
 );

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { advancePinPlayback, crossedPinMilestone, rectanglesOverlap, resolvePinDisplayPositions } from "./presentation-rotation.ts";
+import { advancePinPlayback, crossedPinMilestone, rectanglesOverlap, resolvePinDisplayPositions, resolveVisiblePresentationLabelIds } from "./presentation-rotation.ts";
 
 test("PIN 총합이 새 10단위를 넘으면 건너뛴 구간 중 가장 높은 값을 고른다", () => {
   assert.equal(crossedPinMilestone(9, 10), 10);
@@ -56,4 +56,21 @@ test("말풍선과 PIN의 실제 사각형이 겹칠 때만 충돌로 판단한�
   const first = { left: 0, right: 20, top: 0, bottom: 20 };
   assert.equal(rectanglesOverlap(first, { left: 10, right: 30, top: 10, bottom: 30 }), true);
   assert.equal(rectanglesOverlap(first, { left: 20, right: 40, top: 0, bottom: 20 }), false);
+});
+
+test("새 이모티콘 PIN이 이전 말풍선과 겹치면 새 말풍선만 남긴다", () => {
+  const labels = [
+    { id: "old", bounds: { left: 0, right: 80, top: 0, bottom: 40 } },
+    { id: "new-emoji", bounds: { left: 90, right: 170, top: 0, bottom: 40 } }
+  ];
+  const pins = [
+    { id: "old", bounds: { left: 0, right: 30, top: 50, bottom: 80 } },
+    { id: "new-emoji", bounds: { left: 40, right: 70, top: 10, bottom: 40 } }
+  ];
+
+  assert.deepEqual([...resolveVisiblePresentationLabelIds(labels, pins, "new-emoji")], ["new-emoji"]);
+  assert.deepEqual(resolveVisiblePresentationLabelIds([
+    labels[0],
+    { id: "new-emoji", bounds: { left: 60, right: 140, top: 10, bottom: 50 } }
+  ], pins.map((pin) => ({ ...pin, bounds: { ...pin.bounds, top: 50, bottom: 80 } })), "new-emoji"), ["new-emoji"]);
 });

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { questionsByEmpathy, withQuestionReaction } from "./question-reactions.ts";
+import { questionsByEmpathy, questionsByNewest, withQuestionReaction } from "./question-reactions.ts";
 import type { Question } from "./types.ts";
 
 const question = (values: Partial<Question> = {}): Question => ({
@@ -35,4 +35,14 @@ test("질문은 공감 수, 최신 작성 시각 순으로 계속 정렬된다",
   ]);
 
   assert.deepEqual(sorted.map(({ id }) => id), ["new-popular", "old-popular", "new"]);
+});
+
+test("최신순은 공감 수와 관계없이 작성 시각과 id로 결정된다", () => {
+  const sorted = questionsByNewest([
+    question({ id: "old-popular", reactionCount: 99, createdAt: "2026-08-17T00:00:00.000Z" }),
+    question({ id: "new-b", reactionCount: 0, createdAt: "2026-08-19T00:00:00.000Z" }),
+    question({ id: "new-a", reactionCount: 1, createdAt: "2026-08-19T00:00:00.000Z" }),
+  ]);
+
+  assert.deepEqual(sorted.map(({ id }) => id), ["new-a", "new-b", "old-popular"]);
 });

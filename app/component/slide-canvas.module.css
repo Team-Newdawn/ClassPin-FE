@@ -14,9 +14,9 @@
 .root :global(.question-region.selected){z-index:8;border-color:var(--pin-blue-700);box-shadow:0 0 0 3px rgba(52,120,246,.2),inset 0 0 0 1px rgba(255,255,255,.7)}
 .root :global(.question-region)>span{position:absolute;left:-12px;top:-14px;width:26px;height:26px;display:grid;place-items:center;border:2px solid var(--color-bg-surface);border-radius:50% 50% 50% 4px;background:var(--color-brand);color:var(--color-bg-surface);font-size:11px;font-weight:700;box-shadow:var(--shadow-sm)}
 .root :global(.question-path-marker.emoji-pin),.root :global(.question-region)>span:global(.emoji-pin){border:0;background:transparent;box-shadow:none;font-size:24px;line-height:1}
-.root :global(.question-path),.root :global(.draft-path){position:absolute;inset:0;width:100%;height:100%;overflow:visible;pointer-events:none}
+.root :global(.question-path){position:absolute;inset:0;width:100%;height:100%;overflow:visible;pointer-events:none}
 .root :global(.question-path){z-index:5}
-.root :global(.question-path) polyline,.root :global(.draft-path) polyline{fill:none;stroke:var(--color-brand);stroke-width:5px;stroke-linecap:round;stroke-linejoin:round}
+.root :global(.question-path) polyline{fill:none;stroke:var(--color-brand);stroke-width:5px;stroke-linecap:round;stroke-linejoin:round}
 .root :global(.question-path) polyline{pointer-events:stroke;cursor:pointer;filter:drop-shadow(0 1px 2px rgba(255,255,255,.9)) drop-shadow(0 2px 4px rgba(16,24,39,.25))}
 .root :global(.question-path.selected) polyline{stroke:var(--pin-blue-700);stroke-width:7px}
 .root :global(.question-path-marker){position:absolute;z-index:7;transform:translate(-50%,-50%);width:28px;height:28px;padding:0;border:2px solid var(--color-bg-surface);border-radius:50% 50% 50% 4px;background:var(--color-brand);color:var(--color-bg-surface);font-size:11px;font-weight:700;box-shadow:var(--shadow-sm)}
@@ -27,10 +27,12 @@
 .root :global(.question-displacement-lines) line{stroke:rgba(255,255,255,.72);stroke-width:1.5;stroke-dasharray:3 3;vector-effect:non-scaling-stroke}
 :global(.class-presentation-canvas) .root :global(.question-pin.live){z-index:9;transform-origin:0 100%;background:var(--color-error);box-shadow:0 0 0 2px var(--color-bg-surface),0 0 0 5px var(--color-error);animation:live-pin-pop 1s cubic-bezier(.2,.8,.2,1)}
 :global(.class-presentation-canvas) .root :global(.question-pin.emoji-pin.live){background:transparent;box-shadow:none}
+:global(.class-presentation-canvas) .root :global(.question-pin:not(.emoji-pin)){font-size:0}
 :global(.class-presentation-canvas) .root :global(.question-region.live){z-index:9;border-color:var(--color-error);background:var(--color-error-bg);box-shadow:0 0 0 5px var(--color-error);animation:live-region-pop 1s cubic-bezier(.2,.8,.2,1)}
 :global(.class-presentation-canvas) .root :global(.question-region.live)>span,:global(.class-presentation-canvas) .root :global(.question-path-marker.live){z-index:9;background:var(--color-error);box-shadow:0 0 0 2px var(--color-bg-surface),0 0 0 5px var(--color-error);animation:live-marker-pop 1s cubic-bezier(.2,.8,.2,1)}
 :global(.class-presentation-canvas) .root :global(.question-path.live) polyline{stroke:var(--color-error);filter:drop-shadow(0 0 5px var(--color-error));animation:live-region-pop 1s cubic-bezier(.2,.8,.2,1)}
 :global(.class-presentation-canvas) .root :global(.question-bubble){width:max-content;height:auto;min-height:30px;max-width:clamp(132px,24vw,360px);padding:7px 11px;display:block;transform:translate(42px,calc(-50% - 17px));white-space:pre-wrap;text-align:left;font-size:clamp(15px,calc(1.05vw + 10px),20px);line-height:1.35;overflow-wrap:anywhere;border:1px solid currentColor;border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,.32)}
+:global(.class-presentation-canvas) .root :global(.question-bubble[hidden]){display:none}
 :global(.class-presentation-canvas) .root :global(.question-bubble-body){position:relative;z-index:2}
 :global(.class-presentation-canvas) .root :global(.question-bubble.empathy-fire){isolation:isolate;box-shadow:0 0 24px rgba(249,115,22,.72),0 8px 24px rgba(0,0,0,.32);animation:empathy-fire-glow 900ms ease-in-out infinite alternate}
 :global(.class-presentation-canvas) .root :global(.question-bubble.live){background:var(--color-error);color:var(--color-bg-surface)}

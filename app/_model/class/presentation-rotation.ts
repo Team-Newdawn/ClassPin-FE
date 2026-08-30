@@ -1,5 +1,6 @@
 type PositionedPin = { x: number; y: number };
 type Rectangle = { left: number; right: number; top: number; bottom: number };
+type PositionedRectangle = { id: string; bounds: Rectangle };
 
 const PIN_SIZE = 30;
 const PIN_COLLISION_STEP = 38;
@@ -72,4 +73,19 @@ export function advancePinPlayback<T extends PositionedPin & { id: string }>(pin
 
 export function rectanglesOverlap(first: Rectangle, second: Rectangle) {
   return first.left < second.right && first.right > second.left && first.top < second.bottom && first.bottom > second.top;
+}
+
+export function resolveVisiblePresentationLabelIds(labels: readonly PositionedRectangle[], pins: readonly PositionedRectangle[], activeId: string | null) {
+  const active = labels.find((label) => label.id === activeId);
+  const ordered = active ? [active, ...labels.filter((label) => label !== active)] : labels;
+  const retained: PositionedRectangle[] = [];
+
+  for (const label of ordered) {
+    const overlapsAnotherPin = pins.some((pin) => pin.id !== label.id && rectanglesOverlap(label.bounds, pin.bounds));
+    if (label === active || (!overlapsAnotherPin && retained.every((other) => !rectanglesOverlap(label.bounds, other.bounds)))) {
+      retained.push(label);
+    }
+  }
+
+  return retained.map((label) => label.id);
 }

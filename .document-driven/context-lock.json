@@ -1,10 +1,10 @@
 {
-  "created_at": "2026-08-29T14:03:22+00:00",
+  "created_at": "2026-08-30T09:03:11+00:00",
   "documents": [
     {
       "id": "prd",
       "path": "doc/pin_class_prd.md",
-      "sha256": "2e08e4650cd5fd7baddf8b4f93abd89b9b6309964ef7ada21816d16ebdca0f46"
+      "sha256": "7c909b9d99e30e27776cd275f60ad08c75d6920956cc48c2e3d5111e618789f4"
     },
     {
       "id": "class-frontend-architecture",
@@ -21,15 +21,28 @@
     "class-frontend-architecture"
   ],
   "task": {
-    "id": "folder-material-thumbnail-background",
+    "id": "participant-question-sorting-and-live-controls",
     "requirement_ids": [
-      "CLASS-DASH-003",
-      "CFA-032",
-      "CFA-037"
+      "CLASS-JOIN-002",
+      "CLASS-LIVE-001",
+      "CFA-010",
+      "CFA-020",
+      "CFA-035",
+      "CFA-042",
+      "CFA-053",
+      "CFA-056",
+      "CFA-064",
+      "CFA-080",
+      "CFA-081",
+      "CFA-082",
+      "CFA-083",
+      "CFA-087"
     ],
     "scopes": [
-      "class-route-css-colocation"
+      "class-frontend-layering",
+      "class-route-css-colocation",
+      "class-data-loading-performance"
     ],
-    "summary": "Remove the square backgrounds behind folder grid thumbnail images"
+    "summary": "Add participant question sorting and compact four-card viewport; move QR selection to stage toolbar and simplify live questions panel to one PIN visibility toggle"
   }
 }

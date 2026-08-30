@@ -1,17 +1,20 @@
 {
   "code": [
-    "app/admin/session/[id]/present/page.tsx",
-    "components/slide-canvas.tsx",
-    "lib/pin/presentation-rotation.ts"
+    "app/(view)/admin/session/[id]/present/controller.ts",
+    "app/(view)/admin/session/[id]/present/page.tsx",
+    "app/_model/class/presentation-rotation.ts",
+    "app/component/slide-canvas.module.css",
+    "app/component/slide-canvas.tsx"
   ],
   "documents": [
-    "ai-report-product"
+    "prd",
+    "class-frontend-architecture"
   ],
-  "recorded_at": "2026-08-28T03:37:35+00:00",
+  "recorded_at": "2026-08-30T09:52:56+00:00",
   "requirement_id": "CLASS-PRES-001",
   "task_id": "class-presentation-pin-collision",
   "tests": [
-    "lib/pin/presentation-rotation.test.ts",
+    "app/_model/class/presentation-rotation.test.ts",
     ".document-driven/evidence/class-presentation-pin-collision.md"
   ]
 }

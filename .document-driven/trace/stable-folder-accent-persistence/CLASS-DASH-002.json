@@ -1,0 +1,21 @@
+{
+  "code": [
+    "app/_model/types.ts",
+    "app/_controller/session-store.tsx",
+    "app/_service/class-session-service.ts",
+    "app/(view)/admin/dashboard/controller.ts",
+    "app/(view)/admin/session/[id]/controller.ts",
+    "supabase/migrations/20260829141150_persist_class_folder_color_index.sql"
+  ],
+  "documents": [
+    "class-frontend-architecture"
+  ],
+  "recorded_at": "2026-08-29T14:20:44+00:00",
+  "requirement_id": "CLASS-DASH-002",
+  "task_id": "stable-folder-accent-persistence",
+  "tests": [
+    "app/_model/class-folders.test.ts",
+    "supabase/tests/class_folder_colors.sql",
+    ".document-driven/evidence/stable-folder-accent-persistence.md"
+  ]
+}

@@ -12,7 +12,7 @@ import { SlideCanvas } from "@/app/component/slide-canvas";
 import { StatusBadge } from "@/app/component/status-badge";
 import { MAX_QUESTION_PANEL, MIN_QUESTION_PANEL, useSessionAdminController } from "./controller";
 import styles from "./page.module.css";
-import { configuredQuestionCategories, enabledQuestionCategories, isValidQuestionCategorySettings, QUESTION_CATEGORY_LABEL_MAX, QUESTION_CATEGORY_MAX, questionCategoryClass, questionCategoryLabel, questionMarkerEmoji, type PresentationQrPosition, type Question, type QuestionCategory, type QuestionCategorySettings } from "@/app/_model/types";
+import { configuredQuestionCategories, enabledQuestionCategories, isValidQuestionCategorySettings, QUESTION_CATEGORY_LABEL_MAX, QUESTION_CATEGORY_MAX, questionCategoryClass, questionCategoryLabel, questionMarkerEmoji, type Question, type QuestionCategory, type QuestionCategorySettings } from "@/app/_model/types";
 
 export default function SessionAdmin() {
   const { t, categoryLabel: defaultCategoryLabel, timeAgo } = useLanguage();
@@ -25,7 +25,7 @@ export default function SessionAdmin() {
     slideInputRef, handleSlideWheel, showLive, showQuestions, toggleFolderRail, openShare,
     closeShare, changeAnswer, changeQuery, changeFilter, openQuestionDetail, closeQuestionDetail,
     selectQuestionFromList, changeSlide, toggleStatus, toggleQuestionPins,
-    togglePresentationInteractions, togglePresentationQr, changePresentationQrPosition,
+    changePresentationQrPlacement,
     saveQuestionCategories, reportActionError, submitAnswer, resolveSelectedQuestion,
     saveCurrentSlideNote, changeNoteDraft, saveNoteByKeyboard, addSlideImages, openDeleteSlide,
     closeDeleteSlide, confirmDeleteSlide, startQuestionPanelResize, resizeQuestionPanel,
@@ -38,14 +38,6 @@ export default function SessionAdmin() {
 
   const categoryLabel = (category: QuestionCategory) => questionCategoryLabel(session.questionCategories, category, defaultCategoryLabel);
   const categoryClass = (category: QuestionCategory) => questionCategoryClass(session.questionCategories, category);
-  const qrPositions: PresentationQrPosition[] = ["top-left", "top-right", "bottom-left", "bottom-right"];
-  const qrPositionLabel = (position: PresentationQrPosition) => position === "top-left"
-    ? t("session.qrTopLeft")
-    : position === "top-right"
-      ? t("session.qrTopRight")
-      : position === "bottom-left"
-        ? t("session.qrBottomLeft")
-        : t("session.qrBottomRight");
   return <>
     <div
       className={`${styles.root} session-admin-shell ${folderRailOpen ? "" : "folder-rail-collapsed"}`}
@@ -81,6 +73,21 @@ export default function SessionAdmin() {
               <div className="stage-toolbar">
                 <div className="stage-toolbar-status"><span className={`status-dot ${session.status}`} /><b title={session.title}>{session.title}</b><span className="stage-sync-label">{t(session.status === "live" ? "session.syncing" : "session.stoppedLabel")}</span></div>
                 <div className="stage-toolbar-actions">
+                  <div className="stage-qr-placement">
+                    <QrCode aria-hidden="true" />
+                    <label className="sr-only" htmlFor="stage-qr-placement">{t("session.qrPosition")}</label>
+                    <select
+                      id="stage-qr-placement"
+                      value={session.showPresentationQr ? session.presentationQrPosition : "hidden"}
+                      onChange={(event) => changePresentationQrPlacement(event.target.value)}
+                    >
+                      <option value="hidden">{t("session.qrHidden")}</option>
+                      <option value="top-right">{t("session.qrTopRight")}</option>
+                      <option value="top-left">{t("session.qrTopLeft")}</option>
+                      <option value="bottom-right">{t("session.qrBottomRight")}</option>
+                      <option value="bottom-left">{t("session.qrBottomLeft")}</option>
+                    </select>
+                  </div>
                   <span>{session.currentSlide + 1} / {session.slides.length}</span>
                   <input ref={slideInputRef} type="file" accept=".png,.jpg,.jpeg,.webp,image/png,image/jpeg,image/webp" multiple hidden onChange={addSlideImages} />
                   <button type="button" className="stage-add-slides" disabled={addingSlides} onClick={() => slideInputRef.current?.click()} title={t("session.addSlidesHint")}>
@@ -129,7 +136,7 @@ export default function SessionAdmin() {
                 <div className="panel-heading">
                 <div><h2>{t("session.liveQuestions")}</h2><p>{t("common.currentQuestionsCount", { count: slideQuestions.length })}</p></div>
                 <div className="panel-heading-actions">
-                  <span className="session-toggle-label">{t("session.showPins")}</span>
+                  <span className="pulse-dot" aria-hidden="true" />
                   <button
                     type="button"
                     className={`session-toggle ${session.showQuestionPins ? "on" : ""}`}
@@ -141,63 +148,8 @@ export default function SessionAdmin() {
                     <span className="session-toggle-thumb" />
                     <span className="session-toggle-state">{session.showQuestionPins ? "ON" : "OFF"}</span>
                   </button>
-                  <span className="pulse-dot" aria-hidden="true" />
                 </div>
                 </div>
-                <section className="qr-position-setting" aria-labelledby="presentation-mode-title">
-                <div className="qr-position-heading">
-                  <span><MonitorUp /></span>
-                  <div><b id="presentation-mode-title">{t("session.presentationMode")}</b><small>{t("session.presentationModeHint")}</small></div>
-                  <div className="panel-heading-actions">
-                    <span className="session-toggle-label">{t(session.presentationInteractions ? "session.interactiveMode" : "session.slidesOnlyMode")}</span>
-                    <button
-                      type="button"
-                      className={`session-toggle ${session.presentationInteractions ? "on" : ""}`}
-                      role="switch"
-                      aria-checked={session.presentationInteractions}
-                      aria-label={session.presentationInteractions ? t("session.disableInteractions") : t("session.enableInteractions")}
-                      onClick={togglePresentationInteractions}
-                    >
-                      <span className="session-toggle-thumb" />
-                      <span className="session-toggle-state">{session.presentationInteractions ? "ON" : "OFF"}</span>
-                    </button>
-                  </div>
-                </div>
-                </section>
-                <section className="qr-position-setting" aria-labelledby="qr-position-title">
-                <div className="qr-position-heading">
-                  <span><QrCode /></span>
-                  <div><b id="qr-position-title">{t("session.qrPosition")}</b><small>{t("session.qrPositionHint")}</small></div>
-                  <div className="panel-heading-actions">
-                    <span className="session-toggle-label">{t("presentation.showQr")}</span>
-                    <button
-                      type="button"
-                      className={`session-toggle ${session.showPresentationQr ? "on" : ""}`}
-                      role="switch"
-                      aria-checked={session.showPresentationQr}
-                      aria-label={session.showPresentationQr ? t("presentation.turnQrOff") : t("presentation.turnQrOn")}
-                      onClick={togglePresentationQr}
-                    >
-                      <span className="session-toggle-thumb" />
-                      <span className="session-toggle-state">{session.showPresentationQr ? "ON" : "OFF"}</span>
-                    </button>
-                  </div>
-                </div>
-                <div className="qr-position-options" role="group" aria-label={t("session.qrPosition")}>
-                  {qrPositions.map((position) => (
-                    <button
-                      type="button"
-                      key={position}
-                      className={session.presentationQrPosition === position ? "active" : ""}
-                      aria-pressed={session.presentationQrPosition === position}
-                      onClick={() => changePresentationQrPosition(position)}
-                    >
-                      <span className={`qr-corner-preview ${position}`} aria-hidden="true"><i /></span>
-                      {qrPositionLabel(position)}
-                    </button>
-                  ))}
-                </div>
-                </section>
                 <div className="question-stack">{slideQuestions.length ? slideQuestions.map((q) => <QuestionCard key={q.id} question={q} questionCategories={session.questionCategories} selected={selected?.id === q.id} onClick={() => openQuestionDetail(q.id)} />) : <div className="no-questions"><MessageCircleQuestion /><b>{t("session.noQuestions")}</b><span>{t("session.noQuestionsHint1")}<br />{t("session.noQuestionsHint2")}</span></div>}</div>
                 {selected && <div className="answer-box">
                 {selected.answer && <div className="saved-answer"><span>{t("session.latestAnswer")}</span><p>{selected.answer}</p></div>}

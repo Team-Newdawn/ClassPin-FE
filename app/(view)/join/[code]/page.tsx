@@ -2,7 +2,7 @@
 
 import type { CSSProperties } from "react";
 import Link from "next/link";
-import { Check, ChevronLeft, ChevronRight, MapPin, Pencil, Send, Smile, Trash2, X } from "@/app/component/icons";
+import { Check, ChevronLeft, ChevronRight, MapPin, Send, Smile, Trash2, X } from "@/app/component/icons";
 import { LanguageSwitcher } from "@/app/component/language-switcher";
 import { LoadingScreen } from "@/app/component/loading-screen";
 import { PinLogo } from "@/app/component/pin-logo";
@@ -23,13 +23,12 @@ export default function JoinSession() {
   const {
     t, timeAgo, finalHref, session, liveReactions, activeTool, slideIndex, current, slide,
     draftQuestion, draftText, editingQuestionId, viewingQuestion, submitted, submitting,
-    submitError, composerOpen, selectedQuestionId, submittedQuestions, visibleQuestionIds,
+    submitError, composerOpen, selectedQuestionId, questionSort, slideQuestions, submittedQuestions, visibleQuestionIds,
     pendingReactionIds, reactionError, emojiError, categoryOptions, activeCategory, activeMarker,
     activeMarkerEmoji, categoryLabel, categoryClass, markerLabel, handleSlideWheel, placeDraftTag,
-    selectCategory, selectMarker, startEditingQuestion, updateDraftText, startPenDrawing,
-    movePenDrawing, finishPenDrawing, cancelPenDrawing, startMovingDraftTag, moveDraftTag,
-    finishMovingDraftTag, openDraftComposer, openComposer, submit, closeComposer,
-    deleteDraftQuestion, selectTool, changeSlide, syncToLiveSlide, toggleQuestionReaction,
+    selectCategory, selectMarker, startEditingQuestion, updateDraftText, startMovingDraftTag, moveDraftTag,
+    finishMovingDraftTag, openDraftComposer, submit, closeComposer,
+    deleteDraftQuestion, selectTool, changeSlide, syncToLiveSlide, selectQuestionSort, toggleQuestionReaction,
     sendEmojiReaction
   } = controller;
 
@@ -45,7 +44,7 @@ export default function JoinSession() {
             <div className={`student-canvas lecture-fit tool-${activeTool}`} style={{ "--student-image-width": "min(100%, calc((100dvh - 180px) * 16 / 9))" } as CSSProperties}>
               <SlideCanvas
                 slide={slide}
-                questions={submittedQuestions}
+                questions={slideQuestions}
                 questionCategories={session.questionCategories}
                 visibleQuestionIds={visibleQuestionIds}
                 selectedId={selectedQuestionId}
@@ -53,15 +52,7 @@ export default function JoinSession() {
                 onCanvasClick={activeTool === "pin" ? placeDraftTag : undefined}
                 showQuestionLabels
               >
-                {activeTool === "pen" && <div
-                  className="student-pen-layer"
-                  onPointerDown={startPenDrawing}
-                  onPointerMove={movePenDrawing}
-                  onPointerUp={finishPenDrawing}
-                  onPointerCancel={cancelPenDrawing}
-                  aria-label={t("student.selectArea")}
-                />}
-                {draftQuestion?.anchorKind === "point" && !editingQuestionId && !submitted && <>
+                {draftQuestion && !editingQuestionId && !submitted && <>
                   <button
                     className={`draft-pin ${questionMarkerEmoji(draftQuestion.marker) ? "emoji-pin" : ""}`}
                     style={{ left: `${draftQuestion.x * 100}%`, top: `${draftQuestion.y * 100}%` }}
@@ -74,25 +65,6 @@ export default function JoinSession() {
                   >{questionMarkerEmoji(draftQuestion.marker) && <span aria-hidden="true">{questionMarkerEmoji(draftQuestion.marker)}</span>}</button>
                   <span className={`draft-tag category ${categoryClass(draftQuestion.category)}`} style={{ left: `${draftQuestion.x * 100}%`, top: `${draftQuestion.y * 100}%` }}>{categoryLabel(draftQuestion.category)}</span>
                 </>}
-                {draftQuestion?.anchorKind === "path" && (draftQuestion.path?.length ?? 0) >= 1 && !editingQuestionId && !submitted && <>
-                  <svg className="draft-path" viewBox="0 0 1 1" preserveAspectRatio="none" aria-hidden="true">
-                    <polyline points={draftQuestion.path!.map((point) => `${point.x},${point.y}`).join(" ")} vectorEffect="non-scaling-stroke" />
-                  </svg>
-                  <button
-                    type="button"
-                    className={`draft-path-label category ${categoryClass(draftQuestion.category)}`}
-                    style={{ left: `${draftQuestion.x * 100}%`, top: `${draftQuestion.y * 100}%` }}
-                    aria-label={t("student.openAreaQuestion")}
-                    onClick={openComposer}
-                  >{categoryLabel(draftQuestion.category)}</button>
-                </>}
-                {draftQuestion?.anchorKind === "box" && draftQuestion.width != null && draftQuestion.height != null && !editingQuestionId && !submitted && <button
-                  type="button"
-                  className="draft-region"
-                  style={{ left: `${draftQuestion.x * 100}%`, top: `${draftQuestion.y * 100}%`, width: `${draftQuestion.width * 100}%`, height: `${draftQuestion.height * 100}%` }}
-                  aria-label={t("student.openAreaQuestion")}
-                  onClick={openComposer}
-                ><span>{categoryLabel(draftQuestion.category)}</span></button>}
               </SlideCanvas>
             </div>
           </div>
@@ -108,7 +80,6 @@ export default function JoinSession() {
               </div>}
               <div className="participant-tool-switch" role="toolbar" aria-label={t("student.questionTools")}>
                 <button type="button" className={activeTool === "pin" ? "active" : ""} aria-pressed={activeTool === "pin"} onClick={() => selectTool("pin")} aria-label={t("student.pinTool")} title={t("student.pin")}><MapPin /></button>
-                <button type="button" className={activeTool === "pen" ? "active" : ""} aria-pressed={activeTool === "pen"} onClick={() => selectTool("pen")} aria-label={t("student.penTool")} title={t("student.pen")}><Pencil /></button>
                 <button type="button" className={activeTool === "emoji" ? "active" : ""} aria-pressed={activeTool === "emoji"} onClick={() => selectTool(activeTool === "emoji" ? "pin" : "emoji")} aria-label={t("student.emojiTool")} title={t("student.emoji")}><Smile /></button>
               </div>
               {emojiError && <span className="participant-reaction-error" role="alert">{emojiError}</span>}
@@ -117,7 +88,16 @@ export default function JoinSession() {
           {slideIndex !== null && <button className="student-sync-button" onClick={syncToLiveSlide}>{t("student.currentSlide")}</button>}
         </div>
         <section className="student-feedback-panel" aria-labelledby="student-feedback-title">
-          <header className="student-feedback-head"><h2 id="student-feedback-title">{t("student.feedbackListTitle")}</h2><span>{t("student.feedbackCount", { count: submittedQuestions.length })}</span></header>
+          <header className="student-feedback-head">
+            <h2 id="student-feedback-title">{t("student.feedbackListTitle")}</h2>
+            <div className="student-feedback-head-actions">
+              <span>{t("student.feedbackCount", { count: submittedQuestions.length })}</span>
+              <select aria-label={t("student.sortQuestions")} value={questionSort} onChange={(event) => selectQuestionSort(event.target.value)}>
+                <option value="empathy">{t("student.sortByEmpathy")}</option>
+                <option value="newest">{t("student.sortByNewest")}</option>
+              </select>
+            </div>
+          </header>
           {submittedQuestions.length ? <ul className="student-feedback-list">
             {submittedQuestions.map((question) => {
               const reactionPending = pendingReactionIds.has(question.id);
@@ -163,7 +143,7 @@ export default function JoinSession() {
           </div> : submitted ? <div className="submitted"><span><Check /></span><h2 id="question-modal-title">{editingQuestionId ? t("student.edited") : t("student.submitted")}</h2><p>{t("student.instructorCanSee")}</p><button className="btn primary" onClick={closeComposer}>{editingQuestionId ? t("common.confirm") : t("student.newQuestion")}</button></div> : <>
             <div className="student-modal-heading">
               <span className={activeMarkerEmoji ? "emoji-pin" : ""}>{activeMarkerEmoji && <i aria-hidden="true">{activeMarkerEmoji}</i>}</span>
-              <div><h2 id="question-modal-title">{editingQuestionId ? t("student.editPrompt") : draftQuestion?.anchorKind !== "point" ? t("student.areaPrompt") : t("student.pointPrompt")}</h2><p>{editingQuestionId ? t("student.editHint") : t("student.composeHint")}</p></div>
+              <div><h2 id="question-modal-title">{editingQuestionId ? t("student.editPrompt") : t("student.pointPrompt")}</h2><p>{editingQuestionId ? t("student.editHint") : t("student.composeHint")}</p></div>
             </div>
             <fieldset className="question-marker-picker">
               <legend>{t("student.markerTitle")}</legend>
@@ -182,7 +162,7 @@ export default function JoinSession() {
               <button className="btn primary large full" onClick={() => void submit()} disabled={submitting}>{submitting ? <span className="spinner" /> : <Send />}{editingQuestionId ? t("student.sendEdited") : t("student.sendQuestion")}</button>
               {editingQuestionId
                 ? <button className="btn secondary large full" onClick={closeComposer} disabled={submitting}>{t("student.cancelEdit")}</button>
-                : <button className="btn destructive large full" onClick={deleteDraftQuestion}><Trash2 />{draftQuestion?.anchorKind !== "point" ? t("student.deleteArea") : t("student.deletePin")}</button>}
+                : <button className="btn destructive large full" onClick={deleteDraftQuestion}><Trash2 />{t("student.deletePin")}</button>}
             </div>
           </>}
         </section>

@@ -5,7 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import { useLanguage } from "@/app/_controller/language-context";
 import { useSessions } from "@/app/_controller/session-store";
 import { useLectureReactions } from "@/app/_controller/use-lecture-reactions";
-import { advancePinPlayback, crossedPinMilestone, rectanglesOverlap, resolvePinDisplayPositions } from "@/app/_model/class/presentation-rotation";
+import { advancePinPlayback, crossedPinMilestone, resolvePinDisplayPositions, resolveVisiblePresentationLabelIds } from "@/app/_model/class/presentation-rotation";
 import type { Question } from "@/app/_model/types";
 
 const CONTROLS_HIDE_DELAY = 2600;
@@ -22,9 +22,8 @@ export function useSessionPresentationController() {
   const { sessions, ready, setActiveSession, setCurrentSlide } = useSessions();
   const session = sessions.find((item) => item.id === params.id);
   const sessionId = session?.id ?? null;
-  const presentationInteractions = session?.presentationInteractions ?? false;
   const showQuestionPins = session?.showQuestionPins ?? false;
-  const { reactions: liveReactions } = useLectureReactions(presentationInteractions ? sessionId : null);
+  const { reactions: liveReactions } = useLectureReactions(sessionId);
   const sessionTitle = session?.title;
   const currentSlide = session?.currentSlide;
   const positionedQuestions = useMemo(() => (session?.questions ?? []).filter((question): question is PositionedQuestion => question.x !== null && question.y !== null), [session?.questions]);
@@ -44,7 +43,6 @@ export function useSessionPresentationController() {
   const [controlsVisible, setControlsVisible] = useState(true);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
-  const [selectedQuestionId, setSelectedQuestionId] = useState<string | null>(null);
   const [detailQuestionId, setDetailQuestionId] = useState<string | null>(null);
   const [liveQuestionId, setLiveQuestionId] = useState<string | null>(null);
   const [storedPlayback, setStoredPlayback] = useState(EMPTY_PLAYBACK);
@@ -57,7 +55,7 @@ export function useSessionPresentationController() {
   }, [params.id, setActiveSession]);
 
   const playback = useMemo(() => {
-    if (!presentationInteractions || !showQuestionPins) return EMPTY_PLAYBACK;
+    if (!showQuestionPins) return EMPTY_PLAYBACK;
     const validIds = new Set(pageQuestions.map((question) => question.id));
     const shownPinIds = storedPlayback.slideIndex === currentSlide
       ? storedPlayback.shownPinIds.filter((id) => validIds.has(id))
@@ -68,7 +66,7 @@ export function useSessionPresentationController() {
     };
     const firstPinId = pageQuestions[0]?.id ?? null;
     return { shownPinIds: firstPinId ? [firstPinId] : [], activePinId: firstPinId };
-  }, [currentSlide, pageQuestions, presentationInteractions, showQuestionPins, storedPlayback]);
+  }, [currentSlide, pageQuestions, showQuestionPins, storedPlayback]);
   const visibleQuestionIds = useMemo(() => liveQuestionId && !playback.shownPinIds.includes(liveQuestionId)
     ? [...playback.shownPinIds, liveQuestionId]
     : playback.shownPinIds, [liveQuestionId, playback.shownPinIds]);
@@ -76,7 +74,7 @@ export function useSessionPresentationController() {
     if (!canvasSize) return undefined;
     return resolvePinDisplayPositions(pageQuestions.filter((question) => question.anchorKind !== "box" && question.anchorKind !== "path"), canvasSize.width, canvasSize.height);
   }, [canvasSize, pageQuestions]);
-  const activeQuestionId = pageQuestions.some((question) => question.id === selectedQuestionId) ? selectedQuestionId : playback.activePinId;
+  const activeQuestionId = liveQuestionId ?? (pageQuestions.some((question) => question.id === detailQuestionId) ? detailQuestionId : playback.activePinId);
 
   const revealControls = useCallback(() => {
     setControlsVisible(true);
@@ -114,22 +112,17 @@ export function useSessionPresentationController() {
 
   useLayoutEffect(() => {
     const canvas = presentationCanvasRef.current?.querySelector<HTMLElement>(".slide-canvas");
-    if (!canvas || !presentationInteractions || !showQuestionPins) return;
+    if (!canvas || !showQuestionPins) return;
     const labels = Array.from(canvas.querySelectorAll<HTMLElement>("[data-presentation-label-id]"));
     const pins = Array.from(canvas.querySelectorAll<HTMLElement>("[data-presentation-pin-id]"));
     labels.forEach((label) => { label.hidden = false; });
-    const activeLabel = labels.find((label) => label.dataset.presentationLabelId === activeQuestionId);
-    const orderedLabels = activeLabel ? [activeLabel, ...labels.filter((label) => label !== activeLabel)] : labels;
-    const retained: DOMRect[] = [];
-    for (const label of orderedLabels) {
-      const labelId = label.dataset.presentationLabelId;
-      const bounds = label.getBoundingClientRect();
-      const overlapsPin = pins.some((pin) => pin.dataset.presentationPinId !== labelId && rectanglesOverlap(bounds, pin.getBoundingClientRect()));
-      const keep = label === activeLabel || (!overlapsPin && retained.every((other) => !rectanglesOverlap(bounds, other)));
-      label.hidden = !keep;
-      if (keep) retained.push(bounds);
-    }
-  }, [activeQuestionId, isFullscreen, pinDisplayPositions, presentationInteractions, showQuestionPins, visibleQuestionIds]);
+    const visibleLabelIds = new Set(resolveVisiblePresentationLabelIds(
+      labels.map((label) => ({ id: label.dataset.presentationLabelId!, bounds: label.getBoundingClientRect() })),
+      pins.map((pin) => ({ id: pin.dataset.presentationPinId!, bounds: pin.getBoundingClientRect() })),
+      activeQuestionId
+    ));
+    labels.forEach((label) => { label.hidden = !visibleLabelIds.has(label.dataset.presentationLabelId!); });
+  }, [activeQuestionId, isFullscreen, pinDisplayPositions, showQuestionPins, visibleQuestionIds]);
 
   // 첫 스냅샷은 새 PIN으로 보지 않는다. 이후 현재 슬라이드에 들어온 PIN만 즉시 빨강으로 강조한다.
   useEffect(() => {
@@ -138,7 +131,7 @@ export function useSessionPresentationController() {
     previousQuestionIdsRef.current = positionedQuestionIds;
     const firstSnapshot = questionSessionIdRef.current !== session.id;
     questionSessionIdRef.current = session.id;
-    if (firstSnapshot || !session.presentationInteractions || !session.showQuestionPins) return;
+    if (firstSnapshot || !session.showQuestionPins) return;
     const incoming = positionedQuestions.find((question) => !previousIds.includes(question.id) && question.slideIndex === session.currentSlide);
     if (!incoming) return;
     setLiveQuestionId(incoming.id);
@@ -151,7 +144,7 @@ export function useSessionPresentationController() {
     }));
     // id 집합이 같으면 질문 본문·답변·공감 변경만으로 강조를 재생하지 않는다.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [positionedQuestionKey, session?.id, session?.presentationInteractions, session?.showQuestionPins]);
+  }, [positionedQuestionKey, session?.id, session?.showQuestionPins]);
 
   useEffect(() => {
     if (!liveQuestionId) return;
@@ -167,14 +160,14 @@ export function useSessionPresentationController() {
   }, [currentSlide]);
 
   useEffect(() => {
-    if (!session?.presentationInteractions || !session.showQuestionPins || pageQuestions.length < 2) return;
+    if (!session?.showQuestionPins || pageQuestions.length < 2) return;
     const interval = window.setInterval(rotateQuestions, PIN_REVEAL_DELAY);
     return () => window.clearInterval(interval);
-  }, [pageQuestions.length, rotateQuestions, session?.presentationInteractions, session?.showQuestionPins]);
+  }, [pageQuestions.length, rotateQuestions, session?.showQuestionPins]);
 
   useEffect(() => {
     if (!sessionId) return;
-    if (!presentationInteractions) {
+    if (!showQuestionPins) {
       highestQuestionCountRef.current = positionedQuestions.length;
       return;
     }
@@ -194,7 +187,7 @@ export function useSessionPresentationController() {
       setPinMilestone((current) => current === milestone ? null : current);
       milestoneTimerRef.current = null;
     }, PIN_MILESTONE_DISPLAY_DELAY);
-  }, [positionedQuestions.length, presentationInteractions, sessionId]);
+  }, [positionedQuestions.length, sessionId, showQuestionPins]);
 
   useEffect(() => () => {
     if (milestoneTimerRef.current) window.clearTimeout(milestoneTimerRef.current);
@@ -282,7 +275,6 @@ export function useSessionPresentationController() {
   const detailQuestion = session?.questions.find((question) => question.id === detailQuestionId && question.slideIndex === session.currentSlide);
   const joinUrl = typeof window === "undefined" || !session ? "" : `${window.location.origin}/join/${session.code}`;
   const openQuestionDetail = (questionId: string) => {
-    setSelectedQuestionId(questionId);
     setDetailQuestionId(questionId);
     revealControls();
   };

@@ -1,5 +1,5 @@
 import type { RealtimeChannel } from "@supabase/supabase-js";
-import { isQuestionMarker, normalizeClassFolderName, normalizeQuestionCategorySettings, type ClassFolder, type ClassSession, type NormalizedPoint, type Question, type QuestionCategorySettings, type Slide } from "@/app/_model/types";
+import { isParticipantPointAnchor, isQuestionMarker, normalizeClassFolderColorIndex, normalizeClassFolderName, normalizeQuestionCategorySettings, type ClassFolder, type ClassSession, type NormalizedPoint, type Question, type QuestionCategorySettings, type Slide } from "@/app/_model/types";
 import { ensureAnonymousUser, getAudienceSupabaseClient, getOwnerWriteSupabaseClient, getSessionUser, getSupabaseClient } from "@/app/_infrastructure/supabase/client";
 
 type LectureRow = {
@@ -26,6 +26,7 @@ type ClassFolderRow = {
   id: string;
   name: string;
   created_at: string;
+  color_index: number;
 };
 
 type SlideRow = {
@@ -201,29 +202,31 @@ export async function fetchOwnedClassFolders(): Promise<ClassFolder[]> {
   if (!client) return [];
   const user = await requireOwnerUser();
   const { data, error } = await client.from("session_folders")
-    .select("id, name, created_at")
+    .select("id, name, created_at, color_index")
     .eq("owner_id", user.id)
     .order("created_at", { ascending: true });
   if (error) throw error;
   return ((data ?? []) as ClassFolderRow[]).map((folder) => ({
     id: folder.id,
     name: folder.name,
-    createdAt: folder.created_at
+    createdAt: folder.created_at,
+    colorIndex: folder.color_index
   }));
 }
 
-export async function createClassFolder(name: string): Promise<ClassFolder> {
+export async function createClassFolder(name: string, colorIndex: number): Promise<ClassFolder> {
   const normalizedName = normalizeClassFolderName(name);
+  const normalizedColorIndex = normalizeClassFolderColorIndex(colorIndex);
   const client = getSupabaseClient();
   if (!client) throw new Error("Supabase 연결을 찾지 못했습니다.");
   const user = await requireOwnerUser();
   const { data, error } = await client.from("session_folders")
-    .insert({ owner_id: user.id, name: normalizedName })
-    .select("id, name, created_at")
+    .insert({ owner_id: user.id, name: normalizedName, color_index: normalizedColorIndex })
+    .select("id, name, created_at, color_index")
     .single();
   if (error) throw error;
   const folder = data as ClassFolderRow;
-  return { id: folder.id, name: folder.name, createdAt: folder.created_at };
+  return { id: folder.id, name: folder.name, createdAt: folder.created_at, colorIndex: folder.color_index };
 }
 
 export async function renameClassFolder(folderId: string, name: string): Promise<void> {
@@ -603,6 +606,7 @@ export async function fetchLiveSession(joinCode: string): Promise<ClassSession |
 export async function submitQuestion(session: ClassSession, question: Question) {
   const client = getAudienceSupabaseClient();
   if (!client) return;
+  if (!isParticipantPointAnchor(question)) throw new Error("Participant questions require a point anchor.");
   const user = await ensureAnonymousUser();
   if (!user || !session.courseId) throw new Error("Supabase session is missing ownership context.");
   const slide = session.slides[question.slideIndex];
@@ -610,19 +614,12 @@ export async function submitQuestion(session: ClassSession, question: Question) 
   let regionId: string | null = null;
   if (question.x !== null && question.y !== null && session.materialVersionId) {
     regionId = crypto.randomUUID();
-    const path = (question.path ?? []).slice(0, 512);
-    const isPath = question.anchorKind === "path" && path.length >= 2;
-    const isBox = question.anchorKind === "box" && question.width != null && question.height != null;
     const { error } = await client.from("region_anchors").insert({
       id: regionId,
       slide_id: slide.id,
       material_version_id: session.materialVersionId,
-      kind: isPath ? "path" : isBox ? "box" : "point",
-      coords: isPath
-        ? { x: path[0].x, y: path[0].y, points: path.map((point) => [point.x, point.y]) }
-        : isBox
-          ? { x: question.x, y: question.y, width: question.width, height: question.height }
-          : { x: question.x, y: question.y },
+      kind: "point",
+      coords: { x: question.x, y: question.y },
       created_by: "user"
     });
     if (error) throw error;

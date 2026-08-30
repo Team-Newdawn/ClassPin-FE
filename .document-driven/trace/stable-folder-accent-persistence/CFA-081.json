@@ -1,0 +1,15 @@
+{
+  "code": [
+    "supabase/migrations/20260829141150_persist_class_folder_color_index.sql"
+  ],
+  "documents": [
+    "class-frontend-architecture"
+  ],
+  "recorded_at": "2026-08-29T14:20:45+00:00",
+  "requirement_id": "CFA-081",
+  "task_id": "stable-folder-accent-persistence",
+  "tests": [
+    "supabase/tests/class_folder_colors.sql",
+    ".document-driven/evidence/stable-folder-accent-persistence.md"
+  ]
+}

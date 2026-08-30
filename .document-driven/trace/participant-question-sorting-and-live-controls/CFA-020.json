@@ -1,0 +1,16 @@
+{
+  "code": [
+    "app/_model/question-reactions.ts",
+    "app/(view)/join/[code]/controller.ts"
+  ],
+  "documents": [
+    "class-frontend-architecture"
+  ],
+  "recorded_at": "2026-08-30T09:25:45+00:00",
+  "requirement_id": "CFA-020",
+  "task_id": "participant-question-sorting-and-live-controls",
+  "tests": [
+    "app/_model/question-reactions.test.ts",
+    ".document-driven/evidence/participant-question-sorting-and-live-controls.md"
+  ]
+}

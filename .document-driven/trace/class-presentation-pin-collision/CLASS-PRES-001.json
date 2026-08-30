@@ -1,0 +1,20 @@
+{
+  "code": [
+    "app/(view)/admin/session/[id]/present/controller.ts",
+    "app/(view)/admin/session/[id]/present/page.tsx",
+    "app/_model/class/presentation-rotation.ts",
+    "app/component/slide-canvas.module.css",
+    "app/component/slide-canvas.tsx"
+  ],
+  "documents": [
+    "prd",
+    "class-frontend-architecture"
+  ],
+  "recorded_at": "2026-08-30T09:52:56+00:00",
+  "requirement_id": "CLASS-PRES-001",
+  "task_id": "class-presentation-pin-collision",
+  "tests": [
+    "app/_model/class/presentation-rotation.test.ts",
+    ".document-driven/evidence/class-presentation-pin-collision.md"
+  ]
+}

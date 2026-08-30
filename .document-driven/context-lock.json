@@ -1,0 +1,48 @@
+{
+  "created_at": "2026-08-30T09:03:11+00:00",
+  "documents": [
+    {
+      "id": "prd",
+      "path": "doc/pin_class_prd.md",
+      "sha256": "7c909b9d99e30e27776cd275f60ad08c75d6920956cc48c2e3d5111e618789f4"
+    },
+    {
+      "id": "class-frontend-architecture",
+      "path": "docs/class-frontend-architecture.md",
+      "sha256": "96aa1f117d7db96f1b08dfc4aea6ffc1ad43be22000538fddcc72fdc35a05272"
+    }
+  ],
+  "manifest": {
+    "path": "docs/document-manifest.json",
+    "sha256": "ef9389fd062facf19841be55364cd6cfb9232e1856f7c8612fd668b7723421f2"
+  },
+  "schema_version": "1.0",
+  "selected_artifact_ids": [
+    "class-frontend-architecture"
+  ],
+  "task": {
+    "id": "participant-question-sorting-and-live-controls",
+    "requirement_ids": [
+      "CLASS-JOIN-002",
+      "CLASS-LIVE-001",
+      "CFA-010",
+      "CFA-020",
+      "CFA-035",
+      "CFA-042",
+      "CFA-053",
+      "CFA-056",
+      "CFA-064",
+      "CFA-080",
+      "CFA-081",
+      "CFA-082",
+      "CFA-083",
+      "CFA-087"
+    ],
+    "scopes": [
+      "class-frontend-layering",
+      "class-route-css-colocation",
+      "class-data-loading-performance"
+    ],
+    "summary": "Add participant question sorting and compact four-card viewport; move QR selection to stage toolbar and simplify live questions panel to one PIN visibility toggle"
+  }
+}

@@ -6,14 +6,25 @@
 
 ```bash
 npm install
+cp .env.example .env
+npm run supabase:start
+npm run supabase:status
+# .env의 local publishable key와 Google OAuth 값을 채운 뒤
 npm run dev
 ```
 
-`http://localhost:3000`에서 샘플 세션을 즉시 체험할 수 있습니다. 기본값은 `demo` 모드이며 데이터는 브라우저 `localStorage`와 `BroadcastChannel`에 저장되어 같은 브라우저의 탭 사이에서 실시간 동작합니다.
+`npm run supabase:start`는 Docker에서 Postgres 17, Auth, Storage, Realtime,
+Studio를 실행하고 모든 migration과 `supabase/seed.sql`을 적용합니다. 로컬 Studio는
+`http://127.0.0.1:55323`입니다. Google Cloud OAuth Web client에는
+`http://127.0.0.1:55321/auth/v1/callback`을 Authorized redirect URI로 등록하세요.
+
+로컬 개발은 이 Docker 스택을 기준으로 하며 운영 Supabase를 개발용으로 사용하지
+않습니다. migration 전체 재현 검증은 `npm run supabase:reset`, 종료는
+`npm run supabase:stop`입니다. `supabase:reset`은 로컬 DB 데이터를 지웁니다.
 
 ## Supabase 연결
 
-1. `.env.example`을 `.env.local`로 복사합니다.
+1. `.env.example`을 `.env`로 복사합니다.
 2. 제공된 프로젝트 URL과 프로젝트의 publishable key를 입력합니다.
 3. Supabase Dashboard에서 Anonymous Sign-ins를 활성화합니다. (수강생 익명 참여용)
 4. Authentication → Providers에서 **Google**을 활성화합니다. Google Cloud Console에서 OAuth Client를 만들고, Authorized redirect URI에 `https://<project-ref>.supabase.co/auth/v1/callback`을 등록한 뒤 Client ID/Secret을 입력합니다.
@@ -27,15 +38,17 @@ Secret/service-role key는 브라우저에 노출하지 않습니다. `supabase`
 
 역할은 `admin`과 `participant` 두 개뿐입니다.
 
-- **admin** — 구글 로그인으로 가입한 강사/운영자. 코스 개설·자료 업로드·답변·상태 관리를 합니다. 가입 즉시 `/`에서 슬라이드를 업로드할 수 있습니다.
+- **admin** — 구글 로그인으로 가입한 강사/운영자. 폴더·자료 업로드·답변·상태를 관리하며 로그인 후 `/admin/dashboard`로 이동합니다.
 - **participant** — QR/링크로 들어온 수강생. 로그인 없이 익명 세션(`auth.signInAnonymously`)으로 질문을 남깁니다.
 
 역할은 `public.profiles.role`에 저장되고 `auth.users` 트리거가 가입 경로에 따라 자동 부여합니다(익명 → participant, 구글 → admin). 코스 생성과 Storage 업로드는 RLS restrictive 정책으로 admin에게만 열려 있습니다.
 
 ## MVP 화면
 
-- `/` — PDF/PPT/PPTX 업로드(구글 로그인 필요, demo 모드 제외), 로컬 렌더링, 최근 세션
-- `/login` — 강사 구글 로그인, 로그인 후 바로 업로드 화면으로 이동
+- `/` — 로그인 화면으로 보내는 진입 경로
+- `/login` — 강사 Google 로그인, 로그인 후 폴더 대시보드로 이동
+- `/admin/dashboard` — 폴더 중심 대시보드와 미분류 자료 업로드
+- `/admin/folders/:id` — 폴더 자료의 grid/list 보기와 폴더 범위 인사이트 탭
 - `/admin/session/:id` — 강사용 실시간 플레이어, 핀↔질문 연결, 답변/해결, 질문 목록 (admin 전용)
 - `/join/:code` — 모바일 수강생 화면, 핀 클릭 또는 질문 태그 드래그, 익명 질문 등록 (로그인 불필요)
 
@@ -60,7 +73,7 @@ Course → CourseBrainMemory (append-only, embedding은 후속 백필)
 
 ## 다음 구축 순서
 
-1. 강의자 이메일/소셜 인증과 온보딩
+1. 강의자 온보딩과 폴더 공유 정책
 2. 변환 작업을 비동기 Worker로 분리하고 진행률/재시도 추가
 3. Supabase Broadcast 기반 대규모 Realtime 전환
 4. 질문 공감, CSV export, 답변 알림

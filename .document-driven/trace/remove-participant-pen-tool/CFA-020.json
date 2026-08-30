@@ -1,0 +1,15 @@
+{
+  "code": [
+    "app/_model/types.ts"
+  ],
+  "documents": [
+    "class-frontend-architecture"
+  ],
+  "recorded_at": "2026-08-30T07:52:41+00:00",
+  "requirement_id": "CFA-020",
+  "task_id": "remove-participant-pen-tool",
+  "tests": [
+    "app/_model/participant-question.test.ts",
+    ".document-driven/evidence/remove-participant-pen-tool.md"
+  ]
+}

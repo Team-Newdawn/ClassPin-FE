@@ -1,0 +1,421 @@
+.root:global(.folder-dashboard-shell) {
+  padding-bottom: 0;
+  display: grid;
+  grid-template-columns: 248px minmax(0, 1fr);
+  transition: grid-template-columns 160ms cubic-bezier(.2, 0, 0, 1);
+}
+
+.root:global(.folder-dashboard-shell):global(.sidebar-collapsed) {
+  grid-template-columns: 72px minmax(0, 1fr);
+}
+
+.root :global(.folder-dashboard-content) {
+  min-width: 0;
+  padding-bottom: 24px;
+}
+
+.root :global(.folder-dashboard) {
+  width: min(1440px, calc(100% - 48px));
+  min-height: calc(100dvh - 108px);
+  margin: auto;
+  padding: 48px;
+  gap: 48px;
+  border-radius: 32px;
+  background: var(--color-bg-surface);
+}
+
+.root :global(.folder-dashboard) :global(.page-head) {
+  align-items: center;
+}
+
+.root :global(.folder-dashboard) :global(.page-head) h1 {
+  font-size: 32px;
+  line-height: 42px;
+}
+
+.root :global(.folder-dashboard) :global(.page-head) p {
+  margin-top: 6px;
+  color: var(--color-text-tertiary);
+}
+
+.root :global(.folder-dashboard-actions) {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+  flex: 1 0 auto;
+}
+
+.root :global(.folder-dashboard-search) {
+  width: min(260px, 26vw);
+  height: 44px;
+}
+
+.root :global(.folder-dashboard-actions) :global(.btn) {
+  height: 44px;
+  border-radius: 8px;
+}
+
+.root :global(.folder-upload-button) {
+  border: 0;
+  background: var(--pin-neutral-400);
+  color: var(--color-bg-surface);
+}
+
+.root :global(.folder-upload-button):hover {
+  background: var(--pin-neutral-500);
+}
+
+.root :global(.folder-upload-button) > img {
+  width: clamp(22px, 2.315vw, 33.333px);
+  height: clamp(15.4px, 1.621vw, 23.333px);
+  flex: none;
+}
+
+.root :global(.folder-dashboard-actions) > :global(.btn.primary) > img {
+  width: clamp(19px, 2.014vw, 29px);
+  height: clamp(15.58px, 1.652vw, 23.78px);
+  flex: none;
+}
+
+.root :global(.folder-section) {
+  min-width: 0;
+}
+
+.root :global(.folder-grid) {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 36px 24px;
+}
+
+.root :global(.folder-card) {
+  --folder-accent: var(--viz-cat-facility);
+  position: relative;
+  min-width: 0;
+  overflow: hidden;
+  display: block;
+  border: 0;
+  border-radius: 26px;
+  background: var(--folder-accent);
+  color: var(--color-text-primary);
+  text-align: left;
+  text-decoration: none;
+  transition: box-shadow 140ms, transform 140ms;
+}
+
+.root :global(.folder-accent-0) { --folder-accent: var(--viz-cat-safety); }
+.root :global(.folder-accent-1) { --folder-accent: var(--viz-cat-mobility); }
+.root :global(.folder-accent-2) { --folder-accent: var(--viz-cat-facility); }
+.root :global(.folder-accent-3) { --folder-accent: var(--viz-cat-convenience); }
+.root :global(.folder-accent-4) { --folder-accent: var(--viz-cat-idea); }
+.root :global(.folder-accent-5) { --folder-accent: var(--viz-cat-clean); }
+
+.root :global(.folder-card):hover {
+  box-shadow: var(--shadow-md);
+  transform: translateY(-2px);
+}
+
+.root :global(.folder-card-link) {
+  height: 260px;
+  display: grid;
+  grid-template-rows: 132px 128px;
+  overflow: hidden;
+  border-radius: inherit;
+  color: inherit;
+  text-decoration: none;
+}
+
+.root :global(.folder-card-link):focus-visible {
+  outline: 3px solid var(--pin-blue-500);
+  outline-offset: -3px;
+}
+
+.root :global(.folder-card-visual) {
+  position: relative;
+  display: block;
+  height: 132px;
+  padding: 28px 26px 0;
+}
+
+.root :global(.folder-card-paper),
+.root :global(.folder-card-cover) {
+  position: absolute;
+  inset: 28px 26px -18px;
+  display: block;
+  overflow: hidden;
+  border-radius: 10px;
+  background: var(--pin-neutral-200);
+}
+
+.root :global(.folder-card-paper) {
+  transform: rotate(4deg);
+  transform-origin: center bottom;
+}
+
+.root :global(.folder-card-cover) {
+  transform: rotate(-2.5deg);
+  transform-origin: center bottom;
+  background: var(--pin-neutral-50);
+}
+
+.root :global(.folder-card-cover) :global(.slide-canvas) {
+  height: 100%;
+  aspect-ratio: auto;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+.root :global(.folder-card-cover) img {
+  color: transparent;
+  font-size: 0;
+}
+
+.root :global(.folder-card-cover):global(.empty) {
+  display: grid;
+  place-items: center;
+  color: var(--pin-neutral-400);
+}
+
+.root :global(.folder-card-cover):global(.empty) > svg {
+  width: 44px;
+  height: 44px;
+  stroke-width: 1.5;
+}
+
+.root :global(.folder-card-body) {
+  position: relative;
+  z-index: 2;
+  min-height: 146px;
+  margin-top: -18px;
+  padding: 42px 16px 16px;
+  display: block;
+  background: linear-gradient(140deg, color-mix(in srgb, var(--folder-accent) 20%, var(--color-bg-surface)), color-mix(in srgb, var(--folder-accent) 34%, var(--color-bg-surface)));
+  clip-path: polygon(0 0, 55% 0, 64% 14%, 100% 14%, 100% 100%, 0 100%);
+}
+
+.root :global(.folder-card-title) {
+  display: flex;
+  align-items: center;
+}
+
+.root :global(.folder-card-title) b {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 16px;
+  line-height: 24px;
+}
+
+.root :global(.folder-card-stats) {
+  margin-top: 14px;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+
+.root :global(.folder-card-stats) span {
+  color: var(--color-text-secondary);
+  font-size: 10px;
+}
+
+.root :global(.folder-card-stats) b {
+  display: block;
+  color: var(--color-text-primary);
+  font-size: 14px;
+  line-height: 18px;
+  font-variant-numeric: tabular-nums;
+}
+
+.root :global(.folder-card-meta) {
+  display: block;
+  margin-top: 10px;
+  overflow: hidden;
+  color: var(--color-text-secondary);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 10px;
+}
+
+.root :global(.folder-card-menu) {
+  position: absolute;
+  z-index: 3;
+  right: 10px;
+  top: 10px;
+}
+
+.root :global(.folder-card-menu) > summary {
+  width: 34px;
+  height: 34px;
+  border-color: transparent;
+  background: transparent;
+  color: var(--pin-neutral-700);
+  box-shadow: none;
+  list-style: none;
+}
+
+.root :global(.folder-card-menu) > summary::-webkit-details-marker { display: none; }
+.root :global(.folder-card-menu) > summary > svg { transform: rotate(90deg); }
+
+.root :global(.folder-card-menu) > summary:hover,
+.root :global(.folder-card-menu)[open] > summary {
+  background: color-mix(in srgb, var(--color-bg-surface) 72%, transparent);
+}
+
+.root :global(.folder-card-menu) > summary:focus-visible {
+  outline: 0;
+  box-shadow: var(--focus);
+}
+
+.root :global(.folder-card-menu) > summary[aria-disabled="true"] {
+  cursor: not-allowed;
+  opacity: .48;
+}
+
+.root :global(.folder-card-menu) > summary :global(.spinner) {
+  width: 17px;
+  height: 17px;
+}
+
+.root :global(.folder-card-menu-popover) {
+  position: absolute;
+  right: 0;
+  top: 40px;
+  width: 144px;
+  padding: 6px;
+  display: grid;
+  gap: 2px;
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  background: var(--color-bg-surface);
+  box-shadow: var(--shadow-md);
+}
+
+.root :global(.folder-card-menu-popover) button {
+  height: 36px;
+  padding: 0 10px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--color-text-primary);
+  font-size: 12px;
+  font-weight: 600;
+  text-align: left;
+}
+
+.root :global(.folder-card-menu-popover) button:hover { background: var(--pin-neutral-100); }
+.root :global(.folder-card-menu-popover) button:global(.destructive) { color: var(--color-error); }
+.root :global(.folder-card-menu-popover) svg { width: 15px; height: 15px; }
+
+.root :global(.folder-modal) {
+  text-align: left;
+}
+
+.root :global(.folder-modal) > :global(.modal-icon),
+.root :global(.folder-modal) > h2,
+.root :global(.folder-modal) > p {
+  margin-left: auto;
+  margin-right: auto;
+  text-align: center;
+}
+
+.root :global(.folder-form) {
+  margin-top: 20px;
+  display: grid;
+  gap: 14px;
+}
+
+.root :global(.folder-field) {
+  display: grid;
+  gap: 7px;
+}
+
+.root :global(.folder-field) span { font-size: 12px; font-weight: 700; }
+
+.root :global(.folder-field) input {
+  height: 44px;
+  padding: 0 12px;
+  border: 1px solid var(--color-border-strong);
+  border-radius: 10px;
+  color: var(--color-text-primary);
+}
+
+.root :global(.folder-field) input:focus {
+  outline: 0;
+  border-color: var(--color-brand);
+  box-shadow: var(--focus);
+}
+
+.root :global(.folder-modal-actions) {
+  display: flex;
+  justify-content: flex-end;
+  gap: 9px;
+}
+
+.root :global(.folder-empty) {
+  min-height: 260px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  text-align: center;
+}
+
+.root :global(.folder-empty) > svg {
+  width: 34px;
+  margin-bottom: 10px;
+  color: var(--color-text-tertiary);
+}
+
+.root :global(.folder-empty) b { margin: 0; font-size: 18px; }
+.root :global(.folder-empty) span { margin: 6px 0 18px; color: var(--color-text-tertiary); font-size: 13px; }
+
+@media (max-width: 1400px) {
+  .root:global(.folder-dashboard-shell) :global(.folder-dashboard) { padding: 40px; }
+  .root:global(.folder-dashboard-shell) :global(.folder-grid) { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 28px 20px; }
+}
+
+@media (max-width: 1180px) {
+  .root:global(.folder-dashboard-shell) :global(.folder-grid) { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+
+@media (max-width: 900px) {
+  .root:global(.folder-dashboard-shell) { grid-template-columns: 72px minmax(0, 1fr); }
+  .root :global(.folder-dashboard-content) { grid-column: 2; }
+  .root :global(.folder-dashboard) { width: calc(100% - 28px); min-height: calc(100dvh - 80px); border-radius: 24px; }
+  .root:global(.folder-dashboard-shell) :global(.folder-dashboard) { padding: 28px 24px; }
+  .root :global(.folder-dashboard) :global(.page-head) { align-items: flex-start; flex-direction: column; }
+  .root :global(.folder-dashboard-actions) { width: 100%; justify-content: flex-start; }
+  .root :global(.folder-dashboard-search) { width: auto; flex: 1; }
+  .root :global(.folder-grid) { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; }
+}
+
+@media (max-width: 600px) {
+  .root :global(.folder-dashboard) { width: calc(100% - 20px); border-radius: 20px; }
+  .root :global(.folder-dashboard-actions) { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+  .root :global(.folder-dashboard-search) { width: 100%; grid-column: 1 / -1; }
+  .root :global(.folder-dashboard-actions) :global(.btn) { width: 100%; padding: 0 10px; }
+  .root :global(.folder-grid) { grid-template-columns: minmax(0, 1fr); }
+}
+
+
+/* Route-owned semantic rules moved from globals.css. */
+
+.root :global(.modal-backdrop){position:fixed;inset:0;z-index:100;background:rgba(16,24,39,.55);display:grid;place-items:center;padding:20px}.root :global(.share-modal){position:relative;width:440px;max-width:100%;padding:32px;background:var(--color-bg-surface);border-radius:20px;box-shadow:var(--shadow-lg);text-align:center}.root :global(.modal-close){position:absolute;right:16px;top:16px;width:36px;height:36px;border:0;border-radius:9px;background:transparent;color:var(--color-text-secondary)}.root :global(.modal-close):hover{background:var(--pin-neutral-100)}.root :global(.modal-close) svg{width:19px}.root :global(.share-modal) h2{font-size:22px;margin:16px 0 6px}.root :global(.share-modal)>p{font-size:13px;line-height:20px;color:var(--color-text-secondary);margin:0}
+
+.root :global(.upload-error){max-width:460px;margin:-8px auto 18px;padding:10px 12px;border:1px solid var(--color-error);border-radius:10px;background:var(--color-error-bg);color:var(--color-error);font-size:13px;line-height:20px}
+.root :global(.admin-page){max-width:1440px;margin:auto;padding:32px 40px;display:grid;grid-template-columns:minmax(0,1fr);gap:32px;align-content:start}
+.root :global(.panel){background:var(--color-bg-surface);border:1px solid var(--color-border);border-radius:16px;padding:24px}
+@media (max-width:1100px){.root :global(.admin-page){padding:28px 24px;gap:24px}}
+@media (max-width:820px),(max-width:1100px) and (max-height:560px) and (orientation:landscape){
+.root :global(.admin-page){padding-left:max(24px,env(safe-area-inset-left));padding-right:max(24px,env(safe-area-inset-right))}
+.root :global(.modal-close){width:40px;height:40px}}
+@media (max-width:600px){.root :global(.admin-page){padding:20px max(14px,env(safe-area-inset-left)) 32px max(14px,env(safe-area-inset-right));gap:22px}
+.root :global(.panel){padding:18px 16px}
+.root :global(.modal-backdrop){align-items:end;padding:0}.root :global(.share-modal){width:100%;max-height:calc(100dvh - 24px);overflow-y:auto;border-radius:24px 24px 0 0;padding:26px 20px max(24px,env(safe-area-inset-bottom))}}.root :global(.session-folder-error){padding:11px 14px;border-radius:10px;background:var(--color-error-bg);color:var(--color-error);font-size:12px}.root :global(.session-folder-error){padding:10px 12px;border:1px solid var(--color-error);border-radius:10px;background:var(--color-error-bg);color:var(--color-error);font-size:12px}
+.root :global(.folder-card-menu)>:global(.folder-card-menu-trigger){border-color:transparent;background:transparent;box-shadow:none;backdrop-filter:none}
+.root :global(.folder-card-menu)>:global(.folder-card-menu-trigger):hover,.root :global(.folder-card-menu)[open]>:global(.folder-card-menu-trigger){background:color-mix(in srgb,var(--color-bg-surface) 72%,transparent)}
+.root :global(.folder-card-menu)>:global(.folder-card-menu-trigger)>svg{transform:rotate(90deg)}

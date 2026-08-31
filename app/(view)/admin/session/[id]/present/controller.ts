@@ -5,11 +5,11 @@ import { useParams, useRouter } from "next/navigation";
 import { useLanguage } from "@/app/_controller/language-context";
 import { useSessions } from "@/app/_controller/session-store";
 import { useLectureReactions } from "@/app/_controller/use-lecture-reactions";
-import { advancePinPlayback, crossedPinMilestone, resolvePinDisplayPositions, resolveVisiblePresentationLabelIds } from "@/app/_model/class/presentation-rotation";
+import { advancePinPlayback, canRotatePinPlayback, crossedPinMilestone, resolvePinDisplayPositions, resolveVisiblePresentationLabelIds } from "@/app/_model/class/presentation-rotation";
 import type { Question } from "@/app/_model/types";
 
 const CONTROLS_HIDE_DELAY = 2600;
-const PIN_REVEAL_DELAY = 1000;
+const PIN_REVEAL_DELAY = 1500; // PIN이 순환되는 속도 조절 -> 현재는 3000ms으로 되어있음
 const LIVE_PIN_HIGHLIGHT_DELAY = 1000;
 const PIN_MILESTONE_DISPLAY_DELAY = 3000;
 const EMPTY_PLAYBACK = { slideIndex: null as number | null, shownPinIds: [] as string[], activePinId: null as string | null };
@@ -160,10 +160,10 @@ export function useSessionPresentationController() {
   }, [currentSlide]);
 
   useEffect(() => {
-    if (!session?.showQuestionPins || pageQuestions.length < 2) return;
+    if (!canRotatePinPlayback(showQuestionPins, pageQuestions.length, detailQuestionId)) return;
     const interval = window.setInterval(rotateQuestions, PIN_REVEAL_DELAY);
     return () => window.clearInterval(interval);
-  }, [pageQuestions.length, rotateQuestions, session?.showQuestionPins]);
+  }, [detailQuestionId, pageQuestions.length, rotateQuestions, showQuestionPins]);
 
   useEffect(() => {
     if (!sessionId) return;

@@ -5,6 +5,7 @@ import Link from "next/link";
 import classPinLogo from "@/assets/logo/logo.svg";
 import projectIcon from "@/assets/icons/project_icon.svg";
 import { PanelLeftClose, PanelLeftOpen } from "@/app/component/icons";
+import { WorkspaceAccount } from "@/app/component/workspace-header";
 import { useLanguage } from "@/app/_controller/language-context";
 import type { ClassFolder } from "@/app/_model/types";
 import styles from "./folder-tree-sidebar.module.css";
@@ -44,6 +45,7 @@ export function FolderTreeSidebar({ folders, open, activeFolderId, onToggle }: {
           ))}
         </ul>}
       </nav>
+      <WorkspaceAccount className="folder-tree-account" />
     </aside>
   );
 }

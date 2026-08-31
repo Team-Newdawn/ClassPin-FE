@@ -71,6 +71,10 @@ export function advancePinPlayback<T extends PositionedPin & { id: string }>(pin
   return { shownPinIds: [pins[0].id], activePinId: pins[0].id };
 }
 
+export function canRotatePinPlayback(showPins: boolean, pinCount: number, selectedPinId: string | null) {
+  return showPins && pinCount > 1 && selectedPinId === null;
+}
+
 export function rectanglesOverlap(first: Rectangle, second: Rectangle) {
   return first.left < second.right && first.right > second.left && first.top < second.bottom && first.bottom > second.top;
 }

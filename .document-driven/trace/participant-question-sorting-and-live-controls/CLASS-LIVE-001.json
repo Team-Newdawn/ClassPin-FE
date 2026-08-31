@@ -8,12 +8,16 @@
     "app/_controller/session-store.tsx",
     "app/_model/class/presentation-rotation.ts",
     "app/_model/i18n.ts",
-    "app/component/slide-canvas.module.css"
+    "app/component/slide-canvas.tsx",
+    "app/component/slide-canvas.module.css",
+    "assets/icons/delete_icon.svg",
+    "assets/icons/pin_black_icon.svg",
+    "assets/icons/pin_icon.svg"
   ],
   "documents": [
     "class-frontend-architecture"
   ],
-  "recorded_at": "2026-08-30T09:52:56+00:00",
+  "recorded_at": "2026-08-31T01:41:40+00:00",
   "requirement_id": "CLASS-LIVE-001",
   "task_id": "participant-question-sorting-and-live-controls",
   "tests": [

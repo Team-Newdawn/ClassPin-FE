@@ -10,7 +10,6 @@ import { useLanguage } from "@/app/_controller/language-context";
 import { SlideCanvas } from "@/app/component/slide-canvas";
 import { SlidePreview } from "@/app/component/slide-preview";
 import { UploadProgress } from "@/app/component/upload-progress";
-import { WorkspaceHeader } from "@/app/component/workspace-header";
 import type { ClassSession } from "@/app/_model/types";
 import { UNFILED_ID, useDashboardController } from "./controller";
 import styles from "./page.module.css";
@@ -30,7 +29,6 @@ export default function DashboardPage() {
       <FolderTreeSidebar folders={folders} open={sidebarOpen} onToggle={toggleSidebar} />
 
       <div className="folder-dashboard-content">
-        <WorkspaceHeader showLogo={false} />
         <div className="admin-page folder-dashboard">
           <input ref={inputRef} type="file" accept=".pdf,.ppt,.pptx" hidden onChange={(event) => pick(event.target.files?.[0])} />
 

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { advancePinPlayback, crossedPinMilestone, rectanglesOverlap, resolvePinDisplayPositions, resolveVisiblePresentationLabelIds } from "./presentation-rotation.ts";
+import { advancePinPlayback, canRotatePinPlayback, crossedPinMilestone, rectanglesOverlap, resolvePinDisplayPositions, resolveVisiblePresentationLabelIds } from "./presentation-rotation.ts";
 
 test("PIN 총합이 새 10단위를 넘으면 건너뛴 구간 중 가장 높은 값을 고른다", () => {
   assert.equal(crossedPinMilestone(9, 10), 10);
@@ -32,6 +32,13 @@ test("현재 표시된 PIN과 가장 멀리 떨어진 PIN을 다음으로 고른
   ];
 
   assert.equal(advancePinPlayback(pins, ["center"]).activePinId, "far");
+});
+
+test("사용자가 PIN을 선택한 동안 자동 순환을 멈춘다", () => {
+  assert.equal(canRotatePinPlayback(true, 2, null), true);
+  assert.equal(canRotatePinPlayback(true, 2, "selected"), false);
+  assert.equal(canRotatePinPlayback(false, 2, null), false);
+  assert.equal(canRotatePinPlayback(true, 1, null), false);
 });
 
 test("중앙이나 가장자리에 겹친 PIN 30개를 화면 안의 겹치지 않는 위치로 펼친다", () => {

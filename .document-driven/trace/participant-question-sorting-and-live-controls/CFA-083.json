@@ -1,5 +1,15 @@
 {
   "code": [
+    "app/globals.css",
+    "app/(view)/admin/dashboard/page.module.css",
+    "app/(view)/admin/dashboard/page.tsx",
+    "app/(view)/admin/folders/[id]/page.module.css",
+    "app/(view)/admin/folders/[id]/page.tsx",
+    "app/component/admin-search.module.css",
+    "app/component/folder-tree-sidebar.module.css",
+    "app/component/folder-tree-sidebar.tsx",
+    "app/component/workspace-header.module.css",
+    "app/component/workspace-header.tsx",
     "app/(view)/join/[code]/page.module.css",
     "app/(view)/admin/session/[id]/page.module.css"
   ],

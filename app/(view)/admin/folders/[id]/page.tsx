@@ -43,7 +43,7 @@ export default function FolderPage() {
     <main className={`${styles.root} folder-workspace folder-dashboard-shell folder-detail-shell ${sidebarOpen ? "" : "sidebar-collapsed"}`}>
       <FolderTreeSidebar folders={folders} open={sidebarOpen} activeFolderId={folderId} onToggle={toggleSidebar} />
       <div className="folder-dashboard-content">
-        <WorkspaceHeader showLogo={false} />
+        <WorkspaceHeader spacer />
         <div className="admin-page folder-page">
         <input ref={inputRef} type="file" accept=".pdf,.ppt,.pptx" hidden onChange={(event) => pick(event.target.files?.[0])} />
 

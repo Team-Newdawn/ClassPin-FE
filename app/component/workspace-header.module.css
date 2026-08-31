@@ -1,5 +1,4 @@
 .root{height:84px;padding:0 max(32px,calc((100% - 1440px)/2));display:flex;align-items:center;justify-content:space-between;background:transparent}
-.root:global(.logo-hidden){justify-content:flex-end}
 .root :global(.workspace-account){display:flex;align-items:center;gap:12px}
 .root :global(.workspace-account-copy){display:grid;min-width:0}
 .root :global(.workspace-account-copy) b{font-size:13px}

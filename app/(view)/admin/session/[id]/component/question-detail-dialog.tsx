@@ -53,7 +53,7 @@ export function QuestionDetailDialog({ question, questionCategories, onClose }: 
         aria-labelledby={titleId}
         tabIndex={-1}
       >
-        <button className="modal-close" onClick={onClose} aria-label={t("question.closeDetail")}><X /></button>
+        <button type="button" className={styles.close} onClick={onClose} aria-label={t("question.closeDetail")}><X /></button>
         <div className="question-detail-heading">
           <span className={`category ${questionCategoryClass(questionCategories, question.category)}`}>{questionMarkerEmoji(question.marker) && <i aria-hidden="true">{questionMarkerEmoji(question.marker)}</i>}{categoryLabel}</span>
           <span>{t("common.slideLabel", { number: question.slideIndex + 1 })}</span>
@@ -68,7 +68,7 @@ export function QuestionDetailDialog({ question, questionCategories, onClose }: 
           <span>{t("question.instructorAnswer")}</span>
           <p>{question.answer ?? t("question.noAnswer")}</p>
         </div>
-        <button className="btn primary large full" onClick={onClose}>{t("common.confirm")}</button>
+        <button type="button" className="btn primary large full" onClick={onClose}>{t("common.confirm")}</button>
       </section>
     </div>
   );

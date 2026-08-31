@@ -2,6 +2,7 @@
   padding-bottom: 0;
   display: grid;
   grid-template-columns: 248px minmax(0, 1fr);
+  background: var(--color-folder-workspace-bg);
   transition: grid-template-columns 160ms cubic-bezier(.2, 0, 0, 1);
 }
 
@@ -11,16 +12,16 @@
 
 .root :global(.folder-dashboard-content) {
   min-width: 0;
-  padding-bottom: 24px;
 }
 
-.root :global(.folder-dashboard) {
-  width: min(1440px, calc(100% - 48px));
-  min-height: calc(100dvh - 108px);
-  margin: auto;
+.root :global(.admin-page.folder-dashboard) {
+  width: 100%;
+  max-width: none;
+  min-height: 100dvh;
+  margin: 0;
   padding: 48px;
   gap: 48px;
-  border-radius: 32px;
+  border-radius: 44px;
   background: var(--color-bg-surface);
 }
 
@@ -44,11 +45,6 @@
   justify-content: flex-end;
   gap: 12px;
   flex: 1 0 auto;
-}
-
-.root :global(.folder-dashboard-search) {
-  width: min(260px, 26vw);
-  height: 44px;
 }
 
 .root :global(.folder-dashboard-actions) :global(.btn) {
@@ -385,16 +381,13 @@
 @media (max-width: 900px) {
   .root:global(.folder-dashboard-shell) { grid-template-columns: 72px minmax(0, 1fr); }
   .root :global(.folder-dashboard-content) { grid-column: 2; }
-  .root :global(.folder-dashboard) { width: calc(100% - 28px); min-height: calc(100dvh - 80px); border-radius: 24px; }
   .root:global(.folder-dashboard-shell) :global(.folder-dashboard) { padding: 28px 24px; }
   .root :global(.folder-dashboard) :global(.page-head) { align-items: flex-start; flex-direction: column; }
   .root :global(.folder-dashboard-actions) { width: 100%; justify-content: flex-start; }
-  .root :global(.folder-dashboard-search) { width: auto; flex: 1; }
   .root :global(.folder-grid) { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; }
 }
 
 @media (max-width: 600px) {
-  .root :global(.folder-dashboard) { width: calc(100% - 20px); border-radius: 20px; }
   .root :global(.folder-dashboard-actions) { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
   .root :global(.folder-dashboard-search) { width: 100%; grid-column: 1 / -1; }
   .root :global(.folder-dashboard-actions) :global(.btn) { width: 100%; padding: 0 10px; }

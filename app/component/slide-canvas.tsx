@@ -2,6 +2,8 @@
 /* eslint-disable @next/next/no-img-element */
 
 import { Fragment, type ReactNode } from "react";
+import selectedPinIcon from "@/assets/icons/pin_icon.svg";
+import unselectedPinIcon from "@/assets/icons/pin_black_icon.svg";
 import { useLanguage } from "@/app/_controller/language-context";
 import { defaultQuestionCategorySettings, questionCategoryClass, questionCategoryLabel, questionMarkerEmoji, type Question, type QuestionCategorySettings, type Slide } from "@/app/_model/types";
 import styles from "./slide-canvas.module.css";
@@ -44,12 +46,12 @@ export function SlideCanvas({ slide, questions = [], questionCategories = defaul
           return <line key={question.id} x1={question.x! * 100} y1={question.y! * 100} x2={position.x * 100} y2={position.y * 100} />;
         })}
       </svg>}
-      {showPins && questions.filter((q) => q.x !== null && q.y !== null && (!visibleQuestionIds || visibleQuestionIds.includes(q.id))).map((q, index) => {
+      {showPins && questions.filter((q) => q.x !== null && q.y !== null && (!visibleQuestionIds || visibleQuestionIds.includes(q.id))).map((q) => {
         const isBox = q.anchorKind === "box" && q.width != null && q.height != null;
         const isPath = q.anchorKind === "path" && (q.path?.length ?? 0) >= 2;
         const isLive = liveQuestionId === q.id;
+        const isSelected = selectedId === q.id || isLive;
         const markerEmoji = questionMarkerEmoji(q.marker);
-        const marker = markerEmoji ?? index + 1;
         const position = pinDisplayPositions?.get(q.id) ?? q;
         return (
           <Fragment key={q.id}>
@@ -68,7 +70,7 @@ export function SlideCanvas({ slide, questions = [], questionCategories = defaul
                   onClick={() => onSelectPin?.(q.id)}
                   aria-label={t("question.areaAria", { text: q.text })}
                 >
-                  {markerEmoji ? <span aria-hidden="true">{markerEmoji}</span> : marker}
+                  {markerEmoji && <span aria-hidden="true">{markerEmoji}</span>}
                 </button>
               </>
             ) : isBox ? (
@@ -78,16 +80,17 @@ export function SlideCanvas({ slide, questions = [], questionCategories = defaul
                 onClick={() => onSelectPin?.(q.id)}
                 aria-label={t("question.areaAria", { text: q.text })}
               >
-                <span className={markerEmoji ? "emoji-pin" : ""}>{marker}</span>
+                <span className={markerEmoji ? "emoji-pin" : ""}>{markerEmoji}</span>
               </button>
             ) : (
-              <button className={`question-pin ${markerEmoji ? "emoji-pin" : ""} ${selectedId === q.id ? "selected" : ""} ${isLive ? "live" : ""}`} style={{ left: `${position.x! * 100}%`, top: `${position.y! * 100}%` }} data-presentation-pin-id={q.id} onClick={() => onSelectPin?.(q.id)} aria-label={t("question.pinAria", { text: q.text })}>
-                {markerEmoji ? <span aria-hidden="true">{markerEmoji}</span> : marker}
+              <button className={`question-pin ${isSelected ? "selected" : ""} ${isLive ? "live" : ""}`} style={{ left: `${position.x! * 100}%`, top: `${position.y! * 100}%` }} data-presentation-pin-id={q.id} onClick={() => onSelectPin?.(q.id)} aria-label={t("question.pinAria", { text: q.text })}>
+                <img className="question-pin-icon" src={(isSelected ? selectedPinIcon : unselectedPinIcon).src} alt="" aria-hidden="true" draggable={false} />
+                <span className={`question-pin-marker ${markerEmoji ? "emoji" : ""}`} aria-hidden="true">{markerEmoji}</span>
               </button>
             )}
             {showQuestionLabels && (
               <button
-                className={`question-tag category ${questionCategoryClass(questionCategories, q.category)} ${q.answer ? "answered" : ""} ${isBox || isPath ? "region-tag" : ""} ${labelContent === "body" ? `question-bubble ${position.x! > 0.58 ? "to-left" : ""} ${position.y! < 0.12 ? "below" : ""}` : ""} ${q.reactionCount >= 5 ? "empathy-fire" : ""} ${isLive ? "live" : ""}`}
+                className={`question-tag category ${questionCategoryClass(questionCategories, q.category)} ${q.answer ? "answered" : ""} ${isBox || isPath ? "region-tag" : ""} ${labelContent === "body" ? `question-bubble ${position.x! > 0.58 ? "to-left" : ""} ${position.y! < 0.12 ? "below" : position.y! > 0.88 ? "above" : ""}` : ""} ${q.reactionCount >= 5 ? "empathy-fire" : ""} ${isLive ? "live" : ""}`}
                 style={{ left: `${position.x! * 100}%`, top: `${position.y! * 100}%` }}
                 data-presentation-label-id={q.id}
                 onClick={() => onSelectPin?.(q.id)}

@@ -1,7 +1,10 @@
 "use client";
 
 import type { CSSProperties } from "react";
+import Image from "next/image";
 import Link from "next/link";
+import selectedPinIcon from "@/assets/icons/pin_icon.svg";
+import unselectedPinIcon from "@/assets/icons/pin_black_icon.svg";
 import { Check, ChevronLeft, ChevronRight, MapPin, Send, Smile, Trash2, X } from "@/app/component/icons";
 import { LanguageSwitcher } from "@/app/component/language-switcher";
 import { LoadingScreen } from "@/app/component/loading-screen";
@@ -54,7 +57,7 @@ export default function JoinSession() {
               >
                 {draftQuestion && !editingQuestionId && !submitted && <>
                   <button
-                    className={`draft-pin ${questionMarkerEmoji(draftQuestion.marker) ? "emoji-pin" : ""}`}
+                    className="draft-pin"
                     style={{ left: `${draftQuestion.x * 100}%`, top: `${draftQuestion.y * 100}%` }}
                     aria-label={t("student.movePin")}
                     onPointerDown={startMovingDraftTag}
@@ -62,7 +65,10 @@ export default function JoinSession() {
                     onPointerUp={finishMovingDraftTag}
                     onPointerCancel={finishMovingDraftTag}
                     onClick={openDraftComposer}
-                  >{questionMarkerEmoji(draftQuestion.marker) && <span aria-hidden="true">{questionMarkerEmoji(draftQuestion.marker)}</span>}</button>
+                  >
+                    <Image className="question-pin-icon" src={unselectedPinIcon} alt="" aria-hidden="true" draggable={false} />
+                    {questionMarkerEmoji(draftQuestion.marker) && <span className="question-pin-marker emoji" aria-hidden="true">{questionMarkerEmoji(draftQuestion.marker)}</span>}
+                  </button>
                   <span className={`draft-tag category ${categoryClass(draftQuestion.category)}`} style={{ left: `${draftQuestion.x * 100}%`, top: `${draftQuestion.y * 100}%` }}>{categoryLabel(draftQuestion.category)}</span>
                 </>}
               </SlideCanvas>
@@ -130,7 +136,7 @@ export default function JoinSession() {
       </div>
       {composerOpen && <div className="student-modal-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) closeComposer(); }}>
         <section className="student-question-modal" role="dialog" aria-modal="true" aria-labelledby="question-modal-title">
-          <button className="modal-close" onClick={closeComposer} aria-label={t("student.closeComposer")}><X /></button>
+          <button type="button" className="icon-btn modal-close" onClick={closeComposer} aria-label={t("student.closeComposer")}><X /></button>
           {viewingQuestion ? <div className="student-answer-view">
             <span className={`category ${categoryClass(viewingQuestion.category)}`}>{questionMarkerEmoji(viewingQuestion.marker) && <i aria-hidden="true">{questionMarkerEmoji(viewingQuestion.marker)}</i>}{categoryLabel(viewingQuestion.category)}</span>
             <h2 id="question-modal-title">{t("student.myQuestion")}</h2>
@@ -142,7 +148,7 @@ export default function JoinSession() {
             <button className="btn primary large full" onClick={closeComposer}>{t("common.confirm")}</button>
           </div> : submitted ? <div className="submitted"><span><Check /></span><h2 id="question-modal-title">{editingQuestionId ? t("student.edited") : t("student.submitted")}</h2><p>{t("student.instructorCanSee")}</p><button className="btn primary" onClick={closeComposer}>{editingQuestionId ? t("common.confirm") : t("student.newQuestion")}</button></div> : <>
             <div className="student-modal-heading">
-              <span className={activeMarkerEmoji ? "emoji-pin" : ""}>{activeMarkerEmoji && <i aria-hidden="true">{activeMarkerEmoji}</i>}</span>
+              <span className="question-pin-preview" aria-hidden="true"><Image src={selectedPinIcon} alt="" />{activeMarkerEmoji && <i>{activeMarkerEmoji}</i>}</span>
               <div><h2 id="question-modal-title">{editingQuestionId ? t("student.editPrompt") : t("student.pointPrompt")}</h2><p>{editingQuestionId ? t("student.editHint") : t("student.composeHint")}</p></div>
             </div>
             <fieldset className="question-marker-picker">
@@ -150,7 +156,7 @@ export default function JoinSession() {
               <div>{QUESTION_MARKERS.map((marker) => {
                 const emoji = questionMarkerEmoji(marker);
                 return <button key={marker} type="button" className={activeMarker === marker ? "active" : ""} onClick={() => selectMarker(marker)} aria-pressed={activeMarker === marker} aria-label={markerLabel(marker)}>
-                  <span className={emoji ? "emoji-pin" : ""} aria-hidden="true">{emoji}</span>
+                  <span className="question-pin-preview" aria-hidden="true"><Image src={activeMarker === marker ? selectedPinIcon : unselectedPinIcon} alt="" />{emoji && <i>{emoji}</i>}</span>
                   <b>{markerLabel(marker)}</b>
                 </button>;
               })}</div>

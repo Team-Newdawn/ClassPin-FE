@@ -3,8 +3,9 @@
 import { useState } from "react";
 import Link from "next/link";
 import { QRCodeSVG } from "qrcode.react";
+import deleteIcon from "@/assets/icons/delete_icon.svg";
 import fileListIcon from "@/assets/icons/file_list_icon.svg";
-import { ArrowLeft, Check, ChevronLeft, ChevronRight, Clock3, Copy, FileText, GripVertical, Link2, ListFilter, MessageCircleQuestion, MonitorUp, PanelLeftClose, PanelLeftOpen, Pause, Play, Plus, QrCode, Search, Share2, Trash2, Users, X } from "@/app/component/icons";
+import { ArrowLeft, Check, ChevronLeft, ChevronRight, Copy, FileText, GripVertical, Link2, ListFilter, MessageCircleQuestion, MonitorUp, PanelLeftClose, PanelLeftOpen, Pause, Play, Plus, QrCode, Search, Share2, Trash2, Users, X } from "@/app/component/icons";
 import { useLanguage } from "@/app/_controller/language-context";
 import { LoadingScreen } from "@/app/component/loading-screen";
 import { QuestionDetailDialog } from "./component/question-detail-dialog";
@@ -71,7 +72,7 @@ export default function SessionAdmin() {
           <div className="player-workspace" ref={playerWorkspaceRef}>
             <section className="player-stage">
               <div className="stage-toolbar">
-                <div className="stage-toolbar-status"><span className={`status-dot ${session.status}`} /><b title={session.title}>{session.title}</b><span className="stage-sync-label">{t(session.status === "live" ? "session.syncing" : "session.stoppedLabel")}</span></div>
+                <div className="stage-toolbar-status"><span className={`status-dot ${session.status}`} /><b title={session.title}>{session.title}</b></div>
                 <div className="stage-toolbar-actions">
                   <div className="stage-qr-placement">
                     <QrCode aria-hidden="true" />
@@ -88,14 +89,13 @@ export default function SessionAdmin() {
                       <option value="bottom-left">{t("session.qrBottomLeft")}</option>
                     </select>
                   </div>
-                  <span>{session.currentSlide + 1} / {session.slides.length}</span>
                   <input ref={slideInputRef} type="file" accept=".png,.jpg,.jpeg,.webp,image/png,image/jpeg,image/webp" multiple hidden onChange={addSlideImages} />
                   <button type="button" className="stage-add-slides" disabled={addingSlides} onClick={() => slideInputRef.current?.click()} title={t("session.addSlidesHint")}>
                     {addingSlides ? <span className="spinner" /> : <Plus />}
                     <span>{t(addingSlides ? "session.addingSlides" : "session.addSlides")}</span>
                   </button>
                   <button type="button" className="stage-add-slides stage-delete-slide" disabled={session.slides.length <= 1 || addingSlides} onClick={() => openDeleteSlide(slide.id)} title={t(session.slides.length <= 1 ? "session.deleteLastSlideHint" : "session.deleteSlideHint")}>
-                    <Trash2 />
+                    <span className="stage-delete-icon" style={{ "--stage-delete-icon": `url(${deleteIcon.src})` } as React.CSSProperties} aria-hidden="true" />
                     <span>{t("session.deleteSlide")}</span>
                   </button>
                 </div>
@@ -199,7 +199,7 @@ export default function SessionAdmin() {
 function QuestionCard({ question, questionCategories, selected, onClick }: { question: Question; questionCategories: QuestionCategorySettings; selected: boolean; onClick: () => void }) {
   const { t, categoryLabel: defaultCategoryLabel, timeAgo } = useLanguage();
   const label = questionCategoryLabel(questionCategories, question.category, defaultCategoryLabel);
-  return <button className={`question-card ${selected ? "selected" : ""}`} onClick={onClick}><div className="question-meta"><div className="question-copy"><span className={`category ${questionCategoryClass(questionCategories, question.category)}`}>{questionMarkerEmoji(question.marker) && <i aria-hidden="true">{questionMarkerEmoji(question.marker)}</i>}{label}</span><p>{question.text}</p></div><span className="question-time"><Clock3 />{timeAgo(question.createdAt)}</span></div>{question.answer && <div className="question-answer"><span>{t("session.myAnswer")}</span><p>{question.answer}</p></div>}<div><StatusBadge status={question.status} />{question.x !== null && <span className="pin-context">{question.anchorKind !== "point" ? t("session.regionQuestion") : t("session.pinQuestion")}</span>}</div></button>;
+  return <button className={`question-card ${selected ? "selected" : ""}`} onClick={onClick}><div className="question-meta"><span className={`category ${questionCategoryClass(questionCategories, question.category)}`}>{questionMarkerEmoji(question.marker) && <i aria-hidden="true">{questionMarkerEmoji(question.marker)}</i>}{label}</span><StatusBadge status={question.status} /></div><p className="question-card-copy">{question.text}</p>{question.answer && <div className="question-answer"><span>{t("session.myAnswer")}</span><p>{question.answer}</p></div>}<div className="question-card-footer">{question.x !== null && <span className="pin-context">{question.anchorKind !== "point" ? t("session.regionQuestion") : t("session.pinQuestion")}</span>}<time className="question-time" dateTime={question.createdAt}>{timeAgo(question.createdAt)}</time></div></button>;
 }
 
 function QuestionCategoryManager({ initialSettings, usedCategories, onSave, onError }: {

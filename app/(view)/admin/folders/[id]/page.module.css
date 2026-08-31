@@ -2,6 +2,7 @@
   padding-bottom: 0;
   display: grid;
   grid-template-columns: 248px minmax(0, 1fr);
+  background: var(--color-folder-workspace-bg);
   transition: grid-template-columns 160ms cubic-bezier(.2, 0, 0, 1);
 }
 
@@ -20,7 +21,7 @@
 
 .root:global(.folder-detail-shell) :global(.folder-dashboard-content) {
   min-height: calc(100dvh - 8px);
-  border-radius: 24px 0 0 24px;
+  border-radius: 44px;
   background: var(--color-bg-surface);
 }
 
@@ -68,12 +69,6 @@
   align-items: center;
   justify-content: flex-end;
   gap: 12px;
-}
-
-.root :global(.folder-detail-search) {
-  width: calc(var(--folder-detail-upload-width) + 200px);
-  height: 40px;
-  flex: 0 1 calc(var(--folder-detail-upload-width) + 200px);
 }
 
 .root :global(.folder-detail-actions) :global(.folder-detail-upload-button) {

@@ -11,12 +11,13 @@
     "app/component/workspace-header.module.css",
     "app/component/workspace-header.tsx",
     "app/(view)/join/[code]/page.module.css",
-    "app/(view)/admin/session/[id]/page.module.css"
+    "app/(view)/admin/session/[id]/page.module.css",
+    "app/(view)/admin/session/[id]/component/question-detail-dialog.module.css"
   ],
   "documents": [
     "class-frontend-architecture"
   ],
-  "recorded_at": "2026-08-30T09:25:46+00:00",
+  "recorded_at": "2026-08-31T07:55:38+00:00",
   "requirement_id": "CFA-083",
   "task_id": "participant-question-sorting-and-live-controls",
   "tests": [

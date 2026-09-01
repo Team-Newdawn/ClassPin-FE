@@ -448,3 +448,58 @@ width.
 - no unit test was added for the single CSS declaration; live DOM geometry,
   the accessibility snapshot and keyboard navigation are the regression
   verification
+
+## Presentation question-detail category badge
+
+The shared question-detail dialog now owns its category badge rules instead of
+depending on the admin session page module. This preserves the existing
+semantic category colors in both `/admin/session/[id]` and the separately
+rendered `/admin/session/[id]/present` route without adding state, markup, a
+dependency or a page-level override.
+
+In the reported Orca browser tab, the `why` category changed from an unstyled
+`block` span at 16px with no padding or background to a centered `flex` badge at
+23px high with 8px horizontal padding, 11px/600 type, a full radius and the
+existing pending foreground/background tokens. The dialog remained open and
+accessible as `role="dialog"` during the live computed-style check.
+
+- `npm run supabase:start` — local stack already running
+- `npm run supabase:reset` — clean migration replay passed
+- `npm run lint` — passed
+- `npm run build` — passed with the existing Turbopack NFT tracing warning for
+  `app/api/convert/route.ts`
+- `git diff --check` — passed
+- approved PRD, frontend architecture and manifest SHA-256 values matched the
+  active context lock; `docflow.py` is not installed under the Weak Harness
+  policy
+- no unit test was added for the component-owned CSS-only correction; the live
+  DOM geometry and computed styles are the regression verification
+- Ponytail review: `Lean already. Ship.`
+
+## Participant emoji picker redesign
+
+The participant reaction picker now uses one route-owned rule instead of a
+base rule plus an earlier override that lost the cascade. Its floating surface
+is right-aligned to the existing tool switch and contains four distinct neutral
+tiles with semantic brand hover/pressed states. Every reaction stays a native
+button with its existing accessible name and send handler.
+
+In the reported Orca browser tab, the picker changed from a 36px-wide surface
+whose four buttons overflowed at 23×42px to a complete 208×58px surface. All
+four buttons measured 44×44px, used 6px gaps, stayed inside the 1029px viewport
+and retained `👍/❓/💡/🙁 반응 보내기` names. Hover changed the first tile to
+the existing brand border/subtle background without movement, and clicking the
+light-bulb reaction succeeded. A final screenshot confirmed the complete picker
+above the participant toolbar without covering its trigger.
+
+- `npm run supabase:start` — local stack already running
+- `npm run supabase:reset` — clean migration replay passed
+- `npm run lint` — passed
+- `npm run build` — passed with the existing Turbopack NFT tracing warning for
+  `app/api/convert/route.ts`
+- `git diff --check` — passed
+- no unit test was added for the CSS-only redesign; live DOM geometry,
+  accessibility snapshot, hover state, send click and screenshot are the
+  regression verification
+- Ponytail review removed the dead earlier picker override and found no state,
+  dependency or abstraction to cut: `Lean already. Ship.`

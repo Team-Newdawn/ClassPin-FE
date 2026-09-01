@@ -5,6 +5,7 @@
     "app/(view)/admin/session/[id]/page.module.css",
     "app/(view)/admin/session/[id]/present/page.tsx",
     "app/(view)/admin/session/[id]/present/controller.ts",
+    "app/(view)/join/[code]/page.module.css",
     "app/_controller/session-store.tsx",
     "app/_model/class/presentation-rotation.ts",
     "app/_model/i18n.ts",
@@ -17,7 +18,7 @@
   "documents": [
     "class-frontend-architecture"
   ],
-  "recorded_at": "2026-08-31T01:41:40+00:00",
+  "recorded_at": "2026-08-31T07:55:38+00:00",
   "requirement_id": "CLASS-LIVE-001",
   "task_id": "participant-question-sorting-and-live-controls",
   "tests": [

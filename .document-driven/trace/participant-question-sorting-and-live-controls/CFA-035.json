@@ -1,12 +1,13 @@
 {
   "code": [
     "app/(view)/admin/session/[id]/controller.ts",
-    "app/(view)/admin/session/[id]/present/page.tsx"
+    "app/(view)/admin/session/[id]/present/page.tsx",
+    "app/(view)/admin/session/[id]/component/question-detail-dialog.module.css"
   ],
   "documents": [
     "class-frontend-architecture"
   ],
-  "recorded_at": "2026-08-30T09:25:45+00:00",
+  "recorded_at": "2026-08-31T07:46:08+00:00",
   "requirement_id": "CFA-035",
   "task_id": "participant-question-sorting-and-live-controls",
   "tests": [

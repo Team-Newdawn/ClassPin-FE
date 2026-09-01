@@ -9,7 +9,7 @@ import { advancePinPlayback, canRotatePinPlayback, crossedPinMilestone, resolveP
 import type { Question } from "@/app/_model/types";
 
 const CONTROLS_HIDE_DELAY = 2600;
-const PIN_REVEAL_DELAY = 1500; // PIN이 순환되는 속도 조절 -> 현재는 3000ms으로 되어있음
+const PIN_REVEAL_DELAY = 1000; // PIN이 순환되는 속도 조절 -> 현재는 3000ms으로 되어있음
 const LIVE_PIN_HIGHLIGHT_DELAY = 1000;
 const PIN_MILESTONE_DISPLAY_DELAY = 3000;
 const EMPTY_PLAYBACK = { slideIndex: null as number | null, shownPinIds: [] as string[], activePinId: null as string | null };

@@ -5,8 +5,7 @@ import { useAuth } from "@/app/_controller/auth-context";
 import { classFolderColorIndexForOrder, defaultQuestionCategorySettings, isParticipantPointAnchor, normalizeClassFolderColorIndex, normalizeClassFolderName, normalizeQuestionCategorySettings, type ClassFolder, type ClassSession, type ParticipantQuestionInput, type PresentationQrPosition, type Question, type QuestionCategorySettings, type Slide } from "@/app/_model/types";
 import { withQuestionReaction } from "@/app/_model/question-reactions";
 import { normalizeSessions } from "@/app/_model/class/session";
-import { getAudienceSupabaseClient, getSupabaseClient, supabaseConfigured } from "@/app/_infrastructure/supabase/client";
-import { appendSessionSlides, createClassFolder as persistClassFolder, deleteClassFolder as persistClassFolderDeletion, deleteClassSession as persistSessionDeletion, deleteSessionSlide, fetchLectureSnapshot, fetchLiveSession, fetchOwnedClassFolders, fetchOwnedSessions, fetchSessionSlides, markQuestionResolved, moveSessionToFolder as persistSessionFolder, persistSession, postAnswer, renameClassFolder as persistClassFolderName, saveSlideInstructorNote, setQuestionReaction as persistQuestionReaction, submitQuestion, subscribeToLecture, updateLecture, updateQuestion as persistQuestionUpdate, type LectureRealtimeRow } from "@/app/_service/class-session-service";
+import { appendSessionSlides, classSessionPersistenceEnabled, createClassFolder as persistClassFolder, deleteClassFolder as persistClassFolderDeletion, deleteClassSession as persistSessionDeletion, deleteSessionSlide, fetchLectureSnapshot, fetchLiveSession, fetchOwnedClassFolders, fetchOwnedSessions, fetchSessionSlides, markQuestionResolved, moveSessionToFolder as persistSessionFolder, persistSession, postAnswer, renameClassFolder as persistClassFolderName, saveSlideInstructorNote, setQuestionReaction as persistQuestionReaction, submitQuestion, subscribeToLecture, updateLecture, updateQuestion as persistQuestionUpdate, validateSlideImages, type LectureRealtimeRow } from "@/app/_service/class-session-service";
 
 const STORAGE_KEY = "pin-class-sessions-v1";
 const FOLDER_STORAGE_KEY = "pin-class-folders-v1";
@@ -47,8 +46,6 @@ const SessionContext = createContext<Store | null>(null);
 const makeCode = () => `PIN${crypto.randomUUID().replaceAll("-", "").slice(0, 6).toUpperCase()}`;
 const cacheKey = (userId: string) => `${SUPABASE_CACHE_PREFIX}:${userId}`;
 const folderCacheKey = (userId: string) => `${SUPABASE_FOLDER_CACHE_PREFIX}:${userId}`;
-const APPENDABLE_SLIDE_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
-const MAX_SLIDE_IMAGE_BYTES = 10 * 1024 * 1024;
 const PARTICIPANT_STATUS_POLL_MS = 2_000;
 type LectureSettingPatch = Partial<Pick<ClassSession,
   "status" | "showQuestionPins" | "showPresentationQr" | "presentationQrPosition"
@@ -101,15 +98,18 @@ export function SessionStore({ children }: { children: React.ReactNode }) {
   const refreshSequences = useRef(new Map<string, number>());
   const slideRefreshSequences = useRef(new Map<string, number>());
   const ownerId = useRef<string | null>(null);
-  const sessionsRef = useRef<ClassSession[]>([]);
+  const sessionsByIdRef = useRef<ReadonlyMap<string, ClassSession>>(new Map());
   const authUserId = user?.id ?? null;
   const authIsAnonymous = user?.is_anonymous ?? false;
+  const sessionsById = useMemo(() => new Map(sessions.map((session) => [session.id, session])), [sessions]);
+  const sessionsByCode = useMemo(() => new Map(sessions.map((session) => [session.code.toLowerCase(), session])), [sessions]);
+  const foldersById = useMemo(() => new Map(folders.map((folder) => [folder.id, folder])), [folders]);
 
-  useEffect(() => { sessionsRef.current = sessions; }, [sessions]);
+  useEffect(() => { sessionsByIdRef.current = sessionsById; }, [sessionsById]);
 
   // demo 모드에서만 localStorage가 기준 데이터다.
   useEffect(() => {
-    if (supabaseConfigured) return;
+    if (classSessionPersistenceEnabled) return;
     const stored = window.localStorage.getItem(STORAGE_KEY);
     queueMicrotask(() => {
       const restored: ClassSession[] = stored ? JSON.parse(stored) : [];
@@ -122,7 +122,7 @@ export function SessionStore({ children }: { children: React.ReactNode }) {
   // Supabase 모드에서는 현재 강사가 소유한 DB 데이터가 유일한 기준이다.
   // 계정별 localStorage는 DB 조회가 실패했을 때만 쓰는 임시 캐시다.
   useEffect(() => {
-    if (!supabaseConfigured) return;
+    if (!classSessionPersistenceEnabled) return;
     let active = true;
     if (authLoading) {
       queueMicrotask(() => { if (active) setReady(false); });
@@ -164,21 +164,20 @@ export function SessionStore({ children }: { children: React.ReactNode }) {
     return () => { active = false; };
   }, [authIsAnonymous, authLoading, authUserId, isAdmin]);
 
-  const subscriptionKey = sessions.some((session) => session.id === activeSessionId && session.courseId)
-    ? activeSessionId ?? ""
-    : "";
+  const subscriptionKey = activeSessionId && sessionsById.get(activeSessionId)?.courseId ? activeSessionId : "";
   useEffect(() => {
-    if (!ready || !supabaseConfigured || !subscriptionKey) return;
-    const tracked = sessions.filter((session) => session.id === subscriptionKey);
+    if (!ready || !classSessionPersistenceEnabled || !subscriptionKey) return;
+    const tracked = sessionsById.get(subscriptionKey);
+    if (!tracked) return;
     const asAudience = !ownerId.current;
     let active = true;
     let statusPoll: ReturnType<typeof setInterval> | null = null;
-    const channels: NonNullable<ReturnType<typeof subscribeToLecture>>[] = [];
+    const unsubscribe: Array<() => void> = [];
     const refresh = async (session: ClassSession) => {
       const refreshSequence = (refreshSequences.current.get(session.id) ?? 0) + 1;
       refreshSequences.current.set(session.id, refreshSequence);
       try {
-        const latestSession = sessionsRef.current.find((item) => item.id === session.id) ?? session;
+        const latestSession = sessionsByIdRef.current.get(session.id) ?? session;
         const snapshot = await fetchLectureSnapshot(latestSession, asAudience);
         if (!active || !snapshot || refreshSequences.current.get(session.id) !== refreshSequence) return;
         setSessions((current) => current.map((item) => {
@@ -216,7 +215,7 @@ export function SessionStore({ children }: { children: React.ReactNode }) {
       const refreshSequence = (slideRefreshSequences.current.get(session.id) ?? 0) + 1;
       slideRefreshSequences.current.set(session.id, refreshSequence);
       try {
-        const latestSession = sessionsRef.current.find((item) => item.id === session.id) ?? session;
+        const latestSession = sessionsByIdRef.current.get(session.id) ?? session;
         const slides = await fetchSessionSlides(latestSession, asAudience);
         if (!active || slideRefreshSequences.current.get(session.id) !== refreshSequence) return;
         setSessions((current) => current.map((item) => item.id === session.id ? { ...item, slides } : item));
@@ -224,17 +223,15 @@ export function SessionStore({ children }: { children: React.ReactNode }) {
     };
     const connect = () => {
       try {
-        tracked.forEach((session) => {
-          const channel = subscribeToLecture(
-            session.id,
-            session.materialVersionId,
-            () => void refresh(session),
-            (lecture) => applyLectureUpdate(session, lecture),
-            () => void refreshSlides(session),
-            asAudience
-          );
-          if (channel) channels.push(channel);
-        });
+        const stop = subscribeToLecture(
+          tracked.id,
+          tracked.materialVersionId,
+          () => void refresh(tracked),
+          (lecture) => applyLectureUpdate(tracked, lecture),
+          () => void refreshSlides(tracked),
+          asAudience
+        );
+        if (stop) unsubscribe.push(stop);
       } catch (error) { console.error("Supabase authentication failed", error); }
     };
     // fetchOwnedSessions/fetchLiveSession already returned an authoritative snapshot.
@@ -242,18 +239,15 @@ export function SessionStore({ children }: { children: React.ReactNode }) {
     connect();
     if (asAudience) {
       statusPoll = setInterval(() => {
-        tracked.forEach((session) => {
-          // 다른 작성자의 questions 행은 RLS 때문에 Postgres Changes 이벤트가 오지
-          // 않을 수 있다. 공개 RPC 스냅샷으로 공감 순서와 종료 상태를 함께 보정한다.
-          void refresh(sessionsRef.current.find((item) => item.id === session.id) ?? session);
-        });
+        // 다른 작성자의 questions 행은 RLS 때문에 Postgres Changes 이벤트가 오지
+        // 않을 수 있다. 공개 RPC 스냅샷으로 공감 순서와 종료 상태를 함께 보정한다.
+        void refresh(sessionsByIdRef.current.get(tracked.id) ?? tracked);
       }, PARTICIPANT_STATUS_POLL_MS);
     }
     return () => {
       active = false;
       if (statusPoll) clearInterval(statusPoll);
-      const client = asAudience ? getAudienceSupabaseClient() : getSupabaseClient();
-      if (client) channels.forEach((channel) => void client.removeChannel(channel));
+      unsubscribe.forEach((stop) => stop());
     };
     // Session question changes do not recreate subscriptions; only the stable id set does.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -261,7 +255,7 @@ export function SessionStore({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     if (!ready) return;
-    if (supabaseConfigured) {
+    if (classSessionPersistenceEnabled) {
       if (ownerId.current) window.localStorage.setItem(cacheKey(ownerId.current), JSON.stringify(sessions));
       return;
     }
@@ -273,7 +267,7 @@ export function SessionStore({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     if (!ready) return;
-    if (supabaseConfigured) {
+    if (classSessionPersistenceEnabled) {
       if (ownerId.current) window.localStorage.setItem(folderCacheKey(ownerId.current), JSON.stringify(folders));
       return;
     }
@@ -281,7 +275,7 @@ export function SessionStore({ children }: { children: React.ReactNode }) {
   }, [folders, ready]);
 
   useEffect(() => {
-    if (supabaseConfigured) return;
+    if (classSessionPersistenceEnabled) return;
     const channel = new BroadcastChannel("pin-class-live");
     channel.onmessage = (event) => setSessions((current) => {
       const next = normalizeSessions(event.data as ClassSession[]);
@@ -298,7 +292,7 @@ export function SessionStore({ children }: { children: React.ReactNode }) {
   const createFolder = useCallback(async (name: string) => {
     const normalizedName = normalizeClassFolderName(name);
     const colorIndex = classFolderColorIndexForOrder(folders.length);
-    const folder = supabaseConfigured
+    const folder = classSessionPersistenceEnabled
       ? await persistClassFolder(normalizedName, colorIndex)
       : { id: crypto.randomUUID(), name: normalizedName, createdAt: new Date().toISOString(), colorIndex };
     setFolders((current) => [...current, folder]);
@@ -306,7 +300,7 @@ export function SessionStore({ children }: { children: React.ReactNode }) {
   }, [folders.length]);
 
   const createSession = useCallback(async (input: { folderId: string | null; title: string; fileName: string; slides: Slide[] }) => {
-    if (input.folderId !== null && !folders.some((folder) => folder.id === input.folderId)) {
+    if (input.folderId !== null && !foldersById.has(input.folderId)) {
       throw new Error("강의 자료를 추가할 폴더를 찾지 못했습니다.");
     }
     const materialVersionId = crypto.randomUUID();
@@ -318,10 +312,10 @@ export function SessionStore({ children }: { children: React.ReactNode }) {
       questionCategories: defaultQuestionCategorySettings(),
       createdAt: new Date().toISOString(), slides: input.slides, questions: []
     };
-    if (supabaseConfigured) await persistSession(session);
+    if (classSessionPersistenceEnabled) await persistSession(session);
     setSessions((current) => [session, ...current]);
     return session;
-  }, [folders]);
+  }, [foldersById]);
 
   const updateSession = useCallback((id: string, fn: (session: ClassSession) => ClassSession) => {
     setSessions((current) => current.map((session) => session.id === id ? fn(session) : session));
@@ -336,7 +330,7 @@ export function SessionStore({ children }: { children: React.ReactNode }) {
     lectureSettingTargets.current.set(sessionId, { ...lectureSettingTargets.current.get(sessionId), ...target });
     updateSession(sessionId, (session) => ({ ...session, ...target }));
     try {
-      if (supabaseConfigured) await updateLecture(sessionId, values);
+      if (classSessionPersistenceEnabled) await updateLecture(sessionId, values);
     } catch (error) {
       updateSession(sessionId, (session) => ({ ...session, ...rollback }));
       throw error;
@@ -358,23 +352,23 @@ export function SessionStore({ children }: { children: React.ReactNode }) {
     folders,
     createFolder,
     renameFolder: async (folderId, name) => {
-      if (!folders.some((folder) => folder.id === folderId)) throw new Error("이름을 바꿀 폴더를 찾지 못했습니다.");
+      if (!foldersById.has(folderId)) throw new Error("이름을 바꿀 폴더를 찾지 못했습니다.");
       const normalizedName = normalizeClassFolderName(name);
-      if (supabaseConfigured) await persistClassFolderName(folderId, normalizedName);
+      if (classSessionPersistenceEnabled) await persistClassFolderName(folderId, normalizedName);
       setFolders((current) => current.map((folder) => folder.id === folderId ? { ...folder, name: normalizedName } : folder));
     },
     deleteFolder: async (folderId) => {
-      if (!folders.some((folder) => folder.id === folderId)) throw new Error("삭제할 폴더를 찾지 못했습니다.");
-      if (supabaseConfigured) await persistClassFolderDeletion(folderId);
+      if (!foldersById.has(folderId)) throw new Error("삭제할 폴더를 찾지 못했습니다.");
+      if (classSessionPersistenceEnabled) await persistClassFolderDeletion(folderId);
       setFolders((current) => current.filter((folder) => folder.id !== folderId));
       setSessions((current) => current.map((session) => session.folderId === folderId ? { ...session, folderId: null } : session));
     },
     moveSessionToFolder: async (sessionId, folderId) => {
-      const session = sessions.find((item) => item.id === sessionId);
+      const session = sessionsById.get(sessionId);
       if (!session) throw new Error("이동할 강의 자료를 찾지 못했습니다.");
-      if (folderId !== null && !folders.some((folder) => folder.id === folderId)) throw new Error("이동할 폴더를 찾지 못했습니다.");
+      if (folderId !== null && !foldersById.has(folderId)) throw new Error("이동할 폴더를 찾지 못했습니다.");
       if (session.folderId === folderId) return;
-      if (supabaseConfigured) {
+      if (classSessionPersistenceEnabled) {
         if (!session.courseId) throw new Error("강의 자료의 저장 정보를 찾지 못했습니다.");
         await persistSessionFolder(session.courseId, folderId);
       }
@@ -382,22 +376,19 @@ export function SessionStore({ children }: { children: React.ReactNode }) {
     },
     createSession,
     deleteSession: async (sessionId) => {
-      const session = sessions.find((item) => item.id === sessionId);
+      const session = sessionsById.get(sessionId);
       if (!session) throw new Error("삭제할 강의 자료를 찾지 못했습니다.");
-      if (supabaseConfigured) {
+      if (classSessionPersistenceEnabled) {
         if (!session.courseId) throw new Error("강의 자료의 저장 정보를 찾지 못했습니다.");
         await persistSessionDeletion(session.courseId);
       }
       setSessions((current) => current.filter((item) => item.id !== sessionId));
     },
     appendSlides: async (sessionId, files) => {
-      const session = sessions.find((item) => item.id === sessionId);
+      const session = sessionsById.get(sessionId);
       if (!session) throw new Error("슬라이드를 추가할 강의를 찾지 못했습니다.");
-      if (files.length < 1 || files.length > 20) throw new Error("슬라이드는 한 번에 1~20장까지 추가할 수 있습니다.");
-      if (files.some((file) => !APPENDABLE_SLIDE_TYPES.has(file.type) || file.size > MAX_SLIDE_IMAGE_BYTES)) {
-        throw new Error("10MB 이하의 PNG, JPG, WebP 이미지만 추가할 수 있습니다.");
-      }
-      const appended = supabaseConfigured
+      validateSlideImages(files);
+      const appended = classSessionPersistenceEnabled
         ? await appendSessionSlides(session, files)
         : await Promise.all(files.map(async (file, index): Promise<Slide> => ({
           id: crypto.randomUUID(),
@@ -413,13 +404,13 @@ export function SessionStore({ children }: { children: React.ReactNode }) {
       });
     },
     deleteSlide: async (sessionId, slideId) => {
-      const session = sessions.find((item) => item.id === sessionId);
+      const session = sessionsById.get(sessionId);
       if (!session) throw new Error("슬라이드를 삭제할 강의를 찾지 못했습니다.");
       const deletedIndex = session.slides.findIndex((slide) => slide.id === slideId);
       if (deletedIndex < 0) throw new Error("삭제할 슬라이드를 찾지 못했습니다.");
       if (session.slides.length <= 1) throw new Error("마지막 슬라이드는 삭제할 수 없습니다.");
 
-      if (supabaseConfigured) {
+      if (classSessionPersistenceEnabled) {
         await deleteSessionSlide(slideId);
         const slides = await fetchSessionSlides(session);
         const snapshot = await fetchLectureSnapshot({ ...session, slides });
@@ -443,7 +434,7 @@ export function SessionStore({ children }: { children: React.ReactNode }) {
       });
     },
     addQuestion: async (sessionId, input) => {
-      const session = sessions.find((item) => item.id === sessionId);
+      const session = sessionsById.get(sessionId);
       if (!session) throw new Error("질문을 남길 강의를 찾지 못했습니다.");
       if (!isParticipantPointAnchor(input)) throw new Error("참여자 질문은 PIN 위치에만 남길 수 있습니다.");
       const question: Question = {
@@ -456,7 +447,7 @@ export function SessionStore({ children }: { children: React.ReactNode }) {
         reactedByMe: false,
         createdAt: new Date().toISOString()
       };
-      if (supabaseConfigured) await submitQuestion(session, question);
+      if (classSessionPersistenceEnabled) await submitQuestion(session, question);
       updateSession(sessionId, (current) => ({
         ...current,
         questions: current.questions.some((item) => item.id === question.id)
@@ -465,21 +456,21 @@ export function SessionStore({ children }: { children: React.ReactNode }) {
       }));
     },
     updateQuestion: async (sessionId, questionId, values) => {
-      if (supabaseConfigured) await persistQuestionUpdate(questionId, values);
+      if (classSessionPersistenceEnabled) await persistQuestionUpdate(questionId, values);
       updateSession(sessionId, (session) => ({
         ...session,
         questions: session.questions.map((question) => question.id === questionId ? { ...question, ...values } : question)
       }));
     },
     reactToQuestion: async (sessionId, questionId, reacted) => {
-      const question = sessions.find((session) => session.id === sessionId)?.questions.find((item) => item.id === questionId);
+      const question = sessionsById.get(sessionId)?.questions.find((item) => item.id === questionId);
       if (!question || question.isMine || question.reactedByMe === reacted) return;
       updateSession(sessionId, (session) => ({
         ...session,
         questions: session.questions.map((item) => item.id === questionId ? withQuestionReaction(item, reacted) : item)
       }));
       try {
-        if (supabaseConfigured) await persistQuestionReaction(questionId, reacted);
+        if (classSessionPersistenceEnabled) await persistQuestionReaction(questionId, reacted);
       } catch (error) {
         updateSession(sessionId, (session) => ({
           ...session,
@@ -491,23 +482,24 @@ export function SessionStore({ children }: { children: React.ReactNode }) {
       }
     },
     answerQuestion: async (sessionId, questionId, answer) => {
-      if (supabaseConfigured) await postAnswer(questionId, answer);
+      if (classSessionPersistenceEnabled) await postAnswer(questionId, answer);
       updateSession(sessionId, (session) => ({ ...session, questions: session.questions.map((q) => q.id === questionId ? { ...q, answer, status: "answered" } : q) }));
     },
     resolveQuestion: async (sessionId, questionId) => {
-      if (supabaseConfigured) await markQuestionResolved(questionId);
+      if (classSessionPersistenceEnabled) await markQuestionResolved(questionId);
       updateSession(sessionId, (session) => ({ ...session, questions: session.questions.map((q) => q.id === questionId ? { ...q, status: "resolved" } : q) }));
     },
     setCurrentSlide: async (sessionId, currentSlide) => {
-      const session = sessions.find((item) => item.id === sessionId);
+      const session = sessionsById.get(sessionId);
       if (!session) throw new Error("슬라이드를 변경할 강의를 찾지 못했습니다.");
       const nextSlide = Math.min(Math.max(0, currentSlide), Math.max(0, session.slides.length - 1));
+      const previousSlide = session.currentSlide;
 
       // 화면은 즉시 마지막 입력을 반영하고, DB에는 현재 처리 중인 값과 마지막 목표만
       // 저장한다. 빠른 입력 사이의 모든 중간 페이지를 순서대로 쓰지 않는다.
       slideTargets.current.set(sessionId, nextSlide);
       updateSession(sessionId, (current) => ({ ...current, currentSlide: nextSlide }));
-      if (!supabaseConfigured) {
+      if (!classSessionPersistenceEnabled) {
         slideTargets.current.delete(sessionId);
         return;
       }
@@ -515,13 +507,18 @@ export function SessionStore({ children }: { children: React.ReactNode }) {
       let write = slideWrites.current.get(sessionId);
       if (!write) {
         write = (async () => {
+          let savedSlide = previousSlide;
           try {
             while (true) {
               const target = slideTargets.current.get(sessionId);
               if (target === undefined) return;
               await updateLecture(sessionId, { current_page: target });
+              savedSlide = target;
               if (slideTargets.current.get(sessionId) === target) return;
             }
+          } catch (error) {
+            updateSession(sessionId, (current) => ({ ...current, currentSlide: savedSlide }));
+            throw error;
           } finally {
             // 이미 시작된 Realtime 조회가 마지막 DB 응답 뒤에 도착해도 폐기한다.
             refreshSequences.current.set(sessionId, (refreshSequences.current.get(sessionId) ?? 0) + 1);
@@ -537,17 +534,17 @@ export function SessionStore({ children }: { children: React.ReactNode }) {
       await write;
     },
     setStatus: async (sessionId, status) => {
-      const previous = sessions.find((session) => session.id === sessionId)?.status;
+      const previous = sessionsById.get(sessionId)?.status;
       if (!previous) throw new Error("상태를 변경할 강의를 찾지 못했습니다.");
       await saveLectureSettings(sessionId, { status }, { status: previous }, { status });
     },
     setShowQuestionPins: async (sessionId, visible) => {
-      const previous = sessions.find((session) => session.id === sessionId)?.showQuestionPins;
+      const previous = sessionsById.get(sessionId)?.showQuestionPins;
       if (previous === undefined) throw new Error("설정을 변경할 강의를 찾지 못했습니다.");
       await saveLectureSettings(sessionId, { showQuestionPins: visible }, { showQuestionPins: previous }, { show_question_pins: visible });
     },
     setPresentationQrPlacement: async (sessionId, position) => {
-      const previous = sessions.find((session) => session.id === sessionId);
+      const previous = sessionsById.get(sessionId);
       if (!previous) throw new Error("설정을 변경할 강의를 찾지 못했습니다.");
       const showPresentationQr = position !== null;
       const presentationQrPosition = position ?? previous.presentationQrPosition;
@@ -560,11 +557,11 @@ export function SessionStore({ children }: { children: React.ReactNode }) {
       );
     },
     setQuestionCategories: async (sessionId, settings) => {
-      if (supabaseConfigured) await updateLecture(sessionId, { question_categories: settings });
+      if (classSessionPersistenceEnabled) await updateLecture(sessionId, { question_categories: settings });
       updateSession(sessionId, (session) => ({ ...session, questionCategories: settings }));
     },
     updateSlideNote: async (sessionId, slideId, body) => {
-      if (supabaseConfigured) await saveSlideInstructorNote(slideId, body);
+      if (classSessionPersistenceEnabled) await saveSlideInstructorNote(slideId, body);
       updateSession(sessionId, (session) => ({
         ...session,
         slides: session.slides.map((slide) => slide.id === slideId ? { ...slide, speakerNote: body } : slide)
@@ -573,7 +570,7 @@ export function SessionStore({ children }: { children: React.ReactNode }) {
     setActiveSession: setActiveSessionId,
     loadSessionByCode: async (code) => {
       const key = code.toLowerCase();
-      const existing = sessions.find((session) => session.code.toLowerCase() === key);
+      const existing = sessionsByCode.get(key);
       if (existing) return existing;
       // sessions 는 이 클로저가 만들어진 시점의 값이다. 같은 코드로 조회가 겹치면 (StrictMode 의
       // 이펙트 재실행, 재진입) 위 검사를 둘 다 통과해 같은 세션이 두 번 앞에 붙는다.
@@ -589,7 +586,7 @@ export function SessionStore({ children }: { children: React.ReactNode }) {
       lookups.current.set(key, lookup);
       return lookup;
     }
-  }), [createFolder, createSession, folders, ready, saveLectureSettings, sessions, updateSession]);
+  }), [createFolder, createSession, folders, foldersById, ready, saveLectureSettings, sessions, sessionsByCode, sessionsById, updateSession]);
 
   return <SessionContext.Provider value={value}>{children}</SessionContext.Provider>;
 }

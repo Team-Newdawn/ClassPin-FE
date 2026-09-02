@@ -1,0 +1,37 @@
+{
+  "allowed_paths": [],
+  "document_paths": [
+    "doc/pin_class_prd.md",
+    "docs/ai-instructor-report-product.md",
+    "docs/ai-instructor-report-evidence.md",
+    "docs/ai-instructor-report-system.md",
+    "docs/class-frontend-architecture.md",
+    "docs/pin-feedback-sunset.md",
+    "docs/pin-feedback-data-retirement.md"
+  ],
+  "expires_at": "2026-09-02T06:44:47+00:00",
+  "issued_at": "2026-09-02T06:39:47+00:00",
+  "package_id": null,
+  "run_status": null,
+  "schema_version": "1.0",
+  "selected_artifacts": [
+    "class-frontend-architecture",
+    "pin-feedback-sunset",
+    "pin-feedback-data-retirement"
+  ],
+  "sources": [
+    {
+      "mtime_ns": 1788245403222214672,
+      "path": "docs/document-manifest.json",
+      "sha256": "c32fad17372ce989e8ae65bb3efeb4639578b85946a5e523352315a955f0d01a",
+      "size": 4950
+    },
+    {
+      "mtime_ns": 1788245423522220070,
+      "path": ".document-driven/context-lock.json",
+      "sha256": "c035e5af8e3bfb3cf585934015c968f254656f28e40fa5683b2f27ca5bc525a9",
+      "size": 2285
+    }
+  ],
+  "task_id": "pin-feedback-data-retirement"
+}

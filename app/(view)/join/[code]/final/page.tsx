@@ -4,5 +4,5 @@ export default async function LectureFinalPage({ params }: {
   params: Promise<{ code: string }>;
 }) {
   const { code } = await params;
-  return <PlatformExperienceForm source="lecture" code={code} />;
+  return <PlatformExperienceForm code={code} />;
 }

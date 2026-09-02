@@ -8,8 +8,8 @@ import { useHorizontalSlideWheel } from "@/app/_controller/use-horizontal-slide-
 import { useLectureReactions } from "@/app/_controller/use-lecture-reactions";
 import { LECTURE_REACTION_EVENT, lectureReactionTopic, type LectureReactionEmoji } from "@/app/_model/lecture-reactions";
 import { questionsByEmpathy, questionsByNewest } from "@/app/_model/question-reactions";
-import { broadcastLocalReaction } from "@/app/_model/realtime-reactions";
-import { ensureAnonymousUser, getAudienceSupabaseClient } from "@/app/_infrastructure/supabase/client";
+import { groupQuestionsBySlide } from "@/app/_model/stats";
+import { publishRealtimeReaction } from "@/app/_service/realtime-reaction-service";
 import { acceptsQuestionCategory, enabledQuestionCategories, questionCategoryClass, questionCategoryLabel, questionMarkerEmoji, type Question, type QuestionCategory, type QuestionMarker } from "@/app/_model/types";
 
 type StudentTool = "pin" | "emoji";
@@ -22,6 +22,7 @@ type DraftQuestion = {
   marker: QuestionMarker;
   text: string;
 };
+const EMPTY_QUESTIONS: Question[] = [];
 
 export function useJoinSessionController() {
   const { t, categoryLabel: defaultCategoryLabel, timeAgo } = useLanguage();
@@ -59,7 +60,8 @@ export function useJoinSessionController() {
   }, [session?.id, setActiveSession]);
 
   const current = slideIndex ?? session?.currentSlide ?? 0;
-  const slideQuestions = useMemo(() => (session?.questions ?? []).filter((question) => question.slideIndex === current), [current, session?.questions]);
+  const questionsBySlide = useMemo(() => groupQuestionsBySlide(session?.questions ?? []), [session?.questions]);
+  const slideQuestions = useMemo(() => questionsBySlide.get(current) ?? EMPTY_QUESTIONS, [current, questionsBySlide]);
   const submittedQuestions = useMemo(() => questionSort === "empathy"
     ? questionsByEmpathy(slideQuestions)
     : questionsByNewest(slideQuestions), [questionSort, slideQuestions]);
@@ -325,18 +327,7 @@ export function useJoinSessionController() {
     const reaction = { id: crypto.randomUUID(), emoji };
     addReaction(reaction);
     try {
-      await ensureAnonymousUser();
-      const client = getAudienceSupabaseClient();
-      if (!client) {
-        broadcastLocalReaction(lectureReactionTopic(session.id), LECTURE_REACTION_EVENT, reaction);
-        return;
-      }
-      const channel = client.channel(lectureReactionTopic(session.id));
-      try {
-        await channel.httpSend(LECTURE_REACTION_EVENT, reaction);
-      } finally {
-        await client.removeChannel(channel);
-      }
+      await publishRealtimeReaction(lectureReactionTopic(session.id), LECTURE_REACTION_EVENT, reaction);
     } catch (error) {
       console.error("Lecture emoji reaction failed", error);
       setEmojiError(t("student.reactionError"));

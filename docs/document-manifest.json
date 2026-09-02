@@ -111,9 +111,9 @@
     },
     {
       "approval": {
-        "approved_at": "2026-09-01T02:12:07+00:00",
+        "approved_at": "2026-09-01T06:50:03+00:00",
         "approved_by": "minchan_CTO",
-        "content_sha256": "020cef83f72afed275fac83abf74be4918de39f379ce44834c71f28b3f94a465"
+        "content_sha256": "0edec27f023a0bc0ac8ad9e1567b089372781f3a6b6b93391a51aa35ce4a3e83"
       },
       "depends_on": [
         "pin-feedback-sunset"

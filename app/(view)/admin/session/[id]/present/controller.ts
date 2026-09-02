@@ -6,6 +6,7 @@ import { useLanguage } from "@/app/_controller/language-context";
 import { useSessions } from "@/app/_controller/session-store";
 import { useLectureReactions } from "@/app/_controller/use-lecture-reactions";
 import { advancePinPlayback, canRotatePinPlayback, crossedPinMilestone, resolvePinDisplayPositions, resolveVisiblePresentationLabelIds } from "@/app/_model/class/presentation-rotation";
+import { groupQuestionsBySlide } from "@/app/_model/stats";
 import type { Question } from "@/app/_model/types";
 
 const CONTROLS_HIDE_DELAY = 2600;
@@ -14,6 +15,7 @@ const LIVE_PIN_HIGHLIGHT_DELAY = 1000;
 const PIN_MILESTONE_DISPLAY_DELAY = 3000;
 const EMPTY_PLAYBACK = { slideIndex: null as number | null, shownPinIds: [] as string[], activePinId: null as string | null };
 type PositionedQuestion = Question & { x: number; y: number };
+const EMPTY_POSITIONED_QUESTIONS: PositionedQuestion[] = [];
 
 export function useSessionPresentationController() {
   const { t, locale } = useLanguage();
@@ -26,10 +28,16 @@ export function useSessionPresentationController() {
   const { reactions: liveReactions } = useLectureReactions(sessionId);
   const sessionTitle = session?.title;
   const currentSlide = session?.currentSlide;
-  const positionedQuestions = useMemo(() => (session?.questions ?? []).filter((question): question is PositionedQuestion => question.x !== null && question.y !== null), [session?.questions]);
+  const { positionedQuestions, questionsBySlide } = useMemo(() => {
+    const questions = (session?.questions ?? []).filter((question): question is PositionedQuestion => question.x !== null && question.y !== null);
+    return { positionedQuestions: questions, questionsBySlide: groupQuestionsBySlide(questions) };
+  }, [session]);
   const positionedQuestionIds = useMemo(() => positionedQuestions.map((question) => question.id), [positionedQuestions]);
   const positionedQuestionKey = positionedQuestionIds.join("|");
-  const pageQuestions = useMemo(() => positionedQuestions.filter((question) => question.slideIndex === currentSlide), [currentSlide, positionedQuestions]);
+  const pageQuestions = useMemo(
+    () => questionsBySlide.get(currentSlide ?? -1) ?? EMPTY_POSITIONED_QUESTIONS,
+    [currentSlide, questionsBySlide]
+  );
   const stageRef = useRef<HTMLElement>(null);
   const presentationCanvasRef = useRef<HTMLDivElement>(null);
   const currentIndexRef = useRef(0);

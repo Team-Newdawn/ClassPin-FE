@@ -735,7 +735,7 @@
 /* Dynamic semantic variants moved from globals.css. */
 .root :global(.category){display:inline-flex;align-items:center;height:23px;padding:0 8px;border-radius:999px;background:var(--color-brand-subtle);color:var(--pin-blue-700);font-size:11px;font-weight:600;font-style:normal}.root :global(.category):global(.example){background:var(--color-success-bg);color:var(--color-success)}.root :global(.category):global(.why){background:var(--color-pending-bg);color:var(--color-pending)}.root :global(.category):global(.error){background:var(--color-error-bg);color:var(--color-error)}.root :global(.category):global(.important){background:var(--color-warning-bg);color:var(--color-warning)}
 .root :global(.category)>i{margin-right:4px;font-style:normal}.root :global(.draft-pin){pointer-events:none}.root :global(.draft-tag){position:absolute;z-index:6;transform:translate(36px,calc(-50% - 17px));pointer-events:none;white-space:nowrap;box-shadow:var(--shadow-sm)}.root :global(.student-stage) :global(.draft-pin){pointer-events:auto;touch-action:none;cursor:grab}.root :global(.student-stage) :global(.draft-pin):active{cursor:grabbing}.root :global(.student-stage) :global(.draft-tag){z-index:7;transform:translate(42px,calc(-50% - 19px));padding:0 10px;height:27px;align-items:center;box-shadow:0 8px 22px rgba(0,0,0,.22)}
-.root :global(.student-stage) :global(.draft-pin){opacity:.72}.root :global(.student-stage) :global(.draft-pin):focus-visible{opacity:.9}.root :global(.student-answer-panel){margin:22px 0;padding:16px;border:1px solid var(--pin-blue-200);border-radius:14px;background:var(--pin-blue-50)}.root :global(.student-answer-panel)>span{font-size:11px;font-weight:700;color:var(--pin-blue-700)}.root :global(.student-answer-panel)>p{margin:7px 0 0;font-size:14px;line-height:22px;white-space:pre-wrap}.root :global(.student-answer-panel):global(.pending){border-color:var(--color-border);background:var(--pin-neutral-50)}.root :global(.student-answer-panel):global(.pending)>span{color:var(--color-text-tertiary)}.root :global(.student-answer-panel):global(.pending)>p{color:var(--color-text-secondary)}
+.root :global(.student-stage) button:global(.draft-pin){opacity:.72}.root :global(.student-stage) :global(.draft-pin):focus-visible{opacity:.9}.root :global(.student-answer-panel){margin:22px 0;padding:16px;border:1px solid var(--pin-blue-200);border-radius:14px;background:var(--pin-blue-50)}.root :global(.student-answer-panel)>span{font-size:11px;font-weight:700;color:var(--pin-blue-700)}.root :global(.student-answer-panel)>p{margin:7px 0 0;font-size:14px;line-height:22px;white-space:pre-wrap}.root :global(.student-answer-panel):global(.pending){border-color:var(--color-border);background:var(--pin-neutral-50)}.root :global(.student-answer-panel):global(.pending)>span{color:var(--color-text-tertiary)}.root :global(.student-answer-panel):global(.pending)>p{color:var(--color-text-secondary)}
 .root :global(.category):global(.praise){background:var(--color-success-bg);color:var(--color-success)}
 .root :global(.category):global(.improve){background:var(--color-warning-bg);color:var(--color-warning)}
 .root :global(.category):global(.confusing){background:var(--color-pending-bg);color:var(--color-pending)}
@@ -749,14 +749,14 @@
 .root :global(.category):global(.custom-4){background:var(--color-error-bg);color:var(--color-error)}
 
 /* Compact overrides for route rules that still live in the migration block above. */
-.root :global(.student-question-list-answer) {
+.root :global(.student-feedback-list) :global(.student-question-list-answer) {
   margin-top: 8px;
   padding: 8px 10px;
   line-height: 18px;
 }
 
 @media (max-width: 600px) {
-  .root :global(.student-question-list-meta) time {
+  .root :global(.student-feedback-list) :global(.student-question-list-meta) time {
     width: auto;
     margin-left: auto;
   }

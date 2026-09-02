@@ -4,12 +4,13 @@ import { useMemo, useRef, useState, type FormEvent } from "react";
 import { useLanguage } from "@/app/_controller/language-context";
 import { useSessions } from "@/app/_controller/session-store";
 import { useSlideUpload } from "@/app/_controller/use-slide-upload";
-import { CLASS_UNFILED_COLOR_INDEX, type ClassSession } from "@/app/_model/types";
+import { summarizeFolders, type FolderSummary } from "@/app/_model/stats";
+import { CLASS_UNFILED_COLOR_INDEX } from "@/app/_model/types";
 
 export const UNFILED_ID = "unfiled";
 
 export function useDashboardController() {
-  const { t, timeAgo } = useLanguage();
+  const { t } = useLanguage();
   const { folders, sessions, createFolder, renameFolder, deleteFolder, ready } = useSessions();
   const inputRef = useRef<HTMLInputElement>(null);
   const [folderEditor, setFolderEditor] = useState<"new" | { id: string; name: string } | null>(null);
@@ -23,10 +24,12 @@ export function useDashboardController() {
   const { phase, uploadPct, error: uploadError, slides, total, showPreview, busy, start } = useSlideUpload(null);
 
   const visibleSummaries = useMemo(() => {
-    const summaries = [
-      ...folders.map((folder) => ({ ...folder, sessions: sessions.filter((session) => session.folderId === folder.id) })),
-      { id: UNFILED_ID, name: t("folders.unfiled"), createdAt: "", colorIndex: CLASS_UNFILED_COLOR_INDEX, sessions: sessions.filter((session) => session.folderId === null) }
-    ];
+    const summaries = summarizeFolders(folders, sessions, {
+      id: UNFILED_ID,
+      name: t("folders.unfiled"),
+      createdAt: "",
+      colorIndex: CLASS_UNFILED_COLOR_INDEX
+    });
     const needle = query.trim().toLocaleLowerCase();
     return needle ? summaries.filter((folder) => folder.name.toLocaleLowerCase().includes(needle)) : summaries;
   }, [folders, query, sessions, t]);
@@ -63,8 +66,8 @@ export function useDashboardController() {
     if (!savingFolder) setFolderEditor(null);
   };
 
-  const removeFolder = async (folder: { id: string; name: string; sessions: ClassSession[] }) => {
-    if (deletingFolderId || !window.confirm(t("folders.deleteConfirm", { name: folder.name, count: folder.sessions.length }))) return;
+  const removeFolder = async (folder: FolderSummary) => {
+    if (deletingFolderId || !window.confirm(t("folders.deleteConfirm", { name: folder.name, count: folder.materialCount }))) return;
     setDeletingFolderId(folder.id);
     setFolderActionError(null);
     try {
@@ -79,7 +82,6 @@ export function useDashboardController() {
 
   return {
     t,
-    timeAgo,
     folders,
     ready,
     inputRef,

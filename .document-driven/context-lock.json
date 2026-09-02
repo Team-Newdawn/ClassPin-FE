@@ -1,5 +1,5 @@
 {
-  "created_at": "2026-08-30T09:03:11+00:00",
+  "created_at": "2026-09-01T06:50:23+00:00",
   "documents": [
     {
       "id": "prd",
@@ -10,39 +10,86 @@
       "id": "class-frontend-architecture",
       "path": "docs/class-frontend-architecture.md",
       "sha256": "96aa1f117d7db96f1b08dfc4aea6ffc1ad43be22000538fddcc72fdc35a05272"
+    },
+    {
+      "id": "pin-feedback-sunset",
+      "path": "docs/pin-feedback-sunset.md",
+      "sha256": "7a77fb99b56c0a97912dcebc1969ee2756a95f94048000970159da5b316f18c1"
+    },
+    {
+      "id": "pin-feedback-data-retirement",
+      "path": "docs/pin-feedback-data-retirement.md",
+      "sha256": "0edec27f023a0bc0ac8ad9e1567b089372781f3a6b6b93391a51aa35ce4a3e83"
     }
   ],
   "manifest": {
     "path": "docs/document-manifest.json",
-    "sha256": "ef9389fd062facf19841be55364cd6cfb9232e1856f7c8612fd668b7723421f2"
+    "sha256": "c32fad17372ce989e8ae65bb3efeb4639578b85946a5e523352315a955f0d01a"
   },
   "schema_version": "1.0",
   "selected_artifact_ids": [
-    "class-frontend-architecture"
+    "class-frontend-architecture",
+    "pin-feedback-sunset",
+    "pin-feedback-data-retirement"
   ],
   "task": {
-    "id": "participant-question-sorting-and-live-controls",
+    "id": "pin-feedback-data-retirement",
     "requirement_ids": [
-      "CLASS-JOIN-002",
-      "CLASS-LIVE-001",
-      "CFA-010",
-      "CFA-020",
-      "CFA-035",
-      "CFA-042",
-      "CFA-053",
-      "CFA-056",
-      "CFA-064",
-      "CFA-080",
-      "CFA-081",
-      "CFA-082",
-      "CFA-083",
-      "CFA-087"
+      "PFDR-001",
+      "PFDR-002",
+      "PFDR-003",
+      "PFDR-004",
+      "PFDR-005",
+      "PFDR-010",
+      "PFDR-011",
+      "PFDR-012",
+      "PFDR-013",
+      "PFDR-014",
+      "PFDR-015",
+      "PFDR-016",
+      "PFDR-020",
+      "PFDR-021",
+      "PFDR-022",
+      "PFDR-023",
+      "PFDR-024",
+      "PFDR-025",
+      "PFDR-026",
+      "PFDR-030",
+      "PFDR-031",
+      "PFDR-032",
+      "PFDR-040",
+      "PFDR-041",
+      "PFDR-042",
+      "PFDR-043",
+      "PFDR-044",
+      "PFDR-045",
+      "PFDR-050",
+      "PFDR-051",
+      "PFDR-052",
+      "PFDR-053",
+      "PFDR-054",
+      "PFDR-055",
+      "PFDR-060",
+      "PFDR-061",
+      "PFDR-062",
+      "PFDR-063",
+      "PFDR-064",
+      "PFDR-065",
+      "PFDR-070",
+      "PFDR-071",
+      "PFDR-072",
+      "PFDR-073",
+      "PFDR-074",
+      "PFDR-075",
+      "PFDR-076",
+      "PFDR-080",
+      "PFDR-081",
+      "PFDR-082"
     ],
     "scopes": [
-      "class-frontend-layering",
-      "class-route-css-colocation",
-      "class-data-loading-performance"
+      "pin-feedback-schema-retirement",
+      "pin-feedback-storage-retirement"
     ],
-    "summary": "Add participant question sorting and compact four-card viewport; move QR selection to stage toolbar and simplify live questions panel to one PIN visibility toggle"
+    "summary": "Retire the legacy Pin Feedback Supabase source while preserving imported Pin Class data"
   }
 }

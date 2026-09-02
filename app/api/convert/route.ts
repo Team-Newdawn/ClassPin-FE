@@ -205,7 +205,7 @@ export async function POST(request: Request) {
       localDir = path.join(/* turbopackIgnore: true */ process.cwd(), "public", "generated", outputId);
       await mkdir(localDir, { recursive: true });
       const slides = await Promise.all(images.map(async (name) => {
-        await copyFile(path.join(pages, name), path.join(localDir!, name));
+        await copyFile(path.join(pages, name), path.join(/* turbopackIgnore: true */ localDir!, name));
         const pageIndex = pageIndexOf(name);
         return { id: crypto.randomUUID(), pageIndex, title: `Slide ${pageIndex + 1}`, imageUrl: `/generated/${outputId}/${name}` } satisfies Slide;
       }));

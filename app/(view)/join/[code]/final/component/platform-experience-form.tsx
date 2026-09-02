@@ -1,52 +1,21 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
 import Link from "next/link";
 import { Check, Send } from "@/app/component/icons";
 import { useLanguage } from "@/app/_controller/language-context";
 import { LanguageSwitcher } from "@/app/component/language-switcher";
 import { PinLogo } from "@/app/component/pin-logo";
-import { submitPlatformExperienceResponse } from "@/app/_service/platform-experience-service";
+import { usePlatformExperienceController } from "../controller";
 import styles from "./platform-experience-form.module.css";
 
 const RESPONSE_MAX = 1000;
 
 export function PlatformExperienceForm({ code }: {
-  source: "lecture";
   code: string;
 }) {
   const { t } = useLanguage();
-  const [experience, setExperience] = useState("");
-  const [improvement, setImprovement] = useState("");
-  const [submitting, setSubmitting] = useState(false);
-  const [submitted, setSubmitted] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const { experience, setExperience, improvement, setImprovement, submitting, submitted, error, submit } = usePlatformExperienceController(code);
   const homeHref = "/";
-
-  const submit = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    if (submitting) return;
-    const normalizedExperience = experience.trim();
-    const normalizedImprovement = improvement.trim();
-    if (!normalizedExperience || !normalizedImprovement) {
-      setError(t("experience.required"));
-      return;
-    }
-    setSubmitting(true);
-    setError(null);
-    try {
-      await submitPlatformExperienceResponse(code, normalizedExperience, normalizedImprovement);
-      setSubmitted(true);
-    } catch (submitError) {
-      const detail = submitError && typeof submitError === "object" && "message" in submitError
-        ? String(submitError.message)
-        : String(submitError);
-      console.error(`Platform experience save failed: ${detail}`, submitError);
-      setError(t("experience.saveError"));
-    } finally {
-      setSubmitting(false);
-    }
-  };
 
   return <main className={`${styles.root} experience-final-shell`}>
     <header className="student-header">

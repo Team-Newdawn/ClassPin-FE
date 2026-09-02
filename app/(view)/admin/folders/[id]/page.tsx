@@ -79,7 +79,7 @@ export default function FolderPage() {
             {visibleSessions.length ? (
               <div className={`folder-materials ${view}`}>
                 {visibleSessions.map((session) => (
-                  <FolderMaterialCard key={session.id} session={session} folders={folders} moving={movingId === session.id} onMove={(nextFolderId) => void move(session.id, nextFolderId)} onDelete={() => openDelete(session)} />
+                  <FolderMaterialCard key={session.id} session={session} folders={folders} view={view} moving={movingId === session.id} onMove={(nextFolderId) => void move(session.id, nextFolderId)} onDelete={() => openDelete(session)} />
                 ))}
               </div>
             ) : (

@@ -1,7 +1,6 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { RealtimeChannel } from "@supabase/supabase-js";
 import {
   REALTIME_REACTION_DURATION_MS,
   REALTIME_REACTION_LANES,
@@ -9,7 +8,7 @@ import {
   scheduleRealtimeReaction,
   type RealtimeReactionPayload
 } from "@/app/_model/realtime-reactions";
-import { ensureAnonymousUser, getAudienceSupabaseClient } from "@/app/_infrastructure/supabase/client";
+import { subscribeToRealtimeReactions } from "@/app/_service/realtime-reaction-service";
 
 const MAX_VISIBLE_REACTIONS = 64;
 const MAX_RECENT_REACTION_IDS = 128;
@@ -69,46 +68,29 @@ export function useRealtimeReactions<Emoji extends string>({
   useEffect(() => {
     if (!scopeId || !topic) return;
     let active = true;
-    let channel: RealtimeChannel | null = null;
-    let localChannel: BroadcastChannel | null = null;
+    let unsubscribe: (() => void) | undefined;
     const timers = timersRef.current;
     laneReadyAtRef.current = REALTIME_REACTION_LANES.map(() => 0);
     recentIdsRef.current.clear();
 
-    const connect = async () => {
-      const client = getAudienceSupabaseClient();
-      if (!client) {
-        localChannel = new BroadcastChannel(topic);
-        localChannel.onmessage = ({ data }) => {
-          if (!active || data?.event !== event) return;
-          const reaction = parseRealtimeReaction(data.payload, allowedEmojis);
-          if (reaction) addReaction(reaction);
-        };
-        return;
-      }
-      await ensureAnonymousUser();
-      if (!active) return;
-      channel = client
-        .channel(topic)
-        .on("broadcast", { event }, ({ payload }) => {
-          if (!active) return;
-          const reaction = parseRealtimeReaction(payload, allowedEmojis);
-          if (reaction) addReaction(reaction);
-        })
-        .subscribe((status, error) => {
-          if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
-            console.error(`${errorLabel} channel failed`, error ?? status);
-          }
-        });
-    };
-
-    void connect().catch((error) => console.error(`${errorLabel} subscription failed`, error));
+    void subscribeToRealtimeReactions(
+      topic,
+      event,
+      (payload) => {
+        if (!active) return;
+        const reaction = parseRealtimeReaction(payload, allowedEmojis);
+        if (reaction) addReaction(reaction);
+      },
+      (error) => console.error(`${errorLabel} channel failed`, error)
+    ).then((close) => {
+      if (active) unsubscribe = close;
+      else close();
+    }).catch((error) => console.error(`${errorLabel} subscription failed`, error));
     return () => {
       active = false;
       timers.forEach((timer) => window.clearTimeout(timer));
       timers.clear();
-      localChannel?.close();
-      if (channel) void getAudienceSupabaseClient()?.removeChannel(channel);
+      unsubscribe?.();
     };
   }, [addReaction, allowedEmojis, errorLabel, event, scopeId, topic]);
 

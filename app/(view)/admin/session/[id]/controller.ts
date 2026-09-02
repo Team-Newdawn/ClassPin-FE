@@ -5,6 +5,7 @@ import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { useHorizontalSlideWheel } from "@/app/_controller/use-horizontal-slide-wheel";
 import { useLanguage } from "@/app/_controller/language-context";
 import { useSessions } from "@/app/_controller/session-store";
+import { groupQuestionsBySlide } from "@/app/_model/stats";
 import { CLASS_UNFILED_COLOR_INDEX, type PresentationQrPosition, type QuestionCategorySettings, type QuestionStatus } from "@/app/_model/types";
 
 type Tab = "live" | "questions";
@@ -168,15 +169,19 @@ export function useSessionAdminController() {
   const folderAccentIndex = folder?.colorIndex ?? CLASS_UNFILED_COLOR_INDEX;
   const folderHref = `/admin/folders/${folder?.id ?? "unfiled"}`;
   const folderSessions = sessions.filter((item) => item.folderId === (session?.folderId ?? null));
-  const slideQuestions = session?.questions.filter((question) => question.slideIndex === session.currentSlide) ?? [];
+  const questionsBySlide = useMemo(() => groupQuestionsBySlide(session?.questions ?? []), [session?.questions]);
+  const questionCounts = useMemo(() => (session?.questions ?? []).reduce((counts, question) => {
+    if (question.status === "unanswered") counts.unanswered += 1;
+    if (question.status === "resolved") counts.resolved += 1;
+    return counts;
+  }, { total: session?.questions.length ?? 0, unanswered: 0, resolved: 0 }), [session?.questions]);
+  const slideQuestions = questionsBySlide.get(session?.currentSlide ?? -1) ?? [];
   const selected = session?.questions.find((question) => question.id === selectedId) ?? slideQuestions[0];
   const detailQuestion = session?.questions.find((question) => question.id === detailQuestionId);
   const noteDraft = slide ? noteDrafts[slide.id] ?? slide.speakerNote ?? "" : "";
   const noteDirty = Boolean(slide && noteDraft !== (slide.speakerNote ?? ""));
   const deleteTarget = deleteSlideId ? session?.slides.find((item) => item.id === deleteSlideId) : null;
-  const deleteTargetQuestionCount = deleteTarget
-    ? session?.questions.filter((question) => question.slideIndex === deleteTarget.pageIndex).length ?? 0
-    : 0;
+  const deleteTargetQuestionCount = deleteTarget ? questionsBySlide.get(deleteTarget.pageIndex)?.length ?? 0 : 0;
   const joinUrl = typeof window === "undefined" || !session ? "" : `${window.location.origin}/join/${session.code}`;
 
   const openQuestionDetail = (questionId: string) => {
@@ -318,6 +323,8 @@ export function useSessionAdminController() {
     folderAccentIndex,
     folderHref,
     folderSessions,
+    questionsBySlide,
+    questionCounts,
     slideQuestions,
     selected,
     detailQuestion,

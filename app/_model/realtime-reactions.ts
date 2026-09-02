@@ -3,12 +3,6 @@ export const REALTIME_REACTION_LANES = [8, 92, 32, 68, 50, 20, 80, 44] as const;
 
 export type RealtimeReactionPayload<Emoji extends string = string> = { id: string; emoji: Emoji };
 
-export function broadcastLocalReaction<Emoji extends string>(topic: string, event: string, payload: RealtimeReactionPayload<Emoji>) {
-  const channel = new BroadcastChannel(topic);
-  channel.postMessage({ event, payload });
-  channel.close();
-}
-
 export function parseRealtimeReaction<Emoji extends string>(
   value: unknown,
   allowedEmojis: readonly Emoji[]

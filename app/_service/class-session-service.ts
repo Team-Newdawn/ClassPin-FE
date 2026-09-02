@@ -1,6 +1,7 @@
-import type { RealtimeChannel } from "@supabase/supabase-js";
 import { isParticipantPointAnchor, isQuestionMarker, normalizeClassFolderColorIndex, normalizeClassFolderName, normalizeQuestionCategorySettings, type ClassFolder, type ClassSession, type NormalizedPoint, type Question, type QuestionCategorySettings, type Slide } from "@/app/_model/types";
-import { ensureAnonymousUser, getAudienceSupabaseClient, getOwnerWriteSupabaseClient, getSessionUser, getSupabaseClient } from "@/app/_infrastructure/supabase/client";
+import { ensureAnonymousUser, getAudienceSupabaseClient, getOwnerWriteSupabaseClient, getSessionUser, getSupabaseClient, supabaseConfigured } from "@/app/_infrastructure/supabase/client";
+
+export const classSessionPersistenceEnabled = supabaseConfigured;
 
 type LectureRow = {
   id: string;
@@ -326,14 +327,19 @@ const APPENDABLE_SLIDE_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]
 const MAX_SLIDE_IMAGE_BYTES = 10 * 1024 * 1024;
 const MAX_SLIDES_PER_APPEND = 20;
 
+export function validateSlideImages(files: readonly File[]) {
+  if (files.length < 1 || files.length > MAX_SLIDES_PER_APPEND) throw new Error("슬라이드는 한 번에 1~20장까지 추가할 수 있습니다.");
+  if (files.some((file) => !APPENDABLE_SLIDE_TYPES.has(file.type) || file.size > MAX_SLIDE_IMAGE_BYTES)) {
+    throw new Error("10MB 이하의 PNG, JPG, WebP 이미지만 추가할 수 있습니다.");
+  }
+}
+
 /** 기존 자료 버전의 끝에 이미지 슬라이드를 원자적으로 추가한다. */
 export async function appendSessionSlides(session: ClassSession, files: File[]): Promise<Slide[]> {
   const client = getSupabaseClient();
   if (!client) throw new Error("Supabase 연결을 찾지 못했습니다.");
   if (!session.materialVersionId) throw new Error("슬라이드를 추가할 자료 버전을 찾지 못했습니다.");
-  if (files.length < 1 || files.length > MAX_SLIDES_PER_APPEND) throw new Error("슬라이드는 한 번에 1~20장까지 추가할 수 있습니다.");
-  const invalidFile = files.find((file) => !APPENDABLE_SLIDE_TYPES.has(file.type) || file.size > MAX_SLIDE_IMAGE_BYTES);
-  if (invalidFile) throw new Error("10MB 이하의 PNG, JPG, WebP 이미지만 추가할 수 있습니다.");
+  validateSlideImages(files);
 
   const user = await requireOwnerUser();
   const uploadedPaths: string[] = [];
@@ -697,7 +703,7 @@ export function subscribeToLecture(
   onLectureUpdate: (lecture: LectureRealtimeRow) => void,
   onSlidesRefresh: () => void,
   asAudience = false
-): RealtimeChannel | null {
+): (() => void) | null {
   const client = asAudience ? getAudienceSupabaseClient() : getSupabaseClient();
   if (!client) return null;
   // Realtime reuses an existing channel with the same topic. React effects can
@@ -716,7 +722,8 @@ export function subscribeToLecture(
       filter: `material_version_id=eq.${materialVersionId}`
     }, onSlidesRefresh);
   }
-  return channel.subscribe();
+  channel.subscribe();
+  return () => { void client.removeChannel(channel); };
 }
 
 export async function fetchLectureSnapshot(session: ClassSession, asAudience = false): Promise<Pick<ClassSession, "currentSlide" | "status" | "presentationInteractions" | "showQuestionPins" | "showPresentationQr" | "presentationQrPosition" | "questionCategories" | "questions"> | null> {

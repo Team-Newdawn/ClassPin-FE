@@ -1,22 +1,19 @@
 "use client";
 
 import Image from "next/image";
-import Link from "next/link";
-import { Folder, FolderPlus, MoreHorizontal, Pencil, Search, Trash2, X } from "@/app/component/icons";
+import { FolderPlus, Pencil, Search, X } from "@/app/component/icons";
 import { AdminSearch } from "@/app/component/admin-search";
 import { LoadingScreen } from "@/app/component/loading-screen";
 import { FolderTreeSidebar } from "@/app/component/folder-tree-sidebar";
-import { useLanguage } from "@/app/_controller/language-context";
-import { SlideCanvas } from "@/app/component/slide-canvas";
 import { SlidePreview } from "@/app/component/slide-preview";
 import { UploadProgress } from "@/app/component/upload-progress";
-import type { ClassSession } from "@/app/_model/types";
+import { FolderCard } from "./component/folder-card";
 import { UNFILED_ID, useDashboardController } from "./controller";
 import styles from "./page.module.css";
 
 export default function DashboardPage() {
   const {
-    t, timeAgo, folders, ready, inputRef, folderEditor, folderName, setFolderName, query, setQuery,
+    t, folders, ready, inputRef, folderEditor, folderName, setFolderName, query, setQuery,
     folderError, savingFolder, deletingFolderId, folderActionError, sidebarOpen, toggleSidebar,
     phase, uploadPct, uploadError, slides, total, showPreview, busy, pick, requestUpload,
     submitFolder, openFolderEditor, closeFolderEditor, removeFolder, visibleSummaries
@@ -50,7 +47,7 @@ export default function DashboardPage() {
             <h2 id="folder-list-title" className="sr-only">{t("folders.myFolders")}</h2>
             {visibleSummaries.length ? (
               <div className="folder-grid">
-                {visibleSummaries.map((folder) => <FolderCard key={folder.id} folder={folder} timeAgo={timeAgo} deleting={deletingFolderId === folder.id} onRename={folder.id === UNFILED_ID ? undefined : () => openFolderEditor(folder)} onDelete={folder.id === UNFILED_ID ? undefined : () => void removeFolder(folder)} />)}
+                {visibleSummaries.map((folder) => <FolderCard key={folder.id} folder={folder} deleting={deletingFolderId === folder.id} onRename={folder.id === UNFILED_ID ? undefined : () => openFolderEditor(folder)} onDelete={folder.id === UNFILED_ID ? undefined : () => void removeFolder(folder)} />)}
               </div>
             ) : <div className="panel folder-empty"><Search /><b>{t("folders.noMatch")}</b><span>{t("folders.changeSearch")}</span></div>}
           </section>
@@ -79,42 +76,5 @@ export default function DashboardPage() {
         </div>
       )}
     </main>
-  );
-}
-
-function FolderCard({ folder, timeAgo, deleting, onRename, onDelete }: { folder: { id: string; name: string; createdAt: string; colorIndex: number; sessions: ClassSession[] }; timeAgo: (date: string) => string; deleting: boolean; onRename?: () => void; onDelete?: () => void }) {
-  const { t } = useLanguage();
-  const slideCount = folder.sessions.reduce((sum, session) => sum + session.slides.length, 0);
-  const questionCount = folder.sessions.reduce((sum, session) => sum + session.questions.length, 0);
-  const cover = folder.sessions[0]?.slides[0];
-  const latest = folder.sessions.reduce((value, session) => Math.max(value, new Date(session.createdAt).getTime()), folder.createdAt ? new Date(folder.createdAt).getTime() : 0);
-
-  return (
-    <article className={`folder-card folder-accent-${folder.colorIndex}`}>
-      <Link className="folder-card-link" href={`/admin/folders/${folder.id}`} aria-label={t("folders.openFolder", { name: folder.name })}>
-        <span className="folder-card-visual" aria-hidden="true">
-          <span className="folder-card-paper" />
-          <span className={`folder-card-cover ${cover ? "" : "empty"}`}>
-            {cover ? <SlideCanvas slide={cover} compact /> : <Folder />}
-          </span>
-        </span>
-        <span className="folder-card-body">
-          <span className="folder-card-title"><b>{folder.name}</b></span>
-          <span className="folder-card-stats">
-            <span><b>{folder.sessions.length}</b>{t("folders.materials")}</span>
-            <span><b>{slideCount}</b>{t("common.slide")}</span>
-            <span><b>{questionCount}</b>{t("common.question")}</span>
-          </span>
-          <small className="folder-card-meta">{latest ? t("folders.updated", { time: timeAgo(new Date(latest).toISOString()) }) : t("folders.empty")}</small>
-        </span>
-      </Link>
-      {onRename && onDelete && <details className="folder-card-menu" name="folder-card-actions" onBlur={(event) => { if (!event.currentTarget.contains(event.relatedTarget)) event.currentTarget.removeAttribute("open"); }} onKeyDown={(event) => { if (event.key === "Escape") { event.currentTarget.removeAttribute("open"); event.currentTarget.querySelector("summary")?.focus(); } }}>
-        <summary className="icon-btn folder-card-menu-trigger" aria-label={t("folders.folderMenu", { name: folder.name })} title={t("folders.folderMenu", { name: folder.name })} aria-disabled={deleting} onClick={(event) => { if (deleting) event.preventDefault(); }}>{deleting ? <span className="spinner dark" /> : <MoreHorizontal />}</summary>
-        <div className="folder-card-menu-popover">
-          <button type="button" onClick={(event) => { event.currentTarget.closest("details")?.removeAttribute("open"); onRename(); }}><Pencil />{t("folders.rename")}</button>
-          <button type="button" className="destructive" onClick={(event) => { event.currentTarget.closest("details")?.removeAttribute("open"); onDelete(); }}><Trash2 />{t("folders.delete")}</button>
-        </div>
-      </details>}
-    </article>
   );
 }

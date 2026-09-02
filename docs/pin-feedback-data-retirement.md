@@ -48,7 +48,7 @@
 
 - **PFDR-030**: `campaign-images` bucket의 모든 객체와 bucket metadata를 제거한다.
 - **PFDR-031**: `owners upload campaign images`, `owners delete campaign images` Storage policy를 제거한다. `lecture-slides`를 포함한 다른 bucket과 policy는 변경하지 않는다.
-- **PFDR-032**: 객체 바이트 삭제는 Supabase Storage API 또는 CLI로 수행한다. `storage.objects` 행을 직접 SQL로 삭제하지 않는다.
+- **PFDR-032**: 객체 바이트와 빈 bucket metadata 삭제는 Supabase Storage API 또는 CLI로 수행한다. `storage.objects` 행이나 `storage.buckets` 행을 직접 SQL로 삭제하지 않는다.
 
 2026-09-01 원격 점검 기준 원본은 Campaign 24개, CampaignPage 54개, FeedbackPin 1,001개, FeedbackPinReaction 93개, Campaign 설문 0개, `campaign-images` 객체 120개·44,720,115바이트다. 이 수치도 실행 직전 다시 산출한다.
 
@@ -63,12 +63,12 @@
 
 ## 5. 실행 순서와 실패 처리
 
-- **PFDR-050**: 새 SQL 파일은 `supabase migration new`로 만들고 모든 DB/Data API/Realtime/Storage metadata 변경을 하나의 forward-only transaction에서 수행한다.
+- **PFDR-050**: 새 SQL 파일은 `supabase migration new`로 만들고 DB/Data API/Realtime 계약과 Storage policy 변경을 하나의 forward-only transaction에서 수행한다. Supabase가 직접 SQL 삭제를 차단하는 bucket metadata는 이 transaction의 대상이 아니며, migration 성공 뒤 PFDR-054의 Storage API/CLI 단계에서 제거한다.
 - **PFDR-051**: 검증된 backup 뒤 Storage API/CLI로 `campaign-images` 객체를 비우고, API listing과 `storage.objects` 조회가 모두 0개임을 확인한다.
 - **PFDR-052**: migration은 먼저 두 Campaign Storage policy를 제거하고 `storage.objects`에 명시적 write-excluding lock을 잡은 뒤, `campaign-images` 객체가 0개라는 precondition을 다시 확인한다. 1개라도 있으면 명시적 예외로 전체 transaction을 rollback한다. 따라서 backup 뒤 새 upload가 발생해도 조용히 삭제하지 않는다. 잠금은 짧은 migration transaction 동안만 유지하며 다른 bucket을 변경하지 않는다.
-- **PFDR-053**: migration은 네 legacy table에 write-excluding lock을 잡고, 검증된 backup에서 생성한 기대 행 수·canonical fingerprint와 현재 값을 비교한다. fresh local DB처럼 네 테이블과 Campaign 설문이 모두 비어 있는 상태는 명시적으로 허용하지만, 데이터가 하나라도 있는 환경에서는 전체 fingerprint가 정확히 일치해야 한다. drift가 있으면 전체 transaction을 rollback하고 backup부터 다시 만든다. DB와 Storage precondition을 모두 통과한 transaction만 bucket metadata, Realtime 등록, legacy 함수·설문 분기·테이블·enum을 dependency 순서대로 제거하고 lecture-only RPC와 policy를 설치한다. transaction 끝에서 PostgREST schema reload를 요청한다.
-- **PFDR-054**: Storage 객체 삭제는 DB transaction 밖의 비가역 단계다. 객체를 비운 뒤 migration이 실패하면 backup을 유지한 채 원인을 고치고 migration을 재시도한다. 서비스 복구가 필요하면 검증된 backup에서 `campaign-images`를 복원하고 수·크기·해시를 재검증한다.
-- **PFDR-055**: remote migration 성공 전에는 Auth 계정을 삭제하지 않는다. DB rollback과 Auth Admin 작업을 하나의 원자적 작업으로 가장하지 않는다.
+- **PFDR-053**: migration은 네 legacy table에 write-excluding lock을 잡고, 검증된 backup에서 생성한 기대 행 수·canonical fingerprint와 현재 값을 비교한다. fresh local DB처럼 네 테이블과 Campaign 설문이 모두 비어 있는 상태는 명시적으로 허용하지만, 데이터가 하나라도 있는 환경에서는 전체 fingerprint가 정확히 일치해야 한다. drift가 있으면 전체 transaction을 rollback하고 backup부터 다시 만든다. DB와 Storage precondition을 모두 통과한 transaction만 Realtime 등록, legacy 함수·설문 분기·테이블·enum을 dependency 순서대로 제거하고 lecture-only RPC와 policy를 설치한다. transaction 끝에서 PostgREST schema reload를 요청한다.
+- **PFDR-054**: Storage 객체와 bucket metadata 삭제는 DB transaction 밖의 비가역 단계다. 객체를 비운 뒤 migration이 실패하면 backup을 유지한 채 원인을 고치고 migration을 재시도한다. 서비스 복구가 필요하면 검증된 backup에서 `campaign-images`를 복원하고 수·크기·해시를 재검증한다. migration이 성공하면 Storage API/CLI로 비어 있는 `campaign-images` bucket을 삭제하고, API/CLI bucket 조회와 `storage.buckets` 조회가 모두 부재임을 확인한다. bucket 삭제가 실패하면 빈 bucket을 미완료 대상으로 기록해 같은 API 경계에서 재시도하며 전체 Storage 폐기를 성공으로 표시하지 않는다.
+- **PFDR-055**: remote migration과 PFDR-054의 bucket 삭제가 모두 성공하기 전에는 Auth 계정을 삭제하지 않는다. DB migration, Storage Admin 작업과 Auth Admin 작업을 하나의 원자적 작업으로 가장하지 않는다.
 
 ## 6. Auth 계정 정리
 
@@ -82,7 +82,7 @@
 ## 7. 검증과 추적성
 
 - **PFDR-070**: `npm run supabase:start` 뒤 `npm run supabase:reset`으로 전체 historical migration과 새 retirement migration을 깨끗한 DB에 재생한다.
-- **PFDR-071**: 기존 Campaign import regression test는 retirement regression test로 교체한다. 이 테스트는 legacy table·enum·function·Realtime·bucket 부재, lecture-only 설문 schema/RPC/policy, `source_path` 기반 Class import 데이터 보존을 검증한다.
+- **PFDR-071**: 기존 Campaign import regression test는 retirement regression test로 교체한다. SQL regression은 legacy table·enum·function·Realtime·Storage policy 부재, `campaign-images` 객체 0개 precondition, lecture-only 설문 schema/RPC/policy, `source_path` 기반 Class import 데이터 보존을 검증한다. migration 밖에서 삭제되는 bucket metadata 부재는 PFDR-054의 Storage API/CLI 및 `storage.buckets` 운영 검증으로 확인한다.
 - **PFDR-072**: old RPC 호출과 legacy table Data API 접근은 존재하지 않는 계약으로 실패해야 하며, `campaign-images` listing/bucket 조회도 부재해야 한다. 새 lecture 설문 제출과 owner 조회는 성공해야 한다.
 - **PFDR-073**: 원격 적용 전후 보존 Class ID 집합과 행별 canonical checksum, `lecture-slides` 객체별 크기·SHA-256을 비교한다. 불일치가 하나라도 있으면 완료로 간주하지 않고 복구 절차를 시작한다.
 - **PFDR-074**: Supabase security/performance advisor를 확인하고, `npm run lint`와 `npm run build`를 통과시킨다. 새 비자명 순수 로직이 생기면 가장 작은 Node test를 추가한다.

@@ -3,7 +3,7 @@
 import { createContext, useContext, useEffect, useMemo, useState } from "react";
 import type { User } from "@supabase/supabase-js";
 import type { Profile } from "@/app/_model/types";
-import { fetchOwnProfile, getSupabaseClient, setOwnerAccessToken, signInWithGoogle, signOutUser, supabaseConfigured } from "@/app/_infrastructure/supabase/client";
+import { authConfigured, fetchOwnProfile, observeAuthSession, signInWithGoogle, signOutUser } from "@/app/_service/auth-service";
 
 type AuthState = {
   /** false 면 demo 모드 — 로그인 없이 모든 화면을 쓴다. */
@@ -21,11 +21,9 @@ const AuthContext = createContext<AuthState | null>(null);
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
-  const [loading, setLoading] = useState(supabaseConfigured);
+  const [loading, setLoading] = useState(authConfigured);
 
   useEffect(() => {
-    const client = getSupabaseClient();
-    if (!client) return;
     let active = true;
     const apply = async (nextUser: User | null) => {
       if (!active) return;
@@ -44,20 +42,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       } else if (active) setProfile(null);
       if (active) setLoading(false);
     };
-    void client.auth.getSession().then(({ data }) => {
-      setOwnerAccessToken(data.session?.access_token ?? null);
-      void apply(data.session?.user ?? null);
-    });
-    // 콜백 안에서 바로 supabase 호출을 하면 auth 락과 엉킬 수 있어 다음 틱으로 미룬다.
-    const { data: subscription } = client.auth.onAuthStateChange((_event, session) => {
-      setOwnerAccessToken(session?.access_token ?? null);
-      setTimeout(() => void apply(session?.user ?? null), 0);
-    });
-    return () => { active = false; subscription.subscription.unsubscribe(); };
+    const stop = observeAuthSession((session) => void apply(session?.user ?? null));
+    return () => { active = false; stop?.(); };
   }, []);
 
   const value = useMemo<AuthState>(() => ({
-    configured: supabaseConfigured,
+    configured: authConfigured,
     loading,
     user,
     profile,

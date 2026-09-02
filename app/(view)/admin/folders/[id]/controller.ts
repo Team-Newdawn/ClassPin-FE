@@ -6,8 +6,8 @@ import { useLanguage } from "@/app/_controller/language-context";
 import { useSessions } from "@/app/_controller/session-store";
 import { useSlideUpload } from "@/app/_controller/use-slide-upload";
 import { buildMaterialSearchIndex, searchMaterialIndex } from "@/app/_model/material-search";
-import { categoryBreakdown, countBy, pinRate, resolveRate, slideHeatmap } from "@/app/_model/stats";
-import { defaultQuestionCategorySettings, questionCategoryLabel, type ClassSession, type QuestionCategory } from "@/app/_model/types";
+import { buildSessionInsights } from "@/app/_model/stats";
+import type { ClassSession } from "@/app/_model/types";
 
 type PageTab = "materials" | "insights";
 type View = "grid" | "list";
@@ -119,35 +119,20 @@ export function useFolderInsightsController(sessions: ClassSession[]) {
   const { t, categoryLabel: defaultCategoryLabel, timeAgo } = useLanguage();
   const [scope, setScope] = useState("all");
   const selectedScope = scope === "all" || sessions.some((session) => session.id === scope) ? scope : "all";
-  const selectedSessions = selectedScope === "all" ? sessions : sessions.filter((session) => session.id === selectedScope);
-  const questions = selectedSessions.flatMap((session) => session.questions);
-  const settingsFor = (category: QuestionCategory) => selectedSessions.find((session) => category in session.questionCategories)?.questionCategories ?? defaultQuestionCategorySettings();
-  const categoryLabel = (category: QuestionCategory) => questionCategoryLabel(settingsFor(category), category, defaultCategoryLabel);
-  const unanswered = countBy(questions, "unanswered");
-  const hotspots = slideHeatmap(selectedSessions);
-  const maxHeat = hotspots[0]?.count ?? 0;
-  const categories = categoryBreakdown(questions, categoryLabel);
-  const maxCategory = categories[0]?.count ?? 0;
-  const openQuestions = selectedSessions
-    .flatMap((session) => session.questions.filter((question) => question.status === "unanswered").map((question) => ({ question, session })))
-    .sort((a, b) => new Date(b.question.createdAt).getTime() - new Date(a.question.createdAt).getTime());
+  const selectedSessions = useMemo(
+    () => selectedScope === "all" ? sessions : sessions.filter((session) => session.id === selectedScope),
+    [selectedScope, sessions]
+  );
+  const insights = useMemo(
+    () => buildSessionInsights(selectedSessions, defaultCategoryLabel),
+    [defaultCategoryLabel, selectedSessions]
+  );
 
   return {
     t,
     timeAgo,
     selectedScope,
     setScope,
-    questions,
-    settingsFor,
-    categoryLabel,
-    unanswered,
-    hotspots,
-    maxHeat,
-    categories,
-    maxCategory,
-    openQuestions,
-    pinRate: pinRate(questions),
-    resolveRate: resolveRate(questions),
-    resolved: countBy(questions, "resolved")
+    ...insights
   };
 }

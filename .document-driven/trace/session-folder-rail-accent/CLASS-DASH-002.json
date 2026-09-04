@@ -1,0 +1,15 @@
+{
+  "code": [
+    "app/admin/session/[id]/page.tsx",
+    "app/globals.css"
+  ],
+  "documents": [
+    "ai-report-product"
+  ],
+  "recorded_at": "2026-08-29T10:02:30+00:00",
+  "requirement_id": "CLASS-DASH-002",
+  "task_id": "session-folder-rail-accent",
+  "tests": [
+    ".document-driven/evidence/session-folder-rail-accent.md"
+  ]
+}

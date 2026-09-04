@@ -1,0 +1,37 @@
+{
+  "name": "pin-class",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "dev:local": "supabase start && next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint .",
+    "supabase:start": "supabase start",
+    "supabase:status": "supabase status -o env",
+    "supabase:stop": "supabase stop",
+    "supabase:reset": "supabase db reset --local"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "2.110.8",
+    "lucide-react": "1.25.0",
+    "next": "^16.3.3",
+    "qrcode.react": "4.2.0",
+    "react": "19.2.8",
+    "react-dom": "19.2.8"
+  },
+  "devDependencies": {
+    "@types/node": "22.13.14",
+    "@types/react": "19.2.17",
+    "@types/react-dom": "19.2.3",
+    "eslint": "^9.39.5",
+    "eslint-config-next": "16.2.11",
+    "supabase": "2.105.0",
+    "typescript": "5.8.2"
+  },
+  "overrides": {
+    "postcss": "8.5.22",
+    "sharp": "0.35.3"
+  }
+}

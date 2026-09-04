@@ -1,0 +1,17 @@
+{
+  "code": [
+    "app/(view)/join/[code]/controller.ts",
+    "app/(view)/admin/session/[id]/present/controller.ts",
+    "app/_controller/session-store.tsx",
+    "app/_service/class-session-service.ts"
+  ],
+  "documents": [
+    "class-frontend-architecture"
+  ],
+  "recorded_at": "2026-08-30T09:25:45+00:00",
+  "requirement_id": "CFA-053",
+  "task_id": "participant-question-sorting-and-live-controls",
+  "tests": [
+    ".document-driven/evidence/participant-question-sorting-and-live-controls.md"
+  ]
+}

@@ -1,0 +1,213 @@
+.root {
+  --folder-accent: var(--viz-cat-facility);
+  position: relative;
+  min-width: 0;
+  overflow: hidden;
+  display: block;
+  border-radius: 26px;
+  background: var(--folder-accent);
+  color: var(--color-text-primary);
+  transition: box-shadow 140ms, transform 140ms;
+}
+
+.accent0 { --folder-accent: var(--viz-cat-safety); }
+.accent1 { --folder-accent: var(--viz-cat-mobility); }
+.accent2 { --folder-accent: var(--viz-cat-facility); }
+.accent3 { --folder-accent: var(--viz-cat-convenience); }
+.accent4 { --folder-accent: var(--viz-cat-idea); }
+.accent5 { --folder-accent: var(--viz-cat-clean); }
+
+.root:hover {
+  box-shadow: var(--shadow-md);
+  transform: translateY(-2px);
+}
+
+.link {
+  height: 260px;
+  display: grid;
+  grid-template-rows: 132px 128px;
+  overflow: hidden;
+  border-radius: inherit;
+  color: inherit;
+  text-decoration: none;
+}
+
+.link:focus-visible {
+  outline: 3px solid var(--pin-blue-500);
+  outline-offset: -3px;
+}
+
+.visual {
+  position: relative;
+  display: block;
+  height: 132px;
+  padding: 28px 26px 0;
+}
+
+.paper,
+.cover {
+  position: absolute;
+  inset: 28px 26px -18px;
+  display: block;
+  overflow: hidden;
+  border-radius: 10px;
+  background: var(--pin-neutral-200);
+  transform-origin: center bottom;
+}
+
+.paper { transform: rotate(4deg); }
+
+.cover {
+  transform: rotate(-2.5deg);
+  background: var(--pin-neutral-50);
+}
+
+.cover :global(.slide-canvas) {
+  height: 100%;
+  aspect-ratio: auto;
+}
+
+.cover img {
+  color: transparent;
+  font-size: 0;
+}
+
+.cover.empty {
+  display: grid;
+  place-items: center;
+  color: var(--pin-neutral-400);
+}
+
+.cover.empty > svg {
+  width: 44px;
+  height: 44px;
+  stroke-width: 1.5;
+}
+
+.body {
+  position: relative;
+  z-index: 2;
+  min-height: 146px;
+  margin-top: -18px;
+  padding: 42px 16px 16px;
+  display: block;
+  background: linear-gradient(140deg, color-mix(in srgb, var(--folder-accent) 20%, var(--color-bg-surface)), color-mix(in srgb, var(--folder-accent) 34%, var(--color-bg-surface)));
+  clip-path: polygon(0 0, 55% 0, 64% 14%, 100% 14%, 100% 100%, 0 100%);
+}
+
+.title {
+  display: flex;
+  align-items: center;
+}
+
+.title b {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 16px;
+  line-height: 24px;
+}
+
+.stats {
+  margin-top: 14px;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+
+.stats span {
+  color: var(--color-text-secondary);
+  font-size: 10px;
+}
+
+.stats b {
+  display: block;
+  color: var(--color-text-primary);
+  font-size: 14px;
+  line-height: 18px;
+  font-variant-numeric: tabular-nums;
+}
+
+.meta {
+  display: block;
+  margin-top: 10px;
+  overflow: hidden;
+  color: var(--color-text-secondary);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 10px;
+}
+
+.menu {
+  position: absolute;
+  z-index: 3;
+  right: 10px;
+  top: 10px;
+}
+
+.menuTrigger {
+  width: 34px;
+  height: 34px;
+  border-color: transparent;
+  background: transparent;
+  color: var(--pin-neutral-700);
+  box-shadow: none;
+  list-style: none;
+}
+
+.menuTrigger::-webkit-details-marker { display: none; }
+.menuTrigger > svg { transform: rotate(90deg); }
+
+.menuTrigger:hover,
+.menu[open] > .menuTrigger {
+  background: color-mix(in srgb, var(--color-bg-surface) 72%, transparent);
+}
+
+.menuTrigger:focus-visible {
+  outline: 0;
+  box-shadow: var(--focus);
+}
+
+.menuTrigger[aria-disabled="true"] {
+  cursor: not-allowed;
+  opacity: .48;
+}
+
+.menuTrigger :global(.spinner) {
+  width: 17px;
+  height: 17px;
+}
+
+.popover {
+  position: absolute;
+  right: 0;
+  top: 40px;
+  width: 144px;
+  padding: 6px;
+  display: grid;
+  gap: 2px;
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  background: var(--color-bg-surface);
+  box-shadow: var(--shadow-md);
+}
+
+.popover button {
+  height: 36px;
+  padding: 0 10px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--color-text-primary);
+  font-size: 12px;
+  font-weight: 600;
+  text-align: left;
+}
+
+.popover button:hover { background: var(--pin-neutral-100); }
+.popover button.destructive { color: var(--color-error); }
+.popover svg { width: 15px; height: 15px; }

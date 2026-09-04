@@ -1,0 +1,6 @@
+.root{width:250px;height:44px;min-width:0;display:flex;align-items:center;gap:12px;overflow:hidden;padding:0 18px;border:2px solid var(--color-folder-search-border);border-radius:6px;background:transparent}
+.root:focus-within{border-color:var(--color-brand);box-shadow:var(--focus)}
+.root>img{width:17px;height:17px;flex:none}
+.root input{width:100%;min-width:0;border:0;outline:0;background:transparent;color:#a4a4a4;font-size:16px;font-weight:500;line-height:normal}
+.root input::placeholder{color:#a4a4a4;opacity:1}
+.root input:focus-visible{box-shadow:none}

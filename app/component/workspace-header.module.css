@@ -1,0 +1,11 @@
+.root{height:84px;padding:0 max(32px,calc((100% - 1440px)/2));display:flex;align-items:center;justify-content:space-between;background:transparent}
+.root :global(.workspace-account){display:flex;align-items:center;gap:12px}
+.root :global(.workspace-account-copy){display:grid;min-width:0}
+.root :global(.workspace-account-copy) b{font-size:13px}
+.root :global(.workspace-account-copy) small{max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--color-text-tertiary);font-size:11px}
+@media(max-width:900px){.root{height:66px;padding:0 18px}.root :global(.workspace-account-copy){display:none}}
+@media(max-width:600px){.root :global(.workspace-account){gap:7px}.root :global(.avatar){display:none}}
+
+
+/* Route-owned semantic rules moved from globals.css. */
+.root :global(.logout-btn){border:0;background:transparent;color:var(--color-text-tertiary);display:grid;place-items:center;padding:0;cursor:pointer}.root :global(.logout-btn):hover{color:var(--color-text-primary)}.root :global(.logout-btn) svg{width:18px}

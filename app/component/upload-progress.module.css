@@ -1,0 +1,6 @@
+.root{width:100%;max-width:380px;margin:6px auto 0;text-align:left}
+.root :global(.upload-progress-head){display:flex;align-items:center;justify-content:space-between;font-size:13px;font-weight:600;color:var(--color-text-secondary);margin-bottom:9px}
+.root :global(.upload-progress-track){position:relative;height:8px;border-radius:999px;background:var(--pin-neutral-100);overflow:hidden}
+.root :global(.upload-progress-bar){height:100%;border-radius:999px;background:var(--color-brand);transition:width .2s ease}
+.root :global(.upload-progress-track.indeterminate) :global(.upload-progress-bar){position:absolute;left:-40%;width:40%;animation:upload-flow 1.15s ease-in-out infinite}
+@keyframes upload-flow{0%{left:-40%}100%{left:100%}}

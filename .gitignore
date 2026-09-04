@@ -1,0 +1,12 @@
+.next
+node_modules
+.env*
+!.env.example
+public/generated/*
+!public/generated/.gitkeep
+*.log
+*.tsbuildinfo
+.DS_Store
+.claude/settings.local.json
+supabase/.temp/
+supabase/.branches/

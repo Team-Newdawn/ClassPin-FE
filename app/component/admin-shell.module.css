@@ -1,0 +1,51 @@
+.root:global(.app-shell){min-height:100dvh;display:grid;grid-template-columns:248px 1fr}
+.root :global(.sidebar){position:fixed;inset:0 auto 0 0;width:248px;padding:0 16px;display:flex;flex-direction:column;z-index:20;border-right:1px solid var(--color-border);background:var(--color-bg-surface)}
+.root :global(.sidebar-logo){height:64px;padding:0 8px;display:flex;align-items:center}
+.root :global(.sidebar) nav{display:grid;gap:4px;padding-top:16px}
+.root :global(.nav-item){height:40px;padding:0 12px;display:flex;align-items:center;gap:10px;border:0;border-radius:10px;background:transparent;color:var(--color-text-secondary);font-size:14px;text-align:left;text-decoration:none}
+.root :global(.nav-item) svg{width:18px}
+.root :global(.nav-item):hover{background:var(--pin-neutral-100);color:var(--color-text-primary)}
+.root :global(.nav-item):global(.active){background:var(--color-brand-subtle);color:var(--pin-blue-700);font-weight:600}
+.root :global(.sidebar-language){align-self:center;margin-top:auto;margin-bottom:12px}
+.root :global(.sidebar-language)+:global(.sidebar-bottom){margin-top:0}
+.root :global(.sidebar-bottom){margin-top:auto;padding:16px 8px;display:grid;grid-template-columns:36px 1fr 18px;align-items:center;gap:10px;border-top:1px solid var(--color-border)}
+.root :global(.avatar){width:36px;height:36px;display:grid;place-items:center;border-radius:10px;background:var(--pin-neutral-900);color:var(--color-bg-surface);font-size:12px;font-weight:600}
+.root :global(.sidebar-bottom) b,.root :global(.sidebar-bottom) small{display:block}
+.root :global(.sidebar-bottom) b{font-size:13px}
+.root :global(.sidebar-bottom) small{margin-top:2px;color:var(--color-text-tertiary);font-size:11px}
+.root :global(.sidebar-bottom)>svg{width:18px;color:var(--color-text-tertiary)}
+.root :global(.logout-btn){padding:0;display:grid;place-items:center;border:0;background:transparent;color:var(--color-text-tertiary)}
+.root :global(.logout-btn):hover{color:var(--color-text-primary)}
+.root :global(.logout-btn) svg{width:18px}
+.root :global(.admin-main){grid-column:2;min-width:0}
+
+@media(max-width:1100px){
+  .root:global(.app-shell){grid-template-columns:72px 1fr}
+  .root :global(.sidebar){width:72px;padding:0 8px}
+  .root :global(.sidebar-logo){justify-content:center;padding:0}
+  .root :global(.sidebar-logo) :global(.pin-logo)>span:last-child,.root :global(.nav-item){font-size:0}
+  .root :global(.nav-item){justify-content:center;padding:0}
+  .root :global(.sidebar-bottom)>span:not(:global(.avatar)),.root :global(.sidebar-bottom)>svg{display:none}
+  .root :global(.sidebar-bottom){display:flex;justify-content:center;padding:16px 0}
+  .root :global(.sidebar-language){width:52px}
+  .root :global(.sidebar-language) button{width:22px}
+}
+
+@media(max-width:820px),(max-width:1100px) and (max-height:560px) and (orientation:landscape){
+  .root:global(.app-shell){display:block}
+  .root :global(.admin-main){grid-column:auto;padding-bottom:calc(58px + env(safe-area-inset-bottom))}
+  .root :global(.sidebar){inset:auto 0 0 0;width:auto;height:auto;flex-direction:row;padding:0 env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);z-index:40;border-top:1px solid var(--color-border);border-right:0}
+  .root :global(.sidebar-logo),.root :global(.sidebar-bottom){display:none}
+  .root :global(.sidebar) nav{flex:1;grid-template-columns:repeat(4,1fr);gap:0;padding:0}
+  .root :global(.nav-item){height:58px;flex-direction:column;justify-content:center;gap:3px;padding:0;border-radius:0;font-size:10px;font-weight:600;letter-spacing:-.02em}
+  .root :global(.nav-item) svg{width:21px}
+  .root :global(.nav-item):hover,.root :global(.nav-item):global(.active){background:transparent}
+  .root :global(.nav-item):global(.active){color:var(--pin-blue-700)}
+  .root :global(.sidebar-language){position:fixed;right:max(12px,env(safe-area-inset-right));bottom:calc(70px + env(safe-area-inset-bottom));z-index:45;width:74px;margin:0;box-shadow:var(--shadow-md)}
+}
+
+@media(max-width:1100px) and (max-height:560px) and (orientation:landscape){
+  .root :global(.admin-main){padding-bottom:calc(48px + env(safe-area-inset-bottom))}
+  .root :global(.nav-item){height:48px;flex-direction:row;gap:8px;font-size:12px}
+  .root :global(.nav-item) svg{width:18px}
+}

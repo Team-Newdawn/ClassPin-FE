@@ -1,0 +1,24 @@
+{
+  "code": [
+    "app/(view)/join/[code]/page.tsx",
+    "app/(view)/join/[code]/controller.ts",
+    "app/(view)/join/[code]/page.module.css",
+    "app/_model/i18n.ts",
+    "app/_model/types.ts",
+    "app/_controller/session-store.tsx",
+    "app/_service/class-session-service.ts",
+    "app/component/slide-canvas.module.css",
+    "supabase/migrations/20260830074411_restrict_participant_anchors_to_point.sql"
+  ],
+  "documents": [
+    "class-frontend-architecture"
+  ],
+  "recorded_at": "2026-08-30T07:52:40+00:00",
+  "requirement_id": "CLASS-JOIN-001",
+  "task_id": "remove-participant-pen-tool",
+  "tests": [
+    "app/_model/participant-question.test.ts",
+    "supabase/tests/participant_point_anchors.sql",
+    ".document-driven/evidence/remove-participant-pen-tool.md"
+  ]
+}

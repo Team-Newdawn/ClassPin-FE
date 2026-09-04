@@ -1,0 +1,49 @@
+.root{position:sticky;z-index:20;top:0;height:100dvh;min-width:0;overflow:hidden;padding:0 16px;display:flex;flex-direction:column;border-right:1px solid var(--color-border);background:var(--color-folder-workspace-bg);transition:width 160ms cubic-bezier(.2,0,0,1),padding 160ms cubic-bezier(.2,0,0,1)}
+.root nav{min-height:0;overflow-y:auto;padding-top:4px}
+.root :global(.folder-tree-brand){height:84px;display:flex;align-items:center;justify-content:space-between;gap:8px}
+.root :global(.folder-tree-brand)>a{min-width:0;display:block}
+.root :global(.folder-tree-brand)>a img{width:120px;height:auto;display:block}
+.root :global(.folder-tree-brand)>button{width:40px;height:40px;flex:0 0 40px;display:grid;place-items:center;border:0;border-radius:10px;background:transparent;color:var(--color-text-secondary)}
+.root :global(.folder-tree-brand)>button:hover{background:var(--pin-neutral-200);color:var(--color-text-primary)}
+.root :global(.folder-tree-brand)>button:focus-visible{outline:0;box-shadow:var(--focus)}
+.root :global(.folder-tree-brand)>button svg{width:19px}
+.root :global(.folder-tree-heading){height:40px;padding:0 8px;display:grid;grid-template-columns:27px minmax(0,1fr) auto;align-items:center;gap:10px;color:var(--color-text-secondary)}
+.root :global(.folder-tree-heading) img{width:21px;height:auto}
+.root :global(.folder-tree-heading) b{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:16px}
+.root :global(.folder-tree-heading) span{font-size:16px;font-weight:600;font-variant-numeric:tabular-nums}
+.root :global(.folder-tree-list){position:relative;margin:0 0 0 20px;padding:0 0 0 18px;list-style:none}
+.root :global(.folder-tree-list):before{content:"";position:absolute;left:0;top:0;bottom:18px;border-left:1px solid var(--color-text-tertiary)}
+.root :global(.folder-tree-list) li{position:relative}
+.root :global(.folder-tree-list) li:before{content:"";position:absolute;left:-18px;top:18px;width:17px;border-top:1px solid var(--color-text-tertiary)}
+.root :global(.folder-tree-list) a{height:36px;min-width:0;padding:0 6px;display:flex;align-items:center;border-radius:8px;color:var(--color-text-tertiary);font-size:14px;font-weight:600;text-decoration:none}
+.root :global(.folder-tree-list) a:hover{background:var(--pin-neutral-200);color:var(--color-text-primary)}
+.root :global(.folder-tree-list) a:focus-visible{outline:0;box-shadow:var(--focus)}
+.root :global(.folder-tree-list) a[aria-current="page"]{background:var(--color-bg-surface);color:var(--color-text-primary)}
+.root :global(.folder-tree-initial){display:none}
+.root :global(.folder-tree-name){overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.root :global(.folder-tree-account){margin-top:auto;padding:14px 0 16px;display:grid;grid-template-columns:36px minmax(0,1fr) auto;align-items:center;gap:10px;border-top:1px solid var(--color-border)}
+.root :global(.folder-tree-account) :global(.language-switcher){grid-column:1/-1;justify-self:center;margin-bottom:2px}
+.root :global(.folder-tree-account) :global(.avatar){width:36px;height:36px;display:grid;place-items:center;border-radius:10px;background:var(--pin-neutral-900);color:var(--color-bg-surface);font-size:12px;font-weight:600}
+.root :global(.folder-tree-account) :global(.workspace-account-copy){min-width:0;display:grid}
+.root :global(.folder-tree-account) :global(.workspace-account-copy) b,.root :global(.folder-tree-account) :global(.workspace-account-copy) small{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.root :global(.folder-tree-account) :global(.workspace-account-copy) b{font-size:13px}
+.root :global(.folder-tree-account) :global(.workspace-account-copy) small{margin-top:2px;color:var(--color-text-tertiary);font-size:11px}
+.root :global(.folder-tree-account) :global(.logout-btn){width:40px;height:40px;padding:0;display:grid;place-items:center;border:0;border-radius:10px;background:transparent;color:var(--color-text-tertiary)}
+.root :global(.folder-tree-account) :global(.logout-btn):hover{background:var(--pin-neutral-200);color:var(--color-text-primary)}
+.root :global(.folder-tree-account) :global(.logout-btn) svg{width:18px}
+:global(.folder-dashboard-shell.sidebar-collapsed) .root{padding:0 8px}
+:global(.folder-dashboard-shell.sidebar-collapsed) .root :global(.folder-tree-brand){justify-content:center}
+:global(.folder-dashboard-shell.sidebar-collapsed) .root :global(.folder-tree-brand)>a{display:none}
+:global(.folder-dashboard-shell.sidebar-collapsed) .root :global(.folder-tree-heading){padding:0;display:flex;justify-content:center}
+:global(.folder-dashboard-shell.sidebar-collapsed) .root :global(.folder-tree-heading) b,:global(.folder-dashboard-shell.sidebar-collapsed) .root :global(.folder-tree-heading) span{display:none}
+:global(.folder-dashboard-shell.sidebar-collapsed) .root :global(.folder-tree-list){margin:4px 0 0;padding:0}
+:global(.folder-dashboard-shell.sidebar-collapsed) .root :global(.folder-tree-list):before,:global(.folder-dashboard-shell.sidebar-collapsed) .root :global(.folder-tree-list) li:before{display:none}
+:global(.folder-dashboard-shell.sidebar-collapsed) .root :global(.folder-tree-list) a{justify-content:center;padding:0}
+:global(.folder-dashboard-shell.sidebar-collapsed) .root :global(.folder-tree-initial){width:32px;height:32px;display:grid;place-items:center;border-radius:8px;background:var(--color-bg-surface);color:var(--color-text-secondary);font-size:12px;font-weight:700}
+:global(.folder-dashboard-shell.sidebar-collapsed) .root :global(.folder-tree-name){display:none}
+:global(.folder-dashboard-shell.sidebar-collapsed) .root :global(.folder-tree-account){padding:12px 0 16px;display:flex;flex-direction:column;gap:10px}
+:global(.folder-dashboard-shell.sidebar-collapsed) .root :global(.folder-tree-account) :global(.language-switcher){width:52px;margin:0}
+:global(.folder-dashboard-shell.sidebar-collapsed) .root :global(.folder-tree-account) :global(.language-switcher) button{width:22px}
+:global(.folder-dashboard-shell.sidebar-collapsed) .root :global(.folder-tree-account) :global(.avatar){width:32px;height:32px}
+:global(.folder-dashboard-shell.sidebar-collapsed) .root :global(.folder-tree-account) :global(.workspace-account-copy),:global(.folder-dashboard-shell.sidebar-collapsed) .root :global(.folder-tree-account) :global(.logout-btn){display:none}
+@media(max-width:900px){.root{position:fixed;left:0;width:248px;box-shadow:var(--shadow-md)}:global(.folder-dashboard-shell.sidebar-collapsed) .root{width:72px;box-shadow:none}}

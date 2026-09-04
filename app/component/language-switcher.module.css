@@ -1,0 +1,8 @@
+.switcher{height:32px;padding:3px;display:inline-flex;align-items:center;gap:2px;border:1px solid var(--color-border);border-radius:9px;background:var(--pin-neutral-100)}
+.switcher button{width:34px;height:24px;padding:0;border:0;border-radius:6px;background:transparent;color:var(--color-text-tertiary);font-size:10px;font-weight:700;letter-spacing:.02em}
+.switcher button:hover{color:var(--color-text-primary)}
+.switcher button:global(.active){background:var(--color-bg-surface);color:var(--pin-blue-700);box-shadow:var(--shadow-xs)}
+:global(.presentation-top-actions) .switcher{width:auto;height:42px;padding:4px;border-color:rgba(255,255,255,.16);background:rgba(23,29,38,.72)}
+:global(.presentation-top-actions) .switcher button{width:32px;height:32px;padding:0;border:0;border-radius:7px;background:transparent;color:var(--pin-neutral-400)}
+:global(.presentation-top-actions) .switcher button:global(.active){background:rgba(255,255,255,.14);color:var(--pin-neutral-100);box-shadow:none}
+@media(max-width:600px){:global(.student-header) .switcher{height:30px}:global(.student-header) .switcher button{width:29px;height:22px}}

@@ -1,0 +1,28 @@
+{
+  "code": [
+    "app/(view)/admin/session/[id]/page.tsx",
+    "app/(view)/admin/session/[id]/controller.ts",
+    "app/(view)/admin/session/[id]/page.module.css",
+    "app/(view)/admin/session/[id]/present/page.tsx",
+    "app/(view)/admin/session/[id]/present/controller.ts",
+    "app/(view)/join/[code]/page.module.css",
+    "app/_controller/session-store.tsx",
+    "app/_model/class/presentation-rotation.ts",
+    "app/_model/i18n.ts",
+    "app/component/slide-canvas.tsx",
+    "app/component/slide-canvas.module.css",
+    "assets/icons/delete_icon.svg",
+    "assets/icons/pin_black_icon.svg",
+    "assets/icons/pin_icon.svg"
+  ],
+  "documents": [
+    "class-frontend-architecture"
+  ],
+  "recorded_at": "2026-08-31T07:55:38+00:00",
+  "requirement_id": "CLASS-LIVE-001",
+  "task_id": "participant-question-sorting-and-live-controls",
+  "tests": [
+    "app/_model/class/presentation-rotation.test.ts",
+    ".document-driven/evidence/participant-question-sorting-and-live-controls.md"
+  ]
+}

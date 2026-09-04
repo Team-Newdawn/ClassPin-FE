@@ -1,0 +1,14 @@
+{
+  "code": [
+    "app/globals.css"
+  ],
+  "documents": [
+    "ai-report-product"
+  ],
+  "recorded_at": "2026-08-29T09:21:47+00:00",
+  "requirement_id": "CLASS-DASH-003",
+  "task_id": "admin-search-border-color",
+  "tests": [
+    ".document-driven/evidence/admin-search-border-color.md"
+  ]
+}

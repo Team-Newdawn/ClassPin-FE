@@ -1,0 +1,16 @@
+{
+  "code": [
+    "app/_service/class-session-service.ts",
+    "supabase/migrations/20260830074411_restrict_participant_anchors_to_point.sql"
+  ],
+  "documents": [
+    "class-frontend-architecture"
+  ],
+  "recorded_at": "2026-08-30T07:52:41+00:00",
+  "requirement_id": "CFA-061",
+  "task_id": "remove-participant-pen-tool",
+  "tests": [
+    "supabase/tests/participant_point_anchors.sql",
+    ".document-driven/evidence/remove-participant-pen-tool.md"
+  ]
+}

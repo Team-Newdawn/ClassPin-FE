@@ -1,0 +1,142 @@
+{
+  "artifacts": [
+    {
+      "approval": {
+        "approved_at": "2026-08-26T07:04:47+00:00",
+        "approved_by": "minchan_CTO",
+        "content_sha256": "983db425e870a587d4b5c8ed284709787dc824128567b2c3b63bb2995b68b36a"
+      },
+      "depends_on": [],
+      "id": "ai-report-product",
+      "informed_by": [
+        "prd"
+      ],
+      "path": "docs/ai-instructor-report-product.md",
+      "purpose": "Define instructor report selection, generation, review, AI-directed revision, confirmation, evidence presentation, and PDF delivery behavior.",
+      "required_for": [
+        "admin-report-selection-ui",
+        "admin-report-review-ui",
+        "admin-report-confirmation-and-pdf"
+      ],
+      "status": "approved"
+    },
+    {
+      "approval": {
+        "approved_at": "2026-08-26T15:07:22+00:00",
+        "approved_by": "minchan_CTO",
+        "content_sha256": "15a504a46f154308fd6fdac6a05d2e9291dabcf5438d513ad3283d77a430f035"
+      },
+      "depends_on": [
+        "ai-report-product"
+      ],
+      "id": "ai-report-evidence",
+      "informed_by": [
+        "prd"
+      ],
+      "path": "docs/ai-instructor-report-evidence.md",
+      "purpose": "Define the spatial evidence pack, structured AI output, provenance, evidence sufficiency, revision rules, and release-blocking evaluation criteria.",
+      "required_for": [
+        "spatial-evidence-preparation",
+        "openrouter-report-generation",
+        "ai-report-revision",
+        "ai-report-evaluation"
+      ],
+      "status": "approved"
+    },
+    {
+      "approval": {
+        "approved_at": "2026-08-26T16:02:54+00:00",
+        "approved_by": "minchan_CTO",
+        "content_sha256": "afc138a9187614237769cfeb4f24c3337a16387f13fcffd17021c7ac660c9519"
+      },
+      "depends_on": [
+        "ai-report-product",
+        "ai-report-evidence"
+      ],
+      "id": "ai-report-system",
+      "informed_by": [
+        "prd"
+      ],
+      "path": "docs/ai-instructor-report-system.md",
+      "purpose": "Define report persistence, authorization, APIs, asynchronous execution, provider portability, privacy controls, retries, observability, and cost controls.",
+      "required_for": [
+        "report-database-and-rls",
+        "report-repository-and-api",
+        "cloud-tasks-and-cloud-run-worker",
+        "openrouter-provider-adapter",
+        "report-operations-and-deployment"
+      ],
+      "status": "approved"
+    },
+    {
+      "approval": {
+        "approved_at": "2026-08-29T13:01:00+00:00",
+        "approved_by": "minchan_CTO",
+        "content_sha256": "96aa1f117d7db96f1b08dfc4aea6ffc1ad43be22000538fddcc72fdc35a05272"
+      },
+      "depends_on": [],
+      "id": "class-frontend-architecture",
+      "informed_by": [
+        "prd"
+      ],
+      "path": "docs/class-frontend-architecture.md",
+      "purpose": "Define the Pin Class frontend model-view-controller-service boundaries, object-oriented responsibility rules, route and component CSS ownership, and measurement-led data-loading performance strategy.",
+      "required_for": [
+        "class-frontend-layering",
+        "class-route-css-colocation",
+        "class-data-loading-performance"
+      ],
+      "status": "approved"
+    },
+    {
+      "approval": {
+        "approved_at": "2026-08-29T13:18:00+00:00",
+        "approved_by": "minchan_CTO",
+        "content_sha256": "7a77fb99b56c0a97912dcebc1969ee2756a95f94048000970159da5b316f18c1"
+      },
+      "depends_on": [
+        "class-frontend-architecture"
+      ],
+      "id": "pin-feedback-sunset",
+      "informed_by": [
+        "prd"
+      ],
+      "path": "docs/pin-feedback-sunset.md",
+      "purpose": "Define removal of the separate Pin Feedback runtime and source surface while relocating shared Pin Class behavior and preserving historical campaign database and Storage data.",
+      "required_for": [
+        "pin-feedback-runtime-removal",
+        "class-shared-logic-relocation"
+      ],
+      "status": "approved"
+    },
+    {
+      "approval": {
+        "approved_at": "2026-09-01T06:50:03+00:00",
+        "approved_by": "minchan_CTO",
+        "content_sha256": "0edec27f023a0bc0ac8ad9e1567b089372781f3a6b6b93391a51aa35ce4a3e83"
+      },
+      "depends_on": [
+        "pin-feedback-sunset"
+      ],
+      "id": "pin-feedback-data-retirement",
+      "informed_by": [
+        "prd"
+      ],
+      "path": "docs/pin-feedback-data-retirement.md",
+      "purpose": "Define backup, access closure, forward-only schema retirement, Storage cleanup, and identity handling for the legacy Pin Feedback source layer while preserving imported Pin Class data and shared Class contracts.",
+      "required_for": [
+        "pin-feedback-schema-retirement",
+        "pin-feedback-storage-retirement"
+      ],
+      "status": "approved"
+    }
+  ],
+  "implementation_gate": {
+    "require_relevant_documents_approved": true,
+    "require_traceability": true
+  },
+  "schema_version": "1.0",
+  "source": {
+    "prd": "doc/pin_class_prd.md"
+  }
+}

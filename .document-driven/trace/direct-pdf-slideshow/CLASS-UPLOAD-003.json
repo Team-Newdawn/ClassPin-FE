@@ -1,0 +1,21 @@
+{
+  "code": [
+    "app/_service/convert.ts",
+    "app/_model/upload.ts",
+    "app/component/pdf-page.tsx",
+    "app/component/slide-canvas.tsx",
+    "app/_service/class-session-service.ts",
+    "supabase/migrations/20260907190000_direct_pdf_slides.sql"
+  ],
+  "documents": [
+    "class-frontend-architecture"
+  ],
+  "recorded_at": "2026-09-07T10:27:24+00:00",
+  "requirement_id": "CLASS-UPLOAD-003",
+  "task_id": "direct-pdf-slideshow",
+  "tests": [
+    "app/_model/upload.test.ts",
+    "supabase/tests/direct_pdf_slides.sql",
+    ".document-driven/evidence/direct-pdf-slideshow.md"
+  ]
+}

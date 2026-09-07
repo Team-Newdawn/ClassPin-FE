@@ -1,0 +1,15 @@
+{
+  "code": [
+    "app/(view)/admin/layout.tsx",
+    "app/(view)/admin/session/[id]/present/page.tsx"
+  ],
+  "documents": [
+    "class-frontend-architecture"
+  ],
+  "recorded_at": "2026-09-04T04:13:08+00:00",
+  "requirement_id": "CFA-082",
+  "task_id": "public-live-presentation",
+  "tests": [
+    ".document-driven/evidence/public-live-presentation.md"
+  ]
+}

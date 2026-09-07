@@ -2,8 +2,8 @@ type PositionedPin = { x: number; y: number };
 type Rectangle = { left: number; right: number; top: number; bottom: number };
 type PositionedRectangle = { id: string; bounds: Rectangle };
 
-const PIN_SIZE = 30;
-const PIN_COLLISION_STEP = 38;
+const PIN_SIZE = 40;
+const PIN_COLLISION_STEP = 48;
 
 export function crossedPinMilestone(previousCount: number, currentCount: number) {
   const previousMilestone = Math.floor(Math.max(0, previousCount) / 10);
@@ -71,8 +71,17 @@ export function advancePinPlayback<T extends PositionedPin & { id: string }>(pin
   return { shownPinIds: [pins[0].id], activePinId: pins[0].id };
 }
 
-export function canRotatePinPlayback(showPins: boolean, pinCount: number, selectedPinId: string | null) {
-  return showPins && pinCount > 1 && selectedPinId === null;
+export function canRotatePinPlayback(showPins: boolean, pinCount: number, shownPinCount: number, selectedPinId: string | null) {
+  return showPins && shownPinCount < pinCount && selectedPinId === null;
+}
+
+export function nextPresentationSlide(currentSlide: number, slideCount: number) {
+  return slideCount > 0 ? (currentSlide + 1) % slideCount : 0;
+}
+
+export function findNewestIncomingPin<T extends { id: string }>(pins: readonly T[], previousPinIds: readonly string[]) {
+  const previous = new Set(previousPinIds);
+  return pins.find((pin) => !previous.has(pin.id)) ?? null;
 }
 
 export function rectanglesOverlap(first: Rectangle, second: Rectangle) {

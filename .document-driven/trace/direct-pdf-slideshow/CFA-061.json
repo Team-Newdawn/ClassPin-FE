@@ -1,0 +1,16 @@
+{
+  "code": [
+    "app/_service/class-session-service.ts",
+    "supabase/migrations/20260907190000_direct_pdf_slides.sql"
+  ],
+  "documents": [
+    "class-frontend-architecture"
+  ],
+  "recorded_at": "2026-09-07T10:27:27+00:00",
+  "requirement_id": "CFA-061",
+  "task_id": "direct-pdf-slideshow",
+  "tests": [
+    "supabase/tests/direct_pdf_slides.sql",
+    ".document-driven/evidence/direct-pdf-slideshow.md"
+  ]
+}

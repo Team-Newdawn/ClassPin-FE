@@ -2,7 +2,7 @@
 
 ## 왜 Cloud Run인가
 
-`/api/convert`가 `soffice`(PPT→PDF)와 `pdftoppm`(PDF→JPEG)을 직접 실행하기 때문에
+`/api/convert`가 PPT/PPTX에 대해 `soffice`(PPT→PDF)와 `pdftoppm`(PDF→JPEG)을 직접 실행하기 때문에
 Vercel·Cloudflare Workers 같은 서버리스 런타임에는 올라가지 않는다. 컨테이너가 필요하다.
 
 컨테이너를 무료로 돌릴 수 있는 곳 중에서:
@@ -20,11 +20,21 @@ Cloud Run 도메인 매핑을 지원하지 않는다.
 
 ## 슬라이드가 저장되는 곳
 
-`/api/convert`는 변환한 JPEG를 그 자리에서 `lecture-slides` 버킷의
+신규 PDF는 변환 서버를 거치지 않는다. 브라우저가 private `course-materials`의 원본을
+PDF.js로 필요한 페이지만 렌더링하며, DB Slide는 원본 페이지 번호를 참조한다.
+
+PPT/PPTX는 `/api/convert`가 변환한 JPEG를 그 자리에서 `lecture-slides` 버킷의
 `{uid}/{uploadId}/{slideId}.jpg`에 올리고 공개 URL을 돌려준다.
 
 호출자의 access token을 그대로 서버에 전달해 그 사용자 권한으로 업로드하므로,
 경로의 첫 폴더가 본인 것인지는 storage RLS 정책이 검증한다. 서비스 키는 쓰지 않는다.
+
+원본 PDF/PPT/PPTX는 Cloud Run의 HTTP/1 요청 크기 제한을 피하기 위해 브라우저에서
+private `course-materials` 버킷으로 6MiB 단위 재개 가능 업로드한다. `/api/convert`에는
+PPT/PPTX 원본 경로만 보내며, 변환 서버가 owner 권한으로 원본을 임시 디스크에 스트리밍한다.
+PDF는 live 강의 참여자에게만 RLS로 읽기를 허용해 최대 12시간의 제한된 서명 URL로 전달한다.
+1GiB 업로드를 운영에서 허용하려면 Supabase Storage의 global file size limit도 1GiB
+이상이어야 한다.
 
 컨테이너 디스크에 쓰는 경로도 남아 있지만 Supabase를 설정하지 않은 로컬 실행
 전용이다. 배포 환경에서는 타지 않는다.

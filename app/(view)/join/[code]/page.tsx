@@ -28,7 +28,7 @@ export default function JoinSession() {
     draftQuestion, draftText, editingQuestionId, viewingQuestion, submitted, submitting,
     submitError, composerOpen, selectedQuestionId, questionSort, slideQuestions, submittedQuestions, visibleQuestionIds,
     pendingReactionIds, reactionError, emojiError, categoryOptions, activeCategory, activeMarker,
-    activeMarkerEmoji, categoryLabel, categoryClass, markerLabel, handleSlideWheel, placeDraftTag,
+    categoryLabel, categoryClass, markerLabel, handleSlideWheel, placeDraftTag,
     selectCategory, selectMarker, startEditingQuestion, updateDraftText, startMovingDraftTag, moveDraftTag,
     finishMovingDraftTag, openDraftComposer, submit, closeComposer,
     deleteDraftQuestion, selectTool, changeSlide, syncToLiveSlide, selectQuestionSort, toggleQuestionReaction,
@@ -147,10 +147,7 @@ export default function JoinSession() {
             </div>
             <button className="btn primary large full" onClick={closeComposer}>{t("common.confirm")}</button>
           </div> : submitted ? <div className="submitted"><span><Check /></span><h2 id="question-modal-title">{editingQuestionId ? t("student.edited") : t("student.submitted")}</h2><p>{t("student.instructorCanSee")}</p><button className="btn primary" onClick={closeComposer}>{editingQuestionId ? t("common.confirm") : t("student.newQuestion")}</button></div> : <>
-            <div className="student-modal-heading">
-              <span className="question-pin-preview" aria-hidden="true"><Image src={selectedPinIcon} alt="" />{activeMarkerEmoji && <i>{activeMarkerEmoji}</i>}</span>
-              <div><h2 id="question-modal-title">{editingQuestionId ? t("student.editPrompt") : t("student.pointPrompt")}</h2><p>{editingQuestionId ? t("student.editHint") : t("student.composeHint")}</p></div>
-            </div>
+            <h2 id="question-modal-title" className="sr-only">{editingQuestionId ? t("student.editPrompt") : t("student.pointPrompt")}</h2>
             <fieldset className="question-marker-picker">
               <legend>{t("student.markerTitle")}</legend>
               <div>{QUESTION_MARKERS.map((marker) => {

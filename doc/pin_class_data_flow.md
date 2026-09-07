@@ -1,7 +1,7 @@
 # Pin Class 데이터 플로우 설명서
 
 - Status: 현재 구현 참조 문서
-- Last verified: 2026-08-31
+- Last verified: 2026-09-07
 - Scope: `/admin`, `/join/[code]`, `/api/convert`, Supabase Auth·Database·Storage·Realtime
 - Source of truth: 실행 코드와 로컬 Supabase 데이터베이스
 - Related documents: `doc/pin_class_prd.md`, `docs/class-frontend-architecture.md`, `doc/pin_class_database_schema.md`
@@ -28,7 +28,7 @@ View → Controller / SessionStore → Service → Supabase client
 | Service | Supabase 조회·저장, DB row와 UI model 변환 |
 | Supabase infrastructure | owner/audience client 분리, 인증 세션과 토큰 관리 |
 | PostgreSQL | 권위 데이터, FK·CHECK·Trigger·RLS 적용 |
-| Storage | 변환된 슬라이드 이미지와 보존 자료 저장 |
+| Storage | 원본 PDF/PPT/PPTX와 PPT/PPTX에서 변환된 슬라이드 이미지 저장 |
 | Realtime | 강의·질문·슬라이드 변경과 일회성 이모지 전달 |
 
 ## 2. 전체 데이터 플로우
@@ -42,6 +42,7 @@ sequenceDiagram
     participant AuthContext as AuthContext
     participant Store as SessionStore
     participant Service as class-session-service
+    participant PDFJS as PDF.js
     participant ConvertAPI as POST /api/convert
     participant Converter as LibreOffice + pdftoppm
     participant Auth as Supabase Auth
@@ -76,16 +77,23 @@ sequenceDiagram
         Note over Instructor,Storage: 자료 업로드 및 강의 생성
 
         Instructor->>Admin: PDF/PPT/PPTX 선택
-        Admin->>ConvertAPI: 파일 업로드 + 강사 JWT
-        ConvertAPI->>Auth: auth.getUser()
-        Auth-->>ConvertAPI: 인증된 강사
-        ConvertAPI->>Converter: PPT → PDF<br/>PDF → JPEG 렌더링
+        Admin->>Storage: course-materials에 원본 재개 가능 업로드
 
-        loop 슬라이드 페이지별
-            Converter-->>ConvertAPI: JPEG 이미지
-            ConvertAPI->>Storage: lecture-slides 업로드
-            Storage-->>ConvertAPI: imagePath
-            ConvertAPI-->>Admin: NDJSON slide 이벤트
+        alt 신규 PDF
+            Admin->>PDFJS: 원본의 페이지 수 확인
+            PDFJS-->>Admin: PDF 페이지 매핑
+        else PPT/PPTX
+            Admin->>ConvertAPI: 원본 경로 + 강사 JWT
+            ConvertAPI->>Auth: auth.getUser()
+            Auth-->>ConvertAPI: 인증된 강사
+            ConvertAPI->>Converter: PPT → PDF → JPEG 렌더링
+
+            loop 슬라이드 페이지별
+                Converter-->>ConvertAPI: JPEG 이미지
+                ConvertAPI->>Storage: lecture-slides 업로드
+                Storage-->>ConvertAPI: imagePath
+                ConvertAPI-->>Admin: NDJSON slide 이벤트
+            end
         end
 
         Admin->>Store: createSession(slides)
@@ -109,11 +117,13 @@ sequenceDiagram
         Join->>Store: loadSessionByCode(code)
         Store->>Service: fetchLiveSession(code)
         Service->>DB: live lecture/material/version/slides 조회
+        Service->>Storage: live PDF 서명 URL 요청
         Service->>DB: RPC find_lecture_questions()
         DB-->>Service: 참여 가능한 강의와 질문
         Note over Service,DB: slide_instructor_notes는 참여자 조회에서 제외
         Service-->>Store: 참여자용 ClassSession
-        Store-->>Join: 현재 슬라이드와 질문 렌더링
+        Store-->>Join: 현재 슬라이드와 질문 전달
+        Join->>PDFJS: 현재·인접 PDF 페이지만 캔버스 렌더링
     end
 
     rect rgb(242, 250, 245)
@@ -187,22 +197,22 @@ sequenceDiagram
 - 강사용 조회에는 `slide_instructor_notes`가 포함된다.
 - 계정별 localStorage는 원격 조회 실패 시에만 사용하는 failure cache다. 로그아웃하거나 익명 사용자로 전환하면 이전 강사의 메모리 상태를 비운다.
 
-### 3.3 자료 변환과 저장
+### 3.3 자료 업로드, 렌더링과 저장
 
-1. 브라우저는 access token과 함께 파일을 `/api/convert`로 전송한다.
-2. Route Handler는 `auth.getUser()`로 토큰을 검증한다.
-3. PPT/PPTX는 LibreOffice로 PDF가 되고, PDF 페이지는 `pdftoppm`으로 JPEG가 된다.
-4. 페이지가 완성되는 순서대로 `lecture-slides/{ownerId}/{uploadId}/{slideId}.jpg`에 저장된다.
-5. 서버는 NDJSON 스트림으로 각 슬라이드 메타데이터를 브라우저에 전달한다.
-6. 변환 완료 후 `persistSession()`이 Course, Lecture, Material, MaterialVersion, Slide row를 순서대로 생성한다.
-
-현재 경로는 변환된 이미지를 `lecture-slides`에 저장한다. `material_versions.source_path`는 기록하지만 원본 PDF/PPT를 `course-materials`에 업로드하는 흐름은 연결되어 있지 않다.
+1. 브라우저는 access token으로 원본을 `course-materials/{ownerId}/{uploadId}/source.{ext}`에 6MiB 조각으로 재개 가능 업로드한다.
+2. 신규 PDF는 브라우저의 PDF.js가 페이지 수를 확인한다. PDF 원본은 다시 서버로 보내거나 JPEG로 변환하지 않는다.
+3. 각 PDF 슬라이드는 `source_page_index`로 원본 페이지를 참조한다. 현재 화면과 화면 가까이에 있는 페이지만 캔버스에 지연 렌더링한다.
+4. PPT/PPTX만 원본 경로를 `/api/convert`에 전달한다. Route Handler는 `auth.getUser()`와 owner 경로를 검증한 뒤 private 원본을 임시 디스크로 스트리밍한다.
+5. PPT/PPTX는 LibreOffice로 PDF가 되고, 그 페이지가 `pdftoppm` JPEG로 변환되어 `lecture-slides/{ownerId}/{uploadId}/{slideId}.jpg`에 저장된다.
+6. 서버는 PPT/PPTX 변환 진행을 NDJSON slide 이벤트로 전달한다.
+7. `persistSession()`은 Course, Lecture, Material, MaterialVersion, Slide row를 생성하고 실제 원본 경로를 기록한다. 각 Slide는 `image_path`와 `source_page_index` 중 하나만 가진다.
 
 ### 3.4 참여자 입장과 질문 제출
 
 - 참여자 페이지는 강사 세션과 별도의 Supabase auth storage key를 사용한다.
 - 기존 세션이 없으면 anonymous user를 만든다.
 - `fetchLiveSession()`은 `status = live`인 Lecture와 Material, 최신 MaterialVersion, Slides를 조회한다.
+- PDF 자료이면 live 강의에만 허용되는 `course-materials` RLS로 서명 URL을 만들고 모든 PDF 페이지가 이를 공유한다.
 - 참여자 DTO에는 강사용 발표 메모를 포함하지 않는다.
 - 참여자가 PIN을 남기면 0~1 정규화 좌표를 가진 `region_anchors`가 먼저 생성되고, 이를 참조하는 `questions`가 저장된다.
 - 참여자는 본인이 작성한 미답변 질문만 수정할 수 있다. 이 제한은 UI뿐 아니라 RLS와 UPDATE 조건에도 적용된다.

@@ -48,7 +48,7 @@ exec gcloud run deploy "$SERVICE" \
   --memory 4Gi \
   --cpu 4 \
   --no-cpu-boost \
-  --timeout 300 \
+  --timeout 3600 \
   --concurrency 2 \
   --max 3 \
   --max-instances 3 \

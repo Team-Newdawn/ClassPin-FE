@@ -140,7 +140,8 @@ erDiagram
         uuid id PK
         uuid material_version_id FK
         integer page_index
-        text image_path
+        text image_path nullable
+        integer source_page_index nullable
         integer width_px
         integer height_px
         timestamptz created_at
@@ -301,7 +302,7 @@ Course → Lecture → Material → MaterialVersion → Slide
 | `lectures` | join code와 라이브 상태를 가진 강의 세션 | `join_code` unique, `(course_id, seq_no)` unique |
 | `materials` | Lecture에서 사용하는 PDF 또는 slide deck | Course와 Lecture 모두 참조 |
 | `material_versions` | 자료의 버전과 source path | `(material_id, version_no)` unique |
-| `slides` | 변환된 페이지 이미지 | `(material_version_id, page_index)` unique |
+| `slides` | 변환 이미지 또는 원본 PDF 페이지의 표시 순서 | `(material_version_id, page_index)` unique, `image_path`/`source_page_index` 정확히 하나 |
 | `slide_instructor_notes` | 슬라이드별 강사용 발표 메모 | `slide_id`가 PK이자 FK, 참여자 접근 불가 |
 
 강의 삭제는 상위 Course 삭제를 시작점으로 하위 Lecture, Material, Version, Slide가 cascade된다. Storage object는 FK로 연결되지 않으므로 service가 별도로 정리한다.
@@ -418,11 +419,11 @@ Course → Lecture → Material → MaterialVersion → Slide
 
 | Bucket | 공개 여부 | 제한 | 현재 용도 |
 | --- | --- | --- | --- |
-| `lecture-slides` | Public | 10 MiB, JPEG/PNG/WebP | 변환·추가된 강의 슬라이드 이미지 |
-| `course-materials` | Private | 40 MiB, PDF/PPT/PPTX | 원본 자료용으로 정의됐으나 현재 업로드 흐름 미연결 |
+| `lecture-slides` | Public | 10 MiB, JPEG/PNG/WebP | PPT/PPTX에서 변환하거나 강사가 추가한 슬라이드 이미지 |
+| `course-materials` | Private | 1 GiB, PDF/PPT/PPTX | 재개 가능한 원본 업로드, PPT/PPTX 변환 입력, PDF 직접 렌더링 원본 |
 | `campaign-images` | Public | 10 MiB, JPEG/PNG/WebP | 보존 campaign 이미지 |
 
-DB의 `image_path`와 `source_path`는 Storage object를 문자열로 참조한다. PostgreSQL FK가 아니므로 row 삭제와 object 삭제를 하나의 DB cascade로 처리할 수 없다. 삭제 service는 먼저 관련 경로를 조회하고 DB 삭제 후 Storage object를 정리한다.
+DB의 `image_path`와 `source_path`는 Storage object를 문자열로 참조한다. PDF 슬라이드의 `source_page_index`는 같은 MaterialVersion의 `source_path` PDF 안에서 0부터 시작하는 페이지 번호다. PostgreSQL FK가 아니므로 row 삭제와 object 삭제를 하나의 DB cascade로 처리할 수 없다. 삭제 service는 먼저 관련 경로를 조회하고 DB 삭제 후 Storage object를 정리한다. 참여자는 live PDF에 한해 `course-materials` 객체를 읽을 수 있고, 강의가 종료되면 새 서명 URL 발급이 RLS에서 거부된다.
 
 ## 10. 삭제 및 보존 규칙
 

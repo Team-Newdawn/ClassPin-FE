@@ -5,7 +5,7 @@ import { useAuth } from "@/app/_controller/auth-context";
 import { classFolderColorIndexForOrder, defaultQuestionCategorySettings, isParticipantPointAnchor, normalizeClassFolderColorIndex, normalizeClassFolderName, normalizeQuestionCategorySettings, type ClassFolder, type ClassSession, type ParticipantQuestionInput, type PresentationQrPosition, type Question, type QuestionCategorySettings, type Slide } from "@/app/_model/types";
 import { withQuestionReaction } from "@/app/_model/question-reactions";
 import { normalizeSessions } from "@/app/_model/class/session";
-import { appendSessionSlides, classSessionPersistenceEnabled, createClassFolder as persistClassFolder, deleteClassFolder as persistClassFolderDeletion, deleteClassSession as persistSessionDeletion, deleteSessionSlide, fetchLectureSnapshot, fetchLiveSession, fetchOwnedClassFolders, fetchOwnedSessions, fetchSessionSlides, markQuestionResolved, moveSessionToFolder as persistSessionFolder, persistSession, postAnswer, renameClassFolder as persistClassFolderName, saveSlideInstructorNote, setQuestionReaction as persistQuestionReaction, submitQuestion, subscribeToLecture, updateLecture, updateQuestion as persistQuestionUpdate, validateSlideImages, type LectureRealtimeRow } from "@/app/_service/class-session-service";
+import { appendSessionSlides, classSessionPersistenceEnabled, createClassFolder as persistClassFolder, deleteClassFolder as persistClassFolderDeletion, deleteClassSession as persistSessionDeletion, deleteSessionSlide, fetchLectureSnapshot, fetchLiveSession, fetchLiveSessionById, fetchOwnedClassFolders, fetchOwnedSessions, fetchSessionSlides, markQuestionResolved, moveSessionToFolder as persistSessionFolder, persistSession, postAnswer, renameClassFolder as persistClassFolderName, saveSlideInstructorNote, setQuestionReaction as persistQuestionReaction, submitQuestion, subscribeToLecture, updateLecture, updateQuestion as persistQuestionUpdate, validateSlideImages, type LectureRealtimeRow } from "@/app/_service/class-session-service";
 
 const STORAGE_KEY = "pin-class-sessions-v1";
 const FOLDER_STORAGE_KEY = "pin-class-folders-v1";
@@ -22,7 +22,7 @@ type Store = {
   renameFolder: (folderId: string, name: string) => Promise<void>;
   deleteFolder: (folderId: string) => Promise<void>;
   moveSessionToFolder: (sessionId: string, folderId: string | null) => Promise<void>;
-  createSession: (input: { folderId: string | null; title: string; fileName: string; slides: Slide[] }) => Promise<ClassSession>;
+  createSession: (input: { folderId: string | null; title: string; fileName: string; slides: Slide[]; sourcePath?: string }) => Promise<ClassSession>;
   deleteSession: (sessionId: string) => Promise<void>;
   appendSlides: (sessionId: string, files: File[]) => Promise<void>;
   deleteSlide: (sessionId: string, slideId: string) => Promise<void>;
@@ -38,6 +38,7 @@ type Store = {
   setQuestionCategories: (sessionId: string, settings: QuestionCategorySettings) => Promise<void>;
   updateSlideNote: (sessionId: string, slideId: string, body: string) => Promise<void>;
   loadSessionByCode: (code: string) => Promise<ClassSession | null>;
+  loadSessionById: (sessionId: string) => Promise<ClassSession | null>;
   setActiveSession: (sessionId: string | null) => void;
 };
 
@@ -98,6 +99,7 @@ export function SessionStore({ children }: { children: React.ReactNode }) {
   const refreshSequences = useRef(new Map<string, number>());
   const slideRefreshSequences = useRef(new Map<string, number>());
   const ownerId = useRef<string | null>(null);
+  const demoChannelRef = useRef<BroadcastChannel | null>(null);
   const sessionsByIdRef = useRef<ReadonlyMap<string, ClassSession>>(new Map());
   const authUserId = user?.id ?? null;
   const authIsAnonymous = user?.is_anonymous ?? false;
@@ -260,9 +262,7 @@ export function SessionStore({ children }: { children: React.ReactNode }) {
       return;
     }
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify(sessions));
-    const channel = new BroadcastChannel("pin-class-live");
-    channel.postMessage(sessions);
-    channel.close();
+    demoChannelRef.current?.postMessage(sessions);
   }, [sessions, ready]);
 
   useEffect(() => {
@@ -277,6 +277,8 @@ export function SessionStore({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (classSessionPersistenceEnabled) return;
     const channel = new BroadcastChannel("pin-class-live");
+    // 같은 연결로 보내야 이 탭의 이전 상태를 스스로 수신하지 않는다.
+    demoChannelRef.current = channel;
     channel.onmessage = (event) => setSessions((current) => {
       const next = normalizeSessions(event.data as ClassSession[]);
       return JSON.stringify(current) === JSON.stringify(next) ? current : next;
@@ -286,7 +288,7 @@ export function SessionStore({ children }: { children: React.ReactNode }) {
       if (event.key === FOLDER_STORAGE_KEY) setFolders(readFolders(FOLDER_STORAGE_KEY));
     };
     window.addEventListener("storage", onStorage);
-    return () => { channel.close(); window.removeEventListener("storage", onStorage); };
+    return () => { demoChannelRef.current = null; channel.close(); window.removeEventListener("storage", onStorage); };
   }, []);
 
   const createFolder = useCallback(async (name: string) => {
@@ -299,7 +301,7 @@ export function SessionStore({ children }: { children: React.ReactNode }) {
     return folder;
   }, [folders.length]);
 
-  const createSession = useCallback(async (input: { folderId: string | null; title: string; fileName: string; slides: Slide[] }) => {
+  const createSession = useCallback(async (input: { folderId: string | null; title: string; fileName: string; slides: Slide[]; sourcePath?: string }) => {
     if (input.folderId !== null && !foldersById.has(input.folderId)) {
       throw new Error("강의 자료를 추가할 폴더를 찾지 못했습니다.");
     }
@@ -312,7 +314,7 @@ export function SessionStore({ children }: { children: React.ReactNode }) {
       questionCategories: defaultQuestionCategorySettings(),
       createdAt: new Date().toISOString(), slides: input.slides, questions: []
     };
-    if (classSessionPersistenceEnabled) await persistSession(session);
+    if (classSessionPersistenceEnabled) await persistSession(session, input.sourcePath);
     setSessions((current) => [session, ...current]);
     return session;
   }, [foldersById]);
@@ -345,6 +347,24 @@ export function SessionStore({ children }: { children: React.ReactNode }) {
       else lectureSettingTargets.current.delete(sessionId);
     }
   }, [updateSession]);
+
+  const loadLiveSession = useCallback((
+    key: string,
+    existing: ClassSession | undefined,
+    fetcher: () => Promise<ClassSession | null>
+  ) => {
+    if (existing) return Promise.resolve(existing);
+    const inflight = lookups.current.get(key);
+    if (inflight) return inflight;
+    const lookup = fetcher()
+      .then((remote) => {
+        if (remote) setSessions((current) => current.some((session) => session.id === remote.id) ? current : [remote, ...current]);
+        return remote;
+      })
+      .finally(() => lookups.current.delete(key));
+    lookups.current.set(key, lookup);
+    return lookup;
+  }, []);
 
   const value = useMemo<Store>(() => ({
     ready,
@@ -568,25 +588,17 @@ export function SessionStore({ children }: { children: React.ReactNode }) {
       }));
     },
     setActiveSession: setActiveSessionId,
-    loadSessionByCode: async (code) => {
-      const key = code.toLowerCase();
-      const existing = sessionsByCode.get(key);
-      if (existing) return existing;
-      // sessions 는 이 클로저가 만들어진 시점의 값이다. 같은 코드로 조회가 겹치면 (StrictMode 의
-      // 이펙트 재실행, 재진입) 위 검사를 둘 다 통과해 같은 세션이 두 번 앞에 붙는다.
-      // 조회를 하나로 묶고, 넣는 순간 최신 목록에서 id 를 다시 확인한다.
-      const inflight = lookups.current.get(key);
-      if (inflight) return inflight;
-      const lookup = fetchLiveSession(code)
-        .then((remote) => {
-          if (remote) setSessions((current) => current.some((session) => session.id === remote.id) ? current : [remote, ...current]);
-          return remote;
-        })
-        .finally(() => lookups.current.delete(key));
-      lookups.current.set(key, lookup);
-      return lookup;
-    }
-  }), [createFolder, createSession, folders, foldersById, ready, saveLectureSettings, sessions, sessionsByCode, sessionsById, updateSession]);
+    loadSessionByCode: (code) => loadLiveSession(
+      `code:${code.toLowerCase()}`,
+      sessionsByCode.get(code.toLowerCase()),
+      () => fetchLiveSession(code)
+    ),
+    loadSessionById: (sessionId) => loadLiveSession(
+      `id:${sessionId}`,
+      sessionsById.get(sessionId),
+      () => fetchLiveSessionById(sessionId)
+    )
+  }), [createFolder, createSession, folders, foldersById, loadLiveSession, ready, saveLectureSettings, sessions, sessionsByCode, sessionsById, updateSession]);
 
   return <SessionContext.Provider value={value}>{children}</SessionContext.Provider>;
 }

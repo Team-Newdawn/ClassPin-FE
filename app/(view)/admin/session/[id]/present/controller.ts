@@ -2,32 +2,45 @@
 
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
+import { useAuth } from "@/app/_controller/auth-context";
 import { useLanguage } from "@/app/_controller/language-context";
 import { useSessions } from "@/app/_controller/session-store";
 import { useLectureReactions } from "@/app/_controller/use-lecture-reactions";
-import { advancePinPlayback, canRotatePinPlayback, crossedPinMilestone, resolvePinDisplayPositions, resolveVisiblePresentationLabelIds } from "@/app/_model/class/presentation-rotation";
+import { advancePinPlayback, canRotatePinPlayback, crossedPinMilestone, findNewestIncomingPin, nextPresentationSlide, resolvePinDisplayPositions, resolveVisiblePresentationLabelIds } from "@/app/_model/class/presentation-rotation";
 import { groupQuestionsBySlide } from "@/app/_model/stats";
 import type { Question } from "@/app/_model/types";
+import { classSessionPersistenceEnabled } from "@/app/_service/class-session-service";
 
 const CONTROLS_HIDE_DELAY = 2600;
-const PIN_REVEAL_DELAY = 1000; // PIN이 순환되는 속도 조절 -> 현재는 3000ms으로 되어있음
+const PIN_REVEAL_DELAY = 1000;
+const SLIDE_AUTOPLAY_DELAY = 3000;
 const LIVE_PIN_HIGHLIGHT_DELAY = 1000;
 const PIN_MILESTONE_DISPLAY_DELAY = 3000;
-const EMPTY_PLAYBACK = { slideIndex: null as number | null, shownPinIds: [] as string[], activePinId: null as string | null };
+const EMPTY_PLAYBACK = { shownPinIds: [] as string[], activePinId: null as string | null };
 type PositionedQuestion = Question & { x: number; y: number };
 const EMPTY_POSITIONED_QUESTIONS: PositionedQuestion[] = [];
 
 export function useSessionPresentationController() {
   const { t, locale } = useLanguage();
+  const { isAdmin } = useAuth();
   const params = useParams<{ id: string }>();
   const router = useRouter();
-  const { sessions, ready, setActiveSession, setCurrentSlide } = useSessions();
+  const { sessions, ready: storeReady, loadSessionById, setActiveSession, setCurrentSlide } = useSessions();
   const session = sessions.find((item) => item.id === params.id);
+  const [lookupDone, setLookupDone] = useState(false);
+  const ready = storeReady && (Boolean(session) || lookupDone);
+  const canControl = !classSessionPersistenceEnabled || (isAdmin && !lookupDone);
   const sessionId = session?.id ?? null;
+  const syncedSlide = session?.currentSlide;
+  const [audienceView, setAudienceView] = useState({ sessionId, syncedSlide, currentSlide: syncedSlide ?? 0 });
+  if (audienceView.sessionId !== sessionId || audienceView.syncedSlide !== syncedSlide) {
+    setAudienceView({ sessionId, syncedSlide, currentSlide: syncedSlide ?? 0 });
+  }
   const showQuestionPins = session?.showQuestionPins ?? false;
   const { reactions: liveReactions } = useLectureReactions(sessionId);
   const sessionTitle = session?.title;
-  const currentSlide = session?.currentSlide;
+  const currentSlide = canControl ? syncedSlide ?? 0 : audienceView.currentSlide;
+  const slideCount = session?.slides.length ?? 0;
   const { positionedQuestions, questionsBySlide } = useMemo(() => {
     const questions = (session?.questions ?? []).filter((question): question is PositionedQuestion => question.x !== null && question.y !== null);
     return { positionedQuestions: questions, questionsBySlide: groupQuestionsBySlide(questions) };
@@ -53,9 +66,18 @@ export function useSessionPresentationController() {
   const [actionError, setActionError] = useState<string | null>(null);
   const [detailQuestionId, setDetailQuestionId] = useState<string | null>(null);
   const [liveQuestionId, setLiveQuestionId] = useState<string | null>(null);
-  const [storedPlayback, setStoredPlayback] = useState(EMPTY_PLAYBACK);
+  const [pinPlayback, setPinPlayback] = useState({ sessionId, currentSlide, showQuestionPins, shownPinIds: [] as string[] });
+  if (pinPlayback.sessionId !== sessionId || pinPlayback.currentSlide !== currentSlide || pinPlayback.showQuestionPins !== showQuestionPins) {
+    setPinPlayback({ sessionId, currentSlide, showQuestionPins, shownPinIds: [] });
+    if (pinPlayback.sessionId !== sessionId || pinPlayback.currentSlide !== currentSlide) setDetailQuestionId(null);
+  }
   const [pinMilestone, setPinMilestone] = useState<number | null>(null);
   const [canvasSize, setCanvasSize] = useState<{ width: number; height: number } | null>(null);
+
+  useEffect(() => {
+    if (!storeReady || lookupDone || session) return;
+    void loadSessionById(params.id).finally(() => setLookupDone(true));
+  }, [loadSessionById, lookupDone, params.id, session, storeReady]);
 
   useEffect(() => {
     setActiveSession(params.id);
@@ -65,16 +87,12 @@ export function useSessionPresentationController() {
   const playback = useMemo(() => {
     if (!showQuestionPins) return EMPTY_PLAYBACK;
     const validIds = new Set(pageQuestions.map((question) => question.id));
-    const shownPinIds = storedPlayback.slideIndex === currentSlide
-      ? storedPlayback.shownPinIds.filter((id) => validIds.has(id))
-      : [];
-    if (shownPinIds.length) return {
-      shownPinIds,
-      activePinId: shownPinIds.includes(storedPlayback.activePinId ?? "") ? storedPlayback.activePinId : shownPinIds.at(-1) ?? null
-    };
+    const shownPinIds = pinPlayback.shownPinIds.filter((id) => validIds.has(id));
+    if (shownPinIds.length) return { shownPinIds, activePinId: shownPinIds.at(-1) ?? null };
     const firstPinId = pageQuestions[0]?.id ?? null;
     return { shownPinIds: firstPinId ? [firstPinId] : [], activePinId: firstPinId };
-  }, [currentSlide, pageQuestions, showQuestionPins, storedPlayback]);
+  }, [pageQuestions, showQuestionPins, pinPlayback.shownPinIds]);
+  const allPagePinsVisible = playback.shownPinIds.length >= pageQuestions.length;
   const visibleQuestionIds = useMemo(() => liveQuestionId && !playback.shownPinIds.includes(liveQuestionId)
     ? [...playback.shownPinIds, liveQuestionId]
     : playback.shownPinIds, [liveQuestionId, playback.shownPinIds]);
@@ -89,6 +107,32 @@ export function useSessionPresentationController() {
     if (hideTimerRef.current) clearTimeout(hideTimerRef.current);
     hideTimerRef.current = setTimeout(() => setControlsVisible(false), CONTROLS_HIDE_DELAY);
   }, []);
+
+  const goToSlide = useCallback((requestedIndex: number) => {
+    if (!sessionId || slideCount === 0) return;
+    const nextIndex = Math.min(Math.max(0, requestedIndex), slideCount - 1);
+    if (nextIndex === currentIndexRef.current) return;
+    currentIndexRef.current = nextIndex;
+    setActionError(null);
+    revealControls();
+    if (!canControl) {
+      setAudienceView({ sessionId, syncedSlide, currentSlide: nextIndex });
+      return;
+    }
+    void setCurrentSlide(sessionId, nextIndex).catch((error) => {
+      const detail = error && typeof error === "object" && "message" in error ? String(error.message) : String(error);
+      console.error(`Slide state save failed: ${detail}`, error);
+      setActionError(t("presentation.syncDelay"));
+      revealControls();
+    });
+  }, [canControl, revealControls, sessionId, setCurrentSlide, slideCount, syncedSlide, t]);
+
+  useEffect(() => {
+    if (!showQuestionPins || slideCount < 2 || detailQuestionId || !allPagePinsVisible) return;
+    const delay = pageQuestions.length ? PIN_REVEAL_DELAY : SLIDE_AUTOPLAY_DELAY;
+    const timeout = window.setTimeout(() => goToSlide(nextPresentationSlide(currentIndexRef.current, slideCount)), delay);
+    return () => window.clearTimeout(timeout);
+  }, [allPagePinsVisible, currentSlide, detailQuestionId, goToSlide, pageQuestions.length, positionedQuestionKey, showQuestionPins, slideCount]);
 
   useEffect(() => {
     hideTimerRef.current = setTimeout(() => setControlsVisible(false), CONTROLS_HIDE_DELAY);
@@ -132,27 +176,23 @@ export function useSessionPresentationController() {
     labels.forEach((label) => { label.hidden = !visibleLabelIds.has(label.dataset.presentationLabelId!); });
   }, [activeQuestionId, isFullscreen, pinDisplayPositions, showQuestionPins, visibleQuestionIds]);
 
-  // 첫 스냅샷은 새 PIN으로 보지 않는다. 이후 현재 슬라이드에 들어온 PIN만 즉시 빨강으로 강조한다.
+  // 첫 스냅샷은 새 PIN으로 보지 않는다. 이후 새 PIN이 들어오면 해당 슬라이드로 이동해 즉시 강조한다.
   useEffect(() => {
-    if (!session) return;
+    if (!sessionId) return;
     const previousIds = previousQuestionIdsRef.current;
     previousQuestionIdsRef.current = positionedQuestionIds;
-    const firstSnapshot = questionSessionIdRef.current !== session.id;
-    questionSessionIdRef.current = session.id;
-    if (firstSnapshot || !session.showQuestionPins) return;
-    const incoming = positionedQuestions.find((question) => !previousIds.includes(question.id) && question.slideIndex === session.currentSlide);
+    const firstSnapshot = questionSessionIdRef.current !== sessionId;
+    questionSessionIdRef.current = sessionId;
+    if (firstSnapshot || !showQuestionPins) return;
+    const incoming = findNewestIncomingPin(positionedQuestions, previousIds);
     if (!incoming) return;
+    if (incoming.slideIndex !== currentIndexRef.current) setDetailQuestionId(null);
+    goToSlide(incoming.slideIndex);
     setLiveQuestionId(incoming.id);
-    setStoredPlayback((current) => ({
-      slideIndex: incoming.slideIndex,
-      shownPinIds: current.slideIndex === incoming.slideIndex && current.shownPinIds.includes(incoming.id)
-        ? current.shownPinIds
-        : current.slideIndex === incoming.slideIndex ? [...current.shownPinIds, incoming.id] : [incoming.id],
-      activePinId: incoming.id
-    }));
+    setPinPlayback({ sessionId, currentSlide: incoming.slideIndex, showQuestionPins, shownPinIds: [incoming.id] });
     // id 집합이 같으면 질문 본문·답변·공감 변경만으로 강조를 재생하지 않는다.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [positionedQuestionKey, session?.id, session?.showQuestionPins]);
+  }, [goToSlide, positionedQuestionKey, sessionId, showQuestionPins]);
 
   useEffect(() => {
     if (!liveQuestionId) return;
@@ -161,17 +201,15 @@ export function useSessionPresentationController() {
   }, [liveQuestionId]);
 
   const rotateQuestions = useCallback(() => {
-    setStoredPlayback((current) => ({
-      slideIndex: currentSlide ?? null,
-      ...advancePinPlayback(pageQuestionsRef.current, current.slideIndex === currentSlide ? current.shownPinIds : [])
-    }));
-  }, [currentSlide]);
+    const next = advancePinPlayback(pageQuestionsRef.current, playback.shownPinIds);
+    setPinPlayback((current) => ({ ...current, shownPinIds: next.shownPinIds }));
+  }, [playback.shownPinIds]);
 
   useEffect(() => {
-    if (!canRotatePinPlayback(showQuestionPins, pageQuestions.length, detailQuestionId)) return;
+    if (!canRotatePinPlayback(showQuestionPins, pageQuestions.length, playback.shownPinIds.length, detailQuestionId)) return;
     const interval = window.setInterval(rotateQuestions, PIN_REVEAL_DELAY);
     return () => window.clearInterval(interval);
-  }, [detailQuestionId, pageQuestions.length, rotateQuestions, showQuestionPins]);
+  }, [detailQuestionId, pageQuestions.length, playback.shownPinIds.length, rotateQuestions, showQuestionPins]);
 
   useEffect(() => {
     if (!sessionId) return;
@@ -216,21 +254,6 @@ export function useSessionPresentationController() {
     document.addEventListener("fullscreenchange", onFullscreenChange);
     return () => document.removeEventListener("fullscreenchange", onFullscreenChange);
   }, [revealControls]);
-
-  const goToSlide = useCallback((requestedIndex: number) => {
-    if (!session || session.slides.length === 0) return;
-    const nextIndex = Math.min(Math.max(0, requestedIndex), session.slides.length - 1);
-    if (nextIndex === currentIndexRef.current) return;
-    currentIndexRef.current = nextIndex;
-    setActionError(null);
-    revealControls();
-    void setCurrentSlide(session.id, nextIndex).catch((error) => {
-      const detail = error && typeof error === "object" && "message" in error ? String(error.message) : String(error);
-      console.error(`Slide state save failed: ${detail}`, error);
-      setActionError(t("presentation.syncDelay"));
-      revealControls();
-    });
-  }, [revealControls, session, setCurrentSlide, t]);
 
   const toggleFullscreen = useCallback(async () => {
     setActionError(null);
@@ -279,8 +302,8 @@ export function useSessionPresentationController() {
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [detailQuestionId, goToSlide, revealControls, session, toggleFullscreen]);
 
-  const slide = session?.slides[session.currentSlide];
-  const detailQuestion = session?.questions.find((question) => question.id === detailQuestionId && question.slideIndex === session.currentSlide);
+  const slide = session?.slides[currentSlide];
+  const detailQuestion = session?.questions.find((question) => question.id === detailQuestionId && question.slideIndex === currentSlide);
   const joinUrl = typeof window === "undefined" || !session ? "" : `${window.location.origin}/join/${session.code}`;
   const openQuestionDetail = (questionId: string) => {
     setDetailQuestionId(questionId);
@@ -296,6 +319,7 @@ export function useSessionPresentationController() {
     ready,
     session,
     slide,
+    currentSlide,
     detailQuestion,
     joinUrl,
     pageQuestions,

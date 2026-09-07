@@ -176,7 +176,7 @@ export function useSessionAdminController() {
     return counts;
   }, { total: session?.questions.length ?? 0, unanswered: 0, resolved: 0 }), [session?.questions]);
   const slideQuestions = questionsBySlide.get(session?.currentSlide ?? -1) ?? [];
-  const selected = session?.questions.find((question) => question.id === selectedId) ?? slideQuestions[0];
+  const selected = session?.questions.find((question) => question.id === selectedId);
   const detailQuestion = session?.questions.find((question) => question.id === detailQuestionId);
   const noteDraft = slide ? noteDrafts[slide.id] ?? slide.speakerNote ?? "" : "";
   const noteDirty = Boolean(slide && noteDraft !== (slide.speakerNote ?? ""));
@@ -187,6 +187,11 @@ export function useSessionAdminController() {
   const openQuestionDetail = (questionId: string) => {
     setSelectedId(questionId);
     setDetailQuestionId(questionId);
+    setAnswer("");
+  };
+  const closeQuestionDetail = () => {
+    setDetailQuestionId(null);
+    setAnswer("");
   };
   const selectQuestionFromList = (questionId: string, slideIndex: number) => {
     if (!session) return;
@@ -200,18 +205,18 @@ export function useSessionAdminController() {
     window.setTimeout(() => setCopied(false), 1500);
   };
   const submitAnswer = () => {
-    if (!session || !selected || !answer.trim()) return;
+    if (!session || !detailQuestion || !answer.trim()) return;
     const body = answer.trim();
     setActionError(null);
-    void answerQuestion(session.id, selected.id, body)
+    void answerQuestion(session.id, detailQuestion.id, body)
       .then(() => setAnswer(""))
       .catch((error) => {
         console.error(`Answer save failed: ${errorDetail(error)}`, error);
         setActionError(t("session.saveAnswerError"));
       });
   };
-  const resolveSelectedQuestion = () => {
-    if (session && selected) runAction(resolveQuestion(session.id, selected.id), t("session.saveQuestionError"));
+  const resolveDetailQuestion = () => {
+    if (session && detailQuestion) runAction(resolveQuestion(session.id, detailQuestion.id), t("session.saveQuestionError"));
   };
   const saveCurrentSlideNote = () => {
     if (!session || !slide || !noteDirty || noteSavingSlideId === slide.id) return;
@@ -362,8 +367,9 @@ export function useSessionAdminController() {
     changeAnswer: setAnswer,
     changeQuery: setQuery,
     changeFilter: setFilter,
+    selectQuestion: setSelectedId,
     openQuestionDetail,
-    closeQuestionDetail: () => setDetailQuestionId(null),
+    closeQuestionDetail,
     selectQuestionFromList,
     changeSlide,
     toggleStatus: () => session && runLectureAction(() => setStatus(session.id, session.status === "live" ? "ended" : "live"), t("session.saveLectureError")),
@@ -377,7 +383,7 @@ export function useSessionAdminController() {
     saveQuestionCategories: (settings: QuestionCategorySettings) => session ? setQuestionCategories(session.id, settings) : Promise.resolve(),
     reportActionError: setActionError,
     submitAnswer,
-    resolveSelectedQuestion,
+    resolveDetailQuestion,
     saveCurrentSlideNote,
     changeNoteDraft,
     saveNoteByKeyboard,

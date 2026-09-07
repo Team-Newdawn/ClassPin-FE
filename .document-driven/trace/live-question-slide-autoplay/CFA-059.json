@@ -1,0 +1,14 @@
+{
+  "code": [
+    "app/(view)/admin/session/[id]/present/controller.ts"
+  ],
+  "documents": [
+    "class-frontend-architecture"
+  ],
+  "recorded_at": "2026-09-05T00:27:39+00:00",
+  "requirement_id": "CFA-059",
+  "task_id": "live-question-slide-autoplay",
+  "tests": [
+    ".document-driven/evidence/live-question-slide-autoplay.md"
+  ]
+}

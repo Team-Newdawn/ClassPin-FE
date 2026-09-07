@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { advancePinPlayback, canRotatePinPlayback, crossedPinMilestone, rectanglesOverlap, resolvePinDisplayPositions, resolveVisiblePresentationLabelIds } from "./presentation-rotation.ts";
+import { advancePinPlayback, canRotatePinPlayback, crossedPinMilestone, findNewestIncomingPin, nextPresentationSlide, rectanglesOverlap, resolvePinDisplayPositions, resolveVisiblePresentationLabelIds } from "./presentation-rotation.ts";
 
 test("PIN 총합이 새 10단위를 넘으면 건너뛴 구간 중 가장 높은 값을 고른다", () => {
   assert.equal(crossedPinMilestone(9, 10), 10);
@@ -34,11 +34,38 @@ test("현재 표시된 PIN과 가장 멀리 떨어진 PIN을 다음으로 고른
   assert.equal(advancePinPlayback(pins, ["center"]).activePinId, "far");
 });
 
-test("사용자가 PIN을 선택한 동안 자동 순환을 멈춘다", () => {
-  assert.equal(canRotatePinPlayback(true, 2, null), true);
-  assert.equal(canRotatePinPlayback(true, 2, "selected"), false);
-  assert.equal(canRotatePinPlayback(false, 2, null), false);
-  assert.equal(canRotatePinPlayback(true, 1, null), false);
+test("새 PIN부터 다시 시작하면 기존 PIN도 모두 순환한 뒤 완료한다", () => {
+  const pins = [
+    { id: "incoming", x: 0.5, y: 0.5 },
+    { id: "first", x: 0.1, y: 0.1 },
+    { id: "second", x: 0.9, y: 0.9 }
+  ];
+  let shownPinIds = ["incoming"];
+  for (let count = 1; count < pins.length; count += 1) {
+    assert.equal(canRotatePinPlayback(true, pins.length, shownPinIds.length, null), true);
+    shownPinIds = advancePinPlayback(pins, shownPinIds).shownPinIds;
+    assert.equal(shownPinIds.length, count + 1);
+  }
+  assert.deepEqual(new Set(shownPinIds), new Set(pins.map((pin) => pin.id)));
+  assert.equal(canRotatePinPlayback(true, pins.length, shownPinIds.length, null), false);
+});
+
+test("선택 중이거나 현재 슬라이드의 PIN이 모두 보이면 PIN 순차 노출을 멈춘다", () => {
+  assert.equal(canRotatePinPlayback(true, 2, 1, null), true);
+  assert.equal(canRotatePinPlayback(true, 2, 2, null), false);
+  assert.equal(canRotatePinPlayback(true, 2, 1, "selected"), false);
+  assert.equal(canRotatePinPlayback(false, 2, 1, null), false);
+  assert.equal(canRotatePinPlayback(true, 1, 1, null), false);
+});
+
+test("발표 슬라이드를 순환하고 기존 snapshot에 없던 최신 PIN을 고른다", () => {
+  const pins = [{ id: "new", slideIndex: 2 }, { id: "known", slideIndex: 0 }];
+
+  assert.equal(nextPresentationSlide(0, 3), 1);
+  assert.equal(nextPresentationSlide(2, 3), 0);
+  assert.equal(nextPresentationSlide(0, 0), 0);
+  assert.equal(findNewestIncomingPin(pins, ["known"]), pins[0]);
+  assert.equal(findNewestIncomingPin(pins, pins.map((pin) => pin.id)), null);
 });
 
 test("중앙이나 가장자리에 겹친 PIN 30개를 화면 안의 겹치지 않는 위치로 펼친다", () => {
@@ -53,7 +80,7 @@ test("중앙이나 가장자리에 겹친 PIN 30개를 화면 안의 겹치지 �
       assert.ok(position.x >= 0 && position.x <= 1);
       assert.ok(position.y >= 0 && position.y <= 1);
       positions.slice(index + 1).forEach((other) => {
-        assert.ok(Math.abs(position.x - other.x) * width >= 30 || Math.abs(position.y - other.y) * height >= 30);
+        assert.ok(Math.abs(position.x - other.x) * width >= 40 || Math.abs(position.y - other.y) * height >= 40);
       });
     });
   }

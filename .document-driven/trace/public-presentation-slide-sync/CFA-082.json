@@ -1,0 +1,17 @@
+{
+  "code": [
+    "app/(view)/admin/session/[id]/present/controller.ts",
+    "app/(view)/admin/session/[id]/present/page.tsx",
+    "app/_controller/session-store.tsx",
+    "app/_service/class-session-service.ts"
+  ],
+  "documents": [
+    "class-frontend-architecture"
+  ],
+  "recorded_at": "2026-09-04T11:44:36+00:00",
+  "requirement_id": "CFA-082",
+  "task_id": "public-presentation-slide-sync",
+  "tests": [
+    ".document-driven/evidence/public-presentation-slide-sync.md"
+  ]
+}

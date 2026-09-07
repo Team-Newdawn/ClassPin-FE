@@ -25,10 +25,10 @@ export default function SessionAdmin() {
     noteDirty, noteSavingSlideId, noteSavedSlideId, addingSlides, deleteTarget, deletingSlide,
     deleteSlideError, deleteTargetQuestionCount, joinUrl, playerWorkspaceRef, filmstripRef,
     slideInputRef, handleSlideWheel, showLive, showQuestions, toggleFolderRail, openShare,
-    closeShare, changeAnswer, changeQuery, changeFilter, openQuestionDetail, closeQuestionDetail,
+    closeShare, changeAnswer, changeQuery, changeFilter, selectQuestion, openQuestionDetail, closeQuestionDetail,
     selectQuestionFromList, changeSlide, toggleStatus, toggleQuestionPins,
     changePresentationQrPlacement,
-    saveQuestionCategories, reportActionError, submitAnswer, resolveSelectedQuestion,
+    saveQuestionCategories, reportActionError, submitAnswer, resolveDetailQuestion,
     saveCurrentSlideNote, changeNoteDraft, saveNoteByKeyboard, addSlideImages, openDeleteSlide,
     closeDeleteSlide, confirmDeleteSlide, startQuestionPanelResize, resizeQuestionPanel,
     finishQuestionPanelResize, cancelQuestionPanelResize, resizeQuestionPanelByKeyboard,
@@ -154,13 +154,7 @@ export default function SessionAdmin() {
                   </button>
                 </div>
                 </div>
-                <div className="question-stack">{slideQuestions.length ? slideQuestions.map((q) => <QuestionCard key={q.id} question={q} questionCategories={session.questionCategories} selected={selected?.id === q.id} onClick={() => openQuestionDetail(q.id)} />) : <div className="no-questions"><MessageCircleQuestion /><b>{t("session.noQuestions")}</b><span>{t("session.noQuestionsHint1")}<br />{t("session.noQuestionsHint2")}</span></div>}</div>
-                {selected && <div className="answer-box">
-                {selected.answer && <div className="saved-answer"><span>{t("session.latestAnswer")}</span><p>{selected.answer}</p></div>}
-                <label htmlFor="answer">{selected.answer ? t("session.additionalAnswer") : t("session.quickAnswer")}</label>
-                <textarea id="answer" value={answer} onChange={(event) => changeAnswer(event.target.value)} placeholder={t("session.answerPlaceholder")} />
-                <div className="answer-actions"><button className="btn tertiary" onClick={resolveSelectedQuestion}><Check />{t("session.resolve")}</button><button className="btn primary" onClick={submitAnswer}>{t("session.sendAnswer")}</button></div>
-                </div>}
+                <div className="question-stack">{slideQuestions.length ? slideQuestions.map((q) => <QuestionCard key={q.id} question={q} questionCategories={session.questionCategories} onClick={() => selectQuestion(q.id)} />) : <div className="no-questions"><MessageCircleQuestion /><b>{t("session.noQuestions")}</b><span>{t("session.noQuestionsHint1")}<br />{t("session.noQuestionsHint2")}</span></div>}</div>
             </aside>
           </div>
         ) : (
@@ -179,7 +173,17 @@ export default function SessionAdmin() {
         )}
       </main>
 
-      {detailQuestion && <QuestionDetailDialog question={detailQuestion} questionCategories={session.questionCategories} onClose={closeQuestionDetail} />}
+      {detailQuestion && <QuestionDetailDialog
+        question={detailQuestion}
+        questionCategories={session.questionCategories}
+        onClose={closeQuestionDetail}
+        answerControls={{
+          draft: answer,
+          onDraftChange: changeAnswer,
+          onResolve: resolveDetailQuestion,
+          onSubmit: submitAnswer
+        }}
+      />}
       {deleteTarget && <div className="modal-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) closeDeleteSlide(); }}>
         <section className="delete-slide-modal" role="alertdialog" aria-modal="true" aria-labelledby="delete-slide-title" aria-describedby="delete-slide-description">
           <button type="button" className="modal-close" disabled={deletingSlide} onClick={closeDeleteSlide} aria-label={t("common.cancel")}><X /></button>

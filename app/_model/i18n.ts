@@ -1,4 +1,5 @@
 import { LEGACY_QUESTION_CATEGORY_KEYS, type QuestionCategory, type QuestionStatus } from "./types.ts";
+import { SOURCE_FILE_TOO_LARGE_ERROR } from "./upload.ts";
 
 export type Locale = "ko" | "en";
 type Values = Record<string, string | number>;
@@ -52,7 +53,7 @@ const ko = {
   "home.startGoogle": "Google로 시작하기",
   "home.preparingSlides": "슬라이드를 준비하고 있어요",
   "home.dropMaterial": "강의 자료를 여기에 놓으세요",
-  "home.fileRequirement": "PDF, PPT, PPTX · 최대 40MB",
+  "home.fileRequirement": "PDF, PPT, PPTX · 최대 1GB",
   "home.chooseFile": "파일 선택",
   "home.recentSessions": "최근 세션",
   "home.recentHint": "바로 이어서 관리할 수 있어요",
@@ -365,8 +366,6 @@ const ko = {
   "student.newQuestion": "새 질문 남기기",
   "student.editPrompt": "질문을 수정해 주세요",
   "student.pointPrompt": "이 위치에서 무엇이 궁금한가요?",
-  "student.editHint": "유형이나 내용을 바꾼 뒤 다시 전송할 수 있어요.",
-  "student.composeHint": "질문 유형만 선택하거나 내용을 함께 적어주세요.",
   "student.optionalQuestion": "선택 사항: 질문을 자유롭게 적어주세요",
   "student.sendEdited": "수정한 질문 보내기",
   "student.sendQuestion": "질문 보내기",
@@ -417,7 +416,7 @@ const ko = {
   "upload.invalidResponse": "서버 응답을 해석하지 못했습니다.",
   "upload.networkError": "네트워크 오류로 업로드에 실패했습니다.",
   "upload.fileRequired": "파일이 필요합니다.",
-  "upload.tooLarge": "파일이 40MB를 초과합니다. 더 작은 파일로 다시 시도해 주세요.",
+  "upload.tooLarge": SOURCE_FILE_TOO_LARGE_ERROR,
   "upload.unsupported": "PDF 또는 PPT 파일만 지원합니다.",
   "upload.sessionExpired": "로그인 정보가 만료되었습니다. 새로고침 후 다시 시도해 주세요.",
 } satisfies Record<string, Message>;
@@ -467,7 +466,7 @@ const en: Record<TranslationKey, Message> = {
   "home.startGoogle": "Continue with Google",
   "home.preparingSlides": "Preparing your slides",
   "home.dropMaterial": "Drop your lecture materials here",
-  "home.fileRequirement": "PDF, PPT, PPTX · Up to 40 MB",
+  "home.fileRequirement": "PDF, PPT, PPTX · Up to 1 GB",
   "home.chooseFile": "Choose file",
   "home.recentSessions": "Recent sessions",
   "home.recentHint": "Pick up right where you left off",
@@ -780,8 +779,6 @@ const en: Record<TranslationKey, Message> = {
   "student.newQuestion": "Ask another question",
   "student.editPrompt": "Update your question",
   "student.pointPrompt": "What would you like to ask about this spot?",
-  "student.editHint": "Change the type or details, then send it again.",
-  "student.composeHint": "Choose a question type, and add details if you'd like.",
   "student.optionalQuestion": "Optional: Write your question",
   "student.sendEdited": "Send updated question",
   "student.sendQuestion": "Send question",
@@ -832,7 +829,7 @@ const en: Record<TranslationKey, Message> = {
   "upload.invalidResponse": "Could not read the server response.",
   "upload.networkError": "The upload failed because of a network error.",
   "upload.fileRequired": "Choose a file to upload.",
-  "upload.tooLarge": "The file is larger than 40 MB. Choose a smaller file and try again.",
+  "upload.tooLarge": "The file is larger than 1 GB. Choose a smaller file and try again.",
   "upload.unsupported": "Only PDF, PPT, and PPTX files are supported.",
   "upload.sessionExpired": "Your session has expired. Refresh the page and try again.",
 };
@@ -867,7 +864,7 @@ const uploadErrorKeys: Array<[string, TranslationKey]> = [
   ["서버 응답을 해석하지 못했습니다.", "upload.invalidResponse"],
   ["네트워크 오류로 업로드에 실패했습니다.", "upload.networkError"],
   ["파일이 필요합니다.", "upload.fileRequired"],
-  ["파일이 40MB를 초과합니다. 더 작은 파일로 다시 시도해 주세요.", "upload.tooLarge"],
+  [SOURCE_FILE_TOO_LARGE_ERROR, "upload.tooLarge"],
   ["PDF 또는 PPT 파일만 지원합니다.", "upload.unsupported"],
   ["로그인 정보가 만료되었습니다. 새로고침 후 다시 시도해 주세요.", "upload.sessionExpired"],
 ];

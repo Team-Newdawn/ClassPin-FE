@@ -1,0 +1,15 @@
+{
+  "code": [
+    "app/api/convert/route.ts",
+    "app/_infrastructure/server/pdf-render.ts"
+  ],
+  "documents": [
+    "class-frontend-architecture"
+  ],
+  "recorded_at": "2026-09-04T12:20:43+00:00",
+  "requirement_id": "CFA-013",
+  "task_id": "four-k-slide-rendering",
+  "tests": [
+    ".document-driven/evidence/four-k-slide-rendering.md"
+  ]
+}

@@ -63,10 +63,22 @@ flow unless a task explicitly spans both products.
   no persistent sidebar.
 - Opening a folder shows its material cards with a grid/list view switch and an
   Insights tab in the page header; Insights is not a sidebar destination. Inside
-  that tab, chips switch between the folder aggregate and each material's own
-  insight scope.
+  that tab, one accessible dropdown switches between the folder aggregate and
+  each material's own insight scope.
+- PDF/PPT/PPTX source uploads accept up to 1 GiB. In Supabase mode the browser
+  uses resumable Storage upload and `/api/convert` receives only the owner-scoped
+  source path; do not send large source bytes through Cloud Run request bodies.
 - Opening a material shows the live player. Its folder rail can collapse, its right
   question panel can resize, and speaker notes sit below the slide.
+- A right-panel question item only selects its slide and highlights its PIN in
+  blue. Only clicking the PIN opens the detail dialog; answer and resolve actions
+  live in that dialog, never inline in the right panel.
+- While live questions are enabled, the presentation starts PIN reveal afresh on
+  every slide visit and advances one second after every PIN is visible. PIN-free
+  slides retain the three-second fallback. A new positioned question immediately
+  jumps to its slide and restarts that slide's full reveal cycle with the new PIN,
+  including when it arrives on the current slide. PIN reveal and automatic movement
+  pause while a question detail dialog is open; changing slides closes that dialog.
 - The live/stop state must be visually and textually explicit. The filmstrip has a
   visible horizontal scrollbar, marks the active slide with an error-red border,
   and ArrowLeft/ArrowRight navigate slides except while the user is editing text
@@ -117,3 +129,13 @@ approved behavior and preserve their security, data, accessibility, and
 verification constraints. If the code requires a decision those documents do
 not cover, update and approve the document before continuing. No generated
 context lock, hook, package lock, or document-driven harness is required.
+
+<!-- BEGIN:nextjs-agent-rules -->
+
+# This is NOT the Next.js you know
+
+This version has breaking changes — APIs, conventions, and file structure may all differ from your training data. Read the relevant guide in `node_modules/next/dist/docs/` (resolved from this file's directory; in monorepos the `next` package may not be visible from the repo root) before writing any code. Heed deprecation notices.
+
+This block is written and re-added by `next dev` — verify at `node_modules/next/dist/server/lib/generate-agent-files.js`. Removing it from a diff only re-creates the uncommitted change; committing it with your work keeps the tree clean.
+
+<!-- END:nextjs-agent-rules -->

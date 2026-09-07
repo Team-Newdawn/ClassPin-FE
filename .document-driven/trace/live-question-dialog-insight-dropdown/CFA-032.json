@@ -1,0 +1,15 @@
+{
+  "code": [
+    "app/(view)/admin/session/[id]/component/question-detail-dialog.tsx",
+    "app/(view)/admin/session/[id]/component/question-detail-dialog.module.css"
+  ],
+  "documents": [
+    "class-frontend-architecture"
+  ],
+  "recorded_at": "2026-09-04T05:20:41+00:00",
+  "requirement_id": "CFA-032",
+  "task_id": "live-question-dialog-insight-dropdown",
+  "tests": [
+    ".document-driven/evidence/live-question-dialog-insight-dropdown.md"
+  ]
+}

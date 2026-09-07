@@ -1,8 +1,8 @@
 .root{width:100%;max-width:460px;margin:18px auto 0;text-align:left}
 .root :global(.slide-preview-head){display:flex;align-items:center;justify-content:space-between;font-size:12px;font-weight:600;color:var(--color-text-tertiary);margin-bottom:10px}
 .root :global(.slide-preview-grid){display:grid;grid-template-columns:repeat(auto-fill,minmax(96px,1fr));gap:8px}
-.root :global(.slide-preview-grid) img,.root :global(.slide-preview-ph){aspect-ratio:16/9;width:100%;border-radius:6px;border:1px solid var(--color-border);background:var(--pin-neutral-100)}
-.root :global(.slide-preview-grid) img{object-fit:cover;box-shadow:var(--shadow-xs);animation:slide-pop .25s ease}
+.root :global(.slide-preview-grid) :global(.slide-canvas),.root :global(.slide-preview-ph){aspect-ratio:16/9;width:100%;border-radius:6px;border:1px solid var(--color-border);background:var(--pin-neutral-100)}
+.root :global(.slide-preview-grid) :global(.slide-canvas){box-shadow:var(--shadow-xs);animation:slide-pop .25s ease}
 .root :global(.slide-preview-ph){animation:slide-shimmer 1.3s ease-in-out infinite}
 @keyframes slide-pop{from{opacity:0;transform:scale(.96)}to{opacity:1;transform:none}}
 @keyframes slide-shimmer{0%,100%{opacity:.45}50%{opacity:.8}}

@@ -1,20 +1,27 @@
 "use client";
 
 import { useEffect, useId, useRef } from "react";
-import { X } from "@/app/component/icons";
+import { Check, X } from "@/app/component/icons";
 import { useLanguage } from "@/app/_controller/language-context";
 import { StatusBadge } from "@/app/component/status-badge";
 import { questionCategoryClass, questionCategoryLabel, questionMarkerEmoji, type Question, type QuestionCategorySettings } from "@/app/_model/types";
 import styles from "./question-detail-dialog.module.css";
 
-export function QuestionDetailDialog({ question, questionCategories, onClose }: {
+export function QuestionDetailDialog({ question, questionCategories, onClose, answerControls }: {
   question: Question;
   questionCategories: QuestionCategorySettings;
   onClose: () => void;
+  answerControls?: {
+    draft: string;
+    onDraftChange: (value: string) => void;
+    onResolve: () => void;
+    onSubmit: () => void;
+  };
 }) {
   const { t, categoryLabel: defaultCategoryLabel, timeAgo } = useLanguage();
   const categoryLabel = questionCategoryLabel(questionCategories, question.category, defaultCategoryLabel);
   const titleId = useId();
+  const answerId = useId();
   const dialogRef = useRef<HTMLElement>(null);
   const onCloseRef = useRef(onClose);
 
@@ -68,7 +75,26 @@ export function QuestionDetailDialog({ question, questionCategories, onClose }: 
           <span>{t("question.instructorAnswer")}</span>
           <p>{question.answer ?? t("question.noAnswer")}</p>
         </div>
-        <button type="button" className="btn primary large full" onClick={onClose}>{t("common.confirm")}</button>
+        {answerControls ? (
+          <form className={styles.answerForm} onSubmit={(event) => {
+            event.preventDefault();
+            answerControls.onSubmit();
+          }}>
+            <label htmlFor={answerId}>{question.answer ? t("session.additionalAnswer") : t("session.quickAnswer")}</label>
+            <textarea
+              id={answerId}
+              value={answerControls.draft}
+              onChange={(event) => answerControls.onDraftChange(event.target.value)}
+              placeholder={t("session.answerPlaceholder")}
+            />
+            <div className={styles.answerActions}>
+              <button type="button" className="btn tertiary" onClick={answerControls.onResolve}><Check />{t("session.resolve")}</button>
+              <button type="submit" className="btn primary" disabled={!answerControls.draft.trim()}>{t("session.sendAnswer")}</button>
+            </div>
+          </form>
+        ) : (
+          <button type="button" className="btn primary large full" onClick={onClose}>{t("common.confirm")}</button>
+        )}
       </section>
     </div>
   );

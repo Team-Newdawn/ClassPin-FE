@@ -1,0 +1,16 @@
+{
+  "code": [
+    "app/(view)/admin/session/[id]/present/controller.ts",
+    "app/_controller/session-store.tsx"
+  ],
+  "documents": [
+    "class-frontend-architecture"
+  ],
+  "recorded_at": "2026-09-05T16:05:08+00:00",
+  "requirement_id": "CFA-012",
+  "task_id": "live-question-playback-memory",
+  "tests": [
+    "app/_model/class/presentation-rotation.test.ts",
+    ".document-driven/evidence/live-question-playback-restart.md"
+  ]
+}

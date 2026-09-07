@@ -145,6 +145,10 @@ export interface Slide {
   imageUrl?: string;
   /** lecture-slides 버킷 안의 경로. 변환 단계에서 이미 올라간 이미지를 가리킨다. */
   imagePath?: string;
+  /** 원본 PDF의 0-기반 페이지. imagePath와 동시에 가지지 않는다. */
+  sourcePageIndex?: number;
+  /** 현재 인증 세션에서만 사용하는 PDF 원본 URL. DB에는 저장하지 않는다. */
+  pdfUrl?: string;
   /** 강의자 전용 발표 메모. 청중 세션 조회에는 포함하지 않는다. */
   speakerNote?: string;
 }

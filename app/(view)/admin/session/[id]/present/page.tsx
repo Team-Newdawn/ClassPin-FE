@@ -22,6 +22,7 @@ export default function SessionPresentation() {
     ready,
     session,
     slide,
+    currentSlide,
     detailQuestion,
     joinUrl,
     pageQuestions,
@@ -60,7 +61,7 @@ export default function SessionPresentation() {
       onMouseMove={revealControls}
       onPointerDown={revealControls}
     >
-      <div ref={presentationCanvasRef} className="presentation-slide class-presentation-slide class-presentation-canvas" aria-label={`${session.title} · ${t("common.slideNumber", { number: session.currentSlide + 1 })}`}>
+      <div ref={presentationCanvasRef} className="presentation-slide class-presentation-slide class-presentation-canvas" aria-label={`${session.title} · ${t("common.slideNumber", { number: currentSlide + 1 })}`}>
         <SlideCanvas
           slide={slide}
           questions={pageQuestions}
@@ -71,6 +72,7 @@ export default function SessionPresentation() {
           liveQuestionId={liveQuestionId}
           onSelectPin={openQuestionDetail}
           showPins={session.showQuestionPins}
+          neutralPinShadow
           showQuestionLabels={session.showQuestionPins}
           labelContent="body"
         />
@@ -108,12 +110,12 @@ export default function SessionPresentation() {
         </div>
       </header>
 
-      <button className="presentation-side-control previous" disabled={session.currentSlide === 0} onClick={previousSlide} aria-label={t("session.previousSlide")}><ChevronLeft /></button>
-      <button className="presentation-side-control next" disabled={session.currentSlide === session.slides.length - 1} onClick={nextSlide} aria-label={t("session.nextSlide")}><ChevronRight /></button>
+      <button className="presentation-side-control previous" disabled={currentSlide === 0} onClick={previousSlide} aria-label={t("session.previousSlide")}><ChevronLeft /></button>
+      <button className="presentation-side-control next" disabled={currentSlide === session.slides.length - 1} onClick={nextSlide} aria-label={t("session.nextSlide")}><ChevronRight /></button>
 
       <footer className="presentation-footer">
         {actionError && <span className="presentation-error" role="alert">{actionError}</span>}
-        <span className="presentation-page" aria-live="polite">{session.currentSlide + 1} / {session.slides.length}</span>
+        <span className="presentation-page" aria-live="polite">{currentSlide + 1} / {session.slides.length}</span>
         <span className="presentation-hint">{t("presentation.hint")}</span>
       </footer>
 

@@ -1,0 +1,17 @@
+{
+  "code": [
+    "app/(view)/admin/session/[id]/present/controller.ts",
+    "app/_model/class/presentation-rotation.ts",
+    "app/_controller/session-store.tsx"
+  ],
+  "documents": [
+    "class-frontend-architecture"
+  ],
+  "recorded_at": "2026-09-05T16:05:08+00:00",
+  "requirement_id": "CLASS-LIVE-003",
+  "task_id": "live-question-playback-memory",
+  "tests": [
+    "app/_model/class/presentation-rotation.test.ts",
+    ".document-driven/evidence/live-question-playback-restart.md"
+  ]
+}

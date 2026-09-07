@@ -1,0 +1,17 @@
+{
+  "code": [
+    "app/_controller/use-slide-upload.ts",
+    "app/_service/convert.ts",
+    "app/_service/class-session-service.ts",
+    "app/_infrastructure/browser/pdf-document.ts"
+  ],
+  "documents": [
+    "class-frontend-architecture"
+  ],
+  "recorded_at": "2026-09-07T10:27:24+00:00",
+  "requirement_id": "CFA-010",
+  "task_id": "direct-pdf-slideshow",
+  "tests": [
+    ".document-driven/evidence/direct-pdf-slideshow.md"
+  ]
+}

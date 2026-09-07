@@ -1,0 +1,16 @@
+{
+  "code": [
+    "app/_model/types.ts",
+    "app/_model/upload.ts"
+  ],
+  "documents": [
+    "class-frontend-architecture"
+  ],
+  "recorded_at": "2026-09-07T10:27:25+00:00",
+  "requirement_id": "CFA-020",
+  "task_id": "direct-pdf-slideshow",
+  "tests": [
+    "app/_model/upload.test.ts",
+    ".document-driven/evidence/direct-pdf-slideshow.md"
+  ]
+}

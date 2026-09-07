@@ -1,0 +1,18 @@
+{
+  "code": [
+    "app/component/pdf-page.tsx",
+    "app/component/slide-canvas.tsx",
+    "app/component/slide-canvas.module.css",
+    "app/component/slide-preview.tsx",
+    "app/component/slide-preview.module.css"
+  ],
+  "documents": [
+    "class-frontend-architecture"
+  ],
+  "recorded_at": "2026-09-07T10:27:25+00:00",
+  "requirement_id": "CFA-032",
+  "task_id": "direct-pdf-slideshow",
+  "tests": [
+    ".document-driven/evidence/direct-pdf-slideshow.md"
+  ]
+}

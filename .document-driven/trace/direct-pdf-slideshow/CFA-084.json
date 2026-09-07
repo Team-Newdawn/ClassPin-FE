@@ -1,0 +1,15 @@
+{
+  "code": [
+    "app/_controller/session-store.tsx",
+    "app/_service/convert.ts"
+  ],
+  "documents": [
+    "class-frontend-architecture"
+  ],
+  "recorded_at": "2026-09-07T10:27:29+00:00",
+  "requirement_id": "CFA-084",
+  "task_id": "direct-pdf-slideshow",
+  "tests": [
+    ".document-driven/evidence/direct-pdf-slideshow.md"
+  ]
+}

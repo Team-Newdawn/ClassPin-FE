@@ -126,12 +126,13 @@ function FolderInsights({ sessions }: { sessions: ClassSession[] }) {
 
   return (
     <section id="folder-insights-panel" role="tabpanel" aria-labelledby="folder-insights-tab" className="folder-insights">
-      <div className="folder-insight-scopes" role="group" aria-label={t("folders.insightScope")}>
-        <button type="button" aria-pressed={selectedScope === "all"} onClick={() => setScope("all")}>{t("folders.insightAll")}</button>
-        {sessions.map((session) => (
-          <button key={session.id} type="button" aria-pressed={selectedScope === session.id} onClick={() => setScope(session.id)} title={session.fileName}>{session.title}</button>
-        ))}
-      </div>
+      <label className="folder-insight-scope">
+        <span className="sr-only">{t("folders.insightScope")}</span>
+        <select value={selectedScope} onChange={(event) => setScope(event.target.value)}>
+          <option value="all">{t("folders.insightAll")}</option>
+          {sessions.map((session) => <option key={session.id} value={session.id}>{session.title}</option>)}
+        </select>
+      </label>
 
       <div className="kpi-grid">
         <Kpi label={t("insights.aggregatedQuestions")} value={questions.length} hint={t("insights.fromSlides", { count: hotspots.length })} />

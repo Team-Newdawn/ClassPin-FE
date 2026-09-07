@@ -34,7 +34,8 @@ type SlideRow = {
   id: string;
   material_version_id: string;
   page_index: number;
-  image_path: string;
+  image_path: string | null;
+  source_page_index: number | null;
 };
 
 type SlideInstructorNoteRow = {
@@ -43,7 +44,7 @@ type SlideInstructorNoteRow = {
 };
 
 type DeletedSlideRow = {
-  deleted_image_path: string;
+  deleted_image_path: string | null;
   deleted_page_index: number;
   deleted_question_count: number;
 };
@@ -81,6 +82,7 @@ type OwnedCourseGraphRow = {
       material_versions: Array<{
         id: string;
         version_no: number;
+        source_path: string;
         slides: Array<SlideRow & {
           slide_instructor_notes: SlideInstructorNoteRow | SlideInstructorNoteRow[] | null;
         }>;
@@ -97,10 +99,48 @@ type AudienceLectureGraphRow = LectureRow & {
     material_versions: Array<{
       id: string;
       version_no: number;
+      source_path: string;
       slides: SlideRow[];
     }>;
   }>;
 };
+
+const PDF_URL_TTL_SECONDS = 12 * 60 * 60;
+
+async function createPdfUrlMap(client: NonNullable<ReturnType<typeof getSupabaseClient>>, paths: string[]) {
+  const uniquePaths = [...new Set(paths)];
+  if (!uniquePaths.length) return new Map<string, string>();
+  const { data, error } = await client.storage.from("course-materials").createSignedUrls(uniquePaths, PDF_URL_TTL_SECONDS);
+  if (error) throw error;
+  const urls = new Map<string, string>();
+  data.forEach((item) => {
+    if (item.path && item.signedUrl) urls.set(item.path, item.signedUrl);
+  });
+  if (urls.size !== uniquePaths.length) throw new Error("PDF 원본을 읽을 수 없습니다.");
+  return urls;
+}
+
+function toSlide(
+  client: NonNullable<ReturnType<typeof getSupabaseClient>>,
+  row: SlideRow,
+  pdfUrl?: string,
+  speakerNote?: string,
+): Slide {
+  return {
+    id: row.id,
+    pageIndex: row.page_index,
+    title: `Slide ${row.page_index + 1}`,
+    ...(row.image_path ? {
+      imagePath: row.image_path,
+      imageUrl: client.storage.from("lecture-slides").getPublicUrl(row.image_path).data.publicUrl,
+    } : {}),
+    ...(typeof row.source_page_index === "number" ? {
+      sourcePageIndex: row.source_page_index,
+      ...(pdfUrl ? { pdfUrl } : {}),
+    } : {}),
+    ...(speakerNote === undefined ? {} : { speakerNote }),
+  };
+}
 
 function toNormalizedPath(value: unknown): NormalizedPoint[] | null {
   if (!Array.isArray(value)) return null;
@@ -155,7 +195,7 @@ function toQuestions(rows: QuestionRow[], sessionId: string, slides: Slide[]): Q
     .map((row) => toQuestion(row, sessionId, slideIndexById));
 }
 
-export async function persistSession(session: ClassSession) {
+export async function persistSession(session: ClassSession, sourcePath?: string) {
   const client = getSupabaseClient();
   if (!client) throw new Error("Supabase 연결을 찾지 못했습니다.");
   if (!session.courseId || !session.materialId || !session.materialVersionId) throw new Error("강의 저장 정보가 완전하지 않습니다.");
@@ -180,7 +220,7 @@ export async function persistSession(session: ClassSession) {
   const type = session.fileName.toLowerCase().endsWith(".pdf") ? "pdf" : "slide_deck";
   const { error: materialError } = await client.from("materials").insert({ id: session.materialId, course_id: session.courseId, lecture_id: session.id, type, file_name: session.fileName });
   if (materialError) throw materialError;
-  const { error: versionError } = await client.from("material_versions").insert({ id: session.materialVersionId, material_id: session.materialId, version_no: 1, source_path: `${user.id}/${session.id}/${session.fileName}` });
+  const { error: versionError } = await client.from("material_versions").insert({ id: session.materialVersionId, material_id: session.materialId, version_no: 1, source_path: sourcePath ?? `${user.id}/${session.id}/${session.fileName}` });
   if (versionError) throw versionError;
   const slideRows = [];
   for (const slide of session.slides) {
@@ -192,7 +232,16 @@ export async function persistSession(session: ClassSession) {
       const { error: uploadError } = await client.storage.from("lecture-slides").upload(imagePath, image, { contentType: image.type || "image/jpeg", upsert: false });
       if (uploadError) throw uploadError;
     }
-    slideRows.push({ id: slide.id, material_version_id: session.materialVersionId, page_index: slide.pageIndex, image_path: imagePath });
+    if ((imagePath ? 1 : 0) + (slide.sourcePageIndex === undefined ? 0 : 1) !== 1) {
+      throw new Error("슬라이드 원본 정보가 완전하지 않습니다.");
+    }
+    slideRows.push({
+      id: slide.id,
+      material_version_id: session.materialVersionId,
+      page_index: slide.pageIndex,
+      image_path: imagePath || null,
+      source_page_index: slide.sourcePageIndex ?? null,
+    });
   }
   const { error: slidesError } = await client.from("slides").insert(slideRows);
   if (slidesError) throw slidesError;
@@ -299,7 +348,7 @@ export async function deleteClassSession(courseId: string): Promise<void> {
         .select("image_path")
         .in("material_version_id", versionIds);
       if (slideError) throw slideError;
-      imagePaths = [...new Set((slideData ?? []).map((slide) => slide.image_path as string).filter((path) => path.startsWith(`${user.id}/`)))];
+      imagePaths = [...new Set((slideData ?? []).map((slide) => slide.image_path).filter((path): path is string => typeof path === "string" && path.startsWith(`${user.id}/`)))];
     }
   }
 
@@ -365,14 +414,7 @@ export async function appendSessionSlides(session: ClassSession, files: File[]):
     if (error) throw error;
     return ((data ?? []) as SlideRow[])
       .sort((a, b) => a.page_index - b.page_index)
-      .map((slide) => ({
-        id: slide.id,
-        pageIndex: slide.page_index,
-        title: `Slide ${slide.page_index + 1}`,
-        imagePath: slide.image_path,
-        imageUrl: client.storage.from("lecture-slides").getPublicUrl(slide.image_path).data.publicUrl,
-        speakerNote: ""
-      }));
+      .map((slide) => toSlide(client, slide, undefined, ""));
   } catch (error) {
     if (uploadedPaths.length) await client.storage.from("lecture-slides").remove(uploadedPaths);
     throw error;
@@ -388,8 +430,10 @@ export async function deleteSessionSlide(slideId: string): Promise<DeletedSlideR
   if (error) throw error;
   const deleted = ((data ?? []) as DeletedSlideRow[])[0];
   if (!deleted) throw new Error("삭제된 슬라이드 정보를 받지 못했습니다.");
-  const { error: storageError } = await client.storage.from("lecture-slides").remove([deleted.deleted_image_path]);
-  if (storageError) console.error("Deleted slide storage cleanup failed", storageError);
+  if (deleted.deleted_image_path) {
+    const { error: storageError } = await client.storage.from("lecture-slides").remove([deleted.deleted_image_path]);
+    if (storageError) console.error("Deleted slide storage cleanup failed", storageError);
+  }
   return deleted;
 }
 
@@ -401,7 +445,7 @@ export async function fetchSessionSlides(session: ClassSession, asAudience = fal
   if (asAudience) await ensureAnonymousUser();
 
   const { data, error } = await client.from("slides")
-    .select("id, material_version_id, page_index, image_path")
+    .select("id, material_version_id, page_index, image_path, source_page_index")
     .eq("material_version_id", session.materialVersionId)
     .order("page_index", { ascending: true });
   if (error) throw error;
@@ -415,14 +459,8 @@ export async function fetchSessionSlides(session: ClassSession, asAudience = fal
     if (noteError) throw noteError;
     ((noteData ?? []) as SlideInstructorNoteRow[]).forEach((note) => noteBySlide.set(note.slide_id, note.body));
   }
-  return rows.map((slide) => ({
-    id: slide.id,
-    pageIndex: slide.page_index,
-    title: `Slide ${slide.page_index + 1}`,
-    imagePath: slide.image_path,
-    imageUrl: client.storage.from("lecture-slides").getPublicUrl(slide.image_path).data.publicUrl,
-    ...(asAudience ? {} : { speakerNote: noteBySlide.get(slide.id) ?? "" })
-  }));
+  const pdfUrl = session.slides.find((slide) => slide.pdfUrl)?.pdfUrl;
+  return rows.map((slide) => toSlide(client, slide, pdfUrl, asAudience ? undefined : noteBySlide.get(slide.id) ?? ""));
 }
 
 /** 현재 Google 강사가 소유한 강의 전체를 DB에서 복원한다. */
@@ -453,11 +491,13 @@ export async function fetchOwnedSessions(): Promise<ClassSession[]> {
         material_versions(
           id,
           version_no,
+          source_path,
           slides(
             id,
             material_version_id,
             page_index,
             image_path,
+            source_page_index,
             slide_instructor_notes(slide_id, body)
           )
         )
@@ -481,7 +521,14 @@ export async function fetchOwnedSessions(): Promise<ClassSession[]> {
     .neq("lectures.status", "archived");
   if (error) throw error;
 
-  return ((data ?? []) as unknown as OwnedCourseGraphRow[])
+  const courses = (data ?? []) as unknown as OwnedCourseGraphRow[];
+  const pdfUrls = await createPdfUrlMap(client, courses.flatMap((course) => course.lectures.flatMap((lecture) =>
+    lecture.materials.flatMap((material) => material.material_versions
+      .filter((version) => version.slides.some((slide) => slide.source_page_index !== null))
+      .map((version) => version.source_path))
+  )));
+
+  return courses
     .flatMap((course) => course.lectures.map((lecture) => ({ course, lecture })))
     .sort((a, b) => b.lecture.created_at.localeCompare(a.lecture.created_at))
     .flatMap(({ course, lecture }) => {
@@ -493,14 +540,7 @@ export async function fetchOwnedSessions(): Promise<ClassSession[]> {
         .map((slide): Slide => {
           const noteValue = slide.slide_instructor_notes;
           const note = Array.isArray(noteValue) ? noteValue[0] : noteValue;
-          return {
-            id: slide.id,
-            pageIndex: slide.page_index,
-            title: `Slide ${slide.page_index + 1}`,
-            imagePath: slide.image_path,
-            imageUrl: client.storage.from("lecture-slides").getPublicUrl(slide.image_path).data.publicUrl,
-            speakerNote: note?.body ?? ""
-          };
+          return toSlide(client, slide, pdfUrls.get(version.source_path), note?.body ?? "");
         });
       const questions = toQuestions(lecture.questions, lecture.id, slides);
       return [{
@@ -539,7 +579,7 @@ export async function saveSlideInstructorNote(slideId: string, body: string) {
   if (error) throw error;
 }
 
-export async function fetchLiveSession(joinCode: string): Promise<ClassSession | null> {
+async function fetchLiveSessionBy(column: "id" | "join_code", value: string): Promise<ClassSession | null> {
   const client = getAudienceSupabaseClient();
   if (!client) return null;
   await ensureAnonymousUser();
@@ -563,11 +603,12 @@ export async function fetchLiveSession(joinCode: string): Promise<ClassSession |
         material_versions(
           id,
           version_no,
-          slides(id, material_version_id, page_index, image_path)
+          source_path,
+          slides(id, material_version_id, page_index, image_path, source_page_index)
         )
       )
     `)
-    .eq("join_code", joinCode.toUpperCase())
+    .eq(column, value)
     .eq("status", "live")
     .maybeSingle();
   if (error) throw error;
@@ -576,11 +617,13 @@ export async function fetchLiveSession(joinCode: string): Promise<ClassSession |
   const material = lecture.materials[0];
   const version = material && [...material.material_versions].sort((a, b) => b.version_no - a.version_no)[0];
   if (!material || !version) return null;
-  const slides: Slide[] = [...version.slides].sort((a, b) => a.page_index - b.page_index).map((slide) => ({
-    id: slide.id, pageIndex: slide.page_index, title: `Slide ${slide.page_index + 1}`,
-    imagePath: slide.image_path,
-    imageUrl: client.storage.from("lecture-slides").getPublicUrl(slide.image_path).data.publicUrl
-  }));
+  const pdfUrls = await createPdfUrlMap(
+    client,
+    version.slides.some((slide) => slide.source_page_index !== null) ? [version.source_path] : [],
+  );
+  const slides: Slide[] = [...version.slides]
+    .sort((a, b) => a.page_index - b.page_index)
+    .map((slide) => toSlide(client, slide, pdfUrls.get(version.source_path)));
   const session: ClassSession = {
     id: lecture.id,
     folderId: null,
@@ -607,6 +650,14 @@ export async function fetchLiveSession(joinCode: string): Promise<ClassSession |
     ...session,
     questions: toQuestions(Array.isArray(questionData) ? questionData as unknown as QuestionRow[] : [], session.id, slides)
   };
+}
+
+export function fetchLiveSession(joinCode: string) {
+  return fetchLiveSessionBy("join_code", joinCode.toUpperCase());
+}
+
+export function fetchLiveSessionById(sessionId: string) {
+  return fetchLiveSessionBy("id", sessionId);
 }
 
 export async function submitQuestion(session: ClassSession, question: Question) {

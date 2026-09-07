@@ -86,15 +86,15 @@ export async function getSessionUser(): Promise<User | null> {
 }
 
 /**
- * /api/convert 가 업로드를 사용자 폴더에 넣으려면 누가 보냈는지 알아야 한다.
- * 업로드는 로그인한 강사 전용이므로 익명 세션으로 대체하지 않는다.
+ * 큰 원본을 사용자 Storage 경로에 올리고 /api/convert 가 같은 소유자를 검증할 때 쓴다.
+ * 강사 전용 경로이므로 익명 세션으로 대체하지 않는다.
  */
-export async function getAccessToken() {
+export async function getUploadSession() {
   const client = getSupabaseClient();
   if (!client) return null;
   const { data } = await client.auth.getSession();
   if (!data.session || data.session.user.is_anonymous) return null;
-  return data.session.access_token ?? null;
+  return { accessToken: data.session.access_token, userId: data.session.user.id };
 }
 
 export async function signInWithGoogle(next = "/") {

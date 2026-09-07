@@ -1,23 +1,27 @@
 import { execFile } from "node:child_process";
-import { copyFile, mkdir, mkdtemp, readFile, readdir, rm, stat, writeFile } from "node:fs/promises";
+import { createWriteStream } from "node:fs";
+import { copyFile, mkdir, mkdtemp, readFile, readdir, rm, stat } from "node:fs/promises";
 import { availableParallelism, tmpdir } from "node:os";
 import path from "node:path";
+import { Readable } from "node:stream";
+import { pipeline } from "node:stream/promises";
+import type { ReadableStream as NodeReadableStream } from "node:stream/web";
 import { setTimeout as sleep } from "node:timers/promises";
 import { promisify } from "node:util";
 import { NextResponse } from "next/server";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { resolveDocumentBinary } from "@/app/_infrastructure/server/document-binaries";
 import { getPdfPageCount, renderPdfPages } from "@/app/_infrastructure/server/pdf-render";
-import { getSupabaseClientForToken } from "@/app/_infrastructure/supabase/server";
+import { getSupabaseClientForToken, supabaseServerConfigured } from "@/app/_infrastructure/supabase/server";
 import type { Slide } from "@/app/_model/types";
+import { createPdfSlides, MAX_SOURCE_FILE_BYTES, SOURCE_FILE_TOO_LARGE_ERROR, sourceFileExtension } from "@/app/_model/upload";
 
 export const runtime = "nodejs";
 const run = promisify(execFile);
 
-// 1 vCPU 에서 실제 강의 자료를 렌더링하면 60 초로는 어림도 없다. Cloud Run 의
-// 요청 제한(300초) 안에서 최대한 여유를 두되, 그보다 먼저 끝나도록 잡는다.
-const RENDER_TIMEOUT_MS = 240_000;
-const SOFFICE_TIMEOUT_MS = 180_000;
+// 큰 자료도 처리할 수 있도록 Cloud Run 요청 제한(60분)보다 먼저 끝나게 잡는다.
+const RENDER_TIMEOUT_MS = 3_300_000;
+const SOFFICE_TIMEOUT_MS = 900_000;
 /**
  * 페이지 구간을 나눠 동시에 렌더링할 pdftoppm 프로세스 수.
  *
@@ -28,7 +32,7 @@ const RENDER_WORKERS = Number(process.env.RENDER_WORKERS) || Math.min(8, Math.ma
 /** Storage 업로드 동시 실행 수. 순차로 올리면 장수만큼 왕복이 쌓인다. */
 const UPLOAD_CONCURRENCY = Number(process.env.UPLOAD_CONCURRENCY) || 12;
 /** 슬라이드 이미지 긴 변의 최대 픽셀 수. 렌더 비용과 전송량을 함께 좌우한다. */
-const SLIDE_MAX_EDGE = Number(process.env.SLIDE_MAX_EDGE) || 1600;
+const SLIDE_MAX_EDGE = Number(process.env.SLIDE_MAX_EDGE) || 3840;
 
 /** slide-01.jpg, slide-10.jpg … 를 페이지 번호 순서로 정렬한다. */
 const byPageNumber = (a: string, b: string) => a.localeCompare(b, undefined, { numeric: true });
@@ -48,7 +52,7 @@ function renderPages(pdftoppm: string, pdf: string, outDir: string, total: numbe
     outDir,
     total,
     maxEdge: SLIDE_MAX_EDGE,
-    quality: 86,
+    quality: 100,
     maxWorkers: RENDER_WORKERS,
     timeoutMs: RENDER_TIMEOUT_MS,
   });
@@ -59,10 +63,12 @@ type UploadTarget = { bucket: ReturnType<SupabaseClient["storage"]["from"]>; own
 /** 렌더된 슬라이드 한 장을 Storage 에 올리고 Slide 로 만든다. */
 async function uploadSlide(dir: string, name: string, target: UploadTarget): Promise<Slide> {
   const id = crypto.randomUUID();
+  const localPath = path.join(dir, name);
   // storage 정책이 첫 폴더명을 소유자로 검증한다. 경로 모양을 바꾸면 업로드가 막힌다.
   const imagePath = `${target.ownerId}/${target.uploadId}/${id}.jpg`;
-  const { error } = await target.bucket.upload(imagePath, await readFile(path.join(dir, name)), { contentType: "image/jpeg", upsert: false });
+  const { error } = await target.bucket.upload(imagePath, await readFile(localPath), { contentType: "image/jpeg", upsert: false });
   if (error) throw error;
+  await rm(localPath);
   const pageIndex = pageIndexOf(name);
   return { id, pageIndex, title: `Slide ${pageIndex + 1}`, imagePath, imageUrl: target.bucket.getPublicUrl(imagePath).data.publicUrl };
 }
@@ -159,37 +165,94 @@ function streamConversion(pdftoppm: string, pdf: string, pages: string, total: n
 export async function POST(request: Request) {
   let work: string | null = null;
   try {
-    const form = await request.formData();
-    const file = form.get("file");
-    if (!(file instanceof File)) return NextResponse.json({ error: "파일이 필요합니다." }, { status: 400 });
-    if (file.size > 40 * 1024 * 1024) return NextResponse.json({ error: "파일이 40MB를 초과합니다. 더 작은 파일로 다시 시도해 주세요." }, { status: 413 });
+    const token = request.headers.get("authorization")?.replace(/^Bearer\s+/i, "").trim();
+    const client = token ? getSupabaseClientForToken(token) : null;
+    let ownerId: string | null = null;
+    let source: string;
+    let sourceExtension: ReturnType<typeof sourceFileExtension>;
+    if (supabaseServerConfigured) {
+      if (!client) return NextResponse.json({ error: "로그인 정보가 만료되었습니다. 새로고침 후 다시 시도해 주세요." }, { status: 401 });
+      const { data: auth, error: authError } = await client.auth.getUser();
+      if (authError || !auth.user) return NextResponse.json({ error: "로그인 정보가 만료되었습니다. 새로고침 후 다시 시도해 주세요." }, { status: 401 });
 
-    const extension = path.extname(file.name).toLowerCase();
-    if (![".pdf", ".ppt", ".pptx"].includes(extension)) return NextResponse.json({ error: "PDF 또는 PPT 파일만 지원합니다." }, { status: 415 });
+      const body = await request.json().catch(() => null) as { sourcePath?: unknown; fileName?: unknown } | null;
+      if (!body || typeof body.sourcePath !== "string" || typeof body.fileName !== "string") {
+        return NextResponse.json({ error: "파일이 필요합니다." }, { status: 400 });
+      }
+      ownerId = auth.user.id;
+      const sourcePath = body.sourcePath;
+      const extension = sourceFileExtension(body.fileName);
+      if (!extension || !sourcePath.endsWith(extension)) return NextResponse.json({ error: "PDF 또는 PPT 파일만 지원합니다." }, { status: 415 });
+      sourceExtension = extension;
+      if (!sourcePath.startsWith(`${ownerId}/`)) return NextResponse.json({ error: "업로드한 파일에 접근할 수 없습니다." }, { status: 403 });
 
-    work = await mkdtemp(path.join(tmpdir(), "pin-class-"));
-    const source = path.join(work, `source${extension}`);
-    await writeFile(source, Buffer.from(await file.arrayBuffer()));
+      const bucket = client.storage.from("course-materials");
+      const { data: info, error: infoError } = await bucket.info(sourcePath);
+      if (infoError || !info) return NextResponse.json({ error: "업로드한 파일을 찾지 못했습니다." }, { status: 404 });
+      if (typeof info.size !== "number" || info.size > MAX_SOURCE_FILE_BYTES) {
+        return NextResponse.json({ error: SOURCE_FILE_TOO_LARGE_ERROR }, { status: 413 });
+      }
+      work = await mkdtemp(path.join(tmpdir(), "pin-class-"));
+      source = path.join(work, `source${extension}`);
+      const { data: stream, error: downloadError } = await bucket.download(sourcePath).asStream();
+      if (downloadError || !stream) throw downloadError ?? new Error("업로드한 파일을 읽지 못했습니다.");
+      await pipeline(Readable.fromWeb(stream as unknown as NodeReadableStream), createWriteStream(source));
+    } else {
+      const encodedName = request.headers.get("x-file-name");
+      if (!encodedName || !request.body) return NextResponse.json({ error: "파일이 필요합니다." }, { status: 400 });
+      let fileName: string;
+      try { fileName = decodeURIComponent(encodedName); }
+      catch { return NextResponse.json({ error: "파일 이름이 올바르지 않습니다." }, { status: 400 }); }
+      const extension = sourceFileExtension(fileName);
+      if (!extension) return NextResponse.json({ error: "PDF 또는 PPT 파일만 지원합니다." }, { status: 415 });
+      sourceExtension = extension;
+      const declaredSize = Number(request.headers.get("content-length"));
+      if (declaredSize > MAX_SOURCE_FILE_BYTES) return NextResponse.json({ error: SOURCE_FILE_TOO_LARGE_ERROR }, { status: 413 });
+      work = await mkdtemp(path.join(tmpdir(), "pin-class-"));
+      source = path.join(work, `source${extension}`);
+      await pipeline(Readable.fromWeb(request.body as unknown as NodeReadableStream), createWriteStream(source));
+      if ((await stat(/* turbopackIgnore: true */ source)).size > MAX_SOURCE_FILE_BYTES) return NextResponse.json({ error: SOURCE_FILE_TOO_LARGE_ERROR }, { status: 413 });
+    }
+
     let pdf = source;
-    if (extension !== ".pdf") {
+    if (sourceExtension !== ".pdf") {
       const soffice = await resolveDocumentBinary("soffice");
       await run(soffice, ["--headless", "--convert-to", "pdf", "--outdir", work, source], { timeout: SOFFICE_TIMEOUT_MS });
       pdf = path.join(work, "source.pdf");
+      await rm(source);
+    }
+
+    const pdftoppm = await resolveDocumentBinary("pdftoppm");
+    const total = await getPdfPageCount(pdftoppm, pdf);
+
+    if (sourceExtension === ".pdf") {
+      if (client && ownerId) {
+        const encoder = new TextEncoder();
+        return new Response(new ReadableStream({
+          start(controller) {
+            const emit = (event: unknown) => controller.enqueue(encoder.encode(`${JSON.stringify(event)}\n`));
+            emit({ type: "meta", total });
+            createPdfSlides(total).forEach((slide) => emit({ type: "slide", slide }));
+            emit({ type: "done" });
+            controller.close();
+          },
+        }), { headers: { "Content-Type": "application/x-ndjson; charset=utf-8" } });
+      }
+
+      const outputId = crypto.randomUUID();
+      const localDir = path.join(/* turbopackIgnore: true */ process.cwd(), "public", "generated", outputId);
+      await mkdir(localDir, { recursive: true });
+      await copyFile(pdf, path.join(/* turbopackIgnore: true */ localDir, "source.pdf"));
+      return NextResponse.json({ slides: createPdfSlides(total, `/generated/${outputId}/source.pdf`) });
     }
 
     const pages = path.join(work, "pages");
     await mkdir(pages, { recursive: true });
-    const pdftoppm = await resolveDocumentBinary("pdftoppm");
-    const total = await getPdfPageCount(pdftoppm, pdf);
 
     // 컨테이너 디스크는 인스턴스가 죽으면 같이 사라지고 인스턴스끼리 공유되지도
     // 않는다. 변환한 자리에서 바로 Storage 에 올려야 재접속·재배포 후에도 남는다.
-    const token = request.headers.get("authorization")?.replace(/^Bearer\s+/i, "").trim();
-    const client = token ? getSupabaseClientForToken(token) : null;
-    if (client) {
-      const { data: auth, error: authError } = await client.auth.getUser();
-      if (authError || !auth.user) return NextResponse.json({ error: "로그인 정보가 만료되었습니다. 새로고침 후 다시 시도해 주세요." }, { status: 401 });
-      const target: UploadTarget = { bucket: client.storage.from("lecture-slides"), ownerId: auth.user.id, uploadId: crypto.randomUUID() };
+    if (client && ownerId) {
+      const target: UploadTarget = { bucket: client.storage.from("lecture-slides"), ownerId, uploadId: crypto.randomUUID() };
       const workDir = work;
       work = null; // 정리 책임을 스트림에 넘긴다 — 아래 finally 는 건드리지 않는다.
       return streamConversion(pdftoppm, pdf, pages, total, target, workDir);

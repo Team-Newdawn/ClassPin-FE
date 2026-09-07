@@ -1,8 +1,8 @@
 "use client";
 
-/* eslint-disable @next/next/no-img-element */
 import type { Slide } from "@/app/_model/types";
 import { useLanguage } from "@/app/_controller/language-context";
+import { SlideCanvas } from "./slide-canvas";
 import styles from "./slide-preview.module.css";
 
 /**
@@ -20,7 +20,7 @@ export function SlidePreview({ slides, total }: { slides: Slide[]; total: number
       </div>
       <div className="slide-preview-grid">
         {slides.map((slide) => (
-          <img key={slide.id} src={slide.imageUrl} alt={t("common.slideNumber", { number: slide.pageIndex + 1 })} loading="lazy" />
+          <SlideCanvas key={slide.id} slide={slide} compact />
         ))}
         {Array.from({ length: remaining }).map((_, index) => (
           <div key={`placeholder-${index}`} className="slide-preview-ph" />

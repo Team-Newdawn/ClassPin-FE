@@ -10,7 +10,7 @@ import { LECTURE_REACTION_EVENT, lectureReactionTopic, type LectureReactionEmoji
 import { questionsByEmpathy, questionsByNewest } from "@/app/_model/question-reactions";
 import { groupQuestionsBySlide } from "@/app/_model/stats";
 import { publishRealtimeReaction } from "@/app/_service/realtime-reaction-service";
-import { acceptsQuestionCategory, enabledQuestionCategories, questionCategoryClass, questionCategoryLabel, questionMarkerEmoji, type Question, type QuestionCategory, type QuestionMarker } from "@/app/_model/types";
+import { acceptsQuestionCategory, enabledQuestionCategories, questionCategoryClass, questionCategoryLabel, type Question, type QuestionCategory, type QuestionMarker } from "@/app/_model/types";
 
 type StudentTool = "pin" | "emoji";
 type QuestionSort = "empathy" | "newest";
@@ -90,7 +90,6 @@ export function useJoinSessionController() {
   const defaultCategory = categoryOptions[0] ?? "concept";
   const activeCategory = draftQuestion?.category ?? defaultCategory;
   const activeMarker = draftQuestion?.marker ?? "pin";
-  const activeMarkerEmoji = questionMarkerEmoji(activeMarker);
   const categoryLabel = (category: QuestionCategory) => questionCategoryLabel(session.questionCategories, category, defaultCategoryLabel);
   const categoryClass = (category: QuestionCategory) => questionCategoryClass(session.questionCategories, category);
   const markerLabel = (marker: QuestionMarker) => t(marker === "pin"
@@ -364,7 +363,6 @@ export function useJoinSessionController() {
     categoryOptions,
     activeCategory,
     activeMarker,
-    activeMarkerEmoji,
     categoryLabel,
     categoryClass,
     markerLabel,

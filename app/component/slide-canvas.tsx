@@ -4,11 +4,14 @@
 import { Fragment, type ReactNode } from "react";
 import selectedPinIcon from "@/assets/icons/pin_icon.svg";
 import unselectedPinIcon from "@/assets/icons/pin_black_icon.svg";
+import selectedPinGreyShadowIcon from "@/assets/icons/pin_icon_grey_shadow.svg";
+import unselectedPinGreyShadowIcon from "@/assets/icons/pin_black_icon_grey_shadow.svg";
 import { useLanguage } from "@/app/_controller/language-context";
 import { defaultQuestionCategorySettings, questionCategoryClass, questionCategoryLabel, questionMarkerEmoji, type Question, type QuestionCategorySettings, type Slide } from "@/app/_model/types";
+import { PdfPage } from "./pdf-page";
 import styles from "./slide-canvas.module.css";
 
-export function SlideCanvas({ slide, questions = [], questionCategories = defaultQuestionCategorySettings(), visibleQuestionIds, pinDisplayPositions, selectedId, liveQuestionId, onSelectPin, onCanvasClick, showQuestionLabels = false, labelContent = "category", showPins = true, compact = false, children }: {
+export function SlideCanvas({ slide, questions = [], questionCategories = defaultQuestionCategorySettings(), visibleQuestionIds, pinDisplayPositions, selectedId, liveQuestionId, onSelectPin, onCanvasClick, showQuestionLabels = false, labelContent = "category", showPins = true, neutralPinShadow = false, compact = false, children }: {
   slide: Slide;
   questions?: Question[];
   questionCategories?: QuestionCategorySettings;
@@ -21,11 +24,14 @@ export function SlideCanvas({ slide, questions = [], questionCategories = defaul
   showQuestionLabels?: boolean;
   labelContent?: "category" | "body";
   showPins?: boolean;
+  neutralPinShadow?: boolean;
   compact?: boolean;
   children?: ReactNode;
 }) {
   const { t, categoryLabel: defaultCategoryLabel } = useLanguage();
   const categoryLabel = (category: Question["category"]) => questionCategoryLabel(questionCategories, category, defaultCategoryLabel);
+  const activePinIcon = neutralPinShadow ? selectedPinGreyShadowIcon : selectedPinIcon;
+  const inactivePinIcon = neutralPinShadow ? unselectedPinGreyShadowIcon : unselectedPinIcon;
   const click = (event: React.MouseEvent<HTMLDivElement>) => {
     if (!onCanvasClick || (event.target as HTMLElement).closest("button")) return;
     const box = event.currentTarget.getBoundingClientRect();
@@ -37,8 +43,10 @@ export function SlideCanvas({ slide, questions = [], questionCategories = defaul
       {/* Generated slide URLs are runtime assets and intentionally bypass Next image optimization. */}
       {slide.imageUrl
         ? <img src={slide.imageUrl} alt={t("common.slideNumber", { number: slide.pageIndex + 1 })} />
+        : slide.pdfUrl && slide.sourcePageIndex !== undefined
+          ? <><div className="slide-placeholder">{slide.pageIndex + 1}</div><PdfPage url={slide.pdfUrl} pageNumber={slide.sourcePageIndex + 1} label={t("common.slideNumber", { number: slide.pageIndex + 1 })} /></>
         /* 변환된 슬라이드에는 항상 imageUrl 이 있다. 이미지가 아직/끝내 없을 때 흰 판만 남지 않게 한다. */
-        : <div className="slide-placeholder">{slide.pageIndex + 1}</div>}
+          : <div className="slide-placeholder">{slide.pageIndex + 1}</div>}
       {pinDisplayPositions && <svg className="question-displacement-lines" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
         {questions.filter((question) => question.x !== null && question.y !== null && question.anchorKind !== "box" && question.anchorKind !== "path" && (!visibleQuestionIds || visibleQuestionIds.includes(question.id))).map((question) => {
           const position = pinDisplayPositions.get(question.id);
@@ -84,7 +92,7 @@ export function SlideCanvas({ slide, questions = [], questionCategories = defaul
               </button>
             ) : (
               <button className={`question-pin ${isSelected ? "selected" : ""} ${isLive ? "live" : ""}`} style={{ left: `${position.x! * 100}%`, top: `${position.y! * 100}%` }} data-presentation-pin-id={q.id} onClick={() => onSelectPin?.(q.id)} aria-label={t("question.pinAria", { text: q.text })}>
-                <img className="question-pin-icon" src={(isSelected ? selectedPinIcon : unselectedPinIcon).src} alt="" aria-hidden="true" draggable={false} />
+                <img className="question-pin-icon" src={(isSelected ? activePinIcon : inactivePinIcon).src} alt="" aria-hidden="true" draggable={false} />
                 <span className={`question-pin-marker ${markerEmoji ? "emoji" : ""}`} aria-hidden="true">{markerEmoji}</span>
               </button>
             )}

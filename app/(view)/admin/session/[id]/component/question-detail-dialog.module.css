@@ -29,6 +29,12 @@
 .root :global(.question-detail-answer.pending){border-color:var(--color-border);background:var(--pin-neutral-50)}
 .root :global(.question-detail-answer.pending)>span{color:var(--color-text-tertiary)}
 .root :global(.question-detail-answer.pending)>p{color:var(--color-text-secondary)}
+.answerForm{display:grid;gap:8px}
+.answerForm label{font-size:12px;font-weight:600}
+.answerForm textarea{width:100%;min-height:96px;padding:11px 12px;resize:vertical;border:1px solid var(--color-border-strong);border-radius:10px;background:var(--color-bg-surface);color:var(--color-text-primary);font:inherit;font-size:14px;line-height:21px}
+.answerForm textarea::placeholder{color:var(--color-text-tertiary)}
+.answerForm textarea:focus-visible{border-color:var(--color-brand);outline:0;box-shadow:var(--focus)}
+.answerActions{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:2px}
 .close{position:absolute;top:18px;right:18px;width:40px;height:40px;padding:0;display:grid;place-items:center;border:1px solid var(--color-border);border-radius:12px;background:var(--color-bg-surface);color:var(--color-text-secondary);box-shadow:var(--shadow-xs);transition:background-color 140ms,border-color 140ms,color 140ms,transform 140ms}
 .close:hover{border-color:var(--color-border-strong);background:var(--pin-neutral-100);color:var(--color-text-primary);transform:translateY(-1px)}
 .close:active{transform:translateY(0)}

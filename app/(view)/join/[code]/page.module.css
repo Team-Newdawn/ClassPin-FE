@@ -485,14 +485,6 @@
   top: 18px;
 }
 
-.root :global(.student-modal-heading) {
-  display: flex;
-  align-items: flex-start;
-  gap: 13px;
-  padding-right: 40px;
-  margin-bottom: 22px;
-}
-
 .root :global(.question-pin-preview) {
   position: relative;
   width: 40px;
@@ -517,20 +509,6 @@
   line-height: 1;
 }
 
-.root :global(.student-modal-heading h2) {
-  margin: 0;
-  font-size: 20px;
-  line-height: 28px;
-  letter-spacing: -.02em;
-}
-
-.root :global(.student-modal-heading p) {
-  margin: 4px 0 0;
-  color: var(--color-text-tertiary);
-  font-size: 12px;
-  line-height: 18px;
-}
-
 .root :global(.student-composer-actions) {
   display: grid;
   gap: 12px;
@@ -538,7 +516,7 @@
 
 .root :global(.question-marker-picker) {
   min-width: 0;
-  margin: 0 0 16px;
+  margin: 16px 0;
   padding: 0;
   border: 0;
 }
@@ -690,15 +668,6 @@
     padding: 26px 20px max(24px, env(safe-area-inset-bottom));
     border-radius: 24px 24px 0 0;
   }
-
-  .root :global(.student-modal-heading) {
-    margin-bottom: 18px;
-  }
-
-  .root :global(.student-modal-heading h2) {
-    font-size: 18px;
-    line-height: 25px;
-  }
 }
 
 @media (max-height: 600px) and (orientation: landscape) {
@@ -706,10 +675,6 @@
     max-height: calc(100dvh - 16px);
     overflow-y: auto;
     padding: 22px;
-  }
-
-  .root :global(.student-modal-heading) {
-    margin-bottom: 14px;
   }
 }
 

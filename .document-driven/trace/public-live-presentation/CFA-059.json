@@ -1,0 +1,14 @@
+{
+  "code": [
+    "app/_controller/session-store.tsx"
+  ],
+  "documents": [
+    "class-frontend-architecture"
+  ],
+  "recorded_at": "2026-09-04T04:13:07+00:00",
+  "requirement_id": "CFA-059",
+  "task_id": "public-live-presentation",
+  "tests": [
+    ".document-driven/evidence/public-live-presentation.md"
+  ]
+}

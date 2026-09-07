@@ -1,0 +1,18 @@
+{
+  "code": [
+    "app/_model/upload.ts",
+    "app/_service/convert.ts",
+    "app/api/convert/route.ts",
+    "supabase/migrations/20260904111614_increase_course_material_upload_limit.sql"
+  ],
+  "documents": [
+    "class-frontend-architecture"
+  ],
+  "recorded_at": "2026-09-04T11:29:57+00:00",
+  "requirement_id": "CLASS-UPLOAD-001",
+  "task_id": "one-gib-source-upload",
+  "tests": [
+    "app/_model/upload.test.ts",
+    ".document-driven/evidence/one-gib-source-upload.md"
+  ]
+}

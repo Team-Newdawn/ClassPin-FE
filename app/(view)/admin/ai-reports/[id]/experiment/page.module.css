@@ -1,0 +1,39 @@
+.root { max-width: 1200px; margin: auto; padding: 32px 24px; color: var(--color-text-primary); }
+.root header { margin: 32px 0 24px; }
+.root h1 { font-size: 32px; margin: 8px 0; }
+.root h2 { font-size: 18px; margin: 0 0 12px; }
+.root p { color: var(--color-text-secondary); line-height: 1.65; }
+.root small { color: var(--color-text-secondary); font-size: 12px; }
+.eyebrow { color: var(--color-brand); font-size: 12px; font-weight: 700; }
+.scope { display: flex; justify-content: space-between; gap: 16px; flex-wrap: wrap; padding: 20px; background: var(--color-brand-subtle); border-radius: 12px; margin-bottom: 20px; }
+.scope span { color: var(--color-text-secondary); font-size: 13px; }
+.grid { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 16px; }
+.card { background: var(--color-bg-surface); border: 1px solid var(--color-border); border-radius: 16px; padding: 24px; margin-bottom: 20px; }
+.card label { display: block; font-size: 14px; font-weight: 600; margin-bottom: 12px; }
+.card select { width: 100%; min-height: 44px; border: 1px solid var(--color-border-strong); border-radius: 10px; padding: 8px; color: var(--color-text-primary); background: var(--color-bg-surface); }
+.actions { display: flex; gap: 12px; flex-wrap: wrap; }
+.warning { padding: 16px; border: 1px solid var(--color-warning); border-radius: 12px; }
+.history { display: grid; gap: 8px; margin-top: 16px; }
+.history button { text-align: left; padding: 16px; border: 1px solid var(--color-border); border-radius: 10px; background: var(--color-bg-page); color: var(--color-text-primary); }
+.history span { display:block; margin-top:8px; color:var(--color-text-secondary); }
+.empty { text-align:center; padding:48px 24px; color:var(--color-text-secondary); }
+.root progress { width: 100%; accent-color: var(--color-brand); }
+.root :is(button,select,a,summary):focus-visible { outline: 3px solid var(--color-brand); outline-offset: 3px; }
+.root button:disabled { opacity:.5; cursor:not-allowed; }
+.metricStage { min-width:0; padding:20px; border:1px solid var(--color-border); border-radius:12px; }
+.metricStage h3 { font-size:18px; margin:8px 0 12px; }
+.metricStage dl { margin:20px 0 0; font-size:13px; }
+.metricStage dl div { display:flex; justify-content:space-between; gap:8px; margin-top:12px; }
+.metricStage dt { color:var(--color-text-secondary); }
+.metricStage dd { margin:0; font-weight:600; font-variant-numeric:tabular-nums; }
+.statusBadge { display:inline-block; padding:4px 10px; border-radius:999px; background:var(--color-brand-subtle); color:var(--color-brand); font-size:12px; }
+.statusBadge[data-status="failed"] { background:var(--color-error-bg); color:var(--color-error); }
+.statusBadge[data-status="complete"] { background:var(--color-success-bg); color:var(--color-success); }
+.metricFooter { display:flex; flex-wrap:wrap; gap:16px; margin-top:20px; font-size:13px; }
+.metricTableWrap { overflow-x:auto; margin:16px 0; }
+.metricTable { width:100%; border-collapse:collapse; font-size:13px; }
+.metricTable caption { text-align:left; color:var(--color-text-secondary); padding-bottom:12px; }
+.metricTable :is(th,td) { padding:12px; border-bottom:1px solid var(--color-border); text-align:right; white-space:nowrap; font-variant-numeric:tabular-nums; }
+.metricTable th:first-child { text-align:left; }
+.metricTable thead { background:var(--color-bg-page); }
+@media(max-width:800px) { .grid { grid-template-columns:1fr; } .root { padding:24px 16px; } }

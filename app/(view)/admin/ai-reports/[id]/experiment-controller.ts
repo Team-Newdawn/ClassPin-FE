@@ -3,9 +3,9 @@ import {useEffect,useState} from "react";
 import {useParams} from "next/navigation";
 import type {ExperimentRun} from "./experiment-model";
 
-export function useExperimentSelection(){
+export function useExperimentSelection(allow = true){
   const {id}=useParams<{id:string}>();
-  const enabled=process.env.NODE_ENV==="development"&&id==="ef98fa52-d24a-4d37-88ba-f840a6a2b187";
+  const enabled=allow&&process.env.NODE_ENV==="development"&&id==="ef98fa52-d24a-4d37-88ba-f840a6a2b187";
   const [selected,setSelected]=useState("saved");
   const [runs,setRuns]=useState<ExperimentRun[]>([]);
   const [error,setError]=useState("");

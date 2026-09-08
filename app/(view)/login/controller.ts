@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "@/app/_controller/auth-context";
+import { canUseLocalDevelopmentLogin, signInForLocalDevelopment } from "@/app/_service/auth-service";
 
 export function useLoginController(startError: string) {
   const router = useRouter();
@@ -14,10 +15,19 @@ export function useLoginController(startError: string) {
   const { configured, loading, isAdmin, signIn } = useAuth();
   const [error, setError] = useState<string | null>(null);
   const [redirecting, setRedirecting] = useState(false);
+  const localAutoLoginStarted = useRef(false);
 
   useEffect(() => {
     if (configured && !loading && isAdmin) router.replace(next);
   }, [configured, loading, isAdmin, next, router]);
+
+  useEffect(() => {
+    if (!configured || loading || isAdmin || localAutoLoginStarted.current || !canUseLocalDevelopmentLogin()) return;
+    localAutoLoginStarted.current = true;
+    void signInForLocalDevelopment().catch((cause) => {
+      setError(cause instanceof Error ? cause.message : startError);
+    });
+  }, [configured, loading, isAdmin, startError]);
 
   const startGoogle = async () => {
     setError(null);

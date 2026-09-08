@@ -1,0 +1,6 @@
+steps:
+  - name: gcr.io/cloud-builders/docker
+    args: ["build", "--tag=${_IMAGE}", "services/ai-report-worker"]
+images: ["${_IMAGE}"]
+options:
+  logging: CLOUD_LOGGING_ONLY

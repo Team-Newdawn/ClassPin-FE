@@ -97,11 +97,56 @@ export async function getAccessToken() {
   return data.session.access_token ?? null;
 }
 
+/** Local magic links and older OAuth callbacks may return validated tokens in the URL fragment. */
+export async function restoreSessionFromUrlHash(hash: string) {
+  if (!hash.startsWith("#")) return false;
+  const params = new URLSearchParams(hash.slice(1));
+  const accessToken = params.get("access_token");
+  const refreshToken = params.get("refresh_token");
+  if (!accessToken || !refreshToken) return false;
+  const client = getSupabaseClient();
+  if (!client) return false;
+  const { error } = await client.auth.setSession({ access_token: accessToken, refresh_token: refreshToken });
+  if (error) throw error;
+  window.history.replaceState(null, "", `${window.location.pathname}${window.location.search}`);
+  return true;
+}
+
 export async function signInWithGoogle(next = "/") {
   const client = getSupabaseClient();
   if (!client) throw new Error("Supabase 모드에서만 로그인할 수 있습니다.");
   const redirectTo = `${window.location.origin}/auth/callback?next=${encodeURIComponent(next)}`;
   const { error } = await client.auth.signInWithOAuth({ provider: "google", options: { redirectTo } });
+  if (error) throw error;
+}
+
+export function canUseLocalDevelopmentLogin() {
+  if (process.env.NODE_ENV === "production" || typeof window === "undefined") return false;
+  return window.location.hostname === "127.0.0.1"
+    || window.location.hostname === "localhost"
+    || window.location.hostname === "::1";
+}
+
+/** 로컬 개발 서버에서만 일회용 토큰을 받아 복제 데이터의 강사로 로그인한다. */
+export async function signInForLocalDevelopment() {
+  if (!canUseLocalDevelopmentLogin()) throw new Error("로컬 개발 환경에서만 자동 로그인할 수 있습니다.");
+  const client = getSupabaseClient();
+  if (!client) throw new Error("로컬 Supabase가 설정되지 않았습니다.");
+
+  const response = await fetch("/api/dev/local-login", {
+    method: "POST",
+    headers: { Accept: "application/json" },
+    cache: "no-store",
+  });
+  const payload = await response.json().catch(() => null) as { tokenHash?: string; error?: string } | null;
+  if (!response.ok || !payload?.tokenHash) {
+    throw new Error(payload?.error ?? "로컬 자동 로그인에 실패했습니다.");
+  }
+
+  const { error } = await client.auth.verifyOtp({
+    token_hash: payload.tokenHash,
+    type: "magiclink",
+  });
   if (error) throw error;
 }
 

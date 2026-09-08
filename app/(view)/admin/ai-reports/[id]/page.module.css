@@ -1,0 +1,245 @@
+.root {
+  --category-why: var(--color-brand);
+  --category-example: var(--color-success);
+  --category-concept: var(--color-pending);
+  --category-important: var(--color-warning);
+  --category-other: var(--color-text-secondary);
+  min-height: 100vh;
+  background: var(--color-bg-page);
+}
+
+.root :global(.report-category-panel) { margin: 0 0 24px; padding: 24px; border: 1px solid var(--color-border); border-radius: 16px; background: var(--color-bg-surface); }
+.root :global(.report-category-panel) h2 { margin: 0; font-size: 18px; }
+.root :global(.report-category-panel) > p { color: var(--color-text-secondary); font-size: 13px; line-height: 22px; }
+.root :global(.report-category-layout) { display: grid; grid-template-columns: 200px minmax(200px, 1fr) minmax(240px, 1.5fr); gap: 28px; align-items: center; margin-top: 24px; }
+.root :global(.report-donut) { width: 200px; height: 200px; border-radius: 50%; display: grid; place-items: center; }
+.root :global(.report-donut) > div { width: 136px; height: 136px; border-radius: 50%; background: var(--color-bg-surface); display: flex; flex-direction: column; align-items: center; justify-content: center; }
+.root :global(.report-donut) b { font-size: 36px; font-variant-numeric: tabular-nums; }
+.root :global(.report-donut) span { color: var(--color-text-secondary); font-size: 13px; }
+.root :global(.report-category-legend) { display: grid; gap: 8px; }
+.root :global(.report-category-legend) button { display: grid; grid-template-columns: 10px 1fr auto 52px; gap: 10px; align-items: center; text-align: left; padding: 12px; border: 1px solid var(--color-border); border-radius: 10px; color: var(--color-text-primary); background: var(--color-bg-surface); min-height: 44px; font-size: 13px; }
+.root :global(.report-category-legend) button[aria-pressed="true"] { background: var(--color-brand-subtle); border-color: var(--color-brand); }
+.root :global(.report-category-legend) i { width: 10px; height: 10px; border-radius: 50%; }
+.root :global(.report-category-legend) small { text-align: right; font-size: 12px; color: var(--color-text-secondary); font-variant-numeric: tabular-nums; }
+.root :global(.report-category-questions) { align-self: stretch; min-width: 0; }
+.root :global(.report-category-questions) h3 { margin: 0 0 12px; font-size: 14px; }
+.root :global(.report-category-questions) ul { max-height: 230px; overflow-y: auto; margin: 0; padding: 0; list-style: none; }
+.root :global(.report-category-questions) button { display: grid; grid-template-columns: 28px 1fr 16px; gap: 10px; align-items: center; width: 100%; text-align: left; border: 0; border-bottom: 1px solid var(--color-border); background: var(--color-bg-surface); color: var(--color-text-primary); padding: 12px 4px; font-size: 13px; line-height: 21px; }
+.root :global(.report-category-questions) button:hover { background: var(--color-brand-subtle); }
+.root :global(.report-category-questions) svg { width: 16px; color: var(--color-brand); }
+@media (max-width: 1000px) { .root :global(.report-category-layout) { grid-template-columns: 200px minmax(0, 1fr); } .root :global(.report-category-questions) { grid-column: 1 / -1; } }
+@media (max-width: 600px) { .root :global(.report-category-layout) { grid-template-columns: minmax(0, 1fr); } .root :global(.report-donut) { justify-self: center; } }
+
+.root :global(.ai-report-page) {
+  width: min(1180px, calc(100% - 48px));
+  margin: 0 auto;
+  padding: 34px 0 72px;
+}
+
+.root :global(.report-back) {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--color-text-secondary);
+  font-size: 13px;
+  text-decoration: none;
+}
+
+.root :global(.report-back) svg { width: 17px; }
+
+.root :global(.report-head) {
+  margin-top: 24px;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 24px;
+}
+
+.root :global(.report-head) h1 { margin: 7px 0 4px; font-size: 32px; }
+.root :global(.report-head) p { margin: 0; color: var(--color-text-secondary); font-size: 14px; }
+.root :global(.report-eyebrow) { display: inline-flex; align-items: center; gap: 6px; color: var(--color-brand-hover); font-size: 11px; font-weight: 700; letter-spacing: .07em; }
+.root :global(.report-eyebrow) svg { width: 16px; }
+
+.root :global(.report-status) {
+  height: 34px;
+  padding: 0 12px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border-radius: 999px;
+  background: var(--color-pending-bg);
+  color: var(--color-pending);
+  font-size: 12px;
+  font-weight: 700;
+}
+.root :global(.report-status) svg { width: 15px; }
+.root :global(.report-status.ready), .root :global(.report-status.confirmed) { background: var(--color-success-bg); color: var(--color-success); }
+.root :global(.report-status.failed) { background: var(--color-error-bg); color: var(--color-error); }
+
+.root :global(.report-metadata) {
+  margin-top: 24px;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  border: 1px solid var(--color-border);
+  border-radius: 15px;
+  background: var(--color-bg-surface);
+}
+.root :global(.report-metadata) > div { min-width: 0; padding: 16px 18px; border-right: 1px solid var(--color-border); }
+.root :global(.report-metadata) > div:last-child { border: 0; }
+.root :global(.report-metadata) small, .root :global(.report-metadata) b { display: block; }
+.root :global(.report-metadata) small { color: var(--color-text-tertiary); font-size: 11px; }
+.root :global(.report-metadata) b { margin-top: 5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; }
+
+.root :global(.report-state) {
+  min-height: 320px;
+  margin-top: 24px;
+  padding: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  border: 1px solid var(--color-border);
+  border-radius: 18px;
+  background: var(--color-bg-surface);
+  text-align: center;
+}
+.root :global(.report-state) > svg { width: 34px; color: var(--color-brand); }
+.root :global(.report-state) h1, .root :global(.report-state) h2 { margin: 16px 0 8px; }
+.root :global(.report-state) p { max-width: 620px; margin: 0; color: var(--color-text-secondary); font-size: 13px; line-height: 20px; }
+.root :global(.report-state) small { margin-top: 12px; color: var(--color-text-tertiary); }
+.root :global(.report-state.failed) > svg { color: var(--color-error); }
+.root :global(.report-state) code { margin-top: 14px; color: var(--color-text-tertiary); }
+.root :global(.report-state) > :global(.btn) { margin-top: 20px; }
+.root :global(.report-progress) { width: min(520px, 100%); height: 10px; margin: 14px 0 18px; overflow: hidden; border-radius: 999px; background: var(--pin-neutral-100); }
+.root :global(.report-progress) i { height: 100%; display: block; border-radius: inherit; background: var(--color-brand); transition: width .25s ease; }
+
+.root :global(.report-load-warning) { margin-top: 14px; padding: 10px 12px; border-radius: 10px; background: var(--color-warning-bg); color: var(--color-warning); font-size: 12px; }
+.root :global(.report-load-warning) button { margin-left: 6px; border: 0; background: transparent; color: inherit; font-weight: 700; text-decoration: underline; }
+
+.root :global(.report-view-toggle) { margin: 24px 0 14px; padding: 4px; display: inline-flex; border-radius: 10px; background: var(--pin-neutral-100); }
+.root :global(.report-view-toggle) button { height: 36px; padding: 0 14px; border: 0; border-radius: 8px; background: transparent; color: var(--color-text-secondary); font-size: 12px; }
+.root :global(.report-view-toggle) button[aria-pressed="true"] { background: var(--color-bg-surface); color: var(--color-brand-hover); box-shadow: var(--shadow-xs); font-weight: 700; }
+
+.root :global(.report-content) { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+.root :global(.report-section) { padding: 24px; border: 1px solid var(--color-border); border-radius: 16px; background: var(--color-bg-surface); }
+.root :global(.report-section):first-child, .root :global(.report-section):last-child { grid-column: 1 / -1; }
+.root :global(.report-section) > header { margin-bottom: 16px; display: flex; align-items: center; gap: 8px; }
+.root :global(.report-section) > header svg { width: 19px; color: var(--color-brand); }
+.root :global(.report-section) h2 { margin: 0; font-size: 18px; }
+.root :global(.report-section) > ul { margin: 0; padding-left: 20px; display: grid; gap: 10px; color: var(--color-text-primary); font-size: 14px; line-height: 22px; }
+
+.root :global(.evidence-cards) { display: grid; gap: 10px; }
+.root :global(.evidence-cards) article { padding: 14px; border: 1px solid var(--color-border); border-radius: 11px; background: var(--pin-neutral-50); }
+.root :global(.evidence-cards) article > div { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.root :global(.evidence-cards) h3 { margin: 0; font-size: 13px; }
+.root :global(.evidence-cards) p { margin: 7px 0 0; color: var(--color-text-secondary); font-size: 13px; line-height: 20px; }
+.root :global(.evidence-links) { margin-top: 10px; display: flex; flex-wrap: wrap; gap: 6px; }
+.root :global(.evidence-links) button { padding: 5px 7px; display: inline-flex; align-items: center; gap: 4px; border: 1px solid var(--color-border); border-radius: 7px; background: var(--color-bg-surface); color: var(--color-brand-hover); font-size: 10px; }
+.root :global(.evidence-links) button:hover { border-color: var(--color-brand); background: var(--color-brand-subtle); }
+.root :global(.evidence-links) button svg { width: 12px; }
+.root :global(.evidence-badge) { flex: 0 0 auto; padding: 4px 7px; border-radius: 999px; background: var(--color-error-bg); color: var(--color-error); font-size: 10px; font-weight: 700; }
+.root :global(.evidence-badge.sufficient) { background: var(--color-success-bg); color: var(--color-success); }
+.root :global(.evidence-badge.limited) { background: var(--color-warning-bg); color: var(--color-warning); }
+
+.root :global(.report-materials) { display: grid; gap: 12px; }
+.root :global(.report-materials) article { padding: 16px; border: 1px solid var(--color-border); border-radius: 12px; }
+.root :global(.report-materials) h3 { margin: 0 0 12px; font-size: 15px; }
+.root :global(.report-materials) ul { margin: 0; padding: 0; display: grid; gap: 8px; list-style: none; }
+.root :global(.report-materials) li { padding: 10px; display: grid; grid-template-columns: 28px minmax(0, 1fr); gap: 10px; border-radius: 9px; background: var(--pin-neutral-50); }
+.root :global(.report-materials) li > span { width: 28px; height: 28px; display: grid; place-items: center; border-radius: 7px; background: var(--color-brand-subtle); color: var(--color-brand-hover); font-size: 11px; font-weight: 700; }
+.root :global(.report-materials) b { font-size: 13px; }
+.root :global(.report-materials) p { margin: 3px 0; color: var(--color-text-secondary); font-size: 12px; line-height: 18px; }
+.root :global(.report-materials) small { color: var(--color-text-tertiary); font-size: 10px; }
+.root :global(.report-empty) { margin: 0; color: var(--color-text-tertiary); font-size: 13px; }
+
+.root :global(.report-narrative) { padding: clamp(28px, 6vw, 72px); border: 1px solid var(--color-border); border-radius: 16px; background: var(--color-bg-surface); }
+.root :global(.report-narrative) h2 { max-width: 720px; margin: 14px 0 28px; font-size: 30px; }
+.root :global(.report-narrative) p { max-width: 760px; margin: 0 0 18px; color: var(--color-text-secondary); font-size: 15px; line-height: 28px; }
+
+.root :global(.evidence-backdrop) { position: fixed; inset: 0; z-index: 120; padding: 24px; display: grid; place-items: center; background: rgba(16, 24, 39, .6); }
+.root :global(.evidence-dialog) { position: relative; width: min(900px, 100%); max-height: calc(100dvh - 48px); overflow-y: auto; padding: 26px; border-radius: 20px; background: var(--color-bg-surface); box-shadow: var(--shadow-lg); }
+.root :global(.evidence-close) { position: absolute; top: 16px; right: 16px; width: 38px; height: 38px; border: 0; border-radius: 9px; background: var(--pin-neutral-100); color: var(--color-text-secondary); font-size: 24px; }
+.root :global(.evidence-dialog) header h2 { margin: 7px 0 3px; font-size: 22px; }
+.root :global(.evidence-dialog) header p { margin: 0; color: var(--color-text-tertiary); font-size: 12px; }
+.root :global(.evidence-image) { position: relative; width: 100%; aspect-ratio: 16 / 9; margin: 20px 0 14px; overflow: hidden; border: 1px solid var(--color-border); border-radius: 12px; background-color: var(--pin-neutral-100); background-position: center; background-repeat: no-repeat; background-size: contain; }
+.root :global(.region-overlay) { position: absolute; border: 3px solid var(--color-brand); border-radius: 5px; background: color-mix(in srgb, var(--color-brand) 12%, transparent); box-shadow: 0 0 0 1px var(--color-bg-surface); }
+.root :global(.pin-overlay) { position: absolute; width: 28px; height: 28px; display: grid; place-items: center; transform: translate(-50%, -100%); border-radius: 999px 999px 999px 4px; background: var(--color-error); color: var(--color-bg-surface); box-shadow: var(--shadow-sm); }
+.root :global(.pin-overlay) svg { width: 15px; }
+.root :global(.evidence-dialog) article { margin-top: 10px; padding: 14px; border: 1px solid var(--color-border); border-radius: 11px; }
+.root :global(.evidence-dialog) article small { color: var(--color-brand-hover); font-size: 11px; font-weight: 700; }
+.root :global(.evidence-dialog) article p { margin: 6px 0 0; color: var(--color-text-secondary); font-size: 13px; line-height: 20px; }
+.root :global(.evidence-dialog) blockquote { margin: 9px 0 0; padding: 8px 10px; border-left: 3px solid var(--color-brand); background: var(--pin-neutral-50); color: var(--color-text-secondary); font-size: 12px; }
+
+@media (max-width: 760px) {
+  .root :global(.ai-report-page) { width: min(100% - 28px, 1180px); padding-top: 22px; }
+  .root :global(.report-head) { flex-direction: column; }
+  .root :global(.report-head) h1 { font-size: 27px; }
+  .root :global(.report-metadata) { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .root :global(.report-metadata) > div:nth-child(2) { border-right: 0; }
+  .root :global(.report-metadata) > div:nth-child(-n+2) { border-bottom: 1px solid var(--color-border); }
+  .root :global(.report-content) { grid-template-columns: minmax(0, 1fr); }
+  .root :global(.report-section), .root :global(.report-section):first-child, .root :global(.report-section):last-child { grid-column: auto; padding: 18px 16px; }
+  .root :global(.report-state) { min-height: 280px; padding: 28px 18px; }
+  .root :global(.evidence-backdrop) { align-items: end; padding: 0; }
+  .root :global(.evidence-dialog) { max-height: calc(100dvh - 24px); padding: 24px 16px max(24px, env(safe-area-inset-bottom)); border-radius: 22px 22px 0 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .root :global(.report-progress) i { transition: none; }
+}
+
+/* Snapshot statistics and progressive evidence disclosure (AIR-PROD-050–062). */
+.root :global(.report-statistics) { margin-bottom: 28px; }
+.root :global(.report-kpis) { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; margin: 8px 0 20px; }
+.root :global(.report-kpis) > div { padding: 22px 24px; border: 1px solid var(--color-border); border-radius: 16px; background: var(--color-bg-surface); }
+.root :global(.report-kpis) small { display: block; color: var(--color-text-secondary); font-size: 13px; }
+.root :global(.report-kpis) b { display: block; margin-top: 12px; font-size: 32px; line-height: 42px; font-variant-numeric: tabular-nums; }
+.root :global(.report-charts) { display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr); gap: 16px; }
+.root :global(.report-chart-panel) { min-width: 0; padding: 24px; border: 1px solid var(--color-border); border-radius: 16px; background: var(--color-bg-surface); }
+.root :global(.report-chart-panel) h2 { margin: 0; font-size: 18px; }
+.root :global(.report-chart-panel) p, .root :global(.report-stat-note) { font-size: 13px; line-height: 22px; color: var(--color-text-secondary); }
+.root :global(.report-chart-panel) > small { display: block; margin-top: 18px; font-size: 12px; color: var(--color-text-secondary); }
+.root :global(.report-chart-scroll) { overflow-x: auto; padding: 22px 4px 4px; }
+.root :global(.report-bars) { display: flex; gap: 8px; align-items: end; }
+.root :global(.report-bar-column) { min-width: 32px; flex: 1; display: grid; gap: 12px; text-align: center; color: var(--color-text-secondary); text-decoration: none; font-size: 12px; }
+.root :global(.report-bar-track) { height: 160px; position: relative; display: flex; align-items: end; justify-content: center; border-bottom: 1px solid var(--color-border-strong); background: repeating-linear-gradient(to top, transparent 0, transparent 39px, var(--color-border) 40px); }
+.root :global(.report-bar) { width: 72%; min-height: 2px; border-radius: 5px 5px 0 0; background: var(--color-brand); }
+.root :global(.report-bar-track) b { position: absolute; top: -24px; font-size: 13px; color: var(--color-text-primary); }
+.root :global(.report-bar-column):hover :global(.report-bar) { background: var(--color-brand-hover); }
+.root :global(.report-ranking) { list-style: none; margin: 16px 0 0; padding: 0; }
+.root :global(.report-ranking) li + li { border-top: 1px solid var(--color-border); }
+.root :global(.report-ranking) a { display: grid; grid-template-columns: 38px minmax(0, 1fr) auto; align-items: center; gap: 12px; min-height: 58px; padding: 10px 0; text-decoration: none; color: var(--color-text-primary); }
+.root :global(.report-page-label) { padding: 8px 2px; text-align: center; font-size: 13px; border-radius: 8px; background: var(--color-brand-subtle); color: var(--color-brand-hover); }
+.root :global(.report-ranking) b { font-size: 13px; display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.root :global(.report-ranking) small { font-size: 12px; color: var(--color-text-secondary); }
+.root :global(.report-ranking) strong { font-size: 20px; font-variant-numeric: tabular-nums; }
+.root :global(.report-stat-note) { margin: 12px 0 0; }
+.root :global(.report-section-count) { margin-left: auto; padding: 4px 10px; background: var(--color-brand-subtle); border-radius: 999px; font-size: 13px; color: var(--color-brand-hover); }
+.root :global(.report-finding) { border-bottom: 1px solid var(--color-border); padding: 12px 0; }
+.root :global(.report-finding):last-child { border-bottom: 0; }
+.root :global(.report-finding) > summary { display: flex; align-items: center; gap: 12px; cursor: pointer; min-height: 44px; list-style: none; }
+.root :global(.report-finding) > summary::after { content: "+"; font-size: 20px; color: var(--color-text-secondary); }
+.root :global(.report-finding[open]) > summary::after { content: "−"; }
+.root :global(.report-finding) h3 { flex: 1; font-size: 15px; line-height: 24px; word-break: keep-all; overflow-wrap: anywhere; }
+.root :global(.report-finding-number) { font-size: 12px; color: var(--color-text-secondary); font-variant-numeric: tabular-nums; }
+.root :global(.report-finding) > p { font-size: 14px; line-height: 25px; padding-left: 28px; max-width: 88ch; color: var(--color-text-primary); }
+.root :global(.report-evidence-disclosure) { margin: 12px 0 0 28px; }
+.root :global(.report-evidence-disclosure) > summary { display: flex; align-items: center; gap: 8px; width: fit-content; min-height: 40px; font-size: 13px; color: var(--color-brand-hover); cursor: pointer; }
+.root :global(.report-evidence-disclosure) > summary svg { width: 15px; }
+.root :global(.report-evidence-disclosure) > summary span { padding: 2px 8px; background: var(--color-brand-subtle); border-radius: 999px; }
+.root :global(.evidence-links) { justify-content: flex-start; }
+.root :global(.evidence-links) button { min-height: 40px; padding: 8px 10px; font-size: 12px; }
+.root :global(.evidence-badge) { font-size: 12px; }
+.root :global(.report-materials) li { scroll-margin-top: 24px; }
+.root :global(.report-materials) li:target { outline: 2px solid var(--color-brand); background: var(--color-brand-subtle); }
+.root :global(.report-materials) p { font-size: 14px; line-height: 24px; }
+.root :global(.report-materials) small, .root :global(.report-metadata) small { font-size: 12px; }
+.root summary:focus-visible, .root a:focus-visible, .root button:focus-visible { outline: 2px solid var(--color-brand); outline-offset: 3px; }
+@media (max-width: 1000px) { .root :global(.report-charts) { grid-template-columns: minmax(0, 1fr); } }
+@media (max-width: 760px) {
+  .root :global(.report-kpis) { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+  .root :global(.report-kpis) > div { padding: 16px; }
+  .root :global(.report-chart-panel) { padding: 18px 16px; }
+  .root :global(.report-finding) > summary { flex-wrap: wrap; }
+  .root :global(.report-finding) h3 { min-width: 55%; }
+}

@@ -145,6 +145,8 @@ export interface Slide {
   imageUrl?: string;
   /** lecture-slides 버킷 안의 경로. 변환 단계에서 이미 올라간 이미지를 가리킨다. */
   imagePath?: string;
+  /** 업로드한 이미지 bytes의 SHA-256. AI snapshot에서 원본 교체를 탐지한다. */
+  imageChecksum?: string;
   /** 강의자 전용 발표 메모. 청중 세션 조회에는 포함하지 않는다. */
   speakerNote?: string;
 }

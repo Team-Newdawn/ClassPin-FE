@@ -35,7 +35,13 @@ type SlideRow = {
   material_version_id: string;
   page_index: number;
   image_path: string;
+  image_checksum: string | null;
 };
+
+async function sha256Blob(blob: Blob) {
+  const digest = await crypto.subtle.digest("SHA-256", await blob.arrayBuffer());
+  return [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, "0")).join("");
+}
 
 type SlideInstructorNoteRow = {
   slide_id: string;
@@ -186,13 +192,15 @@ export async function persistSession(session: ClassSession) {
   for (const slide of session.slides) {
     // 변환 단계에서 이미 Storage 에 올라온 슬라이드는 그대로 참조한다.
     let imagePath = slide.imagePath ?? "";
+    let imageChecksum = slide.imageChecksum ?? null;
     if (!imagePath && slide.imageUrl) {
       imagePath = `${user.id}/${session.id}/${slide.id}.jpg`;
       const image = await fetch(slide.imageUrl).then((response) => response.blob());
+      imageChecksum = await sha256Blob(image);
       const { error: uploadError } = await client.storage.from("lecture-slides").upload(imagePath, image, { contentType: image.type || "image/jpeg", upsert: false });
       if (uploadError) throw uploadError;
     }
-    slideRows.push({ id: slide.id, material_version_id: session.materialVersionId, page_index: slide.pageIndex, image_path: imagePath });
+    slideRows.push({ id: slide.id, material_version_id: session.materialVersionId, page_index: slide.pageIndex, image_path: imagePath, image_checksum: imageChecksum });
   }
   const { error: slidesError } = await client.from("slides").insert(slideRows);
   if (slidesError) throw slidesError;
@@ -349,13 +357,14 @@ export async function appendSessionSlides(session: ClassSession, files: File[]):
       const id = crypto.randomUUID();
       const extension = file.type === "image/png" ? "png" : file.type === "image/webp" ? "webp" : "jpg";
       const imagePath = `${user.id}/${session.id}/appended/${id}.${extension}`;
+      const imageChecksum = await sha256Blob(file);
       const { error: uploadError } = await client.storage.from("lecture-slides").upload(imagePath, file, {
         contentType: file.type,
         upsert: false
       });
       if (uploadError) throw uploadError;
       uploadedPaths.push(imagePath);
-      newSlides.push({ id, image_path: imagePath });
+      newSlides.push({ id, image_path: imagePath, image_checksum: imageChecksum });
     }
 
     const { data, error } = await client.rpc("append_lecture_slides", {
@@ -370,6 +379,7 @@ export async function appendSessionSlides(session: ClassSession, files: File[]):
         pageIndex: slide.page_index,
         title: `Slide ${slide.page_index + 1}`,
         imagePath: slide.image_path,
+        imageChecksum: slide.image_checksum ?? undefined,
         imageUrl: client.storage.from("lecture-slides").getPublicUrl(slide.image_path).data.publicUrl,
         speakerNote: ""
       }));
@@ -401,7 +411,7 @@ export async function fetchSessionSlides(session: ClassSession, asAudience = fal
   if (asAudience) await ensureAnonymousUser();
 
   const { data, error } = await client.from("slides")
-    .select("id, material_version_id, page_index, image_path")
+    .select("id, material_version_id, page_index, image_path, image_checksum")
     .eq("material_version_id", session.materialVersionId)
     .order("page_index", { ascending: true });
   if (error) throw error;
@@ -420,6 +430,7 @@ export async function fetchSessionSlides(session: ClassSession, asAudience = fal
     pageIndex: slide.page_index,
     title: `Slide ${slide.page_index + 1}`,
     imagePath: slide.image_path,
+    imageChecksum: slide.image_checksum ?? undefined,
     imageUrl: client.storage.from("lecture-slides").getPublicUrl(slide.image_path).data.publicUrl,
     ...(asAudience ? {} : { speakerNote: noteBySlide.get(slide.id) ?? "" })
   }));
@@ -458,6 +469,7 @@ export async function fetchOwnedSessions(): Promise<ClassSession[]> {
             material_version_id,
             page_index,
             image_path,
+            image_checksum,
             slide_instructor_notes(slide_id, body)
           )
         )
@@ -498,6 +510,7 @@ export async function fetchOwnedSessions(): Promise<ClassSession[]> {
             pageIndex: slide.page_index,
             title: `Slide ${slide.page_index + 1}`,
             imagePath: slide.image_path,
+            imageChecksum: slide.image_checksum ?? undefined,
             imageUrl: client.storage.from("lecture-slides").getPublicUrl(slide.image_path).data.publicUrl,
             speakerNote: note?.body ?? ""
           };
@@ -563,7 +576,7 @@ export async function fetchLiveSession(joinCode: string): Promise<ClassSession |
         material_versions(
           id,
           version_no,
-          slides(id, material_version_id, page_index, image_path)
+          slides(id, material_version_id, page_index, image_path, image_checksum)
         )
       )
     `)
@@ -579,6 +592,7 @@ export async function fetchLiveSession(joinCode: string): Promise<ClassSession |
   const slides: Slide[] = [...version.slides].sort((a, b) => a.page_index - b.page_index).map((slide) => ({
     id: slide.id, pageIndex: slide.page_index, title: `Slide ${slide.page_index + 1}`,
     imagePath: slide.image_path,
+    imageChecksum: slide.image_checksum ?? undefined,
     imageUrl: client.storage.from("lecture-slides").getPublicUrl(slide.image_path).data.publicUrl
   }));
   const session: ClassSession = {

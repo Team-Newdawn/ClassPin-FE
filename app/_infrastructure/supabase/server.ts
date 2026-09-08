@@ -20,3 +20,17 @@ export function getSupabaseClientForToken(accessToken: string): SupabaseClient |
     global: { headers: { Authorization: `Bearer ${accessToken}` } },
   });
 }
+
+let serviceClient: SupabaseClient | null = null;
+
+/** 서버 전용 privileged client. 브라우저 번들이나 NEXT_PUBLIC_*에 secret을 넣지 않는다. */
+export function getSupabaseServiceClient(): SupabaseClient | null {
+  const secretKey = process.env.SUPABASE_SECRET_KEY;
+  if (!supabaseServerConfigured || !secretKey) return null;
+  if (!serviceClient) {
+    serviceClient = createClient(url!, secretKey, {
+      auth: { persistSession: false, autoRefreshToken: false },
+    });
+  }
+  return serviceClient;
+}

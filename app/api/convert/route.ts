@@ -1,4 +1,5 @@
 import { execFile } from "node:child_process";
+import { createHash } from "node:crypto";
 import { copyFile, mkdir, mkdtemp, readFile, readdir, rm, stat, writeFile } from "node:fs/promises";
 import { availableParallelism, tmpdir } from "node:os";
 import path from "node:path";
@@ -61,10 +62,11 @@ async function uploadSlide(dir: string, name: string, target: UploadTarget): Pro
   const id = crypto.randomUUID();
   // storage 정책이 첫 폴더명을 소유자로 검증한다. 경로 모양을 바꾸면 업로드가 막힌다.
   const imagePath = `${target.ownerId}/${target.uploadId}/${id}.jpg`;
-  const { error } = await target.bucket.upload(imagePath, await readFile(path.join(dir, name)), { contentType: "image/jpeg", upsert: false });
+  const image = await readFile(path.join(dir, name));
+  const { error } = await target.bucket.upload(imagePath, image, { contentType: "image/jpeg", upsert: false });
   if (error) throw error;
   const pageIndex = pageIndexOf(name);
-  return { id, pageIndex, title: `Slide ${pageIndex + 1}`, imagePath, imageUrl: target.bucket.getPublicUrl(imagePath).data.publicUrl };
+  return { id, pageIndex, title: `Slide ${pageIndex + 1}`, imagePath, imageChecksum: createHash("sha256").update(image).digest("hex"), imageUrl: target.bucket.getPublicUrl(imagePath).data.publicUrl };
 }
 
 /**

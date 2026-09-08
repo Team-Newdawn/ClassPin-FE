@@ -67,7 +67,32 @@ gcloud projects add-iam-policy-binding <PROJECT_ID> \
 `.env.local`에서 `NEXT_PUBLIC_*`을 읽어 빌드 인자로 넘긴다. 이 값들은 클라이언트
 번들에 그대로 박히기 때문에 런타임 env로는 늦다 — 반드시 이미지를 구울 때 들어가야 한다.
 
-`SUPABASE_SECRET_KEY`는 코드 어디서도 쓰지 않으므로 Cloud Run에 설정하지 않는다.
+기본 강의 기능만 배포할 때는 `SUPABASE_SECRET_KEY`가 필요하지 않다. AI 강사 리포트를
+활성화하면 소유자 요청으로 고정 snapshot을 만들고 private evidence를 읽는 서버 API와
+worker에 이 키가 필요하다. 브라우저 번들·`.env`·이미지·build arg에 넣지 말고 Secret
+Manager의 서로 분리된 app/worker runtime 주입으로만 제공한다.
+
+## AI 강사 리포트 운영 반영
+
+AI 리포트는 기존 public app 안에서 OCR과 모델 호출을 실행하지 않는다. 앱은 요청을
+검증하고 Cloud Tasks에 작은 작업 식별자만 넣으며, Tesseract OCR·ImageMagick 가림·AI
+분석은 별도 private `pin-class-ai-worker` Cloud Run 서비스가 처리한다. 생성 화면의 상태와
+최근 리포트 목록은 DB를 폴링하므로 브라우저를 닫아도 작업이 계속된다.
+
+운영 반영은 다음 순서를 지킨다.
+
+1. `AI_REPORT_ENABLED=false` 상태로 `20260906170431_ai_instructor_reports.sql` migration을 먼저 적용한다.
+2. Secret Manager에 Supabase secret key, OpenRouter key, 32자 이상의 quote HMAC key를 각각 별도 secret으로 만든다.
+3. `classpin-ai-reports` Cloud Tasks queue와 전용 task OIDC service account를 만든다. task 계정에는 private worker의 `roles/run.invoker`만 준다.
+4. app과 worker에 서로 다른 runtime service account를 사용한다. 두 계정에는 queue enqueue와 task OIDC 계정 사용에 필요한 최소 권한만 준다.
+5. `services/ai-report-worker/cloudbuild.yaml`로 worker 이미지를 빌드하고 unauthenticated invocation 없이 배포한다.
+6. app runtime에는 queue·worker URL과 quote/가격 설정을, worker에는 동일한 model/provider fingerprint와 호출별 비용 상한을 넣는다. `AI_REPORT_PRICING_AT`은 배포 시점 기준 24시간 이내여야 한다.
+7. 별도 테스트 자료로 snapshot → 모든 슬라이드 분석 → 합성 → critic → 근거 이미지 조회를 확인한 뒤에만 `AI_REPORT_ENABLED=true`로 새 app revision을 배포한다.
+
+운영에 필요한 비밀이 아닌 설정 이름은 `.env.example`에 정리되어 있다. generation과 critic은
+서로 다른 model family와 고정 provider를 사용하며 자동 fallback, provider data collection,
+prompt caching을 허용하지 않는다. 장애 시에는 `AI_REPORT_ENABLED=false` → queue pause → worker
+scale-to-zero 순서로 새 호출을 막고 기존 ready 리포트 조회는 유지한다.
 
 ## 도메인 연결
 

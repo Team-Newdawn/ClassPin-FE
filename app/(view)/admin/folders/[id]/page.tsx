@@ -5,6 +5,9 @@ import Link from "next/link";
 import { ArrowLeft, ArrowRight, BarChart3, FileText, Folder, Grid2X2, List, MessageCircleQuestion, Trash2, X } from "@/app/component/icons";
 import { AdminSearch } from "@/app/component/admin-search";
 import { FolderMaterialCard } from "./component/folder-material-card";
+import { AiReportBuilder } from "./component/ai-report-builder";
+import { AiReportHistory } from "./component/ai-report-history";
+import { AiReportSpotlight } from "./component/ai-report-spotlight";
 import { FolderTreeSidebar } from "@/app/component/folder-tree-sidebar";
 import { LoadingScreen } from "@/app/component/loading-screen";
 import { SlideCanvas } from "@/app/component/slide-canvas";
@@ -69,6 +72,10 @@ export default function FolderPage() {
 
         {tab === "materials" ? (
           <section id="folder-materials-panel" role="tabpanel" aria-labelledby="folder-materials-tab">
+            <AiReportSpotlight
+              folderId={folderId}
+              expectedSlideCount={scopedSessions.reduce((count, session) => count + session.slides.length, 0)}
+            />
             <div className="folder-toolbar">
               <div className="view-toggle" role="group" aria-label={t("folders.viewMode")}>
                 <button type="button" className={view === "grid" ? "active" : ""} aria-pressed={view === "grid"} title={t("folders.gridView")} onClick={() => setView("grid")}><Grid2X2 /><span>{t("folders.gridView")}</span></button>
@@ -92,7 +99,7 @@ export default function FolderPage() {
             )}
           </section>
         ) : (
-          <FolderInsights key={scopedSessions.map((session) => session.id).join("|")} sessions={scopedSessions} />
+          <FolderInsights key={scopedSessions.map((session) => session.id).join("|")} sessions={scopedSessions} folderId={folderId} />
         )}
         </div>
       </div>
@@ -118,7 +125,7 @@ export default function FolderPage() {
   );
 }
 
-function FolderInsights({ sessions }: { sessions: ClassSession[] }) {
+function FolderInsights({ sessions, folderId }: { sessions: ClassSession[]; folderId: string | null }) {
   const {
     t, timeAgo, selectedScope, setScope, questions, settingsFor, categoryLabel, unanswered,
     hotspots, maxHeat, categories, maxCategory, openQuestions, pinRate, resolveRate, resolved
@@ -126,6 +133,8 @@ function FolderInsights({ sessions }: { sessions: ClassSession[] }) {
 
   return (
     <section id="folder-insights-panel" role="tabpanel" aria-labelledby="folder-insights-tab" className="folder-insights">
+      <AiReportBuilder sessions={sessions} folderId={folderId} />
+      <AiReportHistory />
       <div className="folder-insight-scopes" role="group" aria-label={t("folders.insightScope")}>
         <button type="button" aria-pressed={selectedScope === "all"} onClick={() => setScope("all")}>{t("folders.insightAll")}</button>
         {sessions.map((session) => (

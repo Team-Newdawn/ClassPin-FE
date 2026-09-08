@@ -1,11 +1,16 @@
 .next
 node_modules
+__pycache__/
+*.pyc
 .env*
 !.env.example
 public/generated/*
 !public/generated/.gitkeep
 *.log
 *.tsbuildinfo
+tmp/
+output/
+.local/
 .DS_Store
 .claude/settings.local.json
 supabase/.temp/

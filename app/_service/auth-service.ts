@@ -1,15 +1,25 @@
 import type { Session } from "@supabase/supabase-js";
 import {
+  canUseLocalDevelopmentLogin,
   fetchOwnProfile,
   getSupabaseClient,
+  restoreSessionFromUrlHash,
   setOwnerAccessToken,
+  signInForLocalDevelopment,
   signInWithGoogle,
   signOutUser,
   supabaseConfigured
 } from "@/app/_infrastructure/supabase/client";
 
 export const authConfigured = supabaseConfigured;
-export { fetchOwnProfile, signInWithGoogle, signOutUser };
+export {
+  canUseLocalDevelopmentLogin,
+  fetchOwnProfile,
+  restoreSessionFromUrlHash,
+  signInForLocalDevelopment,
+  signInWithGoogle,
+  signOutUser,
+};
 
 export function observeAuthSession(onSession: (session: Session | null) => void): (() => void) | null {
   const client = getSupabaseClient();

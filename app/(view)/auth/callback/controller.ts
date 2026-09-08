@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { authConfigured, observeAuthSession } from "@/app/_service/auth-service";
+import { authConfigured, observeAuthSession, restoreSessionFromUrlHash } from "@/app/_service/auth-service";
 
 export function useAuthCallbackController() {
   const router = useRouter();
@@ -21,9 +21,15 @@ export function useAuthCallbackController() {
       done = true;
       router.replace(next);
     };
-    const stop = observeAuthSession((session) => { if (session) finish(); });
+    let stop: (() => void) | null = null;
+    void restoreSessionFromUrlHash(window.location.hash)
+      .then((restored) => {
+        if (restored) finish();
+        else if (!done) stop = observeAuthSession((session) => { if (session) finish(); });
+      })
+      .catch(() => { if (!done) setTimedOut(true); });
     const timer = setTimeout(() => { if (!done) setTimedOut(true); }, 8000);
-    return () => { stop?.(); clearTimeout(timer); };
+    return () => { done = true; stop?.(); clearTimeout(timer); };
   }, [oauthError, params, router]);
 
   return { oauthError, timedOut };

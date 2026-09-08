@@ -1,5 +1,6 @@
 {
   "code": [
+    "app/(view)/admin/session/[id]/page.module.css",
     "app/component/pdf-page.tsx",
     "app/component/slide-canvas.tsx",
     "app/component/slide-preview.tsx"
@@ -7,7 +8,7 @@
   "documents": [
     "class-frontend-architecture"
   ],
-  "recorded_at": "2026-09-07T10:27:29+00:00",
+  "recorded_at": "2026-09-08T00:37:21+00:00",
   "requirement_id": "CFA-082",
   "task_id": "direct-pdf-slideshow",
   "tests": [

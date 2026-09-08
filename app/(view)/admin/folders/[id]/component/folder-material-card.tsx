@@ -22,7 +22,7 @@ export function FolderMaterialCard({ session, folders, view, moving, onMove, onD
   return (
     <article className={`${styles.root} ${styles[view]}`}>
       <Link className={styles.link} href={`/admin/session/${session.id}`} aria-label={t("folders.openMaterial", { title: session.title })}>
-        <span className={styles.thumb}><SlideCanvas slide={session.slides[0]} compact /></span>
+        <span className={styles.thumb}>{session.slides[0] && <SlideCanvas slide={session.slides[0]} compact />}</span>
         <span className={styles.body}>
           <b title={session.title}>{session.title}</b>
           <small title={session.fileName}>{session.fileName}</small>

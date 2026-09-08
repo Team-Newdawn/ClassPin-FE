@@ -44,7 +44,7 @@ export function SlideCanvas({ slide, questions = [], questionCategories = defaul
       {slide.imageUrl
         ? <img src={slide.imageUrl} alt={t("common.slideNumber", { number: slide.pageIndex + 1 })} />
         : slide.pdfUrl && slide.sourcePageIndex !== undefined
-          ? <><div className="slide-placeholder">{slide.pageIndex + 1}</div><PdfPage url={slide.pdfUrl} pageNumber={slide.sourcePageIndex + 1} label={t("common.slideNumber", { number: slide.pageIndex + 1 })} /></>
+          ? <><div className="slide-placeholder">{slide.pageIndex + 1}</div><PdfPage url={slide.pdfUrl} pageNumber={slide.sourcePageIndex + 1} label={t("common.slideNumber", { number: slide.pageIndex + 1 })} eager={!compact} /></>
         /* 변환된 슬라이드에는 항상 imageUrl 이 있다. 이미지가 아직/끝내 없을 때 흰 판만 남지 않게 한다. */
           : <div className="slide-placeholder">{slide.pageIndex + 1}</div>}
       {pinDisplayPositions && <svg className="question-displacement-lines" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">

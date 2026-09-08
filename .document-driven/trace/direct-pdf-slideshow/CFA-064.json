@@ -1,7 +1,8 @@
 {
   "code": [
     "app/_service/convert.ts",
-    "app/_service/class-session-service.ts"
+    "app/_service/class-session-service.ts",
+    "app/(view)/admin/folders/[id]/component/folder-material-card.tsx"
   ],
   "documents": [
     "class-frontend-architecture"

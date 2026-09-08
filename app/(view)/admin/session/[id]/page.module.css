@@ -309,6 +309,7 @@
   overflow-x: hidden;
   overflow-y: auto;
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   grid-template-rows: 48px minmax(min(330px, 42dvh), 1fr) 44px 92px auto;
   align-content: stretch;
   padding: 16px 24px 14px;
@@ -445,6 +446,7 @@
 .root :global(.filmstrip) > button > span,
 .root :global(.filmstrip) > button > i {
   position: absolute;
+  z-index: 2;
   color: var(--color-bg-surface);
   font-size: 10px;
 }

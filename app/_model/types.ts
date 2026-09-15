@@ -201,6 +201,8 @@ export interface ClassSession {
   title: string;
   fileName: string;
   status: "live" | "ended";
+  startedAt?: string | null;
+  endedAt?: string | null;
   currentSlide: number;
   presentationInteractions: boolean;
   showQuestionPins: boolean;

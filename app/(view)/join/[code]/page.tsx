@@ -1,6 +1,6 @@
 "use client";
 
-import type { CSSProperties } from "react";
+import { useRef, type CSSProperties } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import selectedPinIcon from "@/assets/icons/pin_icon.svg";
@@ -11,13 +11,16 @@ import { LoadingScreen } from "@/app/component/loading-screen";
 import { PinLogo } from "@/app/component/pin-logo";
 import { SlideCanvas } from "@/app/component/slide-canvas";
 import { StatusBadge } from "@/app/component/status-badge";
+import { SessionRuntime } from "@/app/component/session-runtime";
 import { LECTURE_REACTION_EMOJIS } from "@/app/_model/lecture-reactions";
 import { QUESTION_MARKERS, questionMarkerEmoji } from "@/app/_model/types";
 import { useJoinSessionController } from "./controller";
 import styles from "./page.module.css";
+import { PinComposer } from "@/app/component/pin-composer";
 
 export default function JoinSession() {
   const controller = useJoinSessionController();
+  const canvasRef = useRef<HTMLDivElement>(null);
 
   if (controller.state === "loading") return <LoadingScreen />;
   if (controller.state === "missing") return <div className={`${styles.root} student-empty`}><PinLogo /><LanguageSwitcher /><h1>{controller.t("student.sessionNotFound")}</h1><p>{controller.t("student.checkLink")}</p></div>;
@@ -32,19 +35,19 @@ export default function JoinSession() {
     selectCategory, selectMarker, startEditingQuestion, updateDraftText, startMovingDraftTag, moveDraftTag,
     finishMovingDraftTag, openDraftComposer, submit, closeComposer,
     deleteDraftQuestion, selectTool, changeSlide, syncToLiveSlide, selectQuestionSort, toggleQuestionReaction,
-    sendEmojiReaction
+    sendEmojiReaction, questionsVisible, toggleQuestionsVisible
   } = controller;
 
   return (
     <main className={`${styles.root} student-shell student-slide-shell`}>
       <div className="student-guide class-feedback-guide">
-        <div><b>{session.title}<em>LIVE</em></b><span>{t("student.feedbackGuide")}</span></div>
-        <div className="student-header-actions"><Link className="student-complete-button" href={finalHref}>{t("experience.complete")}</Link><LanguageSwitcher /></div>
+        <div><div className={styles.titleWithTimer}><b>{session.title}<em>LIVE</em></b><SessionRuntime session={session} /></div><span>{t("student.feedbackGuide")}</span></div>
+        <div className="student-header-actions"><button type="button" className={styles.questionsToggle} aria-expanded={questionsVisible} aria-controls="participant-questions" onClick={toggleQuestionsVisible}>{questionsVisible ? "질문 숨기기" : `질문 보기 (${submittedQuestions.length})`}</button><Link className="student-complete-button" href={finalHref}>{t("experience.complete")}</Link><LanguageSwitcher /></div>
       </div>
-      <section className="student-stage" aria-label={t("student.slideAria", { title: session.title })} onWheel={handleSlideWheel}>
+      <section className={`student-stage ${questionsVisible ? "" : styles.questionsHidden}`} aria-label={t("student.slideAria", { title: session.title })} onWheel={handleSlideWheel}>
         <div className="student-image-stage">
           <div className="student-image-viewport">
-            <div className={`student-canvas lecture-fit tool-${activeTool}`} style={{ "--student-image-width": "min(100%, calc((100dvh - 180px) * 16 / 9))" } as CSSProperties}>
+            <div ref={canvasRef} className={`student-canvas lecture-fit tool-${activeTool}`} style={{ "--student-image-width": "min(100%, calc((100dvh - 180px) * 16 / 9))" } as CSSProperties}>
               <SlideCanvas
                 slide={slide}
                 questions={slideQuestions}
@@ -93,7 +96,7 @@ export default function JoinSession() {
           </div>
           {slideIndex !== null && <button className="student-sync-button" onClick={syncToLiveSlide}>{t("student.currentSlide")}</button>}
         </div>
-        <section className="student-feedback-panel" aria-labelledby="student-feedback-title">
+        <section id="participant-questions" className="student-feedback-panel" hidden={!questionsVisible} aria-labelledby="student-feedback-title">
           <header className="student-feedback-head">
             <h2 id="student-feedback-title">{t("student.feedbackListTitle")}</h2>
             <div className="student-feedback-head-actions">
@@ -134,8 +137,7 @@ export default function JoinSession() {
       <div className="participant-page-reactions" aria-hidden="true">
         {liveReactions.map((reaction) => <span key={reaction.id} className="slide-emoji-reaction lecture-live-reaction" style={{ left: `${reaction.left}%`, animationDelay: `${reaction.delay}ms` }}>{reaction.emoji}</span>)}
       </div>
-      {composerOpen && <div className="student-modal-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) closeComposer(); }}>
-        <section className="student-question-modal" role="dialog" aria-modal="true" aria-labelledby="question-modal-title">
+      {composerOpen && <PinComposer canvasRef={canvasRef} x={viewingQuestion?.x ?? draftQuestion?.x ?? 0.5} y={viewingQuestion?.y ?? draftQuestion?.y ?? 0.5} onClose={closeComposer}>
           <button type="button" className="icon-btn modal-close" onClick={closeComposer} aria-label={t("student.closeComposer")}><X /></button>
           {viewingQuestion ? <div className="student-answer-view">
             <span className={`category ${categoryClass(viewingQuestion.category)}`}>{questionMarkerEmoji(viewingQuestion.marker) && <i aria-hidden="true">{questionMarkerEmoji(viewingQuestion.marker)}</i>}{categoryLabel(viewingQuestion.category)}</span>
@@ -171,8 +173,7 @@ export default function JoinSession() {
                 : <button className="btn destructive large full" onClick={deleteDraftQuestion}><Trash2 />{t("student.deletePin")}</button>}
             </div>
           </>}
-        </section>
-      </div>}
+      </PinComposer>}
     </main>
   );
 }

@@ -43,6 +43,7 @@ export function useJoinSessionController() {
   const [lookupDone, setLookupDone] = useState(false);
   const [selectedQuestionId, setSelectedQuestionId] = useState<string | null>(null);
   const [questionSort, setQuestionSort] = useState<QuestionSort>("empathy");
+  const [questionsVisible, setQuestionsVisible] = useState(true);
   const [pendingReactionIds, setPendingReactionIds] = useState<Set<string>>(new Set());
   const [reactionError, setReactionError] = useState<string | null>(null);
   const [emojiError, setEmojiError] = useState<string | null>(null);
@@ -355,6 +356,8 @@ export function useJoinSessionController() {
     composerOpen,
     selectedQuestionId,
     questionSort,
+    questionsVisible,
+    toggleQuestionsVisible: () => setQuestionsVisible(visible => !visible),
     slideQuestions,
     submittedQuestions,
     visibleQuestionIds,

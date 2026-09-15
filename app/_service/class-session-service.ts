@@ -9,6 +9,8 @@ type LectureRow = {
   title: string;
   join_code: string;
   status: ClassSession["status"];
+  started_at: string | null;
+  ended_at: string | null;
   current_page: number;
   presentation_interactions: boolean;
   show_question_pins: boolean;
@@ -19,7 +21,7 @@ type LectureRow = {
 };
 
 export type LectureRealtimeRow = Pick<LectureRow,
-  "current_page" | "status" | "presentation_interactions" | "show_question_pins" |
+  "current_page" | "status" | "started_at" | "ended_at" | "presentation_interactions" | "show_question_pins" |
   "show_presentation_qr" | "presentation_qr_position" | "question_categories"
 >;
 
@@ -451,6 +453,7 @@ export async function fetchOwnedSessions(): Promise<ClassSession[]> {
       join_code,
       status,
       current_page,
+      started_at, ended_at,
       presentation_interactions,
       show_question_pins,
       show_presentation_qr,
@@ -526,6 +529,8 @@ export async function fetchOwnedSessions(): Promise<ClassSession[]> {
         title: lecture.title,
         fileName: material.file_name,
         status: lecture.status,
+        startedAt: lecture.started_at,
+        endedAt: lecture.ended_at,
         currentSlide: lecture.current_page,
         presentationInteractions: lecture.presentation_interactions,
         showQuestionPins: lecture.show_question_pins,
@@ -564,6 +569,7 @@ export async function fetchLiveSession(joinCode: string): Promise<ClassSession |
       join_code,
       status,
       current_page,
+      started_at, ended_at,
       presentation_interactions,
       show_question_pins,
       show_presentation_qr,
@@ -606,6 +612,8 @@ export async function fetchLiveSession(joinCode: string): Promise<ClassSession |
     fileName: material.file_name,
     status: "live",
     currentSlide: lecture.current_page,
+    startedAt: lecture.started_at,
+    endedAt: lecture.ended_at,
     presentationInteractions: lecture.presentation_interactions,
     showQuestionPins: lecture.show_question_pins,
     showPresentationQr: lecture.show_presentation_qr,
@@ -692,6 +700,8 @@ export async function markQuestionResolved(questionId: string) {
 export async function updateLecture(sessionId: string, values: {
   current_page?: number;
   status?: "live" | "ended";
+  started_at?: string | null;
+  ended_at?: string | null;
   presentation_interactions?: boolean;
   show_question_pins?: boolean;
   show_presentation_qr?: boolean;
@@ -740,12 +750,12 @@ export function subscribeToLecture(
   return () => { void client.removeChannel(channel); };
 }
 
-export async function fetchLectureSnapshot(session: ClassSession, asAudience = false): Promise<Pick<ClassSession, "currentSlide" | "status" | "presentationInteractions" | "showQuestionPins" | "showPresentationQr" | "presentationQrPosition" | "questionCategories" | "questions"> | null> {
+export async function fetchLectureSnapshot(session: ClassSession, asAudience = false): Promise<Pick<ClassSession, "currentSlide" | "status" | "startedAt" | "endedAt" | "presentationInteractions" | "showQuestionPins" | "showPresentationQr" | "presentationQrPosition" | "questionCategories" | "questions"> | null> {
   const client = asAudience ? getAudienceSupabaseClient() : getSupabaseClient();
   if (!client) return null;
   if (asAudience) await ensureAnonymousUser();
   const { data: lecture, error: lectureError } = await client.from("lectures")
-    .select("current_page, status, presentation_interactions, show_question_pins, show_presentation_qr, presentation_qr_position, question_categories")
+    .select("current_page, status, started_at, ended_at, presentation_interactions, show_question_pins, show_presentation_qr, presentation_qr_position, question_categories")
     .eq("id", session.id)
     .maybeSingle();
   if (lectureError) throw lectureError;
@@ -764,6 +774,8 @@ export async function fetchLectureSnapshot(session: ClassSession, asAudience = f
   );
   return {
     currentSlide: lecture?.current_page ?? session.currentSlide,
+    startedAt: lecture ? lecture.started_at : session.startedAt,
+    endedAt: lecture ? lecture.ended_at : session.endedAt,
     status: asAudience && !lecture ? "ended" : (lecture?.status as ClassSession["status"]) ?? session.status,
     presentationInteractions: lecture?.presentation_interactions ?? session.presentationInteractions,
     showQuestionPins: lecture?.show_question_pins ?? session.showQuestionPins,

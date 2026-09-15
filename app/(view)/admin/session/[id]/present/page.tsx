@@ -1,6 +1,7 @@
 "use client";
 
 import { QRCodeSVG } from "qrcode.react";
+import { SessionRuntime } from "@/app/component/session-runtime";
 import { ChevronLeft, ChevronRight, Maximize2, Minimize2, X } from "@/app/component/icons";
 import { LanguageSwitcher } from "@/app/component/language-switcher";
 import { QuestionDetailDialog } from "../component/question-detail-dialog";
@@ -60,6 +61,7 @@ export default function SessionPresentation() {
       onMouseMove={revealControls}
       onPointerDown={revealControls}
     >
+      <SessionRuntime session={session} presentation />
       <div ref={presentationCanvasRef} className="presentation-slide class-presentation-slide class-presentation-canvas" aria-label={`${session.title} · ${t("common.slideNumber", { number: session.currentSlide + 1 })}`}>
         <SlideCanvas
           slide={slide}

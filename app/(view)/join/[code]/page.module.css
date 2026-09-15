@@ -359,6 +359,12 @@
   overscroll-behavior: contain;
 }
 
+@keyframes pinBubbleOpen {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+
 .root :global(.student-feedback-list .question-card) {
   min-height: 80px;
   padding: 0;
@@ -761,3 +767,53 @@
     margin-left: auto;
   }
 }
+.root :global(.student-question-modal.pin-composer) {
+  position: fixed;
+  z-index: 100;
+  width: 340px;
+  padding: 16px;
+  border: 1px solid var(--color-border-strong);
+  border-radius: 12px;
+  box-shadow: 0 12px 32px color-mix(in srgb, var(--color-text-primary) 18%, transparent);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.root :global(.pin-composer .modal-close) { top: 8px; right: 8px; width: 44px; height: 44px; }
+.root :global(.pin-composer .student-modal-heading) { gap: 8px; margin-bottom: 12px; padding-right: 36px; }
+.root :global(.pin-composer .student-modal-heading h2) { font-size: 16px; line-height: 24px; }
+.root :global(.pin-composer .student-modal-heading > .question-pin-preview) { display: none; }
+.root :global(.pin-composer .question-marker-picker) { margin-bottom: 10px; }
+.root :global(.pin-composer .question-marker-picker button) { height: 56px; }
+.root :global(.pin-composer .category-scroll) { flex-wrap: wrap; gap: 6px; margin-right: 0; padding: 0 0 10px; }
+.root :global(.pin-composer .category-scroll button) { min-height: 44px; }
+.root :global(.pin-composer .textarea-wrap) { margin-bottom: 10px; }
+.root :global(.pin-composer .textarea-wrap textarea) { height: 100px; font-size: 14px; }
+.root :global(.pin-composer .student-composer-actions) { gap: 8px; }
+.root :global(.pin-composer .student-composer-actions .btn) { min-height: 44px; height: 44px; font-size: 14px; }
+.root :global(.pin-composer .student-composer-actions .btn.destructive) { background: var(--color-bg-surface); color: var(--color-error); border: 1px solid var(--color-border); }
+
+@media (prefers-reduced-motion: reduce) {
+  .root :global(.student-question-modal.pin-composer) { animation: none; }
+}
+
+.root :global(.pin-composer-dismiss) { position: fixed; inset: 0; z-index: 99; background: transparent; }
+.root :global(.pin-composer-tail) { position: fixed; inset: 0; width: 100%; height: 100%; z-index: 101; pointer-events: none; overflow: visible; }
+.root :global(.pin-composer-tail path), .root :global(.pin-composer-tail rect) { fill: var(--color-bg-surface); stroke: var(--color-border-strong); stroke-width: 1; stroke-linejoin: round; }
+.root:has(:global(.pin-composer)) :global(.draft-pin),
+.root:has(:global(.pin-composer)) :global(.draft-tag),
+.root:has(:global(.pin-composer)) :global(.question-pin.selected) { visibility: hidden; }
+
+@media (prefers-reduced-motion: reduce) {
+  .root :global(.pin-composer > *) { animation: none; }
+  .root :global(.pin-composer-tail) { animation: none; }
+}
+.questionsToggle { min-height:44px; padding:8px 12px; border:1px solid var(--color-border-strong); border-radius:10px; background:var(--color-bg-surface); color:var(--color-text-primary); font:inherit; font-size:13px; cursor:pointer; }
+.questionsToggle:focus-visible { outline:3px solid var(--color-brand); outline-offset:2px; }
+.questionsToggle:hover { background:var(--color-brand-subtle); }
+.root :global(.student-feedback-panel[hidden]) { display:none; }
+.root .questionsHidden :global(.student-image-stage) { flex:1 1 auto; width:100%; max-width:100%; }
+.titleWithTimer { display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
+.root .titleWithTimer :global([role="timer"]) { display:inline-flex; margin:0; padding:4px 8px; white-space:nowrap; }
+.root .titleWithTimer :global([role="timer"]) b { color:var(--color-text-primary); font-variant-numeric:tabular-nums; }
+.root .titleWithTimer :global([role="timer"]) span { margin:0; color:var(--color-text-secondary); }

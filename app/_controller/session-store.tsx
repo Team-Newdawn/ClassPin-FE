@@ -48,7 +48,7 @@ const cacheKey = (userId: string) => `${SUPABASE_CACHE_PREFIX}:${userId}`;
 const folderCacheKey = (userId: string) => `${SUPABASE_FOLDER_CACHE_PREFIX}:${userId}`;
 const PARTICIPANT_STATUS_POLL_MS = 2_000;
 type LectureSettingPatch = Partial<Pick<ClassSession,
-  "status" | "showQuestionPins" | "showPresentationQr" | "presentationQrPosition"
+  "status" | "startedAt" | "endedAt" | "showQuestionPins" | "showPresentationQr" | "presentationQrPosition"
 >>;
 
 const fileToDataUrl = (file: File) => new Promise<string>((resolve, reject) => {
@@ -203,6 +203,8 @@ export function SessionStore({ children }: { children: React.ReactNode }) {
         ...item,
         currentSlide: !asAudience && slideTargets.current.has(session.id) ? item.currentSlide : lecture.current_page,
         status: lecture.status,
+        startedAt: lecture.started_at,
+        endedAt: lecture.ended_at,
         presentationInteractions: lecture.presentation_interactions,
         showQuestionPins: lecture.show_question_pins,
         showPresentationQr: lecture.show_presentation_qr,
@@ -310,7 +312,7 @@ export function SessionStore({ children }: { children: React.ReactNode }) {
       code: makeCode(), title: input.title, fileName: input.fileName,
       status: "live", currentSlide: 0, presentationInteractions: true, showQuestionPins: true, showPresentationQr: true, presentationQrPosition: "bottom-right",
       questionCategories: defaultQuestionCategorySettings(),
-      createdAt: new Date().toISOString(), slides: input.slides, questions: []
+      createdAt: new Date().toISOString(), startedAt: new Date().toISOString(), endedAt: null, slides: input.slides, questions: []
     };
     if (classSessionPersistenceEnabled) await persistSession(session);
     setSessions((current) => [session, ...current]);
@@ -534,9 +536,13 @@ export function SessionStore({ children }: { children: React.ReactNode }) {
       await write;
     },
     setStatus: async (sessionId, status) => {
-      const previous = sessionsById.get(sessionId)?.status;
+      const previous = sessionsById.get(sessionId);
       if (!previous) throw new Error("상태를 변경할 강의를 찾지 못했습니다.");
-      await saveLectureSettings(sessionId, { status }, { status: previous }, { status });
+      if (previous.status === status) return;
+      const now = new Date().toISOString();
+      const startedAt = status === "live" ? now : previous.startedAt;
+      const endedAt = status === "ended" ? now : null;
+      await saveLectureSettings(sessionId, { status, startedAt, endedAt }, { status: previous.status, startedAt: previous.startedAt, endedAt: previous.endedAt }, { status, ...(status === "live" ? { started_at: now } : {}), ended_at: endedAt });
     },
     setShowQuestionPins: async (sessionId, visible) => {
       const previous = sessionsById.get(sessionId)?.showQuestionPins;

@@ -50,7 +50,7 @@ export function useSessionAdminController() {
   const [filter, setFilter] = useState<QuestionStatus | "all">("all");
   const [query, setQuery] = useState("");
   const [shareOpen, setShareOpen] = useState(false);
-  const [answer, setAnswer] = useState("");
+  const [answerDrafts, setAnswerDrafts] = useState<Record<string,string>>({});
   const [copied, setCopied] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
   const [lectureSaving, setLectureSaving] = useState(false);
@@ -176,7 +176,9 @@ export function useSessionAdminController() {
     return counts;
   }, { total: session?.questions.length ?? 0, unanswered: 0, resolved: 0 }), [session?.questions]);
   const slideQuestions = questionsBySlide.get(session?.currentSlide ?? -1) ?? [];
-  const selected = session?.questions.find((question) => question.id === selectedId) ?? slideQuestions[0];
+  const selected = session?.questions.find((question) => question.id === selectedId);
+  const answer = selected ? answerDrafts[selected.id] ?? "" : "";
+  const setAnswer = (body: string) => { if (selected) setAnswerDrafts(drafts => ({...drafts,[selected.id]:body})); };
   const detailQuestion = session?.questions.find((question) => question.id === detailQuestionId);
   const noteDraft = slide ? noteDrafts[slide.id] ?? slide.speakerNote ?? "" : "";
   const noteDirty = Boolean(slide && noteDraft !== (slide.speakerNote ?? ""));
@@ -190,8 +192,9 @@ export function useSessionAdminController() {
   };
   const selectQuestionFromList = (questionId: string, slideIndex: number) => {
     if (!session) return;
-    changeSlide(slideIndex);
+    if (session.currentSlide !== slideIndex) changeSlide(slideIndex);
     setSelectedId(questionId);
+    setDetailQuestionId(null);
     setTab("live");
   };
   const copyJoinLink = async () => {
@@ -363,6 +366,11 @@ export function useSessionAdminController() {
     changeQuery: setQuery,
     changeFilter: setFilter,
     openQuestionDetail,
+    selectForAnswer: (questionId: string) => {
+      const question = session?.questions.find(item => item.id === questionId);
+      if (question) selectQuestionFromList(question.id, question.slideIndex);
+    },
+    closeAnswer: () => { setSelectedId(null); setDetailQuestionId(null); },
     closeQuestionDetail: () => setDetailQuestionId(null),
     selectQuestionFromList,
     changeSlide,

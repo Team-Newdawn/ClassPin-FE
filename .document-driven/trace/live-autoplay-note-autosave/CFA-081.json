@@ -1,0 +1,17 @@
+{
+  "code": [
+    "supabase/migrations/20260910120000_add_lecture_presentation_autoplay.sql"
+  ],
+  "documents": [
+    "class-frontend-architecture"
+  ],
+  "recorded_at": "2026-09-10T12:18:04+00:00",
+  "requirement_id": "CFA-081",
+  "task_id": "live-autoplay-note-autosave",
+  "tests": [
+    "app/_model/class/presentation-rotation.test.ts",
+    "app/_model/class/session.test.ts",
+    "supabase/tests/lecture_presentation_autoplay.sql",
+    ".document-driven/evidence/live-autoplay-note-autosave.md"
+  ]
+}

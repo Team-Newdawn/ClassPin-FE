@@ -74,7 +74,7 @@ gcloud projects add-iam-policy-binding <PROJECT_ID> \
 ./scripts/deploy.sh
 ```
 
-`.env.local`에서 `NEXT_PUBLIC_*`을 읽어 빌드 인자로 넘긴다. 이 값들은 클라이언트
+`.env.production.local`에서 `NEXT_PUBLIC_*`을 읽어 빌드 인자로 넘긴다. 이 값들은 클라이언트
 번들에 그대로 박히기 때문에 런타임 env로는 늦다 — 반드시 이미지를 구울 때 들어가야 한다.
 
 `SUPABASE_SECRET_KEY`는 코드 어디서도 쓰지 않으므로 Cloud Run에 설정하지 않는다.

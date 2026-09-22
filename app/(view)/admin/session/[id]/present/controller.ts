@@ -1,4 +1,5 @@
 "use client";
+/* eslint-disable react-hooks/preserve-manual-memoization -- Existing timer callbacks rely on stable identities; React Compiler skips this controller when the live autoplay effect is active. */
 
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
@@ -6,14 +7,13 @@ import { useAuth } from "@/app/_controller/auth-context";
 import { useLanguage } from "@/app/_controller/language-context";
 import { useSessions } from "@/app/_controller/session-store";
 import { useLectureReactions } from "@/app/_controller/use-lecture-reactions";
-import { advancePinPlayback, canRotatePinPlayback, crossedPinMilestone, findNewestIncomingPin, /* nextPresentationSlide, */ resolvePinDisplayPositions, resolveVisiblePresentationLabelIds } from "@/app/_model/class/presentation-rotation";
+import { advancePinPlayback, canRotatePinPlayback, crossedPinMilestone, findNewestIncomingPin, nextPresentationSlide, presentationAutoplayDelay, resolvePinDisplayPositions, resolveVisiblePresentationLabelIds } from "@/app/_model/class/presentation-rotation";
 import { groupQuestionsBySlide } from "@/app/_model/stats";
 import type { Question } from "@/app/_model/types";
 import { classSessionPersistenceEnabled } from "@/app/_service/class-session-service";
 
 const CONTROLS_HIDE_DELAY = 2600;
 const PIN_REVEAL_DELAY = 1000;
-// const SLIDE_AUTOPLAY_DELAY = 3000;
 const LIVE_PIN_HIGHLIGHT_DELAY = 1000;
 const PIN_MILESTONE_DISPLAY_DELAY = 3000;
 const EMPTY_PLAYBACK = { shownPinIds: [] as string[], activePinId: null as string | null };
@@ -37,6 +37,7 @@ export function useSessionPresentationController() {
     setAudienceView({ sessionId, syncedSlide, currentSlide: syncedSlide ?? 0 });
   }
   const showQuestionPins = session?.showQuestionPins ?? false;
+  const presentationAutoplay = session?.presentationAutoplay ?? false;
   const { reactions: liveReactions } = useLectureReactions(sessionId);
   const sessionTitle = session?.title;
   const currentSlide = canControl ? syncedSlide ?? 0 : audienceView.currentSlide;
@@ -92,7 +93,6 @@ export function useSessionPresentationController() {
     const firstPinId = pageQuestions[0]?.id ?? null;
     return { shownPinIds: firstPinId ? [firstPinId] : [], activePinId: firstPinId };
   }, [pageQuestions, showQuestionPins, pinPlayback.shownPinIds]);
-  // const allPagePinsVisible = playback.shownPinIds.length >= pageQuestions.length;
   const visibleQuestionIds = useMemo(() => liveQuestionId && !playback.shownPinIds.includes(liveQuestionId)
     ? [...playback.shownPinIds, liveQuestionId]
     : playback.shownPinIds, [liveQuestionId, playback.shownPinIds]);
@@ -127,15 +127,19 @@ export function useSessionPresentationController() {
     });
   }, [canControl, revealControls, sessionId, setCurrentSlide, slideCount, syncedSlide, t]);
 
-  // 2026-09-08: 사용자 요청으로 자동 넘김만 임시 중지. 복구 시 관련 선언과 함께 주석 해제.
-  /*
+  const autoplayDelay = presentationAutoplayDelay(
+    presentationAutoplay,
+    showQuestionPins,
+    pageQuestions.length,
+    playback.shownPinIds.length,
+    slideCount,
+    detailQuestionId !== null
+  );
   useEffect(() => {
-    if (!showQuestionPins || slideCount < 2 || detailQuestionId || !allPagePinsVisible) return;
-    const delay = pageQuestions.length ? PIN_REVEAL_DELAY : SLIDE_AUTOPLAY_DELAY;
-    const timeout = window.setTimeout(() => goToSlide(nextPresentationSlide(currentIndexRef.current, slideCount)), delay);
+    if (autoplayDelay === null) return;
+    const timeout = window.setTimeout(() => goToSlide(nextPresentationSlide(currentSlide, slideCount)), autoplayDelay);
     return () => window.clearTimeout(timeout);
-  }, [allPagePinsVisible, currentSlide, detailQuestionId, goToSlide, pageQuestions.length, positionedQuestionKey, showQuestionPins, slideCount]);
-  */
+  }, [autoplayDelay, currentSlide, goToSlide, positionedQuestionKey, slideCount]);
 
   useEffect(() => {
     hideTimerRef.current = setTimeout(() => setControlsVisible(false), CONTROLS_HIDE_DELAY);

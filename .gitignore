@@ -10,3 +10,4 @@ public/generated/*
 .claude/settings.local.json
 supabase/.temp/
 supabase/.branches/
+.claude/.headroom_wrap_*

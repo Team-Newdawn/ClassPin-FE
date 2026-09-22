@@ -1,0 +1,15 @@
+{
+  "code": [
+    "app/(view)/admin/dashboard/controller.ts",
+    "app/_controller/session-store.tsx"
+  ],
+  "documents": [
+    "class-frontend-architecture"
+  ],
+  "recorded_at": "2026-09-10T08:11:04+00:00",
+  "requirement_id": "CFA-064",
+  "task_id": "folder-creation-options",
+  "tests": [
+    ".document-driven/evidence/folder-creation-options.md"
+  ]
+}

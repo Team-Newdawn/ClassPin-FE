@@ -1,22 +1,27 @@
 #!/usr/bin/env bash
 # Cloud Run 배포. NEXT_PUBLIC_* 는 클라이언트 번들에 박히는 값이라 런타임 env 가
-# 아니라 빌드 인자로 넘겨야 한다. 그 값들을 .env.local 에서 그대로 읽어온다.
+# 아니라 빌드 인자로 넘겨야 한다. 운영 값은 .env.production.local 에서 읽는다.
 set -euo pipefail
 
 cd "$(dirname "$0")/.."
 
-if [[ ! -f .env.local ]]; then
-  echo "error: .env.local 이 없습니다. 빌드에 필요한 NEXT_PUBLIC_* 값을 읽을 수 없습니다." >&2
+if [[ ! -f .env.production.local ]]; then
+  echo "error: .env.production.local 이 없습니다. 운영 빌드에 필요한 NEXT_PUBLIC_* 값을 읽을 수 없습니다." >&2
   exit 1
 fi
 
 set -a
 # shellcheck disable=SC1091
-source .env.local
+source .env.production.local
 set +a
 
-: "${NEXT_PUBLIC_SUPABASE_URL:?.env.local 에 NEXT_PUBLIC_SUPABASE_URL 이 필요합니다}"
-: "${NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY:?.env.local 에 NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY 가 필요합니다}"
+: "${NEXT_PUBLIC_SUPABASE_URL:?.env.production.local 에 NEXT_PUBLIC_SUPABASE_URL 이 필요합니다}"
+: "${NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY:?.env.production.local 에 NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY 가 필요합니다}"
+
+if [[ "$NEXT_PUBLIC_SUPABASE_URL" == http://127.0.0.1:* || "$NEXT_PUBLIC_SUPABASE_URL" == http://localhost:* ]]; then
+  echo "error: 운영 배포에는 로컬 Supabase URL을 사용할 수 없습니다." >&2
+  exit 1
+fi
 
 PROJECT="${GCP_PROJECT:-$(gcloud config get-value project 2>/dev/null)}"
 : "${PROJECT:?GCP_PROJECT 를 설정하거나 gcloud config set project 를 먼저 실행하세요}"

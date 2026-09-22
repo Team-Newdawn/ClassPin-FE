@@ -1,0 +1,16 @@
+{
+  "code": [
+    "app/(view)/admin/dashboard/page.module.css",
+    "app/(view)/admin/dashboard/component/folder-card.module.css",
+    "app/(view)/admin/session/[id]/page.module.css"
+  ],
+  "documents": [
+    "class-frontend-architecture"
+  ],
+  "recorded_at": "2026-09-10T08:11:03+00:00",
+  "requirement_id": "CFA-032",
+  "task_id": "folder-creation-options",
+  "tests": [
+    ".document-driven/evidence/folder-creation-options.md"
+  ]
+}

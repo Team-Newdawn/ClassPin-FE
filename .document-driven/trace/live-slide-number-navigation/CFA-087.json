@@ -1,0 +1,19 @@
+{
+  "code": [
+    "app/(view)/admin/session/[id]/page.tsx",
+    "app/(view)/admin/session/[id]/controller.ts",
+    "app/(view)/admin/session/[id]/page.module.css",
+    "app/_model/class/presentation-rotation.ts",
+    "app/_model/class/presentation-rotation.test.ts",
+    "app/_model/i18n.ts"
+  ],
+  "documents": [
+    "class-frontend-architecture"
+  ],
+  "recorded_at": "2026-09-10T09:55:57+00:00",
+  "requirement_id": "CFA-087",
+  "task_id": "live-slide-number-navigation",
+  "tests": [
+    ".document-driven/evidence/live-slide-number-navigation.md"
+  ]
+}

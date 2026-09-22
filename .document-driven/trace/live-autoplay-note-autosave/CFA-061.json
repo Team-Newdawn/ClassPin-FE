@@ -1,0 +1,16 @@
+{
+  "code": [
+    "app/_service/class-session-service.ts",
+    "supabase/migrations/20260910120000_add_lecture_presentation_autoplay.sql"
+  ],
+  "documents": [
+    "class-frontend-architecture"
+  ],
+  "recorded_at": "2026-09-10T12:18:03+00:00",
+  "requirement_id": "CFA-061",
+  "task_id": "live-autoplay-note-autosave",
+  "tests": [
+    "supabase/tests/lecture_presentation_autoplay.sql",
+    ".document-driven/evidence/live-autoplay-note-autosave.md"
+  ]
+}

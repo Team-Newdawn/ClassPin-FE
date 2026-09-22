@@ -1,0 +1,15 @@
+{
+  "code": [
+    "app/component/pin-logo.module.css",
+    "app/component/folder-tree-sidebar.module.css"
+  ],
+  "documents": [
+    "class-frontend-architecture"
+  ],
+  "recorded_at": "2026-09-14T08:19:07+00:00",
+  "requirement_id": "CFA-032",
+  "task_id": "ohpin-visible-branding",
+  "tests": [
+    ".document-driven/evidence/ohpin-visible-branding.md"
+  ]
+}

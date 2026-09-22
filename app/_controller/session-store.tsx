@@ -2,10 +2,10 @@
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { useAuth } from "@/app/_controller/auth-context";
-import { classFolderColorIndexForOrder, defaultQuestionCategorySettings, isParticipantPointAnchor, normalizeClassFolderColorIndex, normalizeClassFolderName, normalizeQuestionCategorySettings, type ClassFolder, type ClassSession, type ParticipantQuestionInput, type PresentationQrPosition, type Question, type QuestionCategorySettings, type Slide } from "@/app/_model/types";
+import { defaultQuestionCategorySettings, isParticipantPointAnchor, normalizeClassFolderColorIndex, normalizeClassFolderName, normalizeClassFolderPurpose, normalizeClassFolderPurposeLabel, normalizeQuestionCategorySettings, type ClassFolder, type ClassSession, type CreateClassFolderInput, type ParticipantQuestionInput, type PresentationQrPosition, type Question, type QuestionCategorySettings, type Slide } from "@/app/_model/types";
 import { withQuestionReaction } from "@/app/_model/question-reactions";
-import { normalizeSessions } from "@/app/_model/class/session";
-import { appendSessionSlides, classSessionPersistenceEnabled, createClassFolder as persistClassFolder, deleteClassFolder as persistClassFolderDeletion, deleteClassSession as persistSessionDeletion, deleteSessionSlide, fetchLectureSnapshot, fetchLiveSession, fetchLiveSessionById, fetchOwnedClassFolders, fetchOwnedSessions, fetchSessionSlides, markQuestionResolved, moveSessionToFolder as persistSessionFolder, persistSession, postAnswer, renameClassFolder as persistClassFolderName, saveSlideInstructorNote, setQuestionReaction as persistQuestionReaction, submitQuestion, subscribeToLecture, updateLecture, updateQuestion as persistQuestionUpdate, validateSlideImages, type LectureRealtimeRow } from "@/app/_service/class-session-service";
+import { normalizeSessions, serializeSessionsForFailureCache } from "@/app/_model/class/session";
+import { classSessionPersistenceEnabled, createClassFolder as persistClassFolder, deleteClassFolder as persistClassFolderDeletion, deleteClassSession as persistSessionDeletion, deleteSessionSlide, fetchLectureSnapshot, fetchLiveSession, fetchLiveSessionById, fetchOwnedClassFolders, fetchOwnedSessions, fetchSessionSlides, markQuestionResolved, moveSessionToFolder as persistSessionFolder, persistSession, postAnswer, renameClassFolder as persistClassFolderName, saveSlideInstructorNote, setQuestionReaction as persistQuestionReaction, submitQuestion, subscribeToLecture, updateLecture, updateQuestion as persistQuestionUpdate, type LectureRealtimeRow } from "@/app/_service/class-session-service";
 
 const STORAGE_KEY = "pin-class-sessions-v1";
 const FOLDER_STORAGE_KEY = "pin-class-folders-v1";
@@ -18,13 +18,12 @@ type Store = {
   ready: boolean;
   sessions: ClassSession[];
   folders: ClassFolder[];
-  createFolder: (name: string) => Promise<ClassFolder>;
+  createFolder: (input: CreateClassFolderInput) => Promise<ClassFolder>;
   renameFolder: (folderId: string, name: string) => Promise<void>;
   deleteFolder: (folderId: string) => Promise<void>;
   moveSessionToFolder: (sessionId: string, folderId: string | null) => Promise<void>;
   createSession: (input: { folderId: string | null; title: string; fileName: string; slides: Slide[]; sourcePath?: string }) => Promise<ClassSession>;
   deleteSession: (sessionId: string) => Promise<void>;
-  appendSlides: (sessionId: string, files: File[]) => Promise<void>;
   deleteSlide: (sessionId: string, slideId: string) => Promise<void>;
   addQuestion: (sessionId: string, question: ParticipantQuestionInput) => Promise<void>;
   updateQuestion: (sessionId: string, questionId: string, values: Pick<Question, "category" | "marker" | "text">) => Promise<void>;
@@ -33,6 +32,7 @@ type Store = {
   resolveQuestion: (sessionId: string, questionId: string) => Promise<void>;
   setCurrentSlide: (sessionId: string, slide: number) => Promise<void>;
   setStatus: (sessionId: string, status: ClassSession["status"]) => Promise<void>;
+  setPresentationAutoplay: (sessionId: string, enabled: boolean) => Promise<void>;
   setShowQuestionPins: (sessionId: string, visible: boolean) => Promise<void>;
   setPresentationQrPlacement: (sessionId: string, position: PresentationQrPosition | null) => Promise<void>;
   setQuestionCategories: (sessionId: string, settings: QuestionCategorySettings) => Promise<void>;
@@ -49,15 +49,8 @@ const cacheKey = (userId: string) => `${SUPABASE_CACHE_PREFIX}:${userId}`;
 const folderCacheKey = (userId: string) => `${SUPABASE_FOLDER_CACHE_PREFIX}:${userId}`;
 const PARTICIPANT_STATUS_POLL_MS = 2_000;
 type LectureSettingPatch = Partial<Pick<ClassSession,
-  "status" | "showQuestionPins" | "showPresentationQr" | "presentationQrPosition"
+  "status" | "presentationAutoplay" | "showQuestionPins" | "showPresentationQr" | "presentationQrPosition"
 >>;
-
-const fileToDataUrl = (file: File) => new Promise<string>((resolve, reject) => {
-  const reader = new FileReader();
-  reader.onload = () => resolve(String(reader.result));
-  reader.onerror = () => reject(reader.error ?? new Error("이미지를 읽지 못했습니다."));
-  reader.readAsDataURL(file);
-});
 
 const errorDetail = (error: unknown) => {
   if (error && typeof error === "object" && "message" in error && typeof error.message === "string") return error.message;
@@ -77,10 +70,15 @@ const readFolders = (key: string) => {
   try {
     const stored = window.localStorage.getItem(key);
     const folders = stored ? JSON.parse(stored) : [];
-    return Array.isArray(folders) ? (folders as ClassFolder[]).map((folder, index) => ({
-      ...folder,
-      colorIndex: normalizeClassFolderColorIndex(folder.colorIndex, index)
-    })) : [];
+    return Array.isArray(folders) ? (folders as ClassFolder[]).map((folder, index) => {
+      const purpose = normalizeClassFolderPurpose(folder.purpose);
+      return {
+        ...folder,
+        colorIndex: normalizeClassFolderColorIndex(folder.colorIndex, index),
+        purpose,
+        purposeLabel: normalizeClassFolderPurposeLabel(purpose, folder.purposeLabel)
+      };
+    }) : [];
   } catch {
     return [];
   }
@@ -206,6 +204,7 @@ export function SessionStore({ children }: { children: React.ReactNode }) {
         currentSlide: !asAudience && slideTargets.current.has(session.id) ? item.currentSlide : lecture.current_page,
         status: lecture.status,
         presentationInteractions: lecture.presentation_interactions,
+        presentationAutoplay: lecture.presentation_autoplay,
         showQuestionPins: lecture.show_question_pins,
         showPresentationQr: lecture.show_presentation_qr,
         presentationQrPosition: lecture.presentation_qr_position,
@@ -258,7 +257,7 @@ export function SessionStore({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (!ready) return;
     if (classSessionPersistenceEnabled) {
-      if (ownerId.current) window.localStorage.setItem(cacheKey(ownerId.current), JSON.stringify(sessions));
+      if (ownerId.current) window.localStorage.setItem(cacheKey(ownerId.current), serializeSessionsForFailureCache(sessions));
       return;
     }
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify(sessions));
@@ -291,15 +290,20 @@ export function SessionStore({ children }: { children: React.ReactNode }) {
     return () => { demoChannelRef.current = null; channel.close(); window.removeEventListener("storage", onStorage); };
   }, []);
 
-  const createFolder = useCallback(async (name: string) => {
-    const normalizedName = normalizeClassFolderName(name);
-    const colorIndex = classFolderColorIndexForOrder(folders.length);
+  const createFolder = useCallback(async (input: CreateClassFolderInput) => {
+    const purpose = normalizeClassFolderPurpose(input.purpose);
+    const folderInput = {
+      name: normalizeClassFolderName(input.name),
+      colorIndex: normalizeClassFolderColorIndex(input.colorIndex),
+      purpose,
+      purposeLabel: normalizeClassFolderPurposeLabel(purpose, input.purposeLabel)
+    };
     const folder = classSessionPersistenceEnabled
-      ? await persistClassFolder(normalizedName, colorIndex)
-      : { id: crypto.randomUUID(), name: normalizedName, createdAt: new Date().toISOString(), colorIndex };
+      ? await persistClassFolder(folderInput)
+      : { id: crypto.randomUUID(), createdAt: new Date().toISOString(), ...folderInput };
     setFolders((current) => [...current, folder]);
     return folder;
-  }, [folders.length]);
+  }, []);
 
   const createSession = useCallback(async (input: { folderId: string | null; title: string; fileName: string; slides: Slide[]; sourcePath?: string }) => {
     if (input.folderId !== null && !foldersById.has(input.folderId)) {
@@ -310,7 +314,7 @@ export function SessionStore({ children }: { children: React.ReactNode }) {
       id: crypto.randomUUID(), courseId: crypto.randomUUID(), materialId: crypto.randomUUID(), materialVersionId,
       folderId: input.folderId,
       code: makeCode(), title: input.title, fileName: input.fileName,
-      status: "live", currentSlide: 0, presentationInteractions: true, showQuestionPins: true, showPresentationQr: true, presentationQrPosition: "bottom-right",
+      status: "live", currentSlide: 0, presentationInteractions: true, presentationAutoplay: false, showQuestionPins: true, showPresentationQr: true, presentationQrPosition: "bottom-right",
       questionCategories: defaultQuestionCategorySettings(),
       createdAt: new Date().toISOString(), slides: input.slides, questions: []
     };
@@ -403,25 +407,6 @@ export function SessionStore({ children }: { children: React.ReactNode }) {
         await persistSessionDeletion(session.courseId);
       }
       setSessions((current) => current.filter((item) => item.id !== sessionId));
-    },
-    appendSlides: async (sessionId, files) => {
-      const session = sessionsById.get(sessionId);
-      if (!session) throw new Error("슬라이드를 추가할 강의를 찾지 못했습니다.");
-      validateSlideImages(files);
-      const appended = classSessionPersistenceEnabled
-        ? await appendSessionSlides(session, files)
-        : await Promise.all(files.map(async (file, index): Promise<Slide> => ({
-          id: crypto.randomUUID(),
-          pageIndex: session.slides.length + index,
-          title: `Slide ${session.slides.length + index + 1}`,
-          imageUrl: await fileToDataUrl(file),
-          speakerNote: ""
-        })));
-      updateSession(sessionId, (current) => {
-        const byId = new Map(current.slides.map((slide) => [slide.id, slide]));
-        appended.forEach((slide) => byId.set(slide.id, slide));
-        return { ...current, slides: [...byId.values()].sort((a, b) => a.pageIndex - b.pageIndex) };
-      });
     },
     deleteSlide: async (sessionId, slideId) => {
       const session = sessionsById.get(sessionId);
@@ -557,6 +542,11 @@ export function SessionStore({ children }: { children: React.ReactNode }) {
       const previous = sessionsById.get(sessionId)?.status;
       if (!previous) throw new Error("상태를 변경할 강의를 찾지 못했습니다.");
       await saveLectureSettings(sessionId, { status }, { status: previous }, { status });
+    },
+    setPresentationAutoplay: async (sessionId, enabled) => {
+      const previous = sessionsById.get(sessionId)?.presentationAutoplay;
+      if (previous === undefined) throw new Error("설정을 변경할 강의를 찾지 못했습니다.");
+      await saveLectureSettings(sessionId, { presentationAutoplay: enabled }, { presentationAutoplay: previous }, { presentation_autoplay: enabled });
     },
     setShowQuestionPins: async (sessionId, visible) => {
       const previous = sessionsById.get(sessionId)?.showQuestionPins;

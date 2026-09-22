@@ -1,0 +1,14 @@
+{
+  "code": [
+    "app/(view)/admin/session/[id]/controller.ts"
+  ],
+  "documents": [
+    "class-frontend-architecture"
+  ],
+  "recorded_at": "2026-09-14T08:59:16+00:00",
+  "requirement_id": "CFA-012",
+  "task_id": "mobile-session-remote",
+  "tests": [
+    ".document-driven/evidence/mobile-session-remote.md"
+  ]
+}

@@ -1,0 +1,17 @@
+{
+  "code": [
+    "app/component/pin-logo.tsx",
+    "app/component/folder-tree-sidebar.tsx",
+    "app/layout.tsx",
+    "app/(view)/login/page.tsx"
+  ],
+  "documents": [
+    "class-frontend-architecture"
+  ],
+  "recorded_at": "2026-09-14T08:19:07+00:00",
+  "requirement_id": "CLASS-BRAND-001",
+  "task_id": "ohpin-visible-branding",
+  "tests": [
+    ".document-driven/evidence/ohpin-visible-branding.md"
+  ]
+}

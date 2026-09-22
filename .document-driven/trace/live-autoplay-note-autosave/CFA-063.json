@@ -1,0 +1,19 @@
+{
+  "code": [
+    "app/(view)/admin/session/[id]/page.tsx",
+    "app/(view)/admin/session/[id]/controller.ts",
+    "app/_controller/session-store.tsx",
+    "app/_service/class-session-service.ts",
+    "app/_model/class/session.ts"
+  ],
+  "documents": [
+    "class-frontend-architecture"
+  ],
+  "recorded_at": "2026-09-10T12:18:04+00:00",
+  "requirement_id": "CFA-063",
+  "task_id": "live-autoplay-note-autosave",
+  "tests": [
+    "app/_model/class/session.test.ts",
+    ".document-driven/evidence/live-autoplay-note-autosave.md"
+  ]
+}

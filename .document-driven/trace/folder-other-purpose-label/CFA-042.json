@@ -1,0 +1,17 @@
+{
+  "code": [
+    "app/_controller/session-store.tsx",
+    "app/_service/class-session-service.ts"
+  ],
+  "documents": [
+    "class-frontend-architecture"
+  ],
+  "recorded_at": "2026-09-18T09:00:00+00:00",
+  "requirement_id": "CFA-042",
+  "task_id": "folder-other-purpose-label",
+  "tests": [
+    "app/_model/class-folders.test.ts",
+    "supabase/tests/class_folder_purpose.sql",
+    ".document-driven/evidence/folder-other-purpose-label.md"
+  ]
+}

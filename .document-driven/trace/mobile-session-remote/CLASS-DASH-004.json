@@ -1,0 +1,16 @@
+{
+  "code": [
+    "app/(view)/admin/dashboard/component/folder-card.tsx",
+    "app/(view)/admin/dashboard/component/folder-card.module.css"
+  ],
+  "documents": [
+    "class-frontend-architecture"
+  ],
+  "recorded_at": "2026-09-14T22:34:53+00:00",
+  "requirement_id": "CLASS-DASH-004",
+  "task_id": "mobile-session-remote",
+  "tests": [
+    ".document-driven/evidence/mobile-session-remote.md",
+    "app/_model/class-folders.test.ts"
+  ]
+}

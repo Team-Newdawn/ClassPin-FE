@@ -110,7 +110,13 @@ export interface Profile {
 
 export const CLASS_FOLDER_NAME_MAX = 80;
 export const CLASS_FOLDER_COLOR_COUNT = 6;
-export const CLASS_UNFILED_COLOR_INDEX = 2;
+export const CLASS_FOLDER_DEFAULT_COLOR_INDEX = 2;
+export const CLASS_UNFILED_COLOR_INDEX = CLASS_FOLDER_DEFAULT_COLOR_INDEX;
+export const CLASS_FOLDER_COLOR_OPTIONS = [2, 3, 1, 5, 0] as const;
+export const CLASS_FOLDER_PURPOSES = ["qa", "feedback", "education", "brainstorming", "other"] as const;
+export type ClassFolderPurpose = typeof CLASS_FOLDER_PURPOSES[number];
+export const CLASS_FOLDER_DEFAULT_PURPOSE: ClassFolderPurpose = "qa";
+export const CLASS_FOLDER_PURPOSE_LABEL_MAX = 40;
 
 export function normalizeClassFolderName(value: string) {
   const name = value.trim();
@@ -125,10 +131,31 @@ export function classFolderColorIndexForOrder(index: number) {
   return (Number.isFinite(index) ? Math.max(0, Math.trunc(index)) : 0) % CLASS_FOLDER_COLOR_COUNT;
 }
 
-export function normalizeClassFolderColorIndex(value: unknown, fallbackIndex = 0) {
+export function normalizeClassFolderColorIndex(value: unknown, fallbackIndex = CLASS_FOLDER_DEFAULT_COLOR_INDEX) {
   return typeof value === "number" && Number.isInteger(value) && value >= 0 && value < CLASS_FOLDER_COLOR_COUNT
     ? value
     : classFolderColorIndexForOrder(fallbackIndex);
+}
+
+export function normalizeClassFolderPurpose(value: unknown): ClassFolderPurpose {
+  return typeof value === "string" && (CLASS_FOLDER_PURPOSES as readonly string[]).includes(value)
+    ? value as ClassFolderPurpose
+    : CLASS_FOLDER_DEFAULT_PURPOSE;
+}
+
+/** 직접 입력한 카테고리 이름은 `기타` 목적에서만 유지한다. */
+export function normalizeClassFolderPurposeLabel(purpose: ClassFolderPurpose, value: unknown): string | null {
+  if (purpose !== "other" || typeof value !== "string") return null;
+  const label = [...value.trim()].slice(0, CLASS_FOLDER_PURPOSE_LABEL_MAX).join("");
+  return label || null;
+}
+
+export interface CreateClassFolderInput {
+  name: string;
+  colorIndex: number;
+  purpose: ClassFolderPurpose;
+  /** `기타` 목적에서 직접 입력한 카테고리 이름. 다른 목적에서는 사용하지 않는다. */
+  purposeLabel?: string | null;
 }
 
 export interface ClassFolder {
@@ -136,6 +163,9 @@ export interface ClassFolder {
   name: string;
   createdAt: string;
   colorIndex: number;
+  purpose: ClassFolderPurpose;
+  /** `기타` 목적에서 직접 입력한 카테고리 이름. 다른 목적에서는 null이다. */
+  purposeLabel?: string | null;
 }
 
 export interface Slide {
@@ -205,6 +235,7 @@ export interface ClassSession {
   status: "live" | "ended";
   currentSlide: number;
   presentationInteractions: boolean;
+  presentationAutoplay: boolean;
   showQuestionPins: boolean;
   showPresentationQr: boolean;
   presentationQrPosition: PresentationQrPosition;

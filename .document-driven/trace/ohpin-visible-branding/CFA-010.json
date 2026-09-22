@@ -1,0 +1,14 @@
+{
+  "code": [
+    "app/component/pin-logo.tsx"
+  ],
+  "documents": [
+    "class-frontend-architecture"
+  ],
+  "recorded_at": "2026-09-14T08:19:07+00:00",
+  "requirement_id": "CFA-010",
+  "task_id": "ohpin-visible-branding",
+  "tests": [
+    ".document-driven/evidence/ohpin-visible-branding.md"
+  ]
+}

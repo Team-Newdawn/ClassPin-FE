@@ -6,18 +6,57 @@ For every task that involves planning, designing, implementing, fixing,
 refactoring, or reviewing code in this repository:
 
 1. Use the globally installed `ponytail` skill before planning or design begins,
-   and keep it active in `full` mode through implementation.
-2. Read and trace the affected code path end to end before choosing a solution.
+   and keep it active in `ultra` mode through implementation. Always run
+   `/ponytail ultra` (never `lite` or `full`) unless the user explicitly asks for
+   a different level in that session.
+2. Ultra means YAGNI extremist: deletion before addition, ship the smallest thing
+   that works and challenge the rest of the requirement in the same response.
+3. Read and trace the affected code path end to end before choosing a solution.
    Apply Ponytail's ladder: avoid speculative work, reuse existing code, prefer
    standard-library and native platform features, reuse installed dependencies,
    and only then add the minimum code that works.
-3. Do not simplify away explicit requirements, trust-boundary validation,
+4. Do not simplify away explicit requirements, trust-boundary validation,
    data-loss prevention, error handling, security, accessibility, or the smallest
    runnable check required for non-trivial logic.
-4. Before claiming an implementation is complete, use `ponytail-review` on the
+5. If ultra judgement says the requested scope should be cut, say so first in one
+   line and wait for the user's decision. Never narrow a request on your own.
+6. Before claiming an implementation is complete, use `ponytail-review` on the
    final diff, apply safe in-scope simplifications, and run the relevant checks.
 
 If either required skill is unavailable, report that before making code changes.
+
+## Token budget: which tool does which job
+
+Three tools, three non-overlapping jobs. Use each only for its job.
+
+- **Serena owns input tokens.** For code files: `get_symbols_overview` ->
+  `find_symbol` (`include_body` only when you must read it) ->
+  `find_referencing_symbols`. Never `Read` a code file for discovery and never
+  `Edit` one you located through Serena; edit with `replace_symbol_body`,
+  `insert_before_symbol` / `insert_after_symbol`, and `replace_in_files` for
+  sub-symbol spans or the same change across files. Serena results are
+  authoritative: do not re-read a file to confirm an edit landed. `Grep`/`Glob` stay
+  allowed for discovery only; the follow-up read or reference search goes through
+  Serena. Non-code files (`*.md`, `*.json`, migrations) keep using `Read`/`Edit`.
+- **Ponytail ultra owns output tokens.** Fewest files, shortest working diff,
+  deletion before addition, no unrequested prose. Explanation the user asked for is
+  not debt; give it in full.
+- **Headroom owns what is left, automatically.** The `headroom wrap` proxy
+  compresses large tool outputs in flight and leaves a `hash=...` marker. Call
+  `mcp__headroom__headroom_retrieve` only when a marker hid something the task
+  actually needs. Do not call `headroom_compress` by hand: passing content as an
+  argument means you already paid for it, and the proxy covers tool output.
+  `headroom_stats` is for reporting, not for routine work.
+
+Two cross-cutting rules, in order of impact:
+
+1. **Batch independent tool calls into one message.** Every extra round-trip
+   re-sends the whole conversation, so batching is the largest single lever. Serena
+   applies batched calls serially, so they cannot race.
+2. **Keep the prompt prefix stable.** `CLAUDE.md`, `AGENTS.md` and `DESIGN.md` are
+   re-sent on every request and are only cheap while the provider cache holds them,
+   which is why Headroom refuses to compress that frozen prefix. Edit these files
+   when a rule changes, never to take notes.
 
 ## Weak Harness: project memory
 

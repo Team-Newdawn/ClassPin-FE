@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { advancePinPlayback, canRotatePinPlayback, crossedPinMilestone, findNewestIncomingPin, nextPresentationSlide, rectanglesOverlap, resolvePinDisplayPositions, resolveVisiblePresentationLabelIds } from "./presentation-rotation.ts";
+import { advancePinPlayback, canRotatePinPlayback, crossedPinMilestone, findNewestIncomingPin, nextPresentationSlide, presentationAutoplayDelay, rectanglesOverlap, resolvePinDisplayPositions, resolveVisiblePresentationLabelIds, slideIndexFromPageNumber } from "./presentation-rotation.ts";
 
 test("PIN 총합이 새 10단위를 넘으면 건너뛴 구간 중 가장 높은 값을 고른다", () => {
   assert.equal(crossedPinMilestone(9, 10), 10);
@@ -66,6 +66,26 @@ test("발표 슬라이드를 순환하고 기존 snapshot에 없던 최신 PIN�
   assert.equal(nextPresentationSlide(0, 0), 0);
   assert.equal(findNewestIncomingPin(pins, ["known"]), pins[0]);
   assert.equal(findNewestIncomingPin(pins, pins.map((pin) => pin.id)), null);
+});
+
+test("자동 넘김은 설정·PIN 노출·상세 dialog 상태에 맞는 지연만 반환한다", () => {
+  assert.equal(presentationAutoplayDelay(false, true, 1, 1, 2, false), null);
+  assert.equal(presentationAutoplayDelay(true, true, 2, 1, 2, false), null);
+  assert.equal(presentationAutoplayDelay(true, true, 2, 2, 2, false), 1000);
+  assert.equal(presentationAutoplayDelay(true, true, 0, 0, 2, false), 3000);
+  assert.equal(presentationAutoplayDelay(true, false, 2, 0, 2, false), 3000);
+  assert.equal(presentationAutoplayDelay(true, false, 0, 0, 1, false), null);
+  assert.equal(presentationAutoplayDelay(true, false, 0, 0, 2, true), null);
+});
+
+test("직접 입력한 1-based 슬라이드 번호 문자열이 범위 안의 정수일 때만 index로 바꾼다", () => {
+  assert.equal(slideIndexFromPageNumber("1", 10), 0);
+  assert.equal(slideIndexFromPageNumber("10", 10), 9);
+  assert.equal(slideIndexFromPageNumber("", 10), null);
+  assert.equal(slideIndexFromPageNumber("0", 10), null);
+  assert.equal(slideIndexFromPageNumber("11", 10), null);
+  assert.equal(slideIndexFromPageNumber("1.5", 10), null);
+  assert.equal(slideIndexFromPageNumber("invalid", 10), null);
 });
 
 test("중앙이나 가장자리에 겹친 PIN 30개를 화면 안의 겹치지 않는 위치로 펼친다", () => {

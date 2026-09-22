@@ -1,0 +1,17 @@
+{
+  "code": [
+    "app/(view)/admin/session/[id]/page.tsx",
+    "app/(view)/admin/session/[id]/controller.ts",
+    "app/(view)/admin/dashboard/component/folder-card.tsx",
+    "app/(view)/admin/dashboard/component/folder-card.module.css"
+  ],
+  "documents": [
+    "class-frontend-architecture"
+  ],
+  "recorded_at": "2026-09-14T13:05:43+00:00",
+  "requirement_id": "CFA-088",
+  "task_id": "mobile-session-remote",
+  "tests": [
+    ".document-driven/evidence/mobile-session-remote.md"
+  ]
+}

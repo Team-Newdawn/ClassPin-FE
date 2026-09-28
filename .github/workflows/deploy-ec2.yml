@@ -57,6 +57,10 @@ jobs:
           mkdir -p ~/.ssh
           printf '%s\n' "$EC2_SSH_KEY" > ~/.ssh/ohpin_key
           printf '%s\n' "$EC2_KNOWN_HOSTS" > ~/.ssh/ohpin_known_hosts
+          if ! ssh-keygen -F "$EC2_HOST" -f ~/.ssh/ohpin_known_hosts >/dev/null; then
+            echo "::error::EC2_KNOWN_HOSTS has no entry for EC2_HOST. Its first field must exactly match the EC2_HOST secret."
+            exit 1
+          fi
           cat > ~/.ssh/config <<CONFIG
           Host ohpin-deploy
             HostName $EC2_HOST

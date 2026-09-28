@@ -402,11 +402,13 @@ export function SessionStore({ children }: { children: React.ReactNode }) {
     deleteSession: async (sessionId) => {
       const session = sessionsById.get(sessionId);
       if (!session) throw new Error("삭제할 강의 자료를 찾지 못했습니다.");
+      let cleanupPending = false;
       if (classSessionPersistenceEnabled) {
         if (!session.courseId) throw new Error("강의 자료의 저장 정보를 찾지 못했습니다.");
-        await persistSessionDeletion(session.courseId);
+        ({ cleanupPending } = await persistSessionDeletion(session.courseId));
       }
       setSessions((current) => current.filter((item) => item.id !== sessionId));
+      if (cleanupPending) throw new Error("강의 자료는 삭제됐지만 파일 정리가 대기 중입니다.");
     },
     deleteSlide: async (sessionId, slideId) => {
       const session = sessionsById.get(sessionId);
@@ -416,10 +418,11 @@ export function SessionStore({ children }: { children: React.ReactNode }) {
       if (session.slides.length <= 1) throw new Error("마지막 슬라이드는 삭제할 수 없습니다.");
 
       if (classSessionPersistenceEnabled) {
-        await deleteSessionSlide(slideId);
+        const { cleanupPending } = await deleteSessionSlide(slideId);
         const slides = await fetchSessionSlides(session);
         const snapshot = await fetchLectureSnapshot({ ...session, slides });
         updateSession(sessionId, (current) => ({ ...current, slides, ...(snapshot ?? {}) }));
+        if (cleanupPending) throw new Error("슬라이드는 삭제됐지만 파일 정리가 대기 중입니다.");
         return;
       }
 

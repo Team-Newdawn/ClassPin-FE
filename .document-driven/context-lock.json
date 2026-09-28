@@ -1,48 +1,43 @@
 {
-  "created_at": "2026-09-14T22:32:27+00:00",
+  "created_at": "2026-09-28T06:31:19+00:00",
   "documents": [
     {
       "id": "prd",
       "path": "doc/pin_class_prd.md",
-      "sha256": "a2af9464cba62dcb995fda80094bd7a1bfc825b10abef9bff631f55efe87cd13"
+      "sha256": "9e438bcec46472d6dfe3e60a58b2c2bbc6d845b54e4b925af143782fa3bb0b16"
     },
     {
       "id": "class-frontend-architecture",
       "path": "docs/class-frontend-architecture.md",
-      "sha256": "96aa1f117d7db96f1b08dfc4aea6ffc1ad43be22000538fddcc72fdc35a05272"
+      "sha256": "8054fb943fcbd3c2107789e6364059acd0fd2bba3e5ce140a9a54ab9c9710964"
     }
   ],
   "manifest": {
     "path": "docs/document-manifest.json",
-    "sha256": "c32fad17372ce989e8ae65bb3efeb4639578b85946a5e523352315a955f0d01a"
+    "sha256": "62950db9fce4a8a123ee00193c27ecdfa06e9503a4b44e80ec30b20153673728"
   },
   "schema_version": "1.0",
   "selected_artifact_ids": [
     "class-frontend-architecture"
   ],
   "task": {
-    "id": "mobile-session-remote",
+    "id": "rest-business-api",
     "requirement_ids": [
-      "CLASS-DASH-004",
-      "CLASS-LIVE-003",
-      "CLASS-LIVE-004",
-      "CLASS-LIVE-006",
-      "CFA-010",
-      "CFA-011",
-      "CFA-012",
-      "CFA-031",
-      "CFA-032",
-      "CFA-081",
-      "CFA-082",
-      "CFA-083",
-      "CFA-087",
-      "CFA-088"
+      "CFA-090",
+      "CFA-091",
+      "CFA-092",
+      "CFA-093",
+      "CFA-094",
+      "CFA-095",
+      "CFA-096",
+      "CFA-097",
+      "CFA-098",
+      "CFA-099"
     ],
     "scopes": [
       "class-frontend-layering",
-      "class-route-css-colocation",
       "class-data-loading-performance"
     ],
-    "summary": "Restore the pre-Figma folder face color-mix gradient and polygon clip-path while retaining saved accents and the mobile remote"
+    "summary": "Replace direct Supabase business CRUD with OhPin REST API; preserve identity Storage Realtime and push dev"
   }
 }

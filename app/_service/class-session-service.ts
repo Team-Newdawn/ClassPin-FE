@@ -1,6 +1,7 @@
 import { isParticipantPointAnchor, isQuestionMarker, normalizeClassFolderColorIndex, normalizeClassFolderName, normalizeClassFolderPurpose, normalizeClassFolderPurposeLabel, normalizeQuestionCategorySettings, type ClassFolder, type ClassSession, type CreateClassFolderInput, type NormalizedPoint, type Question, type QuestionCategorySettings, type Slide } from "@/app/_model/types";
-import { ensureAnonymousUser, getAudienceSupabaseClient, getOwnerWriteSupabaseClient, getSessionUser, getSupabaseClient, supabaseConfigured } from "@/app/_infrastructure/supabase/client";
+import { ensureAnonymousUser, getAudienceSupabaseClient, getSessionUser, getSupabaseClient, supabaseConfigured } from "@/app/_infrastructure/supabase/client";
 
+import { restRequest } from "@/app/_infrastructure/rest/request";
 export const classSessionPersistenceEnabled = supabaseConfigured;
 
 type LectureRow = {
@@ -203,52 +204,30 @@ export async function persistSession(session: ClassSession, sourcePath?: string)
   if (!client) throw new Error("Supabase 연결을 찾지 못했습니다.");
   if (!session.courseId || !session.materialId || !session.materialVersionId) throw new Error("강의 저장 정보가 완전하지 않습니다.");
   const user = await requireOwnerUser();
-  const { error: courseError } = await client.from("courses").insert({ id: session.courseId, owner_id: user.id, folder_id: session.folderId, title: session.title, visibility: "link" });
-  if (courseError) throw courseError;
-  const { error: lectureError } = await client.from("lectures").insert({
-    id: session.id,
-    course_id: session.courseId,
-    title: session.title,
-    join_code: session.code,
-    status: session.status,
-    current_page: session.currentSlide,
-    presentation_interactions: session.presentationInteractions,
-    presentation_autoplay: session.presentationAutoplay,
-    show_question_pins: session.showQuestionPins,
-    show_presentation_qr: session.showPresentationQr,
-    presentation_qr_position: session.presentationQrPosition,
-    question_categories: session.questionCategories,
-    started_at: new Date().toISOString()
-  });
-  if (lectureError) throw lectureError;
-  const type = session.fileName.toLowerCase().endsWith(".pdf") ? "pdf" : "slide_deck";
-  const { error: materialError } = await client.from("materials").insert({ id: session.materialId, course_id: session.courseId, lecture_id: session.id, type, file_name: session.fileName });
-  if (materialError) throw materialError;
-  const { error: versionError } = await client.from("material_versions").insert({ id: session.materialVersionId, material_id: session.materialId, version_no: 1, source_path: sourcePath ?? `${user.id}/${session.id}/${session.fileName}` });
-  if (versionError) throw versionError;
-  const slideRows = [];
+  const slides = [];
   for (const slide of session.slides) {
-    // 변환 단계에서 이미 Storage 에 올라온 슬라이드는 그대로 참조한다.
     let imagePath = slide.imagePath ?? "";
     if (!imagePath && slide.imageUrl) {
       imagePath = `${user.id}/${session.id}/${slide.id}.jpg`;
       const image = await fetch(slide.imageUrl).then((response) => response.blob());
-      const { error: uploadError } = await client.storage.from("lecture-slides").upload(imagePath, image, { contentType: image.type || "image/jpeg", upsert: false });
-      if (uploadError) throw uploadError;
+      const { error } = await client.storage.from("lecture-slides").upload(imagePath, image, { contentType: image.type || "image/jpeg", upsert: false });
+      if (error) throw error;
     }
     if ((imagePath ? 1 : 0) + (slide.sourcePageIndex === undefined ? 0 : 1) !== 1) {
       throw new Error("슬라이드 원본 정보가 완전하지 않습니다.");
     }
-    slideRows.push({
-      id: slide.id,
-      material_version_id: session.materialVersionId,
-      page_index: slide.pageIndex,
-      image_path: imagePath || null,
-      source_page_index: slide.sourcePageIndex ?? null,
-    });
+    slides.push({ id: slide.id, pageIndex: slide.pageIndex, imagePath: imagePath || null, sourcePageIndex: slide.sourcePageIndex ?? null });
   }
-  const { error: slidesError } = await client.from("slides").insert(slideRows);
-  if (slidesError) throw slidesError;
+  await restRequest(client, "/instructor/materials", "POST", {
+    id: session.id, courseId: session.courseId, materialId: session.materialId, materialVersionId: session.materialVersionId,
+    folderId: session.folderId, title: session.title, fileName: session.fileName,
+    sourcePath: sourcePath ?? `${user.id}/${session.id}/${session.fileName}`,
+    code: session.code, status: session.status, currentSlide: session.currentSlide,
+    presentationInteractions: session.presentationInteractions, showQuestionPins: session.showQuestionPins,
+    showPresentationQr: session.showPresentationQr, presentationQrPosition: session.presentationQrPosition,
+    questionCategories: session.questionCategories, slides,
+  });
+  if (session.presentationAutoplay) await updateLecture(session.id, { presentation_autoplay: true });
 }
 
 const toClassFolder = (folder: ClassFolderRow): ClassFolder => {
@@ -266,13 +245,8 @@ const toClassFolder = (folder: ClassFolderRow): ClassFolder => {
 export async function fetchOwnedClassFolders(): Promise<ClassFolder[]> {
   const client = getSupabaseClient();
   if (!client) return [];
-  const user = await requireOwnerUser();
-  const { data, error } = await client.from("session_folders")
-    .select("id, name, created_at, color_index, purpose, purpose_label")
-    .eq("owner_id", user.id)
-    .order("created_at", { ascending: true });
-  if (error) throw error;
-  return ((data ?? []) as ClassFolderRow[]).map(toClassFolder);
+  const rows = await restRequest<ClassFolderRow[]>(client, "/instructor/folders");
+  return rows.map(toClassFolder);
 }
 
 export async function createClassFolder(input: CreateClassFolderInput): Promise<ClassFolder> {
@@ -282,122 +256,47 @@ export async function createClassFolder(input: CreateClassFolderInput): Promise<
   const purposeLabel = normalizeClassFolderPurposeLabel(purpose, input.purposeLabel);
   const client = getSupabaseClient();
   if (!client) throw new Error("Supabase 연결을 찾지 못했습니다.");
-  const user = await requireOwnerUser();
-  const { data, error } = await client.from("session_folders")
-    .insert({ owner_id: user.id, name, color_index: colorIndex, purpose, purpose_label: purposeLabel })
-    .select("id, name, created_at, color_index, purpose, purpose_label")
-    .single();
-  if (error) throw error;
-  return toClassFolder(data as ClassFolderRow);
+  return toClassFolder(await restRequest<ClassFolderRow>(client, "/instructor/folders", "POST", { name, colorIndex, purpose, purposeLabel }));
 }
 
 export async function renameClassFolder(folderId: string, name: string): Promise<void> {
   const normalizedName = normalizeClassFolderName(name);
   const client = getSupabaseClient();
   if (!client) throw new Error("Supabase 연결을 찾지 못했습니다.");
-  const user = await requireOwnerUser();
-  const { data, error } = await client.from("session_folders")
-    .update({ name: normalizedName })
-    .eq("id", folderId)
-    .eq("owner_id", user.id)
-    .select("id")
-    .maybeSingle();
-  if (error) throw error;
-  if (!data) throw new Error("이름을 바꿀 폴더를 찾지 못했습니다.");
+  await restRequest(client, `/instructor/folders/${encodeURIComponent(folderId)}`, "PATCH", { name: normalizedName });
 }
 
 export async function deleteClassFolder(folderId: string): Promise<void> {
   const client = getSupabaseClient();
   if (!client) throw new Error("Supabase 연결을 찾지 못했습니다.");
-  const user = await requireOwnerUser();
-  const { data, error } = await client.from("session_folders")
-    .delete()
-    .eq("id", folderId)
-    .eq("owner_id", user.id)
-    .select("id")
-    .maybeSingle();
-  if (error) throw error;
-  if (!data) throw new Error("삭제할 폴더를 찾지 못했습니다.");
+  await restRequest(client, `/instructor/folders/${encodeURIComponent(folderId)}`, "DELETE");
 }
 
 export async function moveSessionToFolder(courseId: string, folderId: string | null): Promise<void> {
   const client = getSupabaseClient();
   if (!client) throw new Error("Supabase 연결을 찾지 못했습니다.");
-  const user = await requireOwnerUser();
-  const { data, error } = await client.from("courses")
-    .update({ folder_id: folderId })
-    .eq("id", courseId)
-    .eq("owner_id", user.id)
-    .select("id")
-    .maybeSingle();
-  if (error) throw error;
-  if (!data) throw new Error("이동할 강의 자료를 찾지 못했습니다.");
+  await restRequest(client, `/instructor/courses/${encodeURIComponent(courseId)}/folder`, "PATCH", { folderId });
 }
 
 /** 코스와 cascade 데이터를 지운 뒤 더는 참조되지 않는 원본·렌더 이미지를 회수한다. */
-export async function deleteClassSession(courseId: string): Promise<void> {
+export async function deleteClassSession(courseId: string): Promise<{ cleanupPending: boolean }> {
   const client = getSupabaseClient();
   if (!client) throw new Error("Supabase 연결을 찾지 못했습니다.");
-  const user = await requireOwnerUser();
-  const { data: materialData, error: materialError } = await client.from("materials")
-    .select("id")
-    .eq("course_id", courseId);
-  if (materialError) throw materialError;
-  const materialIds = (materialData ?? []).map((material) => material.id as string);
-
-  let sourcePaths: string[] = [];
-  let imagePaths: string[] = [];
-  if (materialIds.length) {
-    const { data: versionData, error: versionError } = await client.from("material_versions")
-      .select("id, source_path")
-      .in("material_id", materialIds);
-    if (versionError) throw versionError;
-    const versions = (versionData ?? []) as Array<{ id: string; source_path: string }>;
-    sourcePaths = [...new Set(versions.map((version) => version.source_path).filter((path) => path.startsWith(`${user.id}/`)))];
-    const versionIds = versions.map((version) => version.id);
-    if (versionIds.length) {
-      const { data: slideData, error: slideError } = await client.from("slides")
-        .select("image_path")
-        .in("material_version_id", versionIds);
-      if (slideError) throw slideError;
-      imagePaths = [...new Set((slideData ?? []).map((slide) => slide.image_path).filter((path): path is string => typeof path === "string" && path.startsWith(`${user.id}/`)))];
-    }
-  }
-
-  const { data, error } = await client.from("courses")
-    .delete()
-    .eq("id", courseId)
-    .eq("owner_id", user.id)
-    .select("id")
-    .maybeSingle();
-  if (error) throw error;
-  if (!data) throw new Error("삭제할 강의 자료를 찾지 못했습니다.");
-
-  const cleanup = [
-    sourcePaths.length ? client.storage.from("course-materials").remove(sourcePaths) : null,
-    imagePaths.length ? client.storage.from("lecture-slides").remove(imagePaths) : null
-  ].filter((request): request is NonNullable<typeof request> => request !== null);
-  const results = await Promise.all(cleanup);
-  results.forEach(({ error: storageError }) => {
-    // DB 삭제는 이미 끝났다. 재시도로 복구할 수 없는 전체 실패로 보이지 않는다.
-    if (storageError) console.error("Deleted class material storage cleanup failed", storageError);
-  });
+  return restRequest(client, `/instructor/courses/${encodeURIComponent(courseId)}`, "DELETE");
 }
 
 /** 슬라이드와 연결 데이터를 DB에서 삭제한 뒤 공개 Storage 객체를 회수한다. */
-export async function deleteSessionSlide(slideId: string): Promise<DeletedSlideRow> {
+export async function deleteSessionSlide(slideId: string): Promise<DeletedSlideRow & { cleanupPending: boolean }> {
   const client = getSupabaseClient();
   if (!client) throw new Error("Supabase 연결을 찾지 못했습니다.");
-  await requireOwnerUser();
-  const { data, error } = await client.rpc("delete_lecture_slide", { target_slide_id: slideId });
-  if (error) throw error;
-  const deleted = ((data ?? []) as DeletedSlideRow[])[0];
+  const deleted = await restRequest<DeletedSlideRow>(client, `/instructor/slides/${encodeURIComponent(slideId)}`, "DELETE");
   if (!deleted) throw new Error("삭제된 슬라이드 정보를 받지 못했습니다.");
-  if (deleted.deleted_image_path) {
-    const { error: storageError } = await client.storage.from("lecture-slides").remove([deleted.deleted_image_path]);
-    if (storageError) console.error("Deleted slide storage cleanup failed", storageError);
-  }
-  return deleted;
+  // Deletion has committed; a cleanup failure must never roll back the slide in the UI.
+  let cleanupPending = true;
+  try {
+    ({ cleanupPending } = await restRequest<{ cleanupPending: boolean }>(client, "/instructor/storage-cleanup", "POST"));
+  } catch (error) { console.error("Deleted slide storage cleanup pending", error); }
+  return { ...deleted, cleanupPending };
 }
 
 /** Realtime INSERT 뒤 현재 자료 버전의 전체 슬라이드를 다시 읽는다. */
@@ -406,86 +305,21 @@ export async function fetchSessionSlides(session: ClassSession, asAudience = fal
   const client = asAudience ? getAudienceSupabaseClient() : getSupabaseClient();
   if (!client) return session.slides;
   if (asAudience) await ensureAnonymousUser();
-
-  const { data, error } = await client.from("slides")
-    .select("id, material_version_id, page_index, image_path, source_page_index")
-    .eq("material_version_id", session.materialVersionId)
-    .order("page_index", { ascending: true });
-  if (error) throw error;
-  const rows = (data ?? []) as SlideRow[];
-  const noteBySlide = new Map<string, string>();
-  if (!asAudience && rows.length) {
-    await requireOwnerUser();
-    const { data: noteData, error: noteError } = await client.from("slide_instructor_notes")
-      .select("slide_id, body")
-      .in("slide_id", rows.map((slide) => slide.id));
-    if (noteError) throw noteError;
-    ((noteData ?? []) as SlideInstructorNoteRow[]).forEach((note) => noteBySlide.set(note.slide_id, note.body));
-  }
+  const rows = await restRequest<Array<SlideRow & { slide_instructor_notes?: SlideInstructorNoteRow | SlideInstructorNoteRow[] | null }>>(
+    client, `/${asAudience ? "participant" : "instructor"}/versions/${encodeURIComponent(session.materialVersionId)}/slides`
+  );
   const pdfUrl = session.slides.find((slide) => slide.pdfUrl)?.pdfUrl;
-  return rows.map((slide) => toSlide(client, slide, pdfUrl, asAudience ? undefined : noteBySlide.get(slide.id) ?? ""));
+  return rows.map((slide) => {
+    const note = Array.isArray(slide.slide_instructor_notes) ? slide.slide_instructor_notes[0] : slide.slide_instructor_notes;
+    return toSlide(client, slide, pdfUrl, asAudience ? undefined : note?.body ?? "");
+  });
 }
 
 /** 현재 Google 강사가 소유한 강의 전체를 DB에서 복원한다. */
 export async function fetchOwnedSessions(): Promise<ClassSession[]> {
   const client = getSupabaseClient();
   if (!client) return [];
-  const user = await requireOwnerUser();
-  const { data, error } = await client.from("courses").select(`
-    id,
-    folder_id,
-    lectures!inner(
-      id,
-      course_id,
-      title,
-      join_code,
-      status,
-      current_page,
-      presentation_interactions,
-      presentation_autoplay,
-      show_question_pins,
-      show_presentation_qr,
-      presentation_qr_position,
-      question_categories,
-      created_at,
-      materials!materials_lecture_id_fkey(
-        id,
-        file_name,
-        created_at,
-        material_versions(
-          id,
-          version_no,
-          source_path,
-          slides(
-            id,
-            material_version_id,
-            page_index,
-            image_path,
-            source_page_index,
-            slide_instructor_notes(slide_id, body)
-          )
-        )
-      ),
-      questions(
-        id,
-        lecture_id,
-        slide_id,
-        category,
-        marker,
-        raw_text,
-        status,
-        reaction_count,
-        created_at,
-        region_anchors(kind, coords),
-        answers(body, created_at)
-      )
-    )
-  `)
-    .eq("owner_id", user.id)
-    .neq("lectures.status", "archived");
-  if (error) throw error;
-
-  const courses = (data ?? []) as unknown as OwnedCourseGraphRow[];
+  const courses = await restRequest<OwnedCourseGraphRow[]>(client, "/instructor/courses");
   const pdfUrls = await createPdfUrlMap(client, courses.flatMap((course) => course.lectures.flatMap((lecture) =>
     lecture.materials.flatMap((material) => material.material_versions
       .filter((version) => version.slides.some((slide) => slide.source_page_index !== null))
@@ -535,51 +369,16 @@ export async function fetchOwnedSessions(): Promise<ClassSession[]> {
 export async function saveSlideInstructorNote(slideId: string, body: string) {
   const client = getSupabaseClient();
   if (!client) throw new Error("Supabase 연결을 찾지 못했습니다.");
-  await requireOwnerUser();
-  const { error } = await client.from("slide_instructor_notes").upsert({
-    slide_id: slideId,
-    body,
-    updated_at: new Date().toISOString()
-  }, { onConflict: "slide_id" });
-  if (error) throw error;
+  await restRequest(client, `/instructor/slides/${encodeURIComponent(slideId)}/note`, "PUT", { body });
 }
 
 async function fetchLiveSessionBy(column: "id" | "join_code", value: string): Promise<ClassSession | null> {
   const client = getAudienceSupabaseClient();
   if (!client) return null;
   await ensureAnonymousUser();
-  const { data, error } = await client.from("lectures")
-    .select(`
-      id,
-      course_id,
-      title,
-      join_code,
-      status,
-      current_page,
-      presentation_interactions,
-      presentation_autoplay,
-      show_question_pins,
-      show_presentation_qr,
-      presentation_qr_position,
-      question_categories,
-      created_at,
-      materials!materials_lecture_id_fkey(
-        id,
-        file_name,
-        material_versions(
-          id,
-          version_no,
-          source_path,
-          slides(id, material_version_id, page_index, image_path, source_page_index)
-        )
-      )
-    `)
-    .eq(column, value)
-    .eq("status", "live")
-    .maybeSingle();
-  if (error) throw error;
-  if (!data) return null;
-  const lecture = data as unknown as AudienceLectureGraphRow;
+  const path = column === "join_code" ? `/participant/join/${encodeURIComponent(value)}` : `/participant/lectures/${encodeURIComponent(value)}`;
+  const lecture = await restRequest<AudienceLectureGraphRow | null>(client, path);
+  if (!lecture) return null;
   const material = lecture.materials[0];
   const version = material && [...material.material_versions].sort((a, b) => b.version_no - a.version_no)[0];
   if (!material || !version) return null;
@@ -611,8 +410,7 @@ async function fetchLiveSessionBy(column: "id" | "join_code", value: string): Pr
     slides,
     questions: []
   };
-  const { data: questionData, error: questionError } = await client.rpc("find_lecture_questions", { target_lecture_id: session.id });
-  if (questionError) throw questionError;
+  const questionData = await restRequest<QuestionRow[]>(client, `/participant/lectures/${encodeURIComponent(session.id)}/questions`);
   return {
     ...session,
     questions: toQuestions(Array.isArray(questionData) ? questionData as unknown as QuestionRow[] : [], session.id, slides)
@@ -635,62 +433,36 @@ export async function submitQuestion(session: ClassSession, question: Question) 
   if (!user || !session.courseId) throw new Error("Supabase session is missing ownership context.");
   const slide = session.slides[question.slideIndex];
   if (!slide) throw new Error("질문을 남길 슬라이드를 찾지 못했습니다.");
-  let regionId: string | null = null;
-  if (question.x !== null && question.y !== null && session.materialVersionId) {
-    regionId = crypto.randomUUID();
-    const { error } = await client.from("region_anchors").insert({
-      id: regionId,
-      slide_id: slide.id,
-      material_version_id: session.materialVersionId,
-      kind: "point",
-      coords: { x: question.x, y: question.y },
-      created_by: "user"
-    });
-    if (error) throw error;
-  }
-  const { error } = await client.from("questions").insert({ id: question.id, course_id: session.courseId, lecture_id: session.id, slide_id: slide.id, region_id: regionId, author_id: user.id, is_anonymous: true, category: question.category, marker: question.marker, raw_text: question.text, status: "unanswered", occurred_in: "live" });
-  if (error) throw error;
+  await restRequest(client, `/participant/lectures/${encodeURIComponent(session.id)}/questions`, "POST", {
+    id: question.id, slideId: slide.id, x: question.x, y: question.y,
+    category: question.category, marker: question.marker, text: question.text,
+  });
 }
 
 export async function updateQuestion(questionId: string, values: Pick<Question, "category" | "marker" | "text">) {
   const client = getAudienceSupabaseClient();
   if (!client) return;
   await ensureAnonymousUser();
-  const { data, error } = await client.from("questions")
-    .update({ category: values.category, marker: values.marker, raw_text: values.text, updated_at: new Date().toISOString() })
-    .eq("id", questionId)
-    .eq("status", "unanswered")
-    .select("id")
-    .maybeSingle();
-  if (error) throw error;
-  if (!data) throw new Error("수정할 수 있는 질문을 찾지 못했습니다.");
+  await restRequest(client, `/participant/questions/${encodeURIComponent(questionId)}`, "PATCH", values);
 }
 
 export async function setQuestionReaction(questionId: string, reacted: boolean) {
   const client = getAudienceSupabaseClient();
   if (!client) return;
   await ensureAnonymousUser();
-  const { error } = await client.rpc("set_question_reaction", {
-    target_question_id: questionId,
-    target_reacted: reacted
-  });
-  if (error) throw error;
+  await restRequest(client, `/participant/questions/${encodeURIComponent(questionId)}/reaction`, "PUT", { reacted });
 }
 
 export async function postAnswer(questionId: string, body: string) {
   const client = getSupabaseClient();
   if (!client) return;
-  const user = await requireOwnerUser();
-  const { error } = await client.from("answers").insert({ question_id: questionId, author_id: user.id, body, visibility: "participants" });
-  if (error) throw error;
+  await restRequest(client, `/instructor/questions/${encodeURIComponent(questionId)}/answers`, "POST", { body });
 }
 
 export async function markQuestionResolved(questionId: string) {
   const client = getSupabaseClient();
   if (!client) return;
-  await requireOwnerUser();
-  const { error } = await client.from("questions").update({ status: "resolved", updated_at: new Date().toISOString() }).eq("id", questionId);
-  if (error) throw error;
+  await restRequest(client, `/instructor/questions/${encodeURIComponent(questionId)}/resolved`, "PUT");
 }
 
 export async function updateLecture(sessionId: string, values: {
@@ -703,16 +475,9 @@ export async function updateLecture(sessionId: string, values: {
   presentation_qr_position?: ClassSession["presentationQrPosition"];
   question_categories?: QuestionCategorySettings;
 }) {
-  const client = getOwnerWriteSupabaseClient();
+  const client = getSupabaseClient();
   if (!client) return;
-  // The authenticated request is already checked by the lectures owner RLS policy.
-  // Asking PostgREST for the affected-row count keeps the write to one request
-  // without returning and decoding a row just to detect a missing/denied target.
-  const { count, error } = await client.from("lectures")
-    .update(values, { count: "exact" })
-    .eq("id", sessionId);
-  if (error) throw error;
-  if (count !== 1) throw new Error("저장할 수 있는 강의를 찾지 못했습니다.");
+  await restRequest(client, `/instructor/lectures/${encodeURIComponent(sessionId)}`, "PATCH", values);
 }
 
 export function subscribeToLecture(
@@ -749,19 +514,11 @@ export async function fetchLectureSnapshot(session: ClassSession, asAudience = f
   const client = asAudience ? getAudienceSupabaseClient() : getSupabaseClient();
   if (!client) return null;
   if (asAudience) await ensureAnonymousUser();
-  const { data: lecture, error: lectureError } = await client.from("lectures")
-    .select("current_page, status, presentation_interactions, presentation_autoplay, show_question_pins, show_presentation_qr, presentation_qr_position, question_categories")
-    .eq("id", session.id)
-    .maybeSingle();
-  if (lectureError) throw lectureError;
-  const questionResult = asAudience
-    ? await client.rpc("find_lecture_questions", { target_lecture_id: session.id })
-    : await client.from("questions")
-      .select("id, slide_id, category, marker, raw_text, status, reaction_count, created_at, region_anchors(kind, coords), answers(body, created_at)")
-      .eq("lecture_id", session.id)
-      .order("created_at", { ascending: false });
-  const { data, error } = questionResult;
-  if (error) throw error;
+  const base = `/${asAudience ? "participant" : "instructor"}/lectures/${encodeURIComponent(session.id)}`;
+  const [lecture, data] = await Promise.all([
+    restRequest<LectureRow | null>(client, `${base}/state`),
+    restRequest<QuestionRow[]>(client, `${base}/questions`),
+  ]);
   const questions = toQuestions(
     Array.isArray(data) ? data as unknown as QuestionRow[] : [],
     session.id,

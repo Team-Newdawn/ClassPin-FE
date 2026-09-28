@@ -1,0 +1,14 @@
+{
+  "code": [
+    "app/_service/class-session-service.ts"
+  ],
+  "documents": [
+    "class-frontend-architecture"
+  ],
+  "recorded_at": "2026-09-28T06:23:03+00:00",
+  "requirement_id": "CFA-090",
+  "task_id": "rest-business-api",
+  "tests": [
+    "app/_service/class-session-service.rest.test.ts"
+  ]
+}

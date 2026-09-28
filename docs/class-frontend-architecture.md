@@ -1,7 +1,7 @@
 # Pin Class 프런트엔드 아키텍처 명세
 
 - Artifact: `class-frontend-architecture`
-- Status: `approved`
+- Status: `approved` (2026-09-28 사용자 위임에 따른 Codex 리뷰·승인)
 - Source: `doc/pin_class_prd.md`, `AGENTS.md`, `DESIGN.md`
 - Depends on: 없음
 - Decision boundary: Pin Class의 Model·View·Controller·Service 책임, 객체지향 적용 원칙, route/component CSS 소유권, 전역 상태의 점진 축소, 데이터 로딩·Realtime·성능 기준과 구조 리팩터링 검증
@@ -18,10 +18,10 @@
 
 ## 2. 계층과 의존 방향
 
-- `CFA-010` 의존 방향은 `View -> Controller -> Service -> Supabase client`로 고정한다. Model은 각 계층이 참조할 수 있지만 하위 계층이 View 또는 Controller를 import하지 않는다.
+- `CFA-010` 의존 방향은 `View -> Controller -> Service -> Infrastructure`로 고정한다. 업무 데이터는 REST 연결을, 인증·Storage·Realtime은 Supabase client를 사용한다. Model은 각 계층이 참조할 수 있지만 하위 계층이 View 또는 Controller를 import하지 않는다.
 - `CFA-011` View는 렌더링, semantic HTML, 접근성 속성과 controller가 제공한 상태의 표현만 소유한다. Supabase·Storage 호출, 낙관적 갱신과 복잡한 상태 전이는 View에 두지 않는다.
 - `CFA-012` Controller는 route의 UI 상태, 사용자 이벤트, service 호출, 중복 요청 병합, 최신 응답 우선, 오류 표현과 rollback을 캡슐화한 React hook이다.
-- `CFA-013` Service는 도메인별 함수형 TypeScript 모듈이며 Supabase와 직접 통신한다. React 타입, DOM, 번역 함수와 UI 문구를 참조하지 않는다.
+- `CFA-013` Service는 도메인별 함수형 TypeScript 모듈이며 Infrastructure를 통해 REST 또는 Supabase와 통신한다. React 타입, DOM, 번역 함수와 UI 문구를 참조하지 않는다.
 - `CFA-014` Supabase client·server client 생성, anonymous auth와 토큰 갱신 같은 연결 기반은 `app/_infrastructure/supabase`에 둔다. 도메인 조회·변환·mutation은 `app/_service`가 소유한다.
 - `CFA-015` route 전용 view-model 또는 selector가 두 개 이상이거나 비자명한 변환을 가질 때만 route `model.ts`를 만든다. 재사용 도메인 모델과 순수 로직은 `app/_model`에 둔다.
 
@@ -31,7 +31,8 @@
 View(app/(view)/**/page.tsx, component/)
   -> Controller(controller.ts)
     -> Service(app/_service)
-      -> Supabase client(app/_infrastructure/supabase)
+      -> REST 연결(app/_infrastructure/rest)
+      -> Supabase client(app/_infrastructure/supabase): 인증·Storage·Realtime
   -> Model(route model, app/_model)
 ```
 
@@ -40,7 +41,7 @@ View(app/(view)/**/page.tsx, component/)
 - `CFA-020` Model은 직렬화 가능한 TypeScript DTO와 순수 검증·정규화·집계 함수로 구성한다. Supabase 응답, React state와 localStorage 사이에서 prototype이 필요한 entity class를 사용하지 않는다.
 - `CFA-021` 객체지향성은 책임 캡슐화, 단방향 의존성, 작고 명시적인 public contract, Facade·Adapter·Strategy 패턴으로 적용한다.
 - `CFA-022` 실제 구현이 Supabase mode와 demo mode 두 개인 데이터 경계에만 TypeScript interface를 둔다. 두 구현은 class 상속 대신 같은 contract를 만족하는 함수 또는 객체 모듈로 작성한다.
-- `CFA-023` Supabase adapter는 Postgres·Storage·Realtime을, demo adapter는 localStorage·BroadcastChannel을 캡슐화한다. View는 어떤 adapter가 선택됐는지 알지 못한다.
+- `CFA-023` 연결 모드는 REST 업무 데이터와 Supabase 인증·Storage·Realtime을, demo 모드는 localStorage·BroadcastChannel을 캡슐화한다. 연결 모드의 업무 데이터는 항상 REST를 사용하며 View는 연결 방식을 알지 못한다.
 - `CFA-024` 기존 `SessionStore`는 전환 중 application Facade로 유지한다. 각 route가 controller/service로 이전될 때마다 전역 선로딩, mutation과 public method를 축소한다.
 - `CFA-025` 한 구현만 있는 service에 interface, factory, singleton class를 추가하지 않는다. 두 번째 구현이나 테스트 대역이 실제로 필요해질 때 가장 작은 contract를 도입한다.
 
@@ -58,9 +59,10 @@ app/
   component/               # 여러 페이지가 재사용하는 전역 UI
   _model/                  # 공유 DTO와 순수 도메인 로직
   _controller/             # 전역 provider와 공유 React controller
-  _service/                # Supabase와 직접 통신하는 도메인 service
+  _service/                # REST·Supabase 연결을 사용하는 도메인 service
   _infrastructure/
     supabase/              # Supabase client/server 연결 기반
+    rest/                  # REST 요청·JWT 전달 기반
     server/                # 서버 전용 변환 기반
   api/                     # Next Route Handler
 ```
@@ -114,7 +116,7 @@ app/
 - `CFA-071` 공유 contract package는 `app/_model`, `app/_service`, `app/_infrastructure`와 `app/_controller/session-store.tsx` Facade를 한 소유자가 담당한다. 이 경로를 여러 작업자가 동시에 편집하지 않는다.
 - `CFA-072` 공유 컴포넌트 package와 route package는 contract가 잠긴 뒤 비중첩 경로로 병렬 실행할 수 있다. route package는 dashboard·folder, session·present, join·auth 경계로 나눈다.
 - `CFA-073` `app/globals.css`는 모든 route/component module 이전 후 하나의 integration package만 편집한다. `/pin` 전용 selector 제거도 같은 package가 담당한다.
-- `CFA-074` 임시 호환 import는 같은 run 안에서 제거한다. 새 dependency, migration, 환경변수와 설정 파일은 추가하지 않는다.
+- `CFA-074` 임시 호환 import는 같은 run 안에서 제거한다. 새 dependency와 migration은 추가하지 않는다. REST 전환은 CFA-092에 따른 서버 환경변수와 Route Handler 설정만 허용한다.
 - `CFA-075` 이 구조 변경의 rollback은 package별 Git revert다. DB·Storage 변경이 없으므로 데이터 rollback 절차는 필요하지 않다.
 - `CFA-076` 삭제나 이동 중 승인 문서와 충돌하거나 participant data 경계가 불명확해지면 구현을 중단하고 문서를 다시 승인한다.
 
@@ -140,3 +142,29 @@ app/
 4. 요청 수, Realtime, p95, 접근성, RLS와 speaker note 비공개 기준을 evidence로 검증했다.
 5. `/pin` 제거와 공유 로직 이동은 승인된 `pin-feedback-sunset`과 모순 없이 통합됐다.
 6. Supabase reset, lint, build, targeted tests, browser journey와 Ponytail review가 모두 통과했다.
+
+
+## 11. REST 업무 API 전환 (2026-09-28)
+
+- `CFA-090` 기준은 원격 `origin/feature-dev`다. 기존 UI·모델·controller 공개 함수는 유지하고 현재 service의 업무 데이터 조회·mutation을 OhPin REST API에 연결한다. 전용 API가 없는 기능은 임의로 제거하지 않는다.
+- `CFA-091` Supabase Google OAuth, 강사 세션, 별도 anonymous participant 세션, Storage 원본/슬라이드 업로드·서명 URL, Realtime 구독·반응 broadcast는 유지한다. 프로필 조회만 `/api/me`를 사용하며 Supabase 관리 API와 service-role 키를 브라우저에 추가하지 않는다.
+- `CFA-092` 서버 설정 `REST_API_URL` 하나로 대상 origin을 선택하며 배포 기본값은 `https://ohpinbe.newdawn.co.kr`다. Next.js Route Handler는 고정 `/api/rest/:path*`를 대상의 `/api/:path*`에 연결하며 JWT·Content-Type만 전달하고 브라우저 Origin·쿠키는 전달하지 않는다. 본문과 NDJSON 응답은 스트리밍하고 upstream 장애는 502로 반환한다. 브라우저는 고정된 동일 출처 경로만 사용한다. Supabase 설정 시 모든 업무 CRUD는 REST를 사용하고 자격 증명 없는 demo mode만 기존 localStorage 흐름을 유지한다. REST 오류 시 Supabase 업무 CRUD로 fallback하지 않는다.
+- `CFA-093` 배포 대상은 `https://ohpinbe.newdawn.co.kr`이며 Swagger JSON은 `https://ohpinbe.newdawn.co.kr/v3/api-docs`다. Swagger의 generated HTTP URL을 HTTPS 페이지에서 그대로 사용하지 않는다. 로컬 개발·write 검증은 같은 로컬 Supabase에 연결된 로컬 BE 또는 mock HTTP 서버에서 수행한다. 운영 API에는 승인 없이 검증용 데이터를 쓰지 않는다.
+- `CFA-094` 요청마다 실제 호출자의 현재 Supabase access token을 `Authorization: Bearer`로 전달한다. 강사 API에는 강사 client만, participant API에는 anonymous audience client만 사용한다. JWT 없이 요청하지 않으며 anonymous 토큰으로 강사 API를 호출하지 않는다. 고정 service-role 토큰이나 사용자 입력 upstream URL을 사용하지 않는다.
+- `CFA-095` 폴더 목록·생성·이름변경·삭제, course 목록·이동·삭제, 자료 생성, 강사/participant 슬라이드 조회, 슬라이드 생성(자료 생성 DTO)·삭제·메모, live join/lecture/state, 질문 목록·제출·수정·공감·답변·해결, 참여 경험 응답, source-path 변환·Storage cleanup을 현재 Swagger endpoint에 매핑한다. 요청은 camelCase DTO, 응답은 실제 BE의 snake_case projection을 기존 UI 모델로 변환한다. `purpose`/`purposeLabel`과 `presentation_autoplay`를 보존한다.
+- `CFA-096` `JsonNode` 응답은 Swagger 이름만으로 추정하지 않고 실제 BE controller/repository와 확인한다. 빈 204 응답, 404, 401/403, JSON·텍스트 오류를 처리한다. 낙관적 mutation 실패는 기존 rollback·오류 표시를 유지한다. 자동 mutation 재시도를 추가하지 않는다.
+- `CFA-097` audience 데이터에는 발표 메모·작성자 UUID를 추가하지 않는다. `is_mine`과 공감 desired-state를 기존 contract로 유지한다. 위치·카테고리·작성자 수정권한, owner 접근제어와 강사 전용 메모 경계를 훼손하지 않는다. Realtime 이후 재조회도 같은 REST 경계를 사용한다.
+- `CFA-098` 원본 업로드는 기존 resumable Storage 경로를 유지하고 변환에는 `sourcePath`/`fileName`만 전송한다. 기존 스트리밍 진행률·실패 처리·원본 정리를 보존한다. 삭제 후 Storage cleanup 계약을 실제 BE 응답으로 확인한다.
+- `CFA-099` 구현 완료 조건은 로컬 Supabase 시작·clean migration replay, lint/build, token 분리·요청 DTO·204/오류 처리·participant 메모 비노출에 대한 작은 runnable check, 로컬 BE 또는 mock을 통한 proxy/변환 스트림 검증, 기존 핵심 브라우저 흐름과 최종 Ponytail review다. 운영 로그인·실데이터 검증이 없으면 production-ready라고 주장하지 않는다.
+
+### 구현·검증 경계
+
+| 요구사항 | 예상 코드 경계 | 검증 |
+| --- | --- | --- |
+| CFA-090, CFA-095, CFA-097 | `app/_service/class-session-service.ts`, 기존 session store/model | folder/session/question endpoint·DTO, participant projection |
+| CFA-091, CFA-094 | `app/_infrastructure/rest`, `app/_infrastructure/supabase/client.ts`, auth/experience service | owner/anonymous token 분리, profile·experience 호출 |
+| CFA-092, CFA-093, CFA-096 | `app/api/rest/[...path]/route.ts`, REST 요청 기반, README/env 예시 | local upstream proxy, 204·401/403·404·텍스트 오류 |
+| CFA-098 | `app/_service/convert.ts`, 기존 Storage 업로드 경계 | sourcePath-only 요청, stream·cleanup |
+| CFA-099 | 기존 model tests, REST targeted check, 로컬 runtime | migration replay, lint/build, browser, Ponytail review |
+
+2026-09-28 사전 확인: FE `origin/feature-dev`와 현재 HEAD는 `e00739a`, BE `main`은 `86b65be858d1892d11da0f9d300240b6d25e2e71`다. 배포 OpenAPI는 29 operation을 제공하며 폴더 목적 DTO를 포함한다. BE source는 폴더 목적 projection과 자동재생 projection/PATCH를 포함한다. 배포 API의 무인증 강사·participant 요청은 각각 401이고 localhost 직접 preflight는 403이다. 이 결과는 인증된 end-to-end 검증을 대신하지 않는다.

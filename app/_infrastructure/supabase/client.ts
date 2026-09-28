@@ -1,15 +1,14 @@
 import { createClient, type SupabaseClient, type User } from "@supabase/supabase-js";
 import type { Profile } from "@/app/_model/types";
+import { restRequest } from "@/app/_infrastructure/rest/request";
 import { fetchWithAbortedTransactionRetry } from "./fetch-retry";
 
 let browserClient: SupabaseClient | null = null;
-let ownerWriteClient: SupabaseClient | null = null;
 let audienceClient: SupabaseClient | null = null;
 let anonymousSignInPromise: ReturnType<SupabaseClient["auth"]["signInAnonymously"]> | null = null;
-let ownerAccessToken: string | null = null;
 
 export const supabaseConfigured = Boolean(
-  process.env.NEXT_PUBLIC_DATA_MODE === "supabase" &&
+  (process.env.NEXT_PUBLIC_DATA_MODE === "rest" || process.env.NEXT_PUBLIC_DATA_MODE === "supabase") &&
   process.env.NEXT_PUBLIC_SUPABASE_URL &&
   process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY
 );
@@ -28,27 +27,6 @@ export function getSupabaseClient() {
     );
   }
   return browserClient;
-}
-
-/** 인증 이벤트가 전달한 최신 토큰을 hot-path 쓰기에서 auth lock 없이 재사용한다. */
-export function setOwnerAccessToken(accessToken: string | null) {
-  ownerAccessToken = accessToken;
-}
-
-/** 강의 토글처럼 짧은 쓰기는 메모리 토큰을 써서 매 요청의 getSession lock을 피한다. */
-export function getOwnerWriteSupabaseClient() {
-  if (!supabaseConfigured) return null;
-  if (!ownerWriteClient) {
-    ownerWriteClient = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!,
-      {
-        accessToken: async () => ownerAccessToken,
-        global: { fetch: fetchWithAbortedTransactionRetry }
-      }
-    );
-  }
-  return ownerWriteClient;
 }
 
 /**
@@ -115,12 +93,8 @@ export async function signOutUser() {
 export async function fetchOwnProfile(userId: string): Promise<Profile | null> {
   const client = getSupabaseClient();
   if (!client) return null;
-  const { data, error } = await client.from("profiles")
-    .select("id, role, email, display_name, avatar_url")
-    .eq("id", userId)
-    .maybeSingle();
-  if (error) throw error;
-  if (!data) return null;
+  const data = await restRequest<{ id: string; role: Profile["role"]; email: string; display_name: string; avatar_url: string } | null>(client, "/me");
+  if (!data || data.id !== userId) return null;
   return { id: data.id, role: data.role, email: data.email, displayName: data.display_name, avatarUrl: data.avatar_url };
 }
 

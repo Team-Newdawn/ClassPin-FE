@@ -123,7 +123,7 @@ export async function convertToSlides(file: File, callbacks?: ConvertCallbacks):
 
     const converted = await new Promise<Slide[]>((resolve, reject) => {
       const xhr = new XMLHttpRequest();
-      xhr.open("POST", "/api/convert");
+      xhr.open("POST", auth ? "/api/rest/convert" : "/api/convert");
       if (auth) {
         xhr.setRequestHeader("Authorization", `Bearer ${auth.accessToken}`);
         xhr.setRequestHeader("Content-Type", "application/json");

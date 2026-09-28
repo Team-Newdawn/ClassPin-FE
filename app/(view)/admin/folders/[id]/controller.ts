@@ -76,7 +76,7 @@ export function useFolderController() {
       setDeleteTarget(null);
     } catch (error) {
       console.error("Class material deletion failed", error);
-      setDeleteError(t("materials.deleteError"));
+      setDeleteError(error instanceof Error ? error.message : t("materials.deleteError"));
     } finally {
       setDeletingSession(false);
     }

@@ -70,9 +70,9 @@
     },
     {
       "approval": {
-        "approved_at": "2026-08-29T13:01:00+00:00",
-        "approved_by": "minchan_CTO",
-        "content_sha256": "96aa1f117d7db96f1b08dfc4aea6ffc1ad43be22000538fddcc72fdc35a05272"
+        "approved_at": "2026-09-28T06:31:03+00:00",
+        "approved_by": "Codex (minchanpark delegated document review and approval, 2026-09-28)",
+        "content_sha256": "8054fb943fcbd3c2107789e6364059acd0fd2bba3e5ce140a9a54ab9c9710964"
       },
       "depends_on": [],
       "id": "class-frontend-architecture",
@@ -90,8 +90,8 @@
     },
     {
       "approval": {
-        "approved_at": "2026-08-29T13:18:00+00:00",
-        "approved_by": "minchan_CTO",
+        "approved_at": "2026-09-28T06:31:03+00:00",
+        "approved_by": "Codex (minchanpark delegated document review and approval, 2026-09-28)",
         "content_sha256": "7a77fb99b56c0a97912dcebc1969ee2756a95f94048000970159da5b316f18c1"
       },
       "depends_on": [
@@ -111,8 +111,8 @@
     },
     {
       "approval": {
-        "approved_at": "2026-09-01T06:50:03+00:00",
-        "approved_by": "minchan_CTO",
+        "approved_at": "2026-09-28T06:31:03+00:00",
+        "approved_by": "Codex (minchanpark delegated document review and approval, 2026-09-28)",
         "content_sha256": "0edec27f023a0bc0ac8ad9e1567b089372781f3a6b6b93391a51aa35ce4a3e83"
       },
       "depends_on": [

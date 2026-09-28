@@ -315,7 +315,7 @@ export function useSessionAdminController() {
       setDeleteSlideId(null);
     } catch (error) {
       console.error(`Slide deletion failed: ${errorDetail(error)}`, error);
-      setDeleteSlideError(t("session.deleteSlideError"));
+      setDeleteSlideError(error instanceof Error ? error.message : t("session.deleteSlideError"));
     } finally {
       setDeletingSlide(false);
     }

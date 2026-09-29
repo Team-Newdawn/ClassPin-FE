@@ -1,0 +1,122 @@
+name: Deploy OhPin frontend to EC2
+
+on:
+  push:
+    branches: [dev]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ohpin-fe-production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    if: github.ref == 'refs/heads/dev'
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    defaults:
+      run:
+        shell: bash
+    env:
+      EC2_HOST: ${{ secrets.EC2_HOST }}
+      EC2_USER: ${{ secrets.EC2_USER }}
+      RELEASE_TAG: ${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Prepare environment files
+        env:
+          ENV_FILE: ${{ secrets.ENV_FILE }}
+        run: |
+          set -euo pipefail
+          node scripts/prepare-ec2-env.mjs "$RUNNER_TEMP/ohpin"
+      - name: Set up pinned SSH connection and check EC2
+        id: server
+        env:
+          EC2_SSH_KEY: ${{ secrets.EC2_SSH_KEY }}
+          EC2_KNOWN_HOSTS: ${{ secrets.EC2_KNOWN_HOSTS }}
+        run: |
+          set -euo pipefail
+          umask 077
+          for name in EC2_HOST EC2_USER EC2_SSH_KEY EC2_KNOWN_HOSTS; do
+            if [[ -z "${!name:-}" ]]; then
+              echo "::error::Missing required GitHub Actions secret: $name. Add it in repository Settings > Secrets and variables > Actions > Repository secrets."
+              exit 1
+            fi
+          done
+          if [[ ! "$EC2_HOST" =~ ^[a-zA-Z0-9][a-zA-Z0-9.-]*$ ]]; then
+            echo "::error::EC2_HOST must be a hostname or IPv4 address without a scheme or port."
+            exit 1
+          fi
+          if [[ ! "$EC2_USER" =~ ^[a-z_][a-z0-9_-]*$ ]]; then
+            echo "::error::EC2_USER must be a Linux username such as ec2-user."
+            exit 1
+          fi
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$EC2_SSH_KEY" > ~/.ssh/ohpin_key
+          chmod 600 ~/.ssh/ohpin_key
+          printf '%s\n' "$EC2_KNOWN_HOSTS" > ~/.ssh/ohpin_known_hosts
+          chmod 600 ~/.ssh/ohpin_known_hosts
+          if ! ssh-keygen -F "$EC2_HOST" -f ~/.ssh/ohpin_known_hosts >/dev/null; then
+            echo "::error::EC2_KNOWN_HOSTS has no entry for EC2_HOST. Its first field must exactly match the EC2_HOST secret, followed by a space and the SSH public host key."
+            exit 1
+          fi
+          cat > ~/.ssh/config <<CONFIG
+          Host ohpin-deploy
+            HostName $EC2_HOST
+            User $EC2_USER
+            IdentityFile ~/.ssh/ohpin_key
+            UserKnownHostsFile ~/.ssh/ohpin_known_hosts
+            StrictHostKeyChecking yes
+            IdentitiesOnly yes
+            BatchMode yes
+            ConnectTimeout 15
+            ServerAliveInterval 15
+            ServerAliveCountMax 8
+          CONFIG
+          arch="$(ssh ohpin-deploy 'set -eu; docker info >/dev/null; command -v curl >/dev/null; command -v flock >/dev/null; command -v gzip >/dev/null; uname -m')"
+          case "$arch" in
+            x86_64) platform=linux/amd64 ;;
+            aarch64|arm64) platform=linux/arm64 ;;
+            *) echo 'Unsupported EC2 architecture' >&2; exit 1 ;;
+          esac
+          echo "platform=$platform" >> "$GITHUB_OUTPUT"
+      - uses: docker/setup-qemu-action@v3
+      - uses: docker/setup-buildx-action@v3
+      - name: Build and export image
+        env:
+          PLATFORM: ${{ steps.server.outputs.platform }}
+        run: |
+          set -euo pipefail
+          build_args=()
+          while IFS='=' read -r name value; do
+            build_args+=(--build-arg "$name=$value")
+          done < "$RUNNER_TEMP/ohpin/public.env"
+          docker buildx build --platform "$PLATFORM" \
+            "${build_args[@]}" --tag "ohpin-fe:$RELEASE_TAG" \
+            --output "type=docker,dest=$RUNNER_TEMP/ohpin/image.tar" .
+          gzip "$RUNNER_TEMP/ohpin/image.tar"
+      - name: Transfer and deploy
+        run: |
+          set -euo pipefail
+          remote_dir="ohpin-fe/releases/$RELEASE_TAG"
+          ssh ohpin-deploy "umask 077; mkdir -p '$remote_dir'"
+          scp "$RUNNER_TEMP/ohpin/image.tar.gz" "$RUNNER_TEMP/ohpin/runtime.env" \
+            scripts/deploy-ec2.sh "ohpin-deploy:$remote_dir/"
+          ssh ohpin-deploy "bash '$remote_dir/deploy-ec2.sh' '$remote_dir' '$RELEASE_TAG'"
+      - name: Clean up temporary secrets and archive
+        if: always()
+        run: |
+          set -euo pipefail
+          if [[ -f ~/.ssh/ohpin_key && -f ~/.ssh/config ]]; then
+            ssh ohpin-deploy "rm -f 'ohpin-fe/releases/$RELEASE_TAG/runtime.env' 'ohpin-fe/releases/$RELEASE_TAG/image.tar.gz'" || true
+          fi
+          rm -rf "$RUNNER_TEMP/ohpin"
+          rm -f ~/.ssh/ohpin_key ~/.ssh/ohpin_known_hosts ~/.ssh/config

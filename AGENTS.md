@@ -125,6 +125,9 @@ flow unless a task explicitly spans both products.
 - Keep the stage toolbar at a stable minimum height while the question panel is
   resized; above the stacked breakpoint preserve at least 400px for the stage, and
   truncate its title/sync copy before allowing it to overlap the actions or canvas.
+- The participant `/join` view always follows the instructor's current slide and
+  offers no participant slide navigation. Pinch/ctrl+wheel zoom enlarges only the
+  slide image inside its frame, never the page.
 - Do not restore the text-slide creator. Existing image slide append/delete behavior
   remains supported.
 - Preserve accessible names, focus-visible behavior, semantic tabs/switches, and

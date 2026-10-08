@@ -5,7 +5,7 @@ import Image from "next/image";
 import Link from "next/link";
 import selectedPinIcon from "@/assets/icons/pin_icon.svg";
 import unselectedPinIcon from "@/assets/icons/pin_black_icon.svg";
-import { Check, ChevronLeft, ChevronRight, MapPin, Send, Smile, Trash2, X } from "@/app/component/icons";
+import { Check, MapPin, Send, Smile, Trash2, X } from "@/app/component/icons";
 import { LanguageSwitcher } from "@/app/component/language-switcher";
 import { LoadingScreen } from "@/app/component/loading-screen";
 import { PinLogo } from "@/app/component/pin-logo";
@@ -13,7 +13,7 @@ import { SlideCanvas } from "@/app/component/slide-canvas";
 import { StatusBadge } from "@/app/component/status-badge";
 import { LECTURE_REACTION_EMOJIS } from "@/app/_model/lecture-reactions";
 import { QUESTION_MARKERS, questionMarkerEmoji } from "@/app/_model/types";
-import { useJoinSessionController } from "./controller";
+import { attachSlideZoom, useJoinSessionController } from "./controller";
 import styles from "./page.module.css";
 
 export default function JoinSession() {
@@ -24,14 +24,14 @@ export default function JoinSession() {
   if (controller.state === "ended") return <div className={`${styles.root} student-empty`}><PinLogo /><LanguageSwitcher /><h1>{controller.t("student.sessionEndedTitle")}</h1><p>{controller.t("student.sessionEndedDescription")}</p><Link className="btn primary" href={controller.finalHref}>{controller.t("experience.complete")}</Link></div>;
 
   const {
-    t, timeAgo, finalHref, session, liveReactions, activeTool, slideIndex, current, slide,
+    t, timeAgo, finalHref, session, liveReactions, activeTool, current, slide,
     draftQuestion, draftText, editingQuestionId, viewingQuestion, submitted, submitting,
     submitError, composerOpen, selectedQuestionId, questionSort, slideQuestions, submittedQuestions, visibleQuestionIds,
     pendingReactionIds, reactionError, emojiError, categoryOptions, activeCategory, activeMarker,
-    categoryLabel, categoryClass, markerLabel, handleSlideWheel, placeDraftTag,
+    categoryLabel, categoryClass, markerLabel, placeDraftTag,
     selectCategory, selectMarker, startEditingQuestion, updateDraftText, startMovingDraftTag, moveDraftTag,
     finishMovingDraftTag, openDraftComposer, submit, closeComposer,
-    deleteDraftQuestion, selectTool, changeSlide, syncToLiveSlide, selectQuestionSort, toggleQuestionReaction,
+    deleteDraftQuestion, selectTool, selectQuestionSort, toggleQuestionReaction,
     sendEmojiReaction
   } = controller;
 
@@ -41,9 +41,9 @@ export default function JoinSession() {
         <div><b>{session.title}<em>LIVE</em></b><span>{t("student.feedbackGuide")}</span></div>
         <div className="student-header-actions"><Link className="student-complete-button" href={finalHref}>{t("experience.complete")}</Link><LanguageSwitcher /></div>
       </div>
-      <section className="student-stage" aria-label={t("student.slideAria", { title: session.title })} onWheel={handleSlideWheel}>
+      <section className="student-stage" aria-label={t("student.slideAria", { title: session.title })}>
         <div className="student-image-stage">
-          <div className="student-image-viewport">
+          <div className="student-image-viewport" ref={attachSlideZoom}>
             <div className={`student-canvas lecture-fit tool-${activeTool}`} style={{ "--student-image-width": "min(100%, calc((100dvh - 180px) * 16 / 9))" } as CSSProperties}>
               <SlideCanvas
                 slide={slide}
@@ -75,10 +75,8 @@ export default function JoinSession() {
             </div>
           </div>
           <div className="participant-controls">
-            <div className="participant-page-navigation participant-pages" aria-label={t("student.chooseQuestionSlide")}>
-              <button type="button" disabled={current === 0} onClick={() => changeSlide(current - 1)} aria-label={t("session.previousSlide")}><ChevronLeft /></button>
+            <div className="participant-page-navigation participant-pages">
               <span>{current + 1} / {session.slides.length}</span>
-              <button type="button" disabled={current === session.slides.length - 1} onClick={() => changeSlide(current + 1)} aria-label={t("session.nextSlide")}><ChevronRight /></button>
             </div>
             <div className="participant-reaction-tools">
               {activeTool === "emoji" && <div className="student-emoji-picker participant-emoji-picker" role="group" aria-label={t("student.chooseEmoji")}>
@@ -91,7 +89,6 @@ export default function JoinSession() {
               {emojiError && <span className="participant-reaction-error" role="alert">{emojiError}</span>}
             </div>
           </div>
-          {slideIndex !== null && <button className="student-sync-button" onClick={syncToLiveSlide}>{t("student.currentSlide")}</button>}
         </div>
         <section className="student-feedback-panel" aria-labelledby="student-feedback-title">
           <header className="student-feedback-head">

@@ -91,11 +91,13 @@ test("business services use REST DTOs, preserve settings, and strip participant 
     await service.postAnswer("question", "Answer");
     await service.markQuestionResolved("question");
     await service.persistSession({ ...session, presentationAutoplay: false }, "owner/source.pptx");
-    const material = requests.at(-1)?.body;
+    const material = requests.at(-2)?.body;
+    assert.equal(material?.status, "before");
+    assert.deepEqual(requests.at(-1)?.body, { status: "live" });
     assert.equal(material?.sourcePath, "owner/source.pptx");
     assert.deepEqual(material?.slides, [{ id: "slide", pageIndex: 0, imagePath: "owner/slide.jpg", sourcePageIndex: null }]);
     await service.persistSession(session, "owner/source.pptx");
-    assert.deepEqual(requests.at(-1)?.body, { presentation_autoplay: true });
+    assert.deepEqual(requests.at(-1)?.body, { status: "live", presentation_autoplay: true });
     await service.submitLectureExperienceResponse("PIN123", "Helpful", "More examples");
     assert.deepEqual(requests.at(-1)?.body, { code: "PIN123", experience: "Helpful", improvement: "More examples" });
     assert.equal((await service.deleteClassSession("course")).cleanupPending, true);

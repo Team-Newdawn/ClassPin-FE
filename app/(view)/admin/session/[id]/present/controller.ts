@@ -24,7 +24,7 @@ export function useSessionPresentationController() {
   const { isAdmin } = useAuth();
   const params = useParams<{ id: string }>();
   const router = useRouter();
-  const { sessions, ready: storeReady, loadSessionById, setActiveSession, setCurrentSlide } = useSessions();
+  const { sessions, ready: storeReady, loadSessionById, setActiveSession, setCurrentSlide, notifyQuestionsChanged } = useSessions();
   const session = sessions.find((item) => item.id === params.id);
   const [lookupDone, setLookupDone] = useState(false);
   const ready = storeReady && (Boolean(session) || lookupDone);
@@ -40,7 +40,7 @@ export function useSessionPresentationController() {
   }
   const showQuestionPins = session?.showQuestionPins ?? false;
   const presentationAutoplay = session?.presentationAutoplay ?? false;
-  const { reactions: liveReactions } = useLectureReactions(sessionId);
+  const { reactions: liveReactions } = useLectureReactions(sessionId, notifyQuestionsChanged);
   const sessionTitle = session?.title;
   const currentSlide = canControl ? syncedSlide ?? 0 : audienceView.currentSlide;
   const slideCount = session?.slides.length ?? 0;

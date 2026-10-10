@@ -24,13 +24,18 @@ export function useRealtimeReactions<Emoji extends string>({
   topic,
   event,
   allowedEmojis,
-  errorLabel
+  errorLabel,
+  signalEvent,
+  onSignal
 }: {
   scopeId: string | null;
   topic: string | null;
   event: string;
   allowedEmojis: readonly Emoji[];
   errorLabel: string;
+  /** 같은 토픽의 다른 이벤트를 재조회 신호로 받을 때. 두 값 모두 안정적인 참조여야 한다. */
+  signalEvent?: string;
+  onSignal?: (scopeId: string) => void;
 }) {
   const [reactions, setReactions] = useState<LiveReaction<Emoji>[]>([]);
   const laneReadyAtRef = useRef<number[]>(REALTIME_REACTION_LANES.map(() => 0));
@@ -81,7 +86,8 @@ export function useRealtimeReactions<Emoji extends string>({
         const reaction = parseRealtimeReaction(payload, allowedEmojis);
         if (reaction) addReaction(reaction);
       },
-      (error) => console.error(`${errorLabel} channel failed`, error)
+      (error) => console.error(`${errorLabel} channel failed`, error),
+      signalEvent && onSignal ? { event: signalEvent, handler: () => { if (active) onSignal(scopeId); } } : undefined
     ).then((close) => {
       if (active) unsubscribe = close;
       else close();
@@ -92,7 +98,7 @@ export function useRealtimeReactions<Emoji extends string>({
       timers.clear();
       unsubscribe?.();
     };
-  }, [addReaction, allowedEmojis, errorLabel, event, scopeId, topic]);
+  }, [addReaction, allowedEmojis, errorLabel, event, onSignal, scopeId, signalEvent, topic]);
 
   return {
     reactions: reactions.filter((reaction) => reaction.scopeId === scopeId),

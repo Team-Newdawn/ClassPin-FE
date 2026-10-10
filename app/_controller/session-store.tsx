@@ -6,6 +6,9 @@ import { defaultQuestionCategorySettings, isParticipantPointAnchor, normalizeCla
 import { withQuestionReaction } from "@/app/_model/question-reactions";
 import { normalizeSessions, serializeSessionsForFailureCache } from "@/app/_model/class/session";
 import { classSessionPersistenceEnabled, createClassFolder as persistClassFolder, deleteClassFolder as persistClassFolderDeletion, deleteClassSession as persistSessionDeletion, deleteSessionSlide, fetchLectureSnapshot, fetchLiveSession, fetchLiveSessionById, fetchOwnedClassFolders, fetchOwnedSessions, fetchSessionSlides, markQuestionResolved, moveSessionToFolder as persistSessionFolder, persistSession, postAnswer, renameClassFolder as persistClassFolderName, saveSlideInstructorNote, setQuestionReaction as persistQuestionReaction, submitQuestion, subscribeToLecture, updateLecture, updateQuestion as persistQuestionUpdate, type LectureRealtimeRow } from "@/app/_service/class-session-service";
+import { coalesceRefresh } from "@/app/_model/class/live-refresh";
+import { LECTURE_QUESTIONS_CHANGED_EVENT, lectureReactionTopic } from "@/app/_model/lecture-reactions";
+import { publishRealtimeReaction } from "@/app/_service/realtime-reaction-service";
 
 const STORAGE_KEY = "pin-class-sessions-v1";
 const FOLDER_STORAGE_KEY = "pin-class-folders-v1";
@@ -40,6 +43,8 @@ type Store = {
   loadSessionByCode: (code: string) => Promise<ClassSession | null>;
   loadSessionById: (sessionId: string) => Promise<ClassSession | null>;
   setActiveSession: (sessionId: string | null) => void;
+  /** 다른 참여자의 질문 변경 broadcast 를 받았을 때 활성 세션의 질문 목록 재조회를 예약한다. */
+  notifyQuestionsChanged: (sessionId: string) => void;
 };
 
 const SessionContext = createContext<Store | null>(null);
@@ -47,7 +52,9 @@ const SessionContext = createContext<Store | null>(null);
 const makeCode = () => `PIN${crypto.randomUUID().replaceAll("-", "").slice(0, 6).toUpperCase()}`;
 const cacheKey = (userId: string) => `${SUPABASE_CACHE_PREFIX}:${userId}`;
 const folderCacheKey = (userId: string) => `${SUPABASE_FOLDER_CACHE_PREFIX}:${userId}`;
-const PARTICIPANT_STATUS_POLL_MS = 5_000;
+const PARTICIPANT_STATUS_POLL_MS = 30_000;
+const REALTIME_FALLBACK_POLL_MS = 5_000;
+const BROADCAST_REFRESH_SPREAD_MS = 10_000;
 type LectureSettingPatch = Partial<Pick<ClassSession,
   "status" | "presentationAutoplay" | "showQuestionPins" | "showPresentationQr" | "presentationQrPosition"
 >>;
@@ -95,6 +102,7 @@ export function SessionStore({ children }: { children: React.ReactNode }) {
   const slideTargets = useRef(new Map<string, number>());
   const lectureSettingTargets = useRef(new Map<string, LectureSettingPatch>());
   const refreshSequences = useRef(new Map<string, number>());
+  const refreshTriggers = useRef(new Map<string, () => void>());
   const slideRefreshSequences = useRef(new Map<string, number>());
   const ownerId = useRef<string | null>(null);
   const demoChannelRef = useRef<BroadcastChannel | null>(null);
@@ -173,12 +181,13 @@ export function SessionStore({ children }: { children: React.ReactNode }) {
     let active = true;
     let statusPoll: ReturnType<typeof setInterval> | null = null;
     const unsubscribe: Array<() => void> = [];
-    const refresh = async (session: ClassSession) => {
+    const triggers = refreshTriggers.current;
+    const refresh = async (session: ClassSession, full = true) => {
       const refreshSequence = (refreshSequences.current.get(session.id) ?? 0) + 1;
       refreshSequences.current.set(session.id, refreshSequence);
       try {
         const latestSession = sessionsByIdRef.current.get(session.id) ?? session;
-        const snapshot = await fetchLectureSnapshot(latestSession, asAudience);
+        const snapshot = await fetchLectureSnapshot(latestSession, asAudience, !full);
         if (!active || !snapshot || refreshSequences.current.get(session.id) !== refreshSequence) return;
         setSessions((current) => current.map((item) => {
           if (item.id !== session.id) return item;
@@ -192,27 +201,13 @@ export function SessionStore({ children }: { children: React.ReactNode }) {
             // 되돌리지 못하게 한다. 청중은 계속 서버 페이지를 그대로 따른다.
             currentSlide: !asAudience && localTarget !== undefined
               ? item.currentSlide
-              : snapshot.currentSlide
+              : snapshot.currentSlide ?? item.currentSlide
           };
         }));
       } catch (error) { console.error("Supabase realtime refresh failed", error); }
     };
     // 응답이 늦어도 요청이 쌓이지 않도록 재조회는 하나만 실행하고, 그동안 온 요청은 한 번으로 합친다.
-    let refreshing = false;
-    let refreshAgain = false;
-    const requestRefresh = () => {
-      if (refreshing) {
-        refreshAgain = true;
-        return;
-      }
-      refreshing = true;
-      void refresh(tracked).finally(() => {
-        refreshing = false;
-        if (!active || !refreshAgain) return;
-        refreshAgain = false;
-        requestRefresh();
-      });
-    };
+    const requestRefresh = coalesceRefresh((full) => active ? refresh(tracked, full) : Promise.resolve());
     const applyLectureUpdate = (session: ClassSession, lecture: LectureRealtimeRow) => {
       if (!active) return;
       setSessions((current) => current.map((item) => item.id === session.id ? {
@@ -238,15 +233,28 @@ export function SessionStore({ children }: { children: React.ReactNode }) {
         setSessions((current) => current.map((item) => item.id === session.id ? { ...item, slides } : item));
       } catch (error) { console.error("Supabase slide refresh failed", error); }
     };
+    const startPoll = (ms: number) => {
+      if (statusPoll) clearInterval(statusPoll);
+      // 화면이 꺼진 폰은 쉬고, 다시 켜질 때 한 번에 따라잡는다.
+      statusPoll = setInterval(() => { if (document.visibilityState !== "hidden") requestRefresh(true); }, ms);
+    };
+    const onVisibilityChange = () => { if (document.visibilityState === "visible") requestRefresh(true); };
     const connect = () => {
       try {
         const stop = subscribeToLecture(
           tracked.id,
           tracked.materialVersionId,
-          requestRefresh,
+          () => requestRefresh(true),
           (lecture) => applyLectureUpdate(tracked, lecture),
           () => void refreshSlides(tracked),
-          asAudience
+          asAudience,
+          // Realtime 연결 한도에 걸리거나 끊기면 폴링으로 따라가고, 다시 붙으면 평소대로 돌아간다.
+          (connected) => {
+            if (!active) return;
+            if (!connected) startPoll(REALTIME_FALLBACK_POLL_MS);
+            else if (asAudience) startPoll(PARTICIPANT_STATUS_POLL_MS);
+            else if (statusPoll) { clearInterval(statusPoll); statusPoll = null; }
+          }
         );
         if (stop) unsubscribe.push(stop);
       } catch (error) { console.error("Supabase authentication failed", error); }
@@ -254,15 +262,23 @@ export function SessionStore({ children }: { children: React.ReactNode }) {
     // fetchOwnedSessions/fetchLiveSession already returned an authoritative snapshot.
     // Re-fetching every lecture here caused O(lecture count) duplicate REST traffic.
     connect();
+    document.addEventListener("visibilitychange", onVisibilityChange);
+    let broadcastRefresh: ReturnType<typeof setTimeout> | null = null;
     if (asAudience) {
-      statusPoll = setInterval(() => {
-        // 다른 작성자의 questions 행은 RLS 때문에 Postgres Changes 이벤트가 오지
-        // 않을 수 있다. 공개 RPC 스냅샷으로 공감 순서와 종료 상태를 함께 보정한다.
-        requestRefresh();
-      }, PARTICIPANT_STATUS_POLL_MS);
+      // 다른 작성자의 questions 행은 RLS 때문에 Postgres Changes 이벤트가 오지 않는다.
+      // 제출자가 보낸 broadcast 를 받으면 모두가 같은 순간 몰리지 않도록 0~10초 안에 질문만 다시 읽고,
+      // 느린 폴링이 공감 순서·종료 상태·놓친 신호를 보정한다. 창당 예약은 하나라 신호 스팸이 요청을 늘리지 못한다.
+      startPoll(PARTICIPANT_STATUS_POLL_MS);
+      triggers.set(tracked.id, () => {
+        if (broadcastRefresh) return;
+        broadcastRefresh = setTimeout(() => { broadcastRefresh = null; requestRefresh(false); }, Math.random() * BROADCAST_REFRESH_SPREAD_MS);
+      });
     }
     return () => {
       active = false;
+      triggers.delete(tracked.id);
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+      if (broadcastRefresh) clearTimeout(broadcastRefresh);
       if (statusPoll) clearInterval(statusPoll);
       unsubscribe.forEach((stop) => stop());
     };
@@ -368,6 +384,8 @@ export function SessionStore({ children }: { children: React.ReactNode }) {
     }
   }, [updateSession]);
 
+  const notifyQuestionsChanged = useCallback((sessionId: string) => refreshTriggers.current.get(sessionId)?.(), []);
+
   const loadLiveSession = useCallback((
     key: string,
     existing: ClassSession | undefined,
@@ -471,7 +489,12 @@ export function SessionStore({ children }: { children: React.ReactNode }) {
         reactedByMe: false,
         createdAt: new Date().toISOString()
       };
-      if (classSessionPersistenceEnabled) await submitQuestion(session, question);
+      if (classSessionPersistenceEnabled) {
+        await submitQuestion(session, question);
+        // 다른 참여자는 RLS 때문에 이 질문의 DB 이벤트를 받지 못하므로 목록을 다시 읽으라고 알린다. 실패해도 보정 폴링이 따라잡는다.
+        void publishRealtimeReaction(lectureReactionTopic(sessionId), LECTURE_QUESTIONS_CHANGED_EVENT, {})
+          .catch((error) => console.error("Question change broadcast failed", error));
+      }
       updateSession(sessionId, (current) => ({
         ...current,
         questions: current.questions.some((item) => item.id === question.id)
@@ -597,6 +620,7 @@ export function SessionStore({ children }: { children: React.ReactNode }) {
       }));
     },
     setActiveSession: setActiveSessionId,
+    notifyQuestionsChanged,
     loadSessionByCode: (code) => loadLiveSession(
       `code:${code.toLowerCase()}`,
       sessionsByCode.get(code.toLowerCase()),
@@ -607,7 +631,7 @@ export function SessionStore({ children }: { children: React.ReactNode }) {
       sessionsById.get(sessionId),
       () => fetchLiveSessionById(sessionId)
     )
-  }), [createFolder, createSession, folders, foldersById, loadLiveSession, ready, saveLectureSettings, sessions, sessionsByCode, sessionsById, updateSession]);
+  }), [createFolder, createSession, folders, foldersById, loadLiveSession, notifyQuestionsChanged, ready, saveLectureSettings, sessions, sessionsByCode, sessionsById, updateSession]);
 
   return <SessionContext.Provider value={value}>{children}</SessionContext.Provider>;
 }

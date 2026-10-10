@@ -22,14 +22,15 @@ type DraftQuestion = {
   text: string;
 };
 const EMPTY_QUESTIONS: Question[] = [];
+const JOIN_RETRY_LIMIT = 5;
 
 export function useJoinSessionController() {
   const { t, categoryLabel: defaultCategoryLabel, timeAgo } = useLanguage();
   const params = useParams<{ code: string }>();
   const finalHref = `/join/${encodeURIComponent(params.code)}/final`;
-  const { sessions, ready, addQuestion, updateQuestion, reactToQuestion, loadSessionByCode, setActiveSession } = useSessions();
+  const { sessions, ready, addQuestion, updateQuestion, reactToQuestion, loadSessionByCode, setActiveSession, notifyQuestionsChanged } = useSessions();
   const session = useMemo(() => sessions.find((item) => item.code.toLowerCase() === params.code.toLowerCase()), [params.code, sessions]);
-  const { reactions: liveReactions, addReaction } = useLectureReactions(session?.id ?? null);
+  const { reactions: liveReactions, addReaction } = useLectureReactions(session?.id ?? null, notifyQuestionsChanged);
   const [activeTool, setActiveTool] = useState<StudentTool>("pin");
   const [draftQuestions, setDraftQuestions] = useState<Record<string, DraftQuestion>>({});
   const [editingQuestionId, setEditingQuestionId] = useState<string | null>(null);
@@ -40,6 +41,7 @@ export function useJoinSessionController() {
   const [composerOpen, setComposerOpen] = useState(false);
   const [lookupDone, setLookupDone] = useState(false);
   const [lookupFailed, setLookupFailed] = useState(false);
+  const [lookupAttempt, setLookupAttempt] = useState(0);
   const [selectedQuestionId, setSelectedQuestionId] = useState<string | null>(null);
   const [questionSort, setQuestionSort] = useState<QuestionSort>("empathy");
   const [pendingReactionIds, setPendingReactionIds] = useState<Set<string>>(new Set());
@@ -50,14 +52,24 @@ export function useJoinSessionController() {
 
   useEffect(() => {
     if (!ready || lookupDone || session) return;
+    let retry: ReturnType<typeof setTimeout> | undefined;
     void loadSessionByCode(params.code)
-      .then(() => setLookupFailed(false))
+      .then(() => {
+        setLookupFailed(false);
+        setLookupDone(true);
+      })
       .catch((error) => {
         console.error("Live session lookup failed", error);
+        // 입장이 몰려 서버가 잠시 밀릴 때 모두가 같은 순간 다시 두드리지 않도록 사람마다 다른 시간을 기다린다.
+        if (lookupAttempt < JOIN_RETRY_LIMIT) {
+          retry = setTimeout(() => setLookupAttempt(lookupAttempt + 1), Math.min(16_000, 1_000 * 2 ** lookupAttempt) + Math.random() * 3_000);
+          return;
+        }
         setLookupFailed(true);
-      })
-      .finally(() => setLookupDone(true));
-  }, [loadSessionByCode, lookupDone, params.code, ready, session]);
+        setLookupDone(true);
+      });
+    return () => clearTimeout(retry);
+  }, [loadSessionByCode, lookupAttempt, lookupDone, params.code, ready, session]);
 
   useEffect(() => {
     setActiveSession(session?.id ?? null);
@@ -77,7 +89,7 @@ export function useJoinSessionController() {
     .map((question) => question.id), [selectedQuestionId, slideQuestions]);
 
   if (!ready || (!session && !lookupDone)) return { state: "loading" as const };
-  if (!session && lookupFailed) return { state: "unavailable" as const, t, retry: () => setLookupDone(false) };
+  if (!session && lookupFailed) return { state: "unavailable" as const, t, retry: () => { setLookupAttempt(0); setLookupDone(false); } };
   if (!session) return { state: "missing" as const, t };
   if (session.status !== "live") return { state: "ended" as const, finalHref, t };
 

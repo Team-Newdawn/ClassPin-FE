@@ -491,7 +491,8 @@ export function subscribeToLecture(
   onQuestionsRefresh: () => void,
   onLectureUpdate: (lecture: LectureRealtimeRow) => void,
   onSlidesRefresh: () => void,
-  asAudience = false
+  asAudience = false,
+  onConnectionChange?: (connected: boolean) => void
 ): (() => void) | null {
   const client = asAudience ? getAudienceSupabaseClient() : getSupabaseClient();
   if (!client) return null;
@@ -499,10 +500,14 @@ export function subscribeToLecture(
   // reconnect before an asynchronous removeChannel() has finished, so give
   // every subscription its own topic to avoid mutating a subscribed channel.
   let channel = client.channel(`lecture:${sessionId}:${crypto.randomUUID()}`)
-    .on("postgres_changes", { event: "*", schema: "public", table: "questions", filter: `lecture_id=eq.${sessionId}` }, onQuestionsRefresh)
     .on("postgres_changes", { event: "UPDATE", schema: "public", table: "lectures", filter: `id=eq.${sessionId}` }, (payload) => {
       onLectureUpdate(payload.new as LectureRealtimeRow);
     });
+  // 참여자는 RLS 때문에 자기 질문 행의 이벤트만 받는다. 변경마다 참여자 수만큼 RLS 검사가 돌지
+  // 않도록 참여자는 questions 를 구독하지 않고 broadcast 신호와 보정 폴링으로 목록을 맞춘다.
+  if (!asAudience) {
+    channel = channel.on("postgres_changes", { event: "*", schema: "public", table: "questions", filter: `lecture_id=eq.${sessionId}` }, onQuestionsRefresh);
+  }
   if (materialVersionId) {
     channel = channel.on("postgres_changes", {
       event: "*",
@@ -511,17 +516,30 @@ export function subscribeToLecture(
       filter: `material_version_id=eq.${materialVersionId}`
     }, onSlidesRefresh);
   }
-  channel.subscribe();
+  channel.subscribe((status) => {
+    if (status === "SUBSCRIBED") onConnectionChange?.(true);
+    else if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") onConnectionChange?.(false);
+  });
   return () => { void client.removeChannel(channel); };
 }
 
-export async function fetchLectureSnapshot(session: ClassSession, asAudience = false): Promise<Pick<ClassSession, "currentSlide" | "status" | "presentationInteractions" | "presentationAutoplay" | "showQuestionPins" | "showPresentationQr" | "presentationQrPosition" | "questionCategories" | "questions"> | null> {
+type LectureSnapshot = Pick<ClassSession, "currentSlide" | "status" | "presentationInteractions" | "presentationAutoplay" | "showQuestionPins" | "showPresentationQr" | "presentationQrPosition" | "questionCategories" | "questions">;
+
+/** questionsOnly 는 broadcast 뒤 재조회처럼 질문 목록만 필요할 때 /state 요청을 건너뛴다. */
+export async function fetchLectureSnapshot(session: ClassSession, asAudience = false, questionsOnly = false): Promise<(Partial<LectureSnapshot> & Pick<LectureSnapshot, "questions">) | null> {
   const client = asAudience ? getAudienceSupabaseClient() : getSupabaseClient();
   if (!client) return null;
   if (asAudience) await ensureAnonymousUser();
   const base = `/${asAudience ? "participant" : "instructor"}/lectures/${encodeURIComponent(session.id)}`;
-  const [lecture, data] = await Promise.all([
-    restRequest<LectureRow | null>(client, `${base}/state`),
+  const [state, data] = await Promise.all([
+    // 참여자에게 종료된 강의는 410으로 온다. 시작 전(204, 빈 본문)은 상태를 바꾸지 않는다.
+    questionsOnly ? null : restRequest<LectureRow | null>(client, `${base}/state`).then(
+      (lecture) => ({ lecture, ended: false }),
+      (error: { status?: number }) => {
+        if (error.status === 410) return { lecture: null, ended: true };
+        throw error;
+      },
+    ),
     restRequest<QuestionRow[]>(client, `${base}/questions`),
   ]);
   const questions = toQuestions(
@@ -529,9 +547,11 @@ export async function fetchLectureSnapshot(session: ClassSession, asAudience = f
     session.id,
     session.slides
   );
+  if (questionsOnly) return { questions };
+  const lecture = state?.lecture;
   return {
     currentSlide: lecture?.current_page ?? session.currentSlide,
-    status: asAudience && !lecture ? "ended" : (lecture?.status as ClassSession["status"]) ?? session.status,
+    status: state?.ended ? "ended" : (lecture?.status as ClassSession["status"]) ?? session.status,
     presentationInteractions: lecture?.presentation_interactions ?? session.presentationInteractions,
     presentationAutoplay: lecture?.presentation_autoplay ?? session.presentationAutoplay,
     showQuestionPins: lecture?.show_question_pins ?? session.showQuestionPins,

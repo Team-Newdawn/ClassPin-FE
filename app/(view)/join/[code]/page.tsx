@@ -21,6 +21,7 @@ export default function JoinSession() {
 
   if (controller.state === "loading") return <LoadingScreen />;
   if (controller.state === "missing") return <div className={`${styles.root} student-empty`}><PinLogo /><LanguageSwitcher /><h1>{controller.t("student.sessionNotFound")}</h1><p>{controller.t("student.checkLink")}</p></div>;
+  if (controller.state === "unavailable") return <div className={`${styles.root} student-empty`}><PinLogo /><LanguageSwitcher /><h1>{controller.t("student.sessionUnavailable")}</h1><p>{controller.t("common.tryAgain")}</p><button type="button" className="btn primary" onClick={controller.retry}>{controller.t("student.retryJoin")}</button></div>;
   if (controller.state === "ended") return <div className={`${styles.root} student-empty`}><PinLogo /><LanguageSwitcher /><h1>{controller.t("student.sessionEndedTitle")}</h1><p>{controller.t("student.sessionEndedDescription")}</p><Link className="btn primary" href={controller.finalHref}>{controller.t("experience.complete")}</Link></div>;
 
   const {

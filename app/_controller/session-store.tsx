@@ -47,7 +47,7 @@ const SessionContext = createContext<Store | null>(null);
 const makeCode = () => `PIN${crypto.randomUUID().replaceAll("-", "").slice(0, 6).toUpperCase()}`;
 const cacheKey = (userId: string) => `${SUPABASE_CACHE_PREFIX}:${userId}`;
 const folderCacheKey = (userId: string) => `${SUPABASE_FOLDER_CACHE_PREFIX}:${userId}`;
-const PARTICIPANT_STATUS_POLL_MS = 2_000;
+const PARTICIPANT_STATUS_POLL_MS = 5_000;
 type LectureSettingPatch = Partial<Pick<ClassSession,
   "status" | "presentationAutoplay" | "showQuestionPins" | "showPresentationQr" | "presentationQrPosition"
 >>;
@@ -197,6 +197,22 @@ export function SessionStore({ children }: { children: React.ReactNode }) {
         }));
       } catch (error) { console.error("Supabase realtime refresh failed", error); }
     };
+    // 응답이 늦어도 요청이 쌓이지 않도록 재조회는 하나만 실행하고, 그동안 온 요청은 한 번으로 합친다.
+    let refreshing = false;
+    let refreshAgain = false;
+    const requestRefresh = () => {
+      if (refreshing) {
+        refreshAgain = true;
+        return;
+      }
+      refreshing = true;
+      void refresh(tracked).finally(() => {
+        refreshing = false;
+        if (!active || !refreshAgain) return;
+        refreshAgain = false;
+        requestRefresh();
+      });
+    };
     const applyLectureUpdate = (session: ClassSession, lecture: LectureRealtimeRow) => {
       if (!active) return;
       setSessions((current) => current.map((item) => item.id === session.id ? {
@@ -227,7 +243,7 @@ export function SessionStore({ children }: { children: React.ReactNode }) {
         const stop = subscribeToLecture(
           tracked.id,
           tracked.materialVersionId,
-          () => void refresh(tracked),
+          requestRefresh,
           (lecture) => applyLectureUpdate(tracked, lecture),
           () => void refreshSlides(tracked),
           asAudience
@@ -242,7 +258,7 @@ export function SessionStore({ children }: { children: React.ReactNode }) {
       statusPoll = setInterval(() => {
         // 다른 작성자의 questions 행은 RLS 때문에 Postgres Changes 이벤트가 오지
         // 않을 수 있다. 공개 RPC 스냅샷으로 공감 순서와 종료 상태를 함께 보정한다.
-        void refresh(sessionsByIdRef.current.get(tracked.id) ?? tracked);
+        requestRefresh();
       }, PARTICIPANT_STATUS_POLL_MS);
     }
     return () => {

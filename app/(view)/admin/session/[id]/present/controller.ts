@@ -1,5 +1,4 @@
 "use client";
-/* eslint-disable react-hooks/preserve-manual-memoization -- Existing timer callbacks rely on stable identities; React Compiler skips this controller when the live autoplay effect is active. */
 
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
@@ -29,7 +28,10 @@ export function useSessionPresentationController() {
   const session = sessions.find((item) => item.id === params.id);
   const [lookupDone, setLookupDone] = useState(false);
   const ready = storeReady && (Boolean(session) || lookupDone);
-  const canControl = !classSessionPersistenceEnabled || (isAdmin && !lookupDone);
+  // 작업 공간이 연 창만 진행자다. 다른 기기에서 URL로 연 창이 함께 페이지를 쓰면 서로 덮어쓴다.
+  // ponytail: 진행자 판정은 opener 기준이라 직접 연 창은 넘길 수 없다. 기기 전환이 필요해지면 DB 진행자 lease로 바꾼다.
+  const openedByWorkspace = typeof window !== "undefined" && window.opener !== null;
+  const canControl = !classSessionPersistenceEnabled || (isAdmin && !lookupDone && openedByWorkspace);
   const sessionId = session?.id ?? null;
   const syncedSlide = session?.currentSlide;
   const [audienceView, setAudienceView] = useState({ sessionId, syncedSlide, currentSlide: syncedSlide ?? 0 });
@@ -128,7 +130,7 @@ export function useSessionPresentationController() {
   }, [canControl, revealControls, sessionId, setCurrentSlide, slideCount, syncedSlide, t]);
 
   const autoplayDelay = presentationAutoplayDelay(
-    presentationAutoplay,
+    canControl && presentationAutoplay,
     showQuestionPins,
     pageQuestions.length,
     playback.shownPinIds.length,

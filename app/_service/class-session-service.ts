@@ -378,7 +378,11 @@ async function fetchLiveSessionBy(column: "id" | "join_code", value: string): Pr
   if (!client) return null;
   await ensureAnonymousUser();
   const path = column === "join_code" ? `/participant/join/${encodeURIComponent(value)}` : `/participant/lectures/${encodeURIComponent(value)}`;
-  const lecture = await restRequest<AudienceLectureGraphRow | null>(client, path);
+  // BE는 없는 강의 404, 종료 410, 시작 전 204(빈 본문)로 답한다. 그 밖의 실패는 호출자가 재시도할 수 있게 그대로 던진다.
+  const lecture = await restRequest<AudienceLectureGraphRow | null>(client, path).catch((error: { status?: number }) => {
+    if (error.status === 404 || error.status === 410) return null;
+    throw error;
+  });
   if (!lecture) return null;
   const material = lecture.materials[0];
   const version = material && [...material.material_versions].sort((a, b) => b.version_no - a.version_no)[0];

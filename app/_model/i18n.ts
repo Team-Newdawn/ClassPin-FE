@@ -357,6 +357,8 @@ const ko = {
 
   "student.sessionNotFound": "참여할 세션을 찾을 수 없어요",
   "student.checkLink": "링크나 참여 코드를 다시 확인해 주세요.",
+  "student.sessionUnavailable": "지금은 세션에 연결할 수 없어요",
+  "student.retryJoin": "다시 시도",
   "student.endedSession": "종료된 세션",
   "student.sessionEndedTitle": "세션이 종료되었어요",
   "student.sessionEndedDescription": "진행자가 세션을 종료해 더 이상 참여할 수 없어요.",
@@ -802,6 +804,8 @@ const en: Record<TranslationKey, Message> = {
 
   "student.sessionNotFound": "Session not found",
   "student.checkLink": "Check the join link or code and try again.",
+  "student.sessionUnavailable": "Can't connect to the session right now",
+  "student.retryJoin": "Try again",
   "student.endedSession": "ENDED",
   "student.sessionEndedTitle": "This session has ended",
   "student.sessionEndedDescription": "The host ended this session, so participation is no longer available.",

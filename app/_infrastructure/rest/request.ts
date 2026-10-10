@@ -32,7 +32,7 @@ export async function restRequest<T = void>(
       const payload = JSON.parse(text);
       if (typeof payload.error === "string") detail = payload.error;
     } catch { /* Non-JSON upstream errors still retain their HTTP status. */ }
-    throw new Error(`REST ${response.status}: ${detail || response.statusText}`);
+    throw Object.assign(new Error(`REST ${response.status}: ${detail || response.statusText}`), { status: response.status });
   }
   return text ? JSON.parse(text) as T : undefined as T;
 }

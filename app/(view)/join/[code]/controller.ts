@@ -39,6 +39,7 @@ export function useJoinSessionController() {
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [composerOpen, setComposerOpen] = useState(false);
   const [lookupDone, setLookupDone] = useState(false);
+  const [lookupFailed, setLookupFailed] = useState(false);
   const [selectedQuestionId, setSelectedQuestionId] = useState<string | null>(null);
   const [questionSort, setQuestionSort] = useState<QuestionSort>("empathy");
   const [pendingReactionIds, setPendingReactionIds] = useState<Set<string>>(new Set());
@@ -49,7 +50,13 @@ export function useJoinSessionController() {
 
   useEffect(() => {
     if (!ready || lookupDone || session) return;
-    void loadSessionByCode(params.code).finally(() => setLookupDone(true));
+    void loadSessionByCode(params.code)
+      .then(() => setLookupFailed(false))
+      .catch((error) => {
+        console.error("Live session lookup failed", error);
+        setLookupFailed(true);
+      })
+      .finally(() => setLookupDone(true));
   }, [loadSessionByCode, lookupDone, params.code, ready, session]);
 
   useEffect(() => {
@@ -70,6 +77,7 @@ export function useJoinSessionController() {
     .map((question) => question.id), [selectedQuestionId, slideQuestions]);
 
   if (!ready || (!session && !lookupDone)) return { state: "loading" as const };
+  if (!session && lookupFailed) return { state: "unavailable" as const, t, retry: () => setLookupDone(false) };
   if (!session) return { state: "missing" as const, t };
   if (session.status !== "live") return { state: "ended" as const, finalHref, t };
 

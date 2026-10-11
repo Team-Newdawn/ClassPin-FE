@@ -109,20 +109,13 @@ type AudienceLectureGraphRow = LectureRow & {
   }>;
 };
 
-const PDF_URL_TTL_SECONDS = 12 * 60 * 60;
-
-async function createPdfUrlMap(client: NonNullable<ReturnType<typeof getSupabaseClient>>, paths: string[]) {
-  const uniquePaths = [...new Set(paths)];
-  if (!uniquePaths.length) return new Map<string, string>();
-  const { data, error } = await client.storage.from("course-materials").createSignedUrls(uniquePaths, PDF_URL_TTL_SECONDS);
-  if (error) throw error;
-  const urls = new Map<string, string>();
-  data.forEach((item) => {
-    if (item.path && item.signedUrl) urls.set(item.path, item.signedUrl);
-  });
-  if (urls.size !== uniquePaths.length) throw new Error("PDF 원본을 읽을 수 없습니다.");
-  return urls;
-}
+/**
+ * 원본 PDF 는 서명 URL 대신 같은 origin 의 프록시로 읽는다. 참여자마다 다른 토큰의 서명 URL 은
+ * CDN·브라우저 캐시를 전혀 타지 못해 사람 수만큼 Storage egress 가 나갔다. 프록시는 요청마다
+ * 요청자 토큰으로 RLS(소유자 또는 live 강의 참여자)를 다시 통과시키고 서버 디스크에 한 번만 받는다.
+ */
+const pdfProxyUrl = (sourcePath: string, audience: boolean) =>
+  `/api/pdf?path=${encodeURIComponent(sourcePath)}${audience ? "&audience=1" : ""}`;
 
 function toSlide(
   client: NonNullable<ReturnType<typeof getSupabaseClient>>,
@@ -321,12 +314,6 @@ export async function fetchOwnedSessions(): Promise<ClassSession[]> {
   const client = getSupabaseClient();
   if (!client) return [];
   const courses = await restRequest<OwnedCourseGraphRow[]>(client, "/instructor/courses");
-  const pdfUrls = await createPdfUrlMap(client, courses.flatMap((course) => course.lectures.flatMap((lecture) =>
-    lecture.materials.flatMap((material) => material.material_versions
-      .filter((version) => version.slides.some((slide) => slide.source_page_index !== null))
-      .map((version) => version.source_path))
-  )));
-
   return courses
     .flatMap((course) => course.lectures.map((lecture) => ({ course, lecture })))
     .sort((a, b) => b.lecture.created_at.localeCompare(a.lecture.created_at))
@@ -339,7 +326,7 @@ export async function fetchOwnedSessions(): Promise<ClassSession[]> {
         .map((slide): Slide => {
           const noteValue = slide.slide_instructor_notes;
           const note = Array.isArray(noteValue) ? noteValue[0] : noteValue;
-          return toSlide(client, slide, pdfUrls.get(version.source_path), note?.body ?? "");
+          return toSlide(client, slide, pdfProxyUrl(version.source_path, false), note?.body ?? "");
         });
       const questions = toQuestions(lecture.questions, lecture.id, slides);
       return [{
@@ -387,13 +374,9 @@ async function fetchLiveSessionBy(column: "id" | "join_code", value: string): Pr
   const material = lecture.materials[0];
   const version = material && [...material.material_versions].sort((a, b) => b.version_no - a.version_no)[0];
   if (!material || !version) return null;
-  const pdfUrls = await createPdfUrlMap(
-    client,
-    version.slides.some((slide) => slide.source_page_index !== null) ? [version.source_path] : [],
-  );
   const slides: Slide[] = [...version.slides]
     .sort((a, b) => a.page_index - b.page_index)
-    .map((slide) => toSlide(client, slide, pdfUrls.get(version.source_path)));
+    .map((slide) => toSlide(client, slide, pdfProxyUrl(version.source_path, true)));
   const session: ClassSession = {
     id: lecture.id,
     folderId: null,
@@ -482,7 +465,11 @@ export async function updateLecture(sessionId: string, values: {
 }) {
   const client = getSupabaseClient();
   if (!client) return;
-  await restRequest(client, `/instructor/lectures/${encodeURIComponent(sessionId)}`, "PATCH", values);
+  // ponytail: BE PATCH /instructor/lectures/{id} 가 일부 필드만 담은 본문을 전부 400으로 거절한다
+  // (UpdateLectureRequest 의 Nulls.FAIL). BE 가 같은 검증·소유자 확인을 위임하는 RPC 를 직접 호출하고,
+  // BE 가 고쳐지면 restRequest 로 되돌린다.
+  const { error } = await client.rpc("ohpin_update_lecture_settings", { target_lecture_id: sessionId, settings: values });
+  if (error) throw error;
 }
 
 export function subscribeToLecture(

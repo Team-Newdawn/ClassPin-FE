@@ -107,6 +107,9 @@ flow unless a task explicitly spans both products.
 - PDF/PPT/PPTX source uploads accept up to 1 GiB. In Supabase mode the browser
   uses resumable Storage upload and `/api/convert` receives only the owner-scoped
   source path; do not send large source bytes through Cloud Run request bodies.
+- Source PDFs are read through `GET /api/pdf?path=…` with the requester's JWT, never
+  through per-participant signed URLs. The route keeps the existing live-only RLS
+  gate and a server disk cache; do not add a service-role bypass or long browser cache.
 - Opening a material shows the live player. Its folder rail can collapse, its right
   question panel can resize, and speaker notes sit below the slide.
 - A right-panel question item only selects its slide and highlights its PIN in

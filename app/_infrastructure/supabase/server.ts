@@ -4,7 +4,7 @@ const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const publishableKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
 
 export const supabaseServerConfigured = Boolean(
-  process.env.NEXT_PUBLIC_DATA_MODE === "supabase" && url && publishableKey
+  (process.env.NEXT_PUBLIC_DATA_MODE === "rest" || process.env.NEXT_PUBLIC_DATA_MODE === "supabase") && url && publishableKey
 );
 
 /**

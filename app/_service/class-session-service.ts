@@ -166,7 +166,8 @@ function toQuestion(row: QuestionRow, sessionId: string, slideIndexById: Readonl
   const anchorValue = row.region_anchors;
   const anchor = Array.isArray(anchorValue) ? anchorValue[0] : anchorValue;
   const path = toNormalizedPath(anchor?.coords?.points);
-  const answerRows = [...(row.answers ?? [])].sort((a, b) => a.created_at.localeCompare(b.created_at));
+  const answer = (row.answers ?? []).reduce<(NonNullable<QuestionRow["answers"]>)[number] | undefined>((latest, item) =>
+    !latest || item.created_at.localeCompare(latest.created_at) >= 0 ? item : latest, undefined);
   return {
     id: row.id,
     sessionId,
@@ -181,7 +182,7 @@ function toQuestion(row: QuestionRow, sessionId: string, slideIndexById: Readonl
     marker: isQuestionMarker(row.marker) ? row.marker : "pin",
     text: row.raw_text,
     status: row.status,
-    answer: answerRows[answerRows.length - 1]?.body,
+    answer: answer?.body,
     isMine: row.is_mine ?? false,
     reactionCount: Math.max(0, row.reaction_count ?? 0),
     reactedByMe: row.reacted_by_me ?? false,
@@ -219,13 +220,18 @@ export async function persistSession(session: ClassSession, sourcePath?: string)
     id: session.id, courseId: session.courseId, materialId: session.materialId, materialVersionId: session.materialVersionId,
     folderId: session.folderId, title: session.title, fileName: session.fileName,
     sourcePath: sourcePath ?? `${user.id}/${session.id}/${session.fileName}`,
-    // BE는 생성 시 "before"만 받으므로, 만든 뒤 lecture PATCH로 현재 상태를 반영한다.
+    // 생성 상태는 before다. 다른 상태·자동 넘김이 필요할 때만 추가 저장한다.
     code: session.code, status: "before", currentSlide: session.currentSlide,
     presentationInteractions: session.presentationInteractions, showQuestionPins: session.showQuestionPins,
     showPresentationQr: session.showPresentationQr, presentationQrPosition: session.presentationQrPosition,
     questionCategories: session.questionCategories, slides,
   });
-  await updateLecture(session.id, { status: session.status, ...(session.presentationAutoplay ? { presentation_autoplay: true } : {}) });
+  if (session.status !== "before" || session.presentationAutoplay) {
+    await updateLecture(session.id, {
+      ...(session.status === "before" ? {} : { status: session.status }),
+      ...(session.presentationAutoplay ? { presentation_autoplay: true } : {})
+    });
+  }
 }
 
 const toClassFolder = (folder: ClassFolderRow): ClassFolder => {
@@ -325,8 +331,10 @@ export async function fetchOwnedSessions(): Promise<ClassSession[]> {
     .flatMap((course) => course.lectures.map((lecture) => ({ course, lecture })))
     .sort((a, b) => b.lecture.created_at.localeCompare(a.lecture.created_at))
     .flatMap(({ course, lecture }) => {
-      const material = [...lecture.materials].sort((a, b) => a.created_at.localeCompare(b.created_at))[0];
-      const version = material && [...material.material_versions].sort((a, b) => b.version_no - a.version_no)[0];
+      const material = lecture.materials.reduce<(typeof lecture.materials)[number] | undefined>((first, item) =>
+        !first || item.created_at.localeCompare(first.created_at) < 0 ? item : first, undefined);
+      const version = material?.material_versions.reduce<(typeof material.material_versions)[number] | undefined>((latest, item) =>
+        !latest || item.version_no > latest.version_no ? item : latest, undefined);
       if (!material || !version) return [];
       const slides = [...version.slides]
         .sort((a, b) => a.page_index - b.page_index)
@@ -386,7 +394,8 @@ async function fetchLiveSessionBy(column: "id" | "join_code", value: string): Pr
   if (lecture === null) return null;
   if (!lecture) throw new LectureClosedError("Lecture is not live");
   const material = lecture.materials[0];
-  const version = material && [...material.material_versions].sort((a, b) => b.version_no - a.version_no)[0];
+  const version = material?.material_versions.reduce<(typeof material.material_versions)[number] | undefined>((latest, item) =>
+        !latest || item.version_no > latest.version_no ? item : latest, undefined);
   if (!material || !version) return null;
   const slides: Slide[] = [...version.slides]
     .sort((a, b) => a.page_index - b.page_index)

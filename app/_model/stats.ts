@@ -26,7 +26,7 @@ export function summarizeEndReport(slideCount: number, questions: readonly Pick<
     else unmapped++;
     reactionCount += question.reactionCount;
   }
-  const maximum = Math.max(0, unmapped, ...counts);
+  const maximum = counts.reduce((highest, count) => Math.max(highest, count), unmapped);
   const topSlides: (number | null)[] = counts.flatMap((count, index) => count === maximum && maximum > 0 ? [index + 1] : []);
   if (unmapped === maximum && maximum > 0) topSlides.push(null);
   return { counts, unmapped, maximum, topSlides, questionCount: questions.length, reactionCount };

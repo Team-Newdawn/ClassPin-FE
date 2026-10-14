@@ -29,17 +29,17 @@ export function useDashboardController() {
   const [folderActionError, setFolderActionError] = useState<string | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(true);
 
+  const summaries = useMemo(() => summarizeFolders(folders, sessions, {
+    id: UNFILED_ID,
+    name: t("folders.unfiled"),
+    createdAt: "",
+    colorIndex: CLASS_UNFILED_COLOR_INDEX,
+    purpose: CLASS_FOLDER_DEFAULT_PURPOSE
+  }), [folders, sessions, t]);
   const visibleSummaries = useMemo(() => {
-    const summaries = summarizeFolders(folders, sessions, {
-      id: UNFILED_ID,
-      name: t("folders.unfiled"),
-      createdAt: "",
-      colorIndex: CLASS_UNFILED_COLOR_INDEX,
-      purpose: CLASS_FOLDER_DEFAULT_PURPOSE
-    });
     const needle = query.trim().toLocaleLowerCase();
     return summaries.filter((folder) => folder.name.toLocaleLowerCase().includes(needle)).sort((a, b) => sort === "name" ? a.name.localeCompare(b.name) : (Date.parse(b.updatedAt ?? "") || 0) - (Date.parse(a.updatedAt ?? "") || 0));
-  }, [folders, query, sessions, sort, t]);
+  }, [query, sort, summaries]);
 
 
 

@@ -1,7 +1,7 @@
 "use client";
 /* eslint-disable @next/next/no-img-element */
 
-import { Fragment, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
+import { Fragment, memo, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { clusterPins } from "@/app/_model/pin-clusters";
 import { placeBubbles } from "@/app/_model/class/presentation-rotation";
 
@@ -16,7 +16,7 @@ import styles from "./slide-canvas.module.css";
 // 자리가 좁을 때 말풍선이 바꿀 수 있는 모양. 앞쪽부터 시도한다: 폭을 줄여 최대 3줄로 감싸기 → 더 좁은 한 줄(넘치면 …).
 const BUBBLE_SHAPES = [{ maxWidth: 180, wrap: true }, { maxWidth: 120, wrap: true }, { maxWidth: 90, wrap: true }, { maxWidth: 110, wrap: false }, { maxWidth: 80, wrap: false }];
 
-export function SlideCanvas({ slide, questions = [], visibleQuestionIds, selectedId, liveQuestionId, onSelectPin, onSelectCluster, expandedIds, highlightedId, dimmed = false, onCanvasClick, showQuestionLabels = false, showPins = true, compact = false, children }: {
+export const SlideCanvas = memo(function SlideCanvas({ slide, questions = [], visibleQuestionIds, selectedId, liveQuestionId, onSelectPin, onSelectCluster, expandedIds, highlightedId, dimmed = false, onCanvasClick, showQuestionLabels = false, showPins = true, compact = false, children }: {
   slide: Slide;
   questions?: Question[];
   visibleQuestionIds?: readonly string[];
@@ -45,6 +45,12 @@ export function SlideCanvas({ slide, questions = [], visibleQuestionIds, selecte
     observer.observe(root);
     return () => observer.disconnect();
   }, [compact]);
+  const visiblePins = useMemo(() => {
+    const visibleIds = visibleQuestionIds && new Set(visibleQuestionIds);
+    return questions.filter((q) => q.x !== null && q.y !== null && (!visibleIds || visibleIds.has(q.id)));
+  }, [questions, visibleQuestionIds]);
+  const clusters = useMemo(() => clusterPins(visiblePins.filter((q) => q.anchorKind !== "box" && q.anchorKind !== "path"), size.width, size.height).filter((group) => group.length > 1), [visiblePins, size.width, size.height]);
+  const clusteredIds = useMemo(() => new Set(clusters.flatMap((group) => group.map((q) => q.id))), [clusters]);
   // 말풍선 실제 크기를 재서 PIN 주변의 겹치지 않는 자리로 옮긴다. 모든 말풍선을 표시한다.
   useLayoutEffect(() => {
     const root = rootRef.current;
@@ -62,8 +68,9 @@ export function SlideCanvas({ slide, questions = [], visibleQuestionIds, selecte
       bubble.style.maxWidth = shape ? `${shape.maxWidth}px` : "";
       bubble.classList.toggle("wrapped", Boolean(shape?.wrap));
     };
+    const pinsById = new Map(pins.map((pin) => [pin.id, pin]));
     const requests = bubbles.flatMap((bubble) => {
-      const pin = pins.find((item) => item.id === bubble.dataset.bubbleFor);
+      const pin = pinsById.get(bubble.dataset.bubbleFor!);
       if (!pin) return [];
       apply(bubble);
       const variants = [undefined, ...BUBBLE_SHAPES.filter((shape) => shape.maxWidth < bubble.offsetWidth)];
@@ -78,10 +85,7 @@ export function SlideCanvas({ slide, questions = [], visibleQuestionIds, selecte
       apply(element, variants[placement.shape]);
       element.style.transform = `translate(${placement.x}px, ${placement.y}px)`;
     }
-  });
-  const visiblePins = questions.filter((q) => q.x !== null && q.y !== null && (!visibleQuestionIds || visibleQuestionIds.includes(q.id)));
-  const clusters = clusterPins(visiblePins.filter((q) => q.anchorKind !== "box" && q.anchorKind !== "path"), size.width, size.height).filter((group) => group.length > 1);
-  const clusteredIds = new Set(clusters.flat().map((q) => q.id));
+  }, [clusters, compact, dimmed, expandedIds, highlightedId, liveQuestionId, selectedId, showPins, showQuestionLabels, size, t, visiblePins]);
   const click = (event: React.MouseEvent<HTMLButtonElement>) => {
     if (!onCanvasClick) return;
     const box = event.currentTarget.getBoundingClientRect();
@@ -187,4 +191,4 @@ export function SlideCanvas({ slide, questions = [], visibleQuestionIds, selecte
       {children}
     </div>
   );
-}
+});

@@ -3,7 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { RotateCw } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useLanguage } from "@/app/_controller/language-context";
 import { CLASS_FOLDER_DEFAULT_PURPOSE, type ClassSession } from "@/app/_model/types";
 import styles from "./session-end-report.module.css";
@@ -16,9 +16,9 @@ const CHART_HEIGHT = 300;
 
 export function SessionEndReport({ session, folder }: { session: ClassSession; folder: SummaryPurpose }) {
   const { t, locale } = useLanguage();
-  const { counts, unmapped, maximum, topSlides, questionCount, reactionCount } = summarizeEndReport(session.slides.length, session.questions);
+  const { counts, unmapped, maximum, topSlides, questionCount, reactionCount } = useMemo(() => summarizeEndReport(session.slides.length, session.questions), [session.slides.length, session.questions]);
   // 공감이 많은 질문부터 최대 200개를 근거 페이지와 함께 보낸다.
-  const itemsKey = JSON.stringify(toSummaryItems([...session.questions].sort((a, b) => b.reactionCount - a.reactionCount).slice(0, REPORT_SUMMARY_LIMIT)));
+  const itemsKey = useMemo(() => JSON.stringify(toSummaryItems([...session.questions].sort((a, b) => b.reactionCount - a.reactionCount).slice(0, REPORT_SUMMARY_LIMIT))), [session.questions]);
   const [attempt, setAttempt] = useState(0);
   const [summary, setSummary] = useState<{ key: string; status: "done" | "error" | "unconfigured"; report?: ReportSections }>();
   const purpose = folder?.purpose ?? null;

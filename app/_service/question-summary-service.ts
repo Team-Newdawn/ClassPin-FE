@@ -20,12 +20,12 @@ export type ReportSections = Record<(typeof REPORT_SECTIONS)[number], string[]>;
 export type SummaryPurpose = Pick<ClassFolder, "purpose" | "purposeLabel"> | null | undefined;
 const purposeBody = (folder: SummaryPurpose) => folder ? { purpose: folder.purpose, purposeLabel: folder.purposeLabel ?? null } : {};
 
-function requestSummary<T>(mode: SummaryMode, items: readonly SummaryItem[], locale: string, folder: SummaryPurpose, pick: (payload: Record<string, unknown> | null) => T | undefined) {
-  const key = JSON.stringify([mode, locale, purposeBody(folder), items]);
+async function requestSummary<T>(mode: SummaryMode, items: readonly SummaryItem[], locale: string, folder: SummaryPurpose, pick: (payload: Record<string, unknown> | null) => T | undefined) {
+  const auth = await getUploadSession();
+  const key = JSON.stringify([auth?.accessToken, mode, locale, purposeBody(folder), items]);
   let request = cache.get(key) as Promise<T> | undefined;
   if (!request) {
     request = (async () => {
-      const auth = await getUploadSession();
       const response = await fetch("/api/question-summary", {
         method: "POST",
         headers: { "Content-Type": "application/json", ...(auth ? { Authorization: `Bearer ${auth.accessToken}` } : {}) },
@@ -35,8 +35,9 @@ function requestSummary<T>(mode: SummaryMode, items: readonly SummaryItem[], loc
       if (value === undefined) throw new SummaryError(response.status);
       return value;
     })();
+    if (cache.size >= 50) cache.delete(cache.keys().next().value!);
     cache.set(key, request);
-    request.catch(() => cache.delete(key));
+    request.catch(() => { if (cache.get(key) === request) cache.delete(key); });
   }
   return request;
 }

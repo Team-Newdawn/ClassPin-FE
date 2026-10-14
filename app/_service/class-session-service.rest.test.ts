@@ -82,7 +82,8 @@ test("business services use REST DTOs, preserve settings, and strip participant 
     for (const code of ["BEFORE1", "ENDED1"]) await assert.rejects(service.fetchLiveSession(code), service.LectureClosedError);
     assert.equal(await service.fetchLiveSession("NONE01"), null);
     assert.equal((await service.fetchLectureSnapshot({ ...audience, id: "ended" }, true))?.status, "ended");
-    await service.renameClassFolder("folder", "Updated");
+    await service.updateClassFolder("folder", { name: " Updated ", colorIndex: 2, purpose: "qa", purposeLabel: "ignored" });
+    assert.deepEqual(requests.at(-1)?.body, { name: "Updated", purpose: "qa", purposeLabel: null });
     await service.moveSessionToFolder("course", null);
     await service.saveSlideInstructorNote("slide", "Note");
     await service.updateLecture("lecture", { allow_emoji_reactions: false });

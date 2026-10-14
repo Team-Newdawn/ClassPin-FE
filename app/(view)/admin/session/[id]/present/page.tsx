@@ -21,6 +21,9 @@ export default function SessionPresentation() {
   const {
     t,
     ready,
+    canControl,
+    presenterSlide,
+    returnToPresenter,
     session,
     slide,
     currentSlide,
@@ -123,9 +126,10 @@ export default function SessionPresentation() {
       <button className="presentation-side-control next" disabled={currentSlide === session.slides.length - 1} onClick={nextSlide} aria-label={t("session.nextSlide")}><ChevronRight /></button>
 
       <footer className="presentation-footer">
+        {presenterSlide !== null && <button type="button" className="presentation-text-button presentation-return" onClick={returnToPresenter}>{t("presentation.returnToPresenter", { number: presenterSlide + 1 })}</button>}
         {actionError && <span className="presentation-error" role="alert">{actionError}</span>}
         <span className="presentation-page" aria-live="polite">{currentSlide + 1} / {session.slides.length}</span>
-        <span className="presentation-hint">{t("presentation.hint")}</span>
+        <span className="presentation-hint">{t(canControl ? "presentation.hint" : "presentation.followerHint")}</span>
       </footer>
 
       {session.showQuestionPins && detailQuestion && <QuestionDetailDialog question={detailQuestion} onClose={closeQuestionDetail} />}

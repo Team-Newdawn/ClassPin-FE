@@ -113,8 +113,10 @@ flow unless a task explicitly spans both products.
   in flight; participants never subscribe to `questions` postgres_changes, they get a
   `questions-changed` broadcast and refetch questions only after 0-10 s jitter;
   participant status polling is 30 s and pauses while the tab is hidden, falling back
-  to 5 s polling on `CHANNEL_ERROR`/`TIMED_OUT`; join lookup retries with backoff and
-  jitter (max 5); `publishRealtimeReaction` reuses an already-subscribed channel.
+  on `CHANNEL_ERROR`/`TIMED_OUT` to a per-tab random 15-20 s poll (instructor windows
+  5 s); join lookup retries with backoff and jitter (max 5); `publishRealtimeReaction`
+  reuses an already-subscribed channel; each participant sends at most one emoji
+  reaction per second.
 - Live audience count uses a heartbeat broadcast (participant tab -> instructor-only
   topic `lecture-audience:{id}`, every 60 s, 150 s window), never Realtime Presence:
   Presence fans every join/leave out to all participants (N^2 messages). The count is
@@ -167,6 +169,11 @@ flow unless a task explicitly spans both products.
   jumps to its slide and restarts that slide's full reveal cycle with the new PIN,
   including when it arrives on the current slide. PIN reveal and automatic movement
   pause while a question detail dialog is open; changing slides closes that dialog.
+- Only the first presentation window opened in a browser (Web Locks) writes the live
+  slide. Later windows behave like the participant page: they follow the live slide,
+  local navigation changes only that window and shows a "back to presenter" button,
+  and meeting the live slide again resumes following. They never affect the first
+  window or participants. Closing the first window hands control to the next one.
 - The live/stop state must be visually and textually explicit. The filmstrip has a
   visible horizontal scrollbar, marks the active slide with a blue border, offers
   slide deletion from a per-thumbnail menu, and ArrowLeft/ArrowRight navigate

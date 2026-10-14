@@ -179,6 +179,12 @@
   font-size: 11px;
 }
 
+.root :global(.presentation-return) {
+  grid-column: 1;
+  grid-row: 1;
+  justify-self: start;
+}
+
 .root :global(.presentation-error) {
   justify-self: start;
   color: #fecaca;

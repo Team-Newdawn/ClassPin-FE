@@ -5,7 +5,7 @@ import { useAuth } from "@/app/_controller/auth-context";
 import { defaultQuestionCategorySettings, isParticipantPointAnchor, normalizeClassFolderColorIndex, normalizeClassFolderName, normalizeClassFolderPurpose, normalizeClassFolderPurposeLabel, normalizeQuestionCategorySettings, type ClassFolder, type ClassSession, type CreateClassFolderInput, type ParticipantQuestionInput, type PresentationQrPosition, type Question, type Slide } from "@/app/_model/types";
 import { withQuestionReaction } from "@/app/_model/question-reactions";
 import { normalizeSessions, serializeSessionsForFailureCache } from "@/app/_model/class/session";
-import { classSessionPersistenceEnabled, createClassFolder as persistClassFolder, deleteClassFolder as persistClassFolderDeletion, deleteClassSession as persistSessionDeletion, deleteSessionSlide, fetchLectureSnapshot, fetchLiveSession, fetchLiveSessionById, fetchOwnedClassFolders, fetchOwnedSessions, fetchSessionSlides, markQuestionResolved, moveSessionToFolder as persistSessionFolder, persistSession, postAnswer, renameClassFolder as persistClassFolderName, saveSlideInstructorNote, setQuestionReaction as persistQuestionReaction, submitQuestion, subscribeToLecture, updateLecture, updateQuestion as persistQuestionUpdate, type LectureRealtimeRow } from "@/app/_service/class-session-service";
+import { classSessionPersistenceEnabled, createClassFolder as persistClassFolder, deleteClassFolder as persistClassFolderDeletion, deleteClassSession as persistSessionDeletion, deleteSessionSlide, fetchLectureSnapshot, fetchLiveSession, fetchLiveSessionById, fetchOwnedClassFolders, fetchOwnedSessions, fetchSessionSlides, markQuestionResolved, moveSessionToFolder as persistSessionFolder, persistSession, postAnswer, updateClassFolder as persistClassFolderUpdate, saveSlideInstructorNote, setQuestionReaction as persistQuestionReaction, submitQuestion, subscribeToLecture, updateLecture, updateQuestion as persistQuestionUpdate, type LectureRealtimeRow } from "@/app/_service/class-session-service";
 import { coalesceRefresh } from "@/app/_model/class/live-refresh";
 import { LECTURE_QUESTIONS_CHANGED_EVENT, lectureReactionTopic } from "@/app/_model/lecture-reactions";
 import { publishRealtimeReaction } from "@/app/_service/realtime-reaction-service";
@@ -22,7 +22,7 @@ type Store = {
   sessions: ClassSession[];
   folders: ClassFolder[];
   createFolder: (input: CreateClassFolderInput) => Promise<ClassFolder>;
-  renameFolder: (folderId: string, name: string) => Promise<void>;
+  updateFolder: (folderId: string, input: CreateClassFolderInput) => Promise<void>;
   deleteFolder: (folderId: string) => Promise<void>;
   moveSessionToFolder: (sessionId: string, folderId: string | null) => Promise<void>;
   createSession: (input: { folderId: string | null; title: string; fileName: string; slides: Slide[]; sourcePath?: string }) => Promise<ClassSession>;
@@ -52,8 +52,20 @@ const SessionContext = createContext<Store | null>(null);
 const makeCode = () => `PIN${crypto.randomUUID().replaceAll("-", "").slice(0, 6).toUpperCase()}`;
 const cacheKey = (userId: string) => `${SUPABASE_CACHE_PREFIX}:${userId}`;
 const folderCacheKey = (userId: string) => `${SUPABASE_FOLDER_CACHE_PREFIX}:${userId}`;
+const normalizeFolderInput = (input: CreateClassFolderInput) => {
+  const purpose = normalizeClassFolderPurpose(input.purpose);
+  return {
+    name: normalizeClassFolderName(input.name),
+    colorIndex: normalizeClassFolderColorIndex(input.colorIndex),
+    purpose,
+    purposeLabel: normalizeClassFolderPurposeLabel(purpose, input.purposeLabel)
+  };
+};
 const PARTICIPANT_STATUS_POLL_MS = 30_000;
 const REALTIME_FALLBACK_POLL_MS = 5_000;
+// Realtime 장애는 참여자 전원에게 동시에 오므로 창마다 15~20초 사이 다른 주기로 흩어 백엔드로 한꺼번에 몰리지 않게 한다.
+const PARTICIPANT_FALLBACK_POLL_MS = 15_000;
+const PARTICIPANT_FALLBACK_SPREAD_MS = 5_000;
 const BROADCAST_REFRESH_SPREAD_MS = 10_000;
 type LectureSettingPatch = Partial<Pick<ClassSession,
   "status" | "presentationAutoplay" | "showQuestionPins" | "showPresentationQr" | "presentationQrPosition" | "allowQuestionReactions" | "allowEmojiReactions" | "startedAt"
@@ -254,7 +266,7 @@ export function SessionStore({ children }: { children: React.ReactNode }) {
           // Realtime 연결 한도에 걸리거나 끊기면 폴링으로 따라가고, 다시 붙으면 평소대로 돌아간다.
           (connected) => {
             if (!active) return;
-            if (!connected) startPoll(REALTIME_FALLBACK_POLL_MS);
+            if (!connected) startPoll(asAudience ? PARTICIPANT_FALLBACK_POLL_MS + Math.random() * PARTICIPANT_FALLBACK_SPREAD_MS : REALTIME_FALLBACK_POLL_MS);
             else if (asAudience) startPoll(PARTICIPANT_STATUS_POLL_MS);
             else if (statusPoll) { clearInterval(statusPoll); statusPoll = null; }
           }
@@ -326,13 +338,7 @@ export function SessionStore({ children }: { children: React.ReactNode }) {
   }, []);
 
   const createFolder = useCallback(async (input: CreateClassFolderInput) => {
-    const purpose = normalizeClassFolderPurpose(input.purpose);
-    const folderInput = {
-      name: normalizeClassFolderName(input.name),
-      colorIndex: normalizeClassFolderColorIndex(input.colorIndex),
-      purpose,
-      purposeLabel: normalizeClassFolderPurposeLabel(purpose, input.purposeLabel)
-    };
+    const folderInput = normalizeFolderInput(input);
     const folder = classSessionPersistenceEnabled
       ? await persistClassFolder(folderInput)
       : { id: crypto.randomUUID(), createdAt: new Date().toISOString(), ...folderInput };
@@ -413,11 +419,11 @@ export function SessionStore({ children }: { children: React.ReactNode }) {
     sessions,
     folders,
     createFolder,
-    renameFolder: async (folderId, name) => {
-      if (!foldersById.has(folderId)) throw new Error("이름을 바꿀 폴더를 찾지 못했습니다.");
-      const normalizedName = normalizeClassFolderName(name);
-      if (classSessionPersistenceEnabled) await persistClassFolderName(folderId, normalizedName);
-      setFolders((current) => current.map((folder) => folder.id === folderId ? { ...folder, name: normalizedName } : folder));
+    updateFolder: async (folderId, input) => {
+      if (!foldersById.has(folderId)) throw new Error("수정할 폴더를 찾지 못했습니다.");
+      const folderInput = normalizeFolderInput(input);
+      if (classSessionPersistenceEnabled) await persistClassFolderUpdate(folderId, folderInput);
+      setFolders((current) => current.map((folder) => folder.id === folderId ? { ...folder, ...folderInput } : folder));
     },
     deleteFolder: async (folderId) => {
       if (!foldersById.has(folderId)) throw new Error("삭제할 폴더를 찾지 못했습니다.");

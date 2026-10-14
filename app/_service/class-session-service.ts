@@ -256,11 +256,14 @@ export async function createClassFolder(input: CreateClassFolderInput): Promise<
   return toClassFolder(await restRequest<ClassFolderRow>(client, "/instructor/folders", "POST", { name, colorIndex, purpose, purposeLabel }));
 }
 
-export async function renameClassFolder(folderId: string, name: string): Promise<void> {
-  const normalizedName = normalizeClassFolderName(name);
+export async function updateClassFolder(folderId: string, input: CreateClassFolderInput): Promise<void> {
+  const name = normalizeClassFolderName(input.name);
+  const purpose = normalizeClassFolderPurpose(input.purpose);
+  const purposeLabel = normalizeClassFolderPurposeLabel(purpose, input.purposeLabel);
   const client = getSupabaseClient();
   if (!client) throw new Error("Supabase 연결을 찾지 못했습니다.");
-  await restRequest(client, `/instructor/folders/${encodeURIComponent(folderId)}`, "PATCH", { name: normalizedName });
+  // 백엔드 UpdateFolderRequest는 colorIndex를 모르고, 모르는 필드가 있으면 요청 전체를 400으로 거절한다.
+  await restRequest(client, `/instructor/folders/${encodeURIComponent(folderId)}`, "PATCH", { name, purpose, purposeLabel });
 }
 
 export async function deleteClassFolder(folderId: string): Promise<void> {

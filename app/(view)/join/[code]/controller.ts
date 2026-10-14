@@ -26,6 +26,8 @@ type DraftQuestion = {
 };
 const EMPTY_QUESTIONS: Question[] = [];
 const JOIN_RETRY_LIMIT = 5;
+// 이모지 하나가 참여자 전원에게 퍼지므로 연타가 N²로 불어나지 않게 사람마다 1초에 하나만 보낸다.
+const EMOJI_REACTION_INTERVAL_MS = 1_000;
 
 export function useJoinSessionController() {
   const { t, timeAgo } = useLanguage();
@@ -58,6 +60,7 @@ export function useJoinSessionController() {
   const [emojiError, setEmojiError] = useState<string | null>(null);
   const [captureShielded, setCaptureShielded] = useState(false);
   const pinDragged = useRef(false);
+  const lastEmojiSentAt = useRef(0);
   const pinDragStart = useRef<{ x: number; y: number } | null>(null);
 
   useEffect(() => {
@@ -346,6 +349,9 @@ export function useJoinSessionController() {
   };
 
   const sendEmojiReaction = async (emoji: LectureReactionEmoji) => {
+    const now = Date.now();
+    if (now - lastEmojiSentAt.current < EMOJI_REACTION_INTERVAL_MS) return;
+    lastEmojiSentAt.current = now;
     setEmojiError(null);
     const reaction = { id: crypto.randomUUID(), emoji };
     addReaction(reaction);

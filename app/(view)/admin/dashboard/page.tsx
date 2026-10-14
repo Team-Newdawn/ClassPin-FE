@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { Pencil, Search, Plus, X } from "@/app/component/icons";
+import { Pencil, Search, Plus } from "@/app/component/icons";
 import { AdminSearch } from "@/app/component/admin-search";
 import { LoadingScreen } from "@/app/component/loading-screen";
 import { FolderTreeSidebar } from "@/app/component/folder-tree-sidebar";
@@ -96,55 +96,42 @@ export default function DashboardPage() {
 
       {folderEditor && (
         <div className="modal-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) closeFolderEditor(); }}>
-          <section className={`share-modal folder-modal ${folderEditor === "new" ? styles.createModal : ""}`} role="dialog" aria-modal="true" aria-labelledby="folder-editor-title" aria-describedby="folder-editor-description" onKeyDown={(event) => { if (event.key === "Escape") closeFolderEditor(); }}>
-            {folderEditor !== "new" && <button type="button" className="modal-close" aria-label={t("folders.closeModal")} onClick={closeFolderEditor} disabled={savingFolder}><X /></button>}
-            {folderEditor === "new" ? (
-              <header className={styles.createModalHeader}>
-                <h2 id="folder-editor-title">{t("folders.newFolderTitle")}</h2>
-                <p id="folder-editor-description">{t("folders.newFolderDescription")}</p>
-              </header>
-            ) : (
-              <>
-                <span className="modal-icon"><Pencil /></span>
-                <h2 id="folder-editor-title">{t("folders.renameTitle")}</h2>
-                <p id="folder-editor-description">{t("folders.renameDescription")}</p>
-              </>
-            )}
-            <form className={`folder-form ${folderEditor === "new" ? styles.createForm : ""}`} onSubmit={submitFolder}>
+          <section className={`share-modal folder-modal ${styles.createModal}`} role="dialog" aria-modal="true" aria-labelledby="folder-editor-title" aria-describedby="folder-editor-description" onKeyDown={(event) => { if (event.key === "Escape") closeFolderEditor(); }}>
+            <header className={styles.createModalHeader}>
+              <h2 id="folder-editor-title">{t(folderEditor === "new" ? "folders.newFolderTitle" : "folders.renameTitle")}</h2>
+              <p id="folder-editor-description">{t(folderEditor === "new" ? "folders.newFolderDescription" : "folders.renameDescription")}</p>
+            </header>
+            <form className={`folder-form ${styles.createForm}`} onSubmit={submitFolder}>
               <label className="folder-field">
                 <span>{t("folders.folderName")}</span>
                 <input autoFocus value={folderName} onChange={(event) => setFolderName(event.target.value)} maxLength={80} placeholder={t("folders.folderNamePlaceholder")} disabled={savingFolder} />
               </label>
-              {folderEditor === "new" && (
-                <>
-                  <fieldset className={styles.optionGroup}>
-                    <legend>{t("folders.folderColor")}</legend>
-                    <div className={styles.colorOptions}>
-                      {folderColorOptions.map((option) => (
-                        <label className={styles.colorOption} key={option.value}>
-                          <input className="sr-only" type="radio" name="folder-color" value={option.value} checked={folderColorIndex === option.value} onChange={() => setFolderColorIndex(option.value)} disabled={savingFolder} aria-label={t(option.label)} />
-                          <span className={`${styles.colorSwatch} ${option.className}`} aria-hidden="true" />
-                        </label>
-                      ))}
-                    </div>
-                  </fieldset>
-                  <fieldset className={styles.optionGroup} aria-describedby={folderPurpose === "other" ? undefined : "folder-purpose-description"}>
-                    <legend>{t("folders.folderPurpose")}</legend>
-                    <div className={styles.purposeOptions}>
-                      {folderPurposeOptions.map((option) => (
-                        <label className={styles.purposeOption} key={option.value}>
-                          <input className="sr-only" type="radio" name="folder-purpose" value={option.value} checked={folderPurpose === option.value} onChange={() => setFolderPurpose(option.value)} disabled={savingFolder} />
-                          <span>{t(option.label)}</span>
-                        </label>
-                      ))}
-                    </div>
-                  </fieldset>
-                  {folderPurpose === "other" ? (
-                    <input className={styles.purposeLabelInput} value={folderPurposeLabel} onChange={(event) => setFolderPurposeLabel(event.target.value)} maxLength={CLASS_FOLDER_PURPOSE_LABEL_MAX} placeholder={t("folders.purposeOtherLabelPlaceholder")} aria-label={t("folders.purposeOtherLabel")} disabled={savingFolder} />
-                  ) : (
-                    <p id="folder-purpose-description" className={styles.purposeDescription} aria-live="polite">{t(selectedPurpose.description)}</p>
-                  )}
-                </>
+              <fieldset className={styles.optionGroup}>
+                <legend>{t("folders.folderColor")}</legend>
+                <div className={styles.colorOptions}>
+                  {folderColorOptions.map((option) => (
+                    <label className={styles.colorOption} key={option.value}>
+                      <input className="sr-only" type="radio" name="folder-color" value={option.value} checked={folderColorIndex === option.value} onChange={() => setFolderColorIndex(option.value)} disabled={savingFolder} aria-label={t(option.label)} />
+                      <span className={`${styles.colorSwatch} ${option.className}`} aria-hidden="true" />
+                    </label>
+                  ))}
+                </div>
+              </fieldset>
+              <fieldset className={styles.optionGroup} aria-describedby={folderPurpose === "other" ? undefined : "folder-purpose-description"}>
+                <legend>{t("folders.folderPurpose")}</legend>
+                <div className={styles.purposeOptions}>
+                  {folderPurposeOptions.map((option) => (
+                    <label className={styles.purposeOption} key={option.value}>
+                      <input className="sr-only" type="radio" name="folder-purpose" value={option.value} checked={folderPurpose === option.value} onChange={() => setFolderPurpose(option.value)} disabled={savingFolder} />
+                      <span>{t(option.label)}</span>
+                    </label>
+                  ))}
+                </div>
+              </fieldset>
+              {folderPurpose === "other" ? (
+                <input className={styles.purposeLabelInput} value={folderPurposeLabel} onChange={(event) => setFolderPurposeLabel(event.target.value)} maxLength={CLASS_FOLDER_PURPOSE_LABEL_MAX} placeholder={t("folders.purposeOtherLabelPlaceholder")} aria-label={t("folders.purposeOtherLabel")} disabled={savingFolder} />
+              ) : (
+                <p id="folder-purpose-description" className={styles.purposeDescription} aria-live="polite">{t(selectedPurpose.description)}</p>
               )}
               {folderError && <div className="session-folder-error" role="alert">{folderError}</div>}
               <div className="folder-modal-actions">

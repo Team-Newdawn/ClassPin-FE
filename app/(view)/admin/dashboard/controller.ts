@@ -5,7 +5,7 @@ import { useLanguage } from "@/app/_controller/language-context";
 import { useSessions } from "@/app/_controller/session-store";
 
 import { summarizeFolders, type FolderSummary } from "@/app/_model/stats";
-import { CLASS_FOLDER_DEFAULT_COLOR_INDEX, CLASS_FOLDER_DEFAULT_PURPOSE, CLASS_UNFILED_COLOR_INDEX, type ClassFolderPurpose } from "@/app/_model/types";
+import { CLASS_FOLDER_DEFAULT_COLOR_INDEX, CLASS_FOLDER_DEFAULT_PURPOSE, CLASS_UNFILED_COLOR_INDEX, type ClassFolder, type ClassFolderPurpose } from "@/app/_model/types";
 
 import { useAuth } from "@/app/_controller/auth-context";
 export const UNFILED_ID = "unfiled";
@@ -15,9 +15,9 @@ export function useDashboardController() {
   const { profile } = useAuth();
   const [view, setView] = useState<"grid" | "list">("grid");
   const [sort, setSort] = useState<"recent" | "name">("recent");
-  const { folders, sessions, createFolder, renameFolder, deleteFolder, ready } = useSessions();
+  const { folders, sessions, createFolder, updateFolder, deleteFolder, ready } = useSessions();
   const [uploadOpen, setUploadOpen] = useState(false);
-  const [folderEditor, setFolderEditor] = useState<"new" | { id: string; name: string } | null>(null);
+  const [folderEditor, setFolderEditor] = useState<"new" | ClassFolder | null>(null);
   const [folderName, setFolderName] = useState("");
   const [folderColorIndex, setFolderColorIndex] = useState(CLASS_FOLDER_DEFAULT_COLOR_INDEX);
   const [folderPurpose, setFolderPurpose] = useState<ClassFolderPurpose>(CLASS_FOLDER_DEFAULT_PURPOSE);
@@ -49,8 +49,9 @@ export function useDashboardController() {
     setFolderError(null);
     setSavingFolder(true);
     try {
-      if (folderEditor === "new") await createFolder({ name: folderName, colorIndex: folderColorIndex, purpose: folderPurpose, purposeLabel: folderPurposeLabel });
-      else await renameFolder(folderEditor.id, folderName);
+      const input = { name: folderName, colorIndex: folderColorIndex, purpose: folderPurpose, purposeLabel: folderPurposeLabel };
+      if (folderEditor === "new") await createFolder(input);
+      else await updateFolder(folderEditor.id, input);
       setFolderName("");
       setFolderEditor(null);
     } catch {
@@ -60,14 +61,12 @@ export function useDashboardController() {
     }
   };
 
-  const openFolderEditor = (folder: "new" | { id: string; name: string }) => {
+  const openFolderEditor = (folder: "new" | ClassFolder) => {
     setFolderError(null);
     setFolderName(folder === "new" ? "" : folder.name);
-    if (folder === "new") {
-      setFolderColorIndex(CLASS_FOLDER_DEFAULT_COLOR_INDEX);
-      setFolderPurpose(CLASS_FOLDER_DEFAULT_PURPOSE);
-      setFolderPurposeLabel("");
-    }
+    setFolderColorIndex(folder === "new" ? CLASS_FOLDER_DEFAULT_COLOR_INDEX : folder.colorIndex);
+    setFolderPurpose(folder === "new" ? CLASS_FOLDER_DEFAULT_PURPOSE : folder.purpose);
+    setFolderPurposeLabel(folder === "new" ? "" : folder.purposeLabel ?? "");
     setFolderEditor(folder);
   };
 

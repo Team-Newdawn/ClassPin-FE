@@ -31,19 +31,21 @@ export function useSessionPresentationController() {
   const session = sessions.find((item) => item.id === params.id);
   const [lookupDone, setLookupDone] = useState(false);
   const ready = storeReady && (Boolean(session) || lookupDone);
-  const canControl = !classSessionPersistenceEnabled || (isAdmin && !lookupDone);
+  // 같은 브라우저에서 처음 연 발표 창만 슬라이드를 서버에 쓴다. 나머지 창은 이동해도 참여자·진행 창에 영향이 없고, 첫 창이 닫히면 다음 창이 이어받는다.
+  // ponytail: Web Locks는 브라우저 단위라 다른 기기에서 연 창은 각자 진행자가 된다. 기기 간 진행자가 필요해지면 DB 진행자 lease로 바꾼다.
+  const [holdsPresenterLock, setHoldsPresenterLock] = useState(false);
+  const canControl = holdsPresenterLock && (!classSessionPersistenceEnabled || (isAdmin && !lookupDone));
   const sessionId = session?.id ?? null;
   const syncedSlide = session?.currentSlide;
-  const [audienceView, setAudienceView] = useState({ sessionId, syncedSlide, currentSlide: syncedSlide ?? 0 });
-  if (audienceView.sessionId !== sessionId || audienceView.syncedSlide !== syncedSlide) {
-    setAudienceView({ sessionId, syncedSlide, currentSlide: syncedSlide ?? 0 });
-  }
+  // 진행 창이 아닌 창은 참여자 화면처럼 발표자 슬라이드를 따라가다가, 직접 넘기면 이 창에서만 바뀐다. 발표자 슬라이드와 다시 만나면 따라가기로 돌아간다.
+  const [localSlide, setLocalSlide] = useState<number | null>(null);
+  if (localSlide !== null && (canControl || localSlide === syncedSlide)) setLocalSlide(null);
   const showQuestionPins = session?.showQuestionPins ?? false;
   const presentationAutoplay = session?.presentationAutoplay ?? false;
   const { reactions: lectureReactions } = useLectureReactions(sessionId, notifyQuestionsChanged);
   const liveReactions = session?.allowEmojiReactions ? lectureReactions : [];
   const sessionTitle = session?.title;
-  const currentSlide = canControl ? syncedSlide ?? 0 : audienceView.currentSlide;
+  const currentSlide = localSlide ?? syncedSlide ?? 0;
   const slideCount = session?.slides.length ?? 0;
   const { positionedQuestions, questionsBySlide } = useMemo(() => {
     const questions = (session?.questions ?? []).filter((question): question is PositionedQuestion => question.x !== null && question.y !== null);
@@ -91,6 +93,19 @@ export function useSessionPresentationController() {
     return () => setActiveSession(null);
   }, [params.id, setActiveSession]);
 
+  useEffect(() => {
+    if (!sessionId) return;
+    const release = new AbortController();
+    navigator.locks.request(`presentation:${sessionId}`, { signal: release.signal }, () => {
+      setHoldsPresenterLock(true);
+      return new Promise<void>((resolve) => release.signal.addEventListener("abort", () => resolve()));
+    }).catch(() => { /* 기다리던 중 창을 닫으면 AbortError로 끝난다. */ });
+    return () => {
+      release.abort();
+      setHoldsPresenterLock(false);
+    };
+  }, [sessionId]);
+
   const playback = useMemo(() => {
     if (!showQuestionPins) return EMPTY_PLAYBACK;
     if (!presentationAutoplay) return { shownPinIds: pageQuestions.map((pin) => pin.id), activePinId: null };
@@ -119,7 +134,7 @@ export function useSessionPresentationController() {
     setActionError(null);
     revealControls();
     if (!canControl) {
-      setAudienceView({ sessionId, syncedSlide, currentSlide: nextIndex });
+      setLocalSlide(nextIndex);
       return;
     }
     void setCurrentSlide(sessionId, nextIndex).catch((error) => {
@@ -128,10 +143,11 @@ export function useSessionPresentationController() {
       setActionError(t("presentation.syncDelay"));
       revealControls();
     });
-  }, [canControl, revealControls, sessionId, setCurrentSlide, slideCount, syncedSlide, t]);
+  }, [canControl, revealControls, sessionId, setCurrentSlide, slideCount, t]);
 
+  // 따라가는 창이 자동 넘김을 직접 돌리면 매번 따라가기가 풀린다. 진행 창이 넘긴 슬라이드를 받기만 한다.
   const autoplayDelay = presentationAutoplayDelay(
-    presentationAutoplay,
+    (canControl || localSlide !== null) && presentationAutoplay,
     showQuestionPins,
     pageQuestions.length,
     playback.shownPinIds.length,
@@ -171,7 +187,8 @@ export function useSessionPresentationController() {
     const incoming = findNewestIncomingPin(positionedQuestions, previousIds);
     if (!incoming) return;
     if (incoming.slideIndex !== currentIndexRef.current) setDetailQuestionId(null);
-    goToSlide(incoming.slideIndex);
+    // 따라가는 중인 창은 진행 창이 옮긴 슬라이드를 받아 이동한다. 여기서 직접 옮기면 잠깐 따라가기가 풀린다.
+    if (canControl || localSlide !== null) goToSlide(incoming.slideIndex);
     setLiveQuestionId(incoming.id);
     setPinPlayback({ sessionId, currentSlide: incoming.slideIndex, showQuestionPins, presentationAutoplay, shownPinIds: [incoming.id] });
     // id 집합이 같으면 질문 본문·답변·공감 변경만으로 강조를 재생하지 않는다.
@@ -301,6 +318,9 @@ export function useSessionPresentationController() {
   return {
     t,
     ready,
+    canControl,
+    presenterSlide: localSlide === null ? null : syncedSlide ?? 0,
+    returnToPresenter: () => setLocalSlide(null),
     session,
     slide,
     currentSlide,

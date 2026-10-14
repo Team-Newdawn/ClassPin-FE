@@ -1,5 +1,14 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
+/** 호출자가 204 외의 HTTP 상태(예: 청중 404·410)로 분기할 수 있게 상태를 함께 싣는다. */
+export class RestError extends Error {
+  readonly status: number;
+  constructor(status: number, message: string) {
+    super(message);
+    this.status = status;
+  }
+}
+
 export async function restRequest<T = void>(
   client: SupabaseClient,
   path: string,
@@ -32,7 +41,7 @@ export async function restRequest<T = void>(
       const payload = JSON.parse(text);
       if (typeof payload.error === "string") detail = payload.error;
     } catch { /* Non-JSON upstream errors still retain their HTTP status. */ }
-    throw new Error(`REST ${response.status}: ${detail || response.statusText}`);
+    throw new RestError(response.status, `REST ${response.status}: ${detail || response.statusText}`);
   }
   return text ? JSON.parse(text) as T : undefined as T;
 }

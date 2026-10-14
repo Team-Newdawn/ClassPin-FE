@@ -1,0 +1,18 @@
+/* OhPin Figma 161:5039. Screen styles use semantic tokens. */
+:root {
+ --color-overlay:rgb(11 18 38 / 24%);
+  --pin-blue-50:#eef4ff; --pin-blue-100:#dce8ff; --pin-blue-200:#b9d1ff; --pin-blue-300:#8db3ff; --pin-blue-400:#5b92ff; --pin-blue-500:#2e75ff; --pin-blue-600:#0f62fe; --pin-blue-700:#0b4fd1; --pin-blue-800:#0c3f9f; --pin-blue-900:#0e3274;
+  --pin-neutral-0:#fff; --pin-neutral-50:#f4f6fa; --pin-neutral-100:#e9edf4; --pin-neutral-150:#dde2ec; --pin-neutral-200:#cbd2e0; --pin-neutral-300:#a3aec4; --pin-neutral-400:#7483a0; --pin-neutral-500:#53627f; --pin-neutral-600:#3a4763; --pin-neutral-700:#27324c; --pin-neutral-800:#1b2540; --pin-neutral-900:#141f38; --pin-neutral-950:#0b1226;
+  --color-brand:var(--pin-blue-600); --color-brand-hover:var(--pin-blue-700); --color-brand-subtle:var(--pin-blue-50);
+  --color-text-primary:var(--pin-neutral-900); --color-text-secondary:var(--pin-neutral-500); --color-text-tertiary:var(--pin-neutral-400); --color-text-inverse:var(--pin-neutral-0);
+  --color-bg-page:var(--pin-neutral-50); --color-bg-surface:var(--pin-neutral-0); --color-bg-subtle:var(--pin-neutral-100); --color-bg-inverse:var(--pin-neutral-950);
+  --color-border:var(--pin-neutral-150); --color-border-strong:var(--pin-neutral-200);
+  --color-success:#12a26a; --color-success-bg:#e9f8f1; --color-success-text:#0b7a4f; --color-warning:#b26a00; --color-warning-bg:#fff6e5; --color-error:#e5484d; --color-error-hover:#b4292e; --color-error-bg:#fdecec;
+  --color-pending:var(--color-brand); --color-pending-bg:var(--color-brand-subtle); --color-idea:var(--pin-neutral-700); --color-idea-bg:var(--pin-neutral-100);
+  --folder-blue:var(--color-brand); --folder-blue-soft:var(--pin-blue-50); --folder-sky:var(--pin-blue-400); --folder-sky-soft:var(--pin-blue-100); --folder-navy:var(--pin-neutral-900); --folder-navy-soft:var(--pin-neutral-100); --folder-slate:var(--pin-neutral-400); --folder-slate-soft:var(--pin-neutral-50);
+  --color-folder-action:var(--color-brand); --color-folder-search-border:var(--color-border); --color-folder-workspace-bg:var(--color-bg-page);
+  --viz-cat-facility:var(--color-brand); --viz-cat-safety:var(--color-error); --viz-cat-clean:var(--color-success); --viz-cat-convenience:var(--pin-neutral-500); --viz-cat-mobility:var(--color-warning); --viz-cat-idea:var(--pin-blue-400); --viz-heat-low:var(--pin-blue-100); --viz-heat-mid:var(--pin-blue-300); --viz-heat-high:var(--pin-blue-500); --viz-heat-critical:var(--pin-blue-700);
+  --space-1:4px; --space-2:8px; --space-3:12px; --space-4:16px; --space-6:24px; --space-8:32px;
+  --radius-control:10px; --radius-card:18px; --radius-modal:24px;
+  --shadow-xs:0 1px 2px rgb(20 31 56 / 4%); --shadow-sm:0 4px 12px rgb(20 31 56 / 6%); --shadow-md:0 8px 24px rgb(20 31 56 / 10%); --shadow-lg:0 24px 64px rgb(20 31 56 / 12%); --focus:0 0 0 3px rgb(15 98 254 / 20%);
+}

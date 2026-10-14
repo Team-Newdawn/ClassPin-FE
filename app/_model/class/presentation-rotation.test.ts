@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { advancePinPlayback, canRotatePinPlayback, crossedPinMilestone, findNewestIncomingPin, nextPresentationSlide, presentationAutoplayDelay, rectanglesOverlap, resolvePinDisplayPositions, resolveVisiblePresentationLabelIds, slideIndexFromPageNumber } from "./presentation-rotation.ts";
+import { advancePinPlayback, canRotatePinPlayback, crossedPinMilestone, findNewestIncomingPin, nextPresentationSlide, presentationAutoplayDelay, rectanglesOverlap, resolvePinDisplayPositions, placeBubbles, slideIndexFromPageNumber } from "./presentation-rotation.ts";
 
 test("PIN 총합이 새 10단위를 넘으면 건너뛴 구간 중 가장 높은 값을 고른다", () => {
   assert.equal(crossedPinMilestone(9, 10), 10);
@@ -112,19 +112,30 @@ test("말풍선과 PIN의 실제 사각형이 겹칠 때만 충돌로 판단한�
   assert.equal(rectanglesOverlap(first, { left: 20, right: 40, top: 0, bottom: 20 }), false);
 });
 
-test("새 이모티콘 PIN이 이전 말풍선과 겹치면 새 말풍선만 남긴다", () => {
-  const labels = [
-    { id: "old", bounds: { left: 0, right: 80, top: 0, bottom: 40 } },
-    { id: "new-emoji", bounds: { left: 90, right: 170, top: 0, bottom: 40 } }
-  ];
-  const pins = [
-    { id: "old", bounds: { left: 0, right: 30, top: 50, bottom: 80 } },
-    { id: "new-emoji", bounds: { left: 40, right: 70, top: 10, bottom: 40 } }
-  ];
+test("말풍선은 겹치지 않게 자기 PIN에 붙이고, 빈자리가 없어도 숨기지 않는다", () => {
+  const pin = (id: string, x: number, y: number) => ({ id, bounds: { left: x - 10, right: x + 10, top: y - 10, bottom: y + 10 } });
+  const box = (request: { x: number; y: number; width: number; height: number }, offset: { x: number; y: number }) =>
+    ({ left: request.x + offset.x, top: request.y + offset.y, right: request.x + offset.x + request.width, bottom: request.y + offset.y + request.height });
+  const pins = ["a", "b", "c", "d"].map((id, index) => pin(id, 100, 100 + index * 20));
+  const requests = pins.map((item) => ({ id: item.id, x: 100, y: (item.bounds.top + item.bounds.bottom) / 2, width: 80, height: 24, shapes: [{ width: 80, height: 24 }], pin: item.bounds }));
+  const placed = placeBubbles(requests, pins, 400, 300, null);
+  const boxes = requests.map((request) => box(request, placed.get(request.id)!));
+  const gap = (first: { left: number; right: number; top: number; bottom: number }, second: typeof first) =>
+    Math.max(0, first.left - second.right, second.left - first.right) + Math.max(0, first.top - second.bottom, second.top - first.bottom);
+  boxes.forEach((first, index) => {
+    assert.ok(gap(first, pins[index].bounds) <= 6, `${pins[index].id} 말풍선은 자기 PIN에 붙어 있다`);
+    boxes.slice(index + 1).forEach((second) => assert.equal(rectanglesOverlap(first, second), false));
+    pins.forEach((item) => assert.equal(rectanglesOverlap(first, item.bounds), false));
+    assert.ok(first.left >= 0 && first.top >= 0 && first.right <= 400 && first.bottom <= 300);
+  });
 
-  assert.deepEqual([...resolveVisiblePresentationLabelIds(labels, pins, "new-emoji")], ["new-emoji"]);
-  assert.deepEqual(resolveVisiblePresentationLabelIds([
-    labels[0],
-    { id: "new-emoji", bounds: { left: 60, right: 140, top: 10, bottom: 50 } }
-  ], pins.map((pin) => ({ ...pin, bounds: { ...pin.bounds, top: 50, bottom: 80 } })), "new-emoji"), ["new-emoji"]);
+  const crowded = placeBubbles(requests, pins, 120, 100, "d");
+  assert.equal(crowded.size, 4);
+  const active = box(requests[3], crowded.get("d")!);
+  assert.ok(active.left >= 0 && active.top >= 0 && active.right <= 120 && active.bottom <= 100);
+
+  // 넓은 모양이 PIN 옆에 안 들어가면 멀리 보내지 않고 좁은 여러 줄 모양으로 PIN 옆에 둔다.
+  const edge = pin("e", 150, 25);
+  const narrow = placeBubbles([{ id: "e", x: 150, y: 25, pin: edge.bounds, shapes: [{ width: 200, height: 24 }, { width: 90, height: 44 }] }], [edge], 260, 50, null);
+  assert.deepEqual(narrow.get("e"), { x: 16, y: -22, shape: 1 });
 });

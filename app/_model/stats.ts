@@ -17,6 +17,21 @@ export const resolveRate = (questions: readonly Question[]) => questions.length 
 
 export const pinRate = (questions: readonly Question[]) => questions.length ? Math.round((questions.filter((q) => q.x !== null).length / questions.length) * 100) : 0;
 
+export function summarizeEndReport(slideCount: number, questions: readonly Pick<Question, "slideIndex" | "reactionCount">[]) {
+  const counts = Array.from({ length: slideCount }, () => 0);
+  let unmapped = 0;
+  let reactionCount = 0;
+  for (const question of questions) {
+    if (Number.isInteger(question.slideIndex) && question.slideIndex >= 0 && question.slideIndex < slideCount) counts[question.slideIndex]++;
+    else unmapped++;
+    reactionCount += question.reactionCount;
+  }
+  const maximum = Math.max(0, unmapped, ...counts);
+  const topSlides: (number | null)[] = counts.flatMap((count, index) => count === maximum && maximum > 0 ? [index + 1] : []);
+  if (unmapped === maximum && maximum > 0) topSlides.push(null);
+  return { counts, unmapped, maximum, topSlides, questionCount: questions.length, reactionCount };
+}
+
 export function groupQuestionsBySlide<T extends Question>(questions: readonly T[]): ReadonlyMap<number, T[]> {
   const grouped = new Map<number, T[]>();
   questions.forEach((question) => {

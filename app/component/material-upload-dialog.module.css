@@ -1,0 +1,40 @@
+.backdrop{position:fixed;inset:0;z-index:80;display:grid;place-items:center;padding:24px;background:var(--color-overlay)}
+.dialog{width:min(100%,580px);max-height:calc(100dvh - 48px);overflow:auto;display:flex;flex-direction:column;gap:20px;padding:26px 28px 24px;border-radius:24px;background:var(--color-bg-surface);box-shadow:0 30px 80px rgb(10 18 38 / 30%)}
+.dialog:focus{outline:none;box-shadow:0 30px 80px rgb(10 18 38 / 30%)}
+.header{display:flex;gap:14px;align-items:flex-start}
+.headerIcon{display:grid;place-items:center;flex:none;width:44px;height:44px;border-radius:12px;background:var(--color-brand-subtle)}
+.headerIcon img{width:22px;height:22px}
+.header>div{flex:1;min-width:0}
+.header h2{margin:0;font-size:22px;line-height:1.5;color:var(--color-text-primary)}
+.header p{margin:2px 0 0;font-size:14px;line-height:1.5;color:var(--color-text-secondary)}
+.close,.remove{display:grid;place-items:center;flex:none;padding:0;width:24px;height:24px;border:0;border-radius:6px;background:transparent;color:var(--color-text-tertiary);cursor:pointer}
+.close svg{width:18px;height:18px}.remove svg{width:16px;height:16px}
+.close:disabled,.remove:disabled{opacity:.45;cursor:wait}
+.dropzone{display:flex;flex-direction:column;justify-content:center;align-items:center;gap:10px;width:100%;min-height:144px;padding:24px 16px;border:1px dashed var(--color-brand);border-radius:16px;background:var(--color-brand-subtle);color:var(--color-text-primary);cursor:pointer}
+.dropzone>img{width:24px;height:24px}
+.dropzone b{font-size:14px;line-height:1.5;font-weight:500}.dropzone b span{font-weight:700;color:var(--color-brand)}
+.dropzone small{font-size:12px;color:var(--color-text-tertiary)}
+.dropzone:disabled{opacity:.6;cursor:wait}
+.items{display:grid;gap:8px;list-style:none;padding:0;margin:0}
+.items li{display:flex;flex-wrap:wrap;align-items:center;gap:10px;padding:12px 14px;border:1px solid var(--color-border);border-radius:12px}
+.fileIcon{display:grid;place-items:center;flex:none;width:34px;height:34px;border-radius:8px;background:var(--color-subtle)}
+.fileIcon img{width:18px;height:18px}.complete .fileIcon{background:var(--color-success-bg)}
+.file{flex:1;min-width:0;display:grid;gap:2px}.file b{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:14px;line-height:1.5}.file span{font-size:12px;line-height:1.5;color:var(--color-text-secondary)}
+.complete .file span{color:var(--color-success-text)}
+.items progress{display:block;flex-basis:100%;width:100%;height:6px;border:0;border-radius:3px;overflow:hidden;background:var(--color-subtle);accent-color:var(--color-brand)}
+.items progress::-webkit-progress-bar{border-radius:3px;background:var(--color-subtle)}
+.items progress::-webkit-progress-value{border-radius:3px;background:var(--color-brand)}
+.items progress::-moz-progress-bar{border-radius:3px;background:var(--color-brand)}
+.items progress:indeterminate{background:linear-gradient(90deg,var(--color-subtle) 25%,var(--color-brand) 50%,var(--color-subtle) 75%);background-size:200% 100%;animation:conversion-progress 1.5s linear infinite}
+.items progress:indeterminate::-webkit-progress-bar{background:transparent}
+@keyframes conversion-progress{to{background-position:-200% 0}}
+.error{width:100%;font-size:12px;overflow-wrap:anywhere;color:var(--color-error)}.error button{border:0;background:none;color:var(--color-brand);padding:8px;text-decoration:underline;cursor:pointer}
+.folder{display:grid;gap:8px;font-size:13px;line-height:1.5;font-weight:700}
+.folder select{width:100%;height:46px;min-width:0;padding:0 14px;border:1px solid var(--color-border-strong);border-radius:10px;font:inherit;font-weight:500;background:var(--color-bg-surface);color:var(--color-text-primary)}
+.folder small{font-size:12px;font-weight:400;color:var(--color-text-tertiary)}.folder select:disabled{opacity:.7}
+.footer{display:flex;align-items:center;gap:12px}
+.footer p{flex:1;min-width:0;margin:0;font-size:12px;line-height:1.5;color:var(--color-text-tertiary)}
+.footer>div{display:flex;flex:none;gap:10px}
+.footer :global(.btn){height:44px;padding:0 18px;font-size:14px;border-radius:10px;white-space:nowrap}
+@media(max-width:600px){.backdrop{padding:16px}.dialog{padding:24px 20px;max-height:calc(100dvh - 32px)}.header h2{font-size:20px}.header p{font-size:13px}.footer{flex-wrap:wrap}.footer p{flex-basis:100%}.footer>div{margin-left:auto}}
+@media(prefers-reduced-motion:reduce){.items progress:indeterminate{animation:none}}

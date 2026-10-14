@@ -4,6 +4,7 @@ import { QRCodeSVG } from "qrcode.react";
 import { ChevronLeft, ChevronRight, Maximize2, Minimize2, X } from "@/app/component/icons";
 import { LanguageSwitcher } from "@/app/component/language-switcher";
 import { QuestionDetailDialog } from "../component/question-detail-dialog";
+import { PinClusterPopover } from "../component/pin-cluster-popover";
 import { SlideCanvas } from "@/app/component/slide-canvas";
 import type { PresentationQrPosition } from "@/app/_model/types";
 import { useSessionPresentationController } from "./controller";
@@ -27,7 +28,6 @@ export default function SessionPresentation() {
     joinUrl,
     pageQuestions,
     visibleQuestionIds,
-    pinDisplayPositions,
     activeQuestionId,
     liveQuestionId,
     liveReactions,
@@ -37,10 +37,17 @@ export default function SessionPresentation() {
     isFullscreen,
     actionError,
     stageRef,
-    presentationCanvasRef,
     revealControls,
     openQuestionDetail,
     closeQuestionDetail,
+    showQuestionLabels,
+    folder,
+    expandedIds,
+    highlightedId,
+    highlightPin,
+    clusterQuestions,
+    openCluster,
+    closeCluster,
     toggleFullscreen,
     previousSlide,
     nextSlide,
@@ -61,21 +68,23 @@ export default function SessionPresentation() {
       onMouseMove={revealControls}
       onPointerDown={revealControls}
     >
-      <div ref={presentationCanvasRef} className="presentation-slide class-presentation-slide class-presentation-canvas" aria-label={`${session.title} · ${t("common.slideNumber", { number: currentSlide + 1 })}`}>
+      <div className="presentation-slide class-presentation-slide class-presentation-canvas" aria-label={`${session.title} · ${t("common.slideNumber", { number: currentSlide + 1 })}`}>
         <SlideCanvas
           slide={slide}
           questions={pageQuestions}
-          questionCategories={session.questionCategories}
           visibleQuestionIds={visibleQuestionIds}
-          pinDisplayPositions={pinDisplayPositions}
           selectedId={activeQuestionId}
           liveQuestionId={liveQuestionId}
           onSelectPin={openQuestionDetail}
+          onSelectCluster={openCluster}
+          expandedIds={expandedIds}
+          highlightedId={highlightedId}
+          dimmed={Boolean(expandedIds || detailQuestion)}
           showPins={session.showQuestionPins}
-          neutralPinShadow
-          showQuestionLabels={session.showQuestionPins}
-          labelContent="body"
-        />
+          showQuestionLabels={session.showQuestionPins && showQuestionLabels}
+        >
+          {session.showQuestionPins && clusterQuestions.length > 0 && <PinClusterPopover key={expandedIds!.join("|")} questions={clusterQuestions} folder={folder} highlightedId={highlightedId} onHighlight={highlightPin} onClose={closeCluster} />}
+        </SlideCanvas>
       </div>
 
       {session.showPresentationQr && <aside
@@ -119,7 +128,7 @@ export default function SessionPresentation() {
         <span className="presentation-hint">{t("presentation.hint")}</span>
       </footer>
 
-      {session.showQuestionPins && detailQuestion && <QuestionDetailDialog question={detailQuestion} questionCategories={session.questionCategories} onClose={closeQuestionDetail} />}
+      {session.showQuestionPins && detailQuestion && <QuestionDetailDialog question={detailQuestion} onClose={closeQuestionDetail} />}
     </main>
   );
 }

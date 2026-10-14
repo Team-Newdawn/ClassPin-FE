@@ -1,18 +1,22 @@
 "use client";
 
-import { useMemo, useRef, useState, type FormEvent } from "react";
+import { useMemo, useState, type FormEvent } from "react";
 import { useLanguage } from "@/app/_controller/language-context";
 import { useSessions } from "@/app/_controller/session-store";
-import { useSlideUpload } from "@/app/_controller/use-slide-upload";
+
 import { summarizeFolders, type FolderSummary } from "@/app/_model/stats";
 import { CLASS_FOLDER_DEFAULT_COLOR_INDEX, CLASS_FOLDER_DEFAULT_PURPOSE, CLASS_UNFILED_COLOR_INDEX, type ClassFolderPurpose } from "@/app/_model/types";
 
+import { useAuth } from "@/app/_controller/auth-context";
 export const UNFILED_ID = "unfiled";
 
 export function useDashboardController() {
   const { t } = useLanguage();
+  const { profile } = useAuth();
+  const [view, setView] = useState<"grid" | "list">("grid");
+  const [sort, setSort] = useState<"recent" | "name">("recent");
   const { folders, sessions, createFolder, renameFolder, deleteFolder, ready } = useSessions();
-  const inputRef = useRef<HTMLInputElement>(null);
+  const [uploadOpen, setUploadOpen] = useState(false);
   const [folderEditor, setFolderEditor] = useState<"new" | { id: string; name: string } | null>(null);
   const [folderName, setFolderName] = useState("");
   const [folderColorIndex, setFolderColorIndex] = useState(CLASS_FOLDER_DEFAULT_COLOR_INDEX);
@@ -24,7 +28,6 @@ export function useDashboardController() {
   const [deletingFolderId, setDeletingFolderId] = useState<string | null>(null);
   const [folderActionError, setFolderActionError] = useState<string | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(true);
-  const { phase, uploadPct, error: uploadError, slides, total, showPreview, busy, start } = useSlideUpload(null);
 
   const visibleSummaries = useMemo(() => {
     const summaries = summarizeFolders(folders, sessions, {
@@ -35,13 +38,10 @@ export function useDashboardController() {
       purpose: CLASS_FOLDER_DEFAULT_PURPOSE
     });
     const needle = query.trim().toLocaleLowerCase();
-    return needle ? summaries.filter((folder) => folder.name.toLocaleLowerCase().includes(needle)) : summaries;
-  }, [folders, query, sessions, t]);
+    return summaries.filter((folder) => folder.name.toLocaleLowerCase().includes(needle)).sort((a, b) => sort === "name" ? a.name.localeCompare(b.name) : (Date.parse(b.updatedAt ?? "") || 0) - (Date.parse(a.updatedAt ?? "") || 0));
+  }, [folders, query, sessions, sort, t]);
 
-  const pick = (file?: File) => {
-    if (inputRef.current) inputRef.current.value = "";
-    void start(file);
-  };
+
 
   const submitFolder = async (event: FormEvent) => {
     event.preventDefault();
@@ -91,9 +91,11 @@ export function useDashboardController() {
 
   return {
     t,
+    displayName: profile?.displayName ?? t("nav.myWorkspace"), view, setView, sort, setSort,
     folders,
     ready,
-    inputRef,
+    uploadOpen,
+    closeUpload: () => setUploadOpen(false),
     folderEditor,
     folderName,
     setFolderName,
@@ -111,15 +113,7 @@ export function useDashboardController() {
     folderActionError,
     sidebarOpen,
     toggleSidebar: () => setSidebarOpen((open) => !open),
-    phase,
-    uploadPct,
-    uploadError,
-    slides,
-    total,
-    showPreview,
-    busy,
-    pick,
-    requestUpload: () => inputRef.current?.click(),
+    requestUpload: () => setUploadOpen(true),
     submitFolder,
     openFolderEditor,
     closeFolderEditor,

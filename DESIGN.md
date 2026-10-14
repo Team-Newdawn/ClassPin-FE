@@ -231,6 +231,13 @@ components:
     rounded: "{rounded.2xl}"
 ---
 
+## 현재 UI 기준: OhPin Figma (2026-10-02 승인)
+
+새 작업은 `docs/ohpin-figma-ui-redesign.md`와 `app/_design-system/tokens.css`를 기준으로 한다. 브랜드는 Blue/600 #0F62FE, 본문은 Navy/900 #141F38, 페이지는 Navy/50 #F4F6FA, 테두리는 Navy/150 #DDE2EC, 무대는 Navy/950 #0B1226이다. 폴더는 Blue·Sky·Navy·Slate 네 팔레트다. 기존 토큰 이름은 새 의미 토큰의 별칭으로 유지한다. 아래 과거 색상 수치와 충돌하면 새 토큰을 우선한다. 전역에는 토큰과 primitive만 두고 화면 CSS는 해당 route/component가 소유한다. 로고 외 버튼·배경·글자에 그라데이션을 쓰지 않는다.
+
+
+
+
 # Pin Design System
 
 > 원본: `Pin_디자인시스템_정의서_v1.0.html` (v1.0 · 2026.07.14 · 근거 문서: 01_DESIGN_SYSTEM_SPEC.md, 02_CLAUDE_DESIGN_MASTER_PROMPT.md). 브랜드명은 Taglow → Pin으로 통일. Elevation shadow 값은 정의서에서 확정된 값.

@@ -1,43 +1,39 @@
 {
-  "created_at": "2026-09-28T06:31:19+00:00",
+  "created_at": "2026-10-02T07:41:49+00:00",
   "documents": [
     {
       "id": "prd",
       "path": "doc/pin_class_prd.md",
-      "sha256": "9e438bcec46472d6dfe3e60a58b2c2bbc6d845b54e4b925af143782fa3bb0b16"
+      "sha256": "141f64417138d7c1a4e383fab189448f89387648d0f0131469471cbc817c2ce3"
     },
     {
       "id": "class-frontend-architecture",
       "path": "docs/class-frontend-architecture.md",
-      "sha256": "8054fb943fcbd3c2107789e6364059acd0fd2bba3e5ce140a9a54ab9c9710964"
+      "sha256": "09c5e3440189f1f6dac0eed5b776077f4938f797efdf0772088d47d27190b26a"
+    },
+    {
+      "id": "ohpin-figma-ui-redesign",
+      "path": "docs/ohpin-figma-ui-redesign.md",
+      "sha256": "b4d733f64bba78a77c139987769188b466690eb63ded76e5a3e4f192d307cf43"
     }
   ],
   "manifest": {
     "path": "docs/document-manifest.json",
-    "sha256": "62950db9fce4a8a123ee00193c27ecdfa06e9503a4b44e80ec30b20153673728"
+    "sha256": "3559232a8866f0c77641a6a5e1ef3f34a27990864d64beb55bd815dd979d985a"
   },
   "schema_version": "1.0",
   "selected_artifact_ids": [
-    "class-frontend-architecture"
+    "class-frontend-architecture",
+    "ohpin-figma-ui-redesign"
   ],
   "task": {
-    "id": "rest-business-api",
+    "id": "ohpin-ui-redesign",
     "requirement_ids": [
-      "CFA-090",
-      "CFA-091",
-      "CFA-092",
-      "CFA-093",
-      "CFA-094",
-      "CFA-095",
-      "CFA-096",
-      "CFA-097",
-      "CFA-098",
-      "CFA-099"
+      "OHUI-001"
     ],
     "scopes": [
-      "class-frontend-layering",
-      "class-data-loading-performance"
+      "ohpin-ui-redesign"
     ],
-    "summary": "Replace direct Supabase business CRUD with OhPin REST API; preserve identity Storage Realtime and push dev"
+    "summary": "Approved Figma UI redesign, frontend first, preserve runtime boundaries"
   }
 }

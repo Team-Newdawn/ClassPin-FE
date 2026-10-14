@@ -25,15 +25,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     let active = true;
+    // 토큰 갱신마다 프로필을 다시 읽으면 일시적인 서버 오류 한 번에 강사가 로그인 화면으로 밀려난다.
+    let profileLookup: { userId: string; request: Promise<Profile | null> } | null = null;
     const apply = async (nextUser: User | null) => {
       if (!active) return;
       setUser(nextUser);
       // 익명 수강생은 participant 고정이라 프로필까지 읽을 필요가 없다.
       if (nextUser && !nextUser.is_anonymous) {
         try {
-          const nextProfile = await fetchOwnProfile(nextUser.id);
+          if (profileLookup?.userId !== nextUser.id) profileLookup = { userId: nextUser.id, request: fetchOwnProfile(nextUser.id) };
+          const nextProfile = await profileLookup.request;
           if (active) setProfile(nextProfile);
         } catch (error) {
+          profileLookup = null;
           // PostgrestError 는 콘솔에서 {} 로 뭉개져 message 를 따로 찍는다.
           const detail = (error as { message?: string })?.message ?? String(error);
           console.error(`Profile fetch failed: ${detail}`, error);

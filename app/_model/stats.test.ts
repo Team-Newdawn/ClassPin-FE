@@ -1,8 +1,19 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { buildSessionInsights, groupQuestionsBySlide, summarizeFolders } from "./stats.ts";
+import { buildSessionInsights, groupQuestionsBySlide, summarizeFolders, summarizeEndReport } from "./stats.ts";
 import type { ClassFolder, ClassSession, Question } from "./types.ts";
 
+test("종료 리포트는 동률과 삭제된 슬라이드의 질문을 보존하고 빈 자료를 구분한다", () => {
+  const report = summarizeEndReport(2, [{ slideIndex: 0, reactionCount: 2 }, { slideIndex: 1, reactionCount: 3 }, { slideIndex: 9, reactionCount: 4 }]);
+  assert.deepEqual(report.counts, [1, 1]);
+  assert.deepEqual(report.topSlides, [1, 2, null]);
+  assert.equal(report.unmapped, 1);
+  assert.equal(report.reactionCount, 9);
+  assert.equal(report.questionCount, 3);
+  const empty = summarizeEndReport(0, []);
+  assert.deepEqual(empty.topSlides, []);
+  assert.equal(empty.maximum, 0);
+});
 const question = (id: string, slideIndex: number, status: Question["status"], createdAt: string): Question => ({
   id,
   sessionId: "session-1",
@@ -32,6 +43,9 @@ const sessions = [{
   showQuestionPins: true,
   showPresentationQr: true,
   presentationQrPosition: "bottom-right",
+  allowQuestionReactions: true,
+  allowEmojiReactions: true,
+  startedAt: null,
   createdAt: "2026-08-03T00:00:00.000Z",
   slides: [
     { id: "slide-1", pageIndex: 0, title: "첫 장" },

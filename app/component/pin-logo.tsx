@@ -2,17 +2,14 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import ohPinLogo from "@/assets/logo/ohpin_logo.svg";
+
 import { useLanguage } from "@/app/_controller/language-context";
 import styles from "./pin-logo.module.css";
 
-export function PinLogo({ href = "/" }: {
-  href?: string;
-}) {
+export function PinLogo({ href = "/" }: { href?: string }) {
   const { t } = useLanguage();
-  return (
-    <Link className={`${styles.root} pin-logo`} href={href} aria-label={`OhPin · ${t("common.home")}`}>
-      <Image className={styles.image} src={ohPinLogo} alt="" loading="eager" />
-    </Link>
-  );
+  return <Link className={styles.root} href={href} aria-label={`OhPin · ${t("common.home")}`}>
+    <Image className={styles.image} src="/assets/design/ohpin-mark.svg" width={37.5} height={26} alt="" loading="eager" />
+    <span>Oh<span className={styles.pin}>Pin</span></span>
+  </Link>;
 }

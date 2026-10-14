@@ -1,16 +1,18 @@
 "use client";
-/* eslint-disable react-hooks/preserve-manual-memoization -- Existing timer callbacks rely on stable identities; React Compiler skips this controller when the live autoplay effect is active. */
 
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useAuth } from "@/app/_controller/auth-context";
 import { useLanguage } from "@/app/_controller/language-context";
 import { useSessions } from "@/app/_controller/session-store";
 import { useLectureReactions } from "@/app/_controller/use-lecture-reactions";
-import { advancePinPlayback, canRotatePinPlayback, crossedPinMilestone, findNewestIncomingPin, nextPresentationSlide, presentationAutoplayDelay, resolvePinDisplayPositions, resolveVisiblePresentationLabelIds } from "@/app/_model/class/presentation-rotation";
+import { advancePinPlayback, canRotatePinPlayback, crossedPinMilestone, findNewestIncomingPin, nextPresentationSlide, presentationAutoplayDelay } from "@/app/_model/class/presentation-rotation";
 import { groupQuestionsBySlide } from "@/app/_model/stats";
 import type { Question } from "@/app/_model/types";
 import { classSessionPersistenceEnabled } from "@/app/_service/class-session-service";
+import { usePinCluster } from "../component/pin-cluster-popover";
+import { usePinLabelMode } from "@/app/_controller/use-pin-label-mode";
 
 const CONTROLS_HIDE_DELAY = 2600;
 const PIN_REVEAL_DELAY = 1000;
@@ -25,7 +27,7 @@ export function useSessionPresentationController() {
   const { isAdmin } = useAuth();
   const params = useParams<{ id: string }>();
   const router = useRouter();
-  const { sessions, ready: storeReady, loadSessionById, setActiveSession, setCurrentSlide } = useSessions();
+  const { sessions, folders, ready: storeReady, loadSessionById, setActiveSession, setCurrentSlide, notifyQuestionsChanged } = useSessions();
   const session = sessions.find((item) => item.id === params.id);
   const [lookupDone, setLookupDone] = useState(false);
   const ready = storeReady && (Boolean(session) || lookupDone);
@@ -38,7 +40,8 @@ export function useSessionPresentationController() {
   }
   const showQuestionPins = session?.showQuestionPins ?? false;
   const presentationAutoplay = session?.presentationAutoplay ?? false;
-  const { reactions: liveReactions } = useLectureReactions(sessionId);
+  const { reactions: lectureReactions } = useLectureReactions(sessionId, notifyQuestionsChanged);
+  const liveReactions = session?.allowEmojiReactions ? lectureReactions : [];
   const sessionTitle = session?.title;
   const currentSlide = canControl ? syncedSlide ?? 0 : audienceView.currentSlide;
   const slideCount = session?.slides.length ?? 0;
@@ -53,7 +56,6 @@ export function useSessionPresentationController() {
     [currentSlide, questionsBySlide]
   );
   const stageRef = useRef<HTMLElement>(null);
-  const presentationCanvasRef = useRef<HTMLDivElement>(null);
   const currentIndexRef = useRef(0);
   const hideTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pageQuestionsRef = useRef<PositionedQuestion[]>([]);
@@ -65,15 +67,19 @@ export function useSessionPresentationController() {
   const [controlsVisible, setControlsVisible] = useState(true);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
+
   const [detailQuestionId, setDetailQuestionId] = useState<string | null>(null);
   const [liveQuestionId, setLiveQuestionId] = useState<string | null>(null);
-  const [pinPlayback, setPinPlayback] = useState({ sessionId, currentSlide, showQuestionPins, shownPinIds: [] as string[] });
-  if (pinPlayback.sessionId !== sessionId || pinPlayback.currentSlide !== currentSlide || pinPlayback.showQuestionPins !== showQuestionPins) {
-    setPinPlayback({ sessionId, currentSlide, showQuestionPins, shownPinIds: [] });
+  const [showQuestionLabels] = usePinLabelMode(params.id);
+  const { expandedIds, highlightedId, highlightPin, clusterQuestions, openCluster, closeCluster } = usePinCluster(session?.slides[currentSlide]?.id, pageQuestions);
+  // 상세 대화상자나 묶음 팝오버가 열려 있으면 PIN 공개·자동 넘김·키보드 이동을 멈춘다.
+  const pinFocusId = detailQuestionId ?? expandedIds?.[0] ?? null;
+  const [pinPlayback, setPinPlayback] = useState({ sessionId, currentSlide, showQuestionPins, presentationAutoplay, shownPinIds: [] as string[] });
+  if (pinPlayback.sessionId !== sessionId || pinPlayback.currentSlide !== currentSlide || pinPlayback.showQuestionPins !== showQuestionPins || pinPlayback.presentationAutoplay !== presentationAutoplay) {
+    setPinPlayback({ sessionId, currentSlide, showQuestionPins, presentationAutoplay, shownPinIds: [] });
     if (pinPlayback.sessionId !== sessionId || pinPlayback.currentSlide !== currentSlide) setDetailQuestionId(null);
   }
   const [pinMilestone, setPinMilestone] = useState<number | null>(null);
-  const [canvasSize, setCanvasSize] = useState<{ width: number; height: number } | null>(null);
 
   useEffect(() => {
     if (!storeReady || lookupDone || session) return;
@@ -87,19 +93,16 @@ export function useSessionPresentationController() {
 
   const playback = useMemo(() => {
     if (!showQuestionPins) return EMPTY_PLAYBACK;
+    if (!presentationAutoplay) return { shownPinIds: pageQuestions.map((pin) => pin.id), activePinId: null };
     const validIds = new Set(pageQuestions.map((question) => question.id));
     const shownPinIds = pinPlayback.shownPinIds.filter((id) => validIds.has(id));
     if (shownPinIds.length) return { shownPinIds, activePinId: shownPinIds.at(-1) ?? null };
     const firstPinId = pageQuestions[0]?.id ?? null;
     return { shownPinIds: firstPinId ? [firstPinId] : [], activePinId: firstPinId };
-  }, [pageQuestions, showQuestionPins, pinPlayback.shownPinIds]);
+  }, [pageQuestions, presentationAutoplay, showQuestionPins, pinPlayback.shownPinIds]);
   const visibleQuestionIds = useMemo(() => liveQuestionId && !playback.shownPinIds.includes(liveQuestionId)
     ? [...playback.shownPinIds, liveQuestionId]
     : playback.shownPinIds, [liveQuestionId, playback.shownPinIds]);
-  const pinDisplayPositions = useMemo(() => {
-    if (!canvasSize) return undefined;
-    return resolvePinDisplayPositions(pageQuestions.filter((question) => question.anchorKind !== "box" && question.anchorKind !== "path"), canvasSize.width, canvasSize.height);
-  }, [canvasSize, pageQuestions]);
   const activeQuestionId = liveQuestionId ?? (pageQuestions.some((question) => question.id === detailQuestionId) ? detailQuestionId : playback.activePinId);
 
   const revealControls = useCallback(() => {
@@ -133,7 +136,7 @@ export function useSessionPresentationController() {
     pageQuestions.length,
     playback.shownPinIds.length,
     slideCount,
-    detailQuestionId !== null
+    pinFocusId !== null
   );
   useEffect(() => {
     if (autoplayDelay === null) return;
@@ -157,32 +160,6 @@ export function useSessionPresentationController() {
     pageQuestionsRef.current = pageQuestions;
   }, [pageQuestions]);
 
-  useLayoutEffect(() => {
-    const canvas = presentationCanvasRef.current?.querySelector<HTMLElement>(".slide-canvas");
-    if (!canvas) return;
-    const observer = new ResizeObserver(([entry]) => {
-      const width = Math.round(entry.contentRect.width);
-      const height = Math.round(entry.contentRect.height);
-      setCanvasSize((current) => current?.width === width && current.height === height ? current : { width, height });
-    });
-    observer.observe(canvas);
-    return () => observer.disconnect();
-  }, [sessionId]);
-
-  useLayoutEffect(() => {
-    const canvas = presentationCanvasRef.current?.querySelector<HTMLElement>(".slide-canvas");
-    if (!canvas || !showQuestionPins) return;
-    const labels = Array.from(canvas.querySelectorAll<HTMLElement>("[data-presentation-label-id]"));
-    const pins = Array.from(canvas.querySelectorAll<HTMLElement>("[data-presentation-pin-id]"));
-    labels.forEach((label) => { label.hidden = false; });
-    const visibleLabelIds = new Set(resolveVisiblePresentationLabelIds(
-      labels.map((label) => ({ id: label.dataset.presentationLabelId!, bounds: label.getBoundingClientRect() })),
-      pins.map((pin) => ({ id: pin.dataset.presentationPinId!, bounds: pin.getBoundingClientRect() })),
-      activeQuestionId
-    ));
-    labels.forEach((label) => { label.hidden = !visibleLabelIds.has(label.dataset.presentationLabelId!); });
-  }, [activeQuestionId, isFullscreen, pinDisplayPositions, showQuestionPins, visibleQuestionIds]);
-
   // 첫 스냅샷은 새 PIN으로 보지 않는다. 이후 새 PIN이 들어오면 해당 슬라이드로 이동해 즉시 강조한다.
   useEffect(() => {
     if (!sessionId) return;
@@ -190,16 +167,16 @@ export function useSessionPresentationController() {
     previousQuestionIdsRef.current = positionedQuestionIds;
     const firstSnapshot = questionSessionIdRef.current !== sessionId;
     questionSessionIdRef.current = sessionId;
-    if (firstSnapshot || !showQuestionPins) return;
+    if (firstSnapshot || !showQuestionPins || !presentationAutoplay) return;
     const incoming = findNewestIncomingPin(positionedQuestions, previousIds);
     if (!incoming) return;
     if (incoming.slideIndex !== currentIndexRef.current) setDetailQuestionId(null);
     goToSlide(incoming.slideIndex);
     setLiveQuestionId(incoming.id);
-    setPinPlayback({ sessionId, currentSlide: incoming.slideIndex, showQuestionPins, shownPinIds: [incoming.id] });
+    setPinPlayback({ sessionId, currentSlide: incoming.slideIndex, showQuestionPins, presentationAutoplay, shownPinIds: [incoming.id] });
     // id 집합이 같으면 질문 본문·답변·공감 변경만으로 강조를 재생하지 않는다.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [goToSlide, positionedQuestionKey, sessionId, showQuestionPins]);
+  }, [goToSlide, positionedQuestionKey, presentationAutoplay, sessionId, showQuestionPins]);
 
   useEffect(() => {
     if (!liveQuestionId) return;
@@ -213,10 +190,10 @@ export function useSessionPresentationController() {
   }, [playback.shownPinIds]);
 
   useEffect(() => {
-    if (!canRotatePinPlayback(showQuestionPins, pageQuestions.length, playback.shownPinIds.length, detailQuestionId)) return;
+    if (!presentationAutoplay || !canRotatePinPlayback(showQuestionPins, pageQuestions.length, playback.shownPinIds.length, pinFocusId)) return;
     const interval = window.setInterval(rotateQuestions, PIN_REVEAL_DELAY);
     return () => window.clearInterval(interval);
-  }, [detailQuestionId, pageQuestions.length, playback.shownPinIds.length, rotateQuestions, showQuestionPins]);
+  }, [pinFocusId, pageQuestions.length, playback.shownPinIds.length, presentationAutoplay, rotateQuestions, showQuestionPins]);
 
   useEffect(() => {
     if (!sessionId) return;
@@ -277,7 +254,7 @@ export function useSessionPresentationController() {
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
-      if (!session || detailQuestionId) return;
+      if (!session || pinFocusId) return;
       const target = event.target instanceof HTMLElement ? event.target : null;
       if (target?.closest("button") && (event.key === " " || event.key === "Enter")) return;
       const isNavigationKey = ["ArrowRight", "PageDown", " ", "ArrowLeft", "PageUp", "Home", "End"].includes(event.key);
@@ -307,7 +284,7 @@ export function useSessionPresentationController() {
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [detailQuestionId, goToSlide, revealControls, session, toggleFullscreen]);
+  }, [pinFocusId, goToSlide, revealControls, session, toggleFullscreen]);
 
   const slide = session?.slides[currentSlide];
   const detailQuestion = session?.questions.find((question) => question.id === detailQuestionId && question.slideIndex === currentSlide);
@@ -331,7 +308,6 @@ export function useSessionPresentationController() {
     joinUrl,
     pageQuestions,
     visibleQuestionIds,
-    pinDisplayPositions,
     activeQuestionId,
     liveQuestionId,
     liveReactions,
@@ -341,10 +317,17 @@ export function useSessionPresentationController() {
     isFullscreen,
     actionError,
     stageRef,
-    presentationCanvasRef,
     revealControls,
     openQuestionDetail,
     closeQuestionDetail: () => setDetailQuestionId(null),
+    showQuestionLabels,
+    folder: folders.find((item) => item.id === session?.folderId) ?? null,
+    expandedIds,
+    highlightedId,
+    highlightPin,
+    clusterQuestions,
+    openCluster: (ids: string[]) => { setDetailQuestionId(null); openCluster(ids); revealControls(); },
+    closeCluster,
     toggleFullscreen,
     previousSlide: () => goToSlide(currentIndexRef.current - 1),
     nextSlide: () => goToSlide(currentIndexRef.current + 1),

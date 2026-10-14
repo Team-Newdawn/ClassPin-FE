@@ -75,6 +75,14 @@ export async function getUploadSession() {
   return { accessToken: data.session.access_token, userId: data.session.user.id };
 }
 
+/** 같은 origin 프록시를 fetch 로 직접 부르는 곳(PDF 뷰어)에 넘길 현재 세션 토큰. */
+export async function getAccessToken(audience = false) {
+  const client = audience ? getAudienceSupabaseClient() : getSupabaseClient();
+  if (!client) return null;
+  const { data } = await client.auth.getSession();
+  return data.session?.access_token ?? null;
+}
+
 export async function signInWithGoogle(next = "/") {
   const client = getSupabaseClient();
   if (!client) throw new Error("Supabase 모드에서만 로그인할 수 있습니다.");

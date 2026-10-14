@@ -2,10 +2,13 @@
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { useAuth } from "@/app/_controller/auth-context";
-import { defaultQuestionCategorySettings, isParticipantPointAnchor, normalizeClassFolderColorIndex, normalizeClassFolderName, normalizeClassFolderPurpose, normalizeClassFolderPurposeLabel, normalizeQuestionCategorySettings, type ClassFolder, type ClassSession, type CreateClassFolderInput, type ParticipantQuestionInput, type PresentationQrPosition, type Question, type QuestionCategorySettings, type Slide } from "@/app/_model/types";
+import { defaultQuestionCategorySettings, isParticipantPointAnchor, normalizeClassFolderColorIndex, normalizeClassFolderName, normalizeClassFolderPurpose, normalizeClassFolderPurposeLabel, normalizeQuestionCategorySettings, type ClassFolder, type ClassSession, type CreateClassFolderInput, type ParticipantQuestionInput, type PresentationQrPosition, type Question, type Slide } from "@/app/_model/types";
 import { withQuestionReaction } from "@/app/_model/question-reactions";
 import { normalizeSessions, serializeSessionsForFailureCache } from "@/app/_model/class/session";
 import { classSessionPersistenceEnabled, createClassFolder as persistClassFolder, deleteClassFolder as persistClassFolderDeletion, deleteClassSession as persistSessionDeletion, deleteSessionSlide, fetchLectureSnapshot, fetchLiveSession, fetchLiveSessionById, fetchOwnedClassFolders, fetchOwnedSessions, fetchSessionSlides, markQuestionResolved, moveSessionToFolder as persistSessionFolder, persistSession, postAnswer, renameClassFolder as persistClassFolderName, saveSlideInstructorNote, setQuestionReaction as persistQuestionReaction, submitQuestion, subscribeToLecture, updateLecture, updateQuestion as persistQuestionUpdate, type LectureRealtimeRow } from "@/app/_service/class-session-service";
+import { coalesceRefresh } from "@/app/_model/class/live-refresh";
+import { LECTURE_QUESTIONS_CHANGED_EVENT, lectureReactionTopic } from "@/app/_model/lecture-reactions";
+import { publishRealtimeReaction } from "@/app/_service/realtime-reaction-service";
 
 const STORAGE_KEY = "pin-class-sessions-v1";
 const FOLDER_STORAGE_KEY = "pin-class-folders-v1";
@@ -34,12 +37,14 @@ type Store = {
   setStatus: (sessionId: string, status: ClassSession["status"]) => Promise<void>;
   setPresentationAutoplay: (sessionId: string, enabled: boolean) => Promise<void>;
   setShowQuestionPins: (sessionId: string, visible: boolean) => Promise<void>;
+  setReactionAllowed: (sessionId: string, setting: "allowQuestionReactions" | "allowEmojiReactions", allowed: boolean) => Promise<void>;
   setPresentationQrPlacement: (sessionId: string, position: PresentationQrPosition | null) => Promise<void>;
-  setQuestionCategories: (sessionId: string, settings: QuestionCategorySettings) => Promise<void>;
   updateSlideNote: (sessionId: string, slideId: string, body: string) => Promise<void>;
   loadSessionByCode: (code: string) => Promise<ClassSession | null>;
   loadSessionById: (sessionId: string) => Promise<ClassSession | null>;
   setActiveSession: (sessionId: string | null) => void;
+  /** 다른 참여자의 질문 변경 broadcast 를 받았을 때 활성 세션의 질문 목록 재조회를 예약한다. */
+  notifyQuestionsChanged: (sessionId: string) => void;
 };
 
 const SessionContext = createContext<Store | null>(null);
@@ -47,9 +52,11 @@ const SessionContext = createContext<Store | null>(null);
 const makeCode = () => `PIN${crypto.randomUUID().replaceAll("-", "").slice(0, 6).toUpperCase()}`;
 const cacheKey = (userId: string) => `${SUPABASE_CACHE_PREFIX}:${userId}`;
 const folderCacheKey = (userId: string) => `${SUPABASE_FOLDER_CACHE_PREFIX}:${userId}`;
-const PARTICIPANT_STATUS_POLL_MS = 2_000;
+const PARTICIPANT_STATUS_POLL_MS = 30_000;
+const REALTIME_FALLBACK_POLL_MS = 5_000;
+const BROADCAST_REFRESH_SPREAD_MS = 10_000;
 type LectureSettingPatch = Partial<Pick<ClassSession,
-  "status" | "presentationAutoplay" | "showQuestionPins" | "showPresentationQr" | "presentationQrPosition"
+  "status" | "presentationAutoplay" | "showQuestionPins" | "showPresentationQr" | "presentationQrPosition" | "allowQuestionReactions" | "allowEmojiReactions" | "startedAt"
 >>;
 
 const errorDetail = (error: unknown) => {
@@ -95,6 +102,7 @@ export function SessionStore({ children }: { children: React.ReactNode }) {
   const slideTargets = useRef(new Map<string, number>());
   const lectureSettingTargets = useRef(new Map<string, LectureSettingPatch>());
   const refreshSequences = useRef(new Map<string, number>());
+  const refreshTriggers = useRef(new Map<string, () => void>());
   const slideRefreshSequences = useRef(new Map<string, number>());
   const ownerId = useRef<string | null>(null);
   const demoChannelRef = useRef<BroadcastChannel | null>(null);
@@ -173,12 +181,13 @@ export function SessionStore({ children }: { children: React.ReactNode }) {
     let active = true;
     let statusPoll: ReturnType<typeof setInterval> | null = null;
     const unsubscribe: Array<() => void> = [];
-    const refresh = async (session: ClassSession) => {
+    const triggers = refreshTriggers.current;
+    const refresh = async (session: ClassSession, full = true) => {
       const refreshSequence = (refreshSequences.current.get(session.id) ?? 0) + 1;
       refreshSequences.current.set(session.id, refreshSequence);
       try {
         const latestSession = sessionsByIdRef.current.get(session.id) ?? session;
-        const snapshot = await fetchLectureSnapshot(latestSession, asAudience);
+        const snapshot = await fetchLectureSnapshot(latestSession, asAudience, !full);
         if (!active || !snapshot || refreshSequences.current.get(session.id) !== refreshSequence) return;
         setSessions((current) => current.map((item) => {
           if (item.id !== session.id) return item;
@@ -192,11 +201,13 @@ export function SessionStore({ children }: { children: React.ReactNode }) {
             // 되돌리지 못하게 한다. 청중은 계속 서버 페이지를 그대로 따른다.
             currentSlide: !asAudience && localTarget !== undefined
               ? item.currentSlide
-              : snapshot.currentSlide
+              : snapshot.currentSlide ?? item.currentSlide
           };
         }));
       } catch (error) { console.error("Supabase realtime refresh failed", error); }
     };
+    // 응답이 늦어도 요청이 쌓이지 않도록 재조회는 하나만 실행하고, 그동안 온 요청은 한 번으로 합친다.
+    const requestRefresh = coalesceRefresh((full) => active ? refresh(tracked, full) : Promise.resolve());
     const applyLectureUpdate = (session: ClassSession, lecture: LectureRealtimeRow) => {
       if (!active) return;
       setSessions((current) => current.map((item) => item.id === session.id ? {
@@ -209,6 +220,9 @@ export function SessionStore({ children }: { children: React.ReactNode }) {
         showPresentationQr: lecture.show_presentation_qr,
         presentationQrPosition: lecture.presentation_qr_position,
         questionCategories: normalizeQuestionCategorySettings(lecture.question_categories),
+        allowQuestionReactions: lecture.allow_question_reactions,
+        allowEmojiReactions: lecture.allow_emoji_reactions,
+        startedAt: lecture.started_at,
         ...lectureSettingTargets.current.get(session.id)
       } : item));
     };
@@ -222,15 +236,28 @@ export function SessionStore({ children }: { children: React.ReactNode }) {
         setSessions((current) => current.map((item) => item.id === session.id ? { ...item, slides } : item));
       } catch (error) { console.error("Supabase slide refresh failed", error); }
     };
+    const startPoll = (ms: number) => {
+      if (statusPoll) clearInterval(statusPoll);
+      // 화면이 꺼진 폰은 쉬고, 다시 켜질 때 한 번에 따라잡는다.
+      statusPoll = setInterval(() => { if (document.visibilityState !== "hidden") requestRefresh(true); }, ms);
+    };
+    const onVisibilityChange = () => { if (document.visibilityState === "visible") requestRefresh(true); };
     const connect = () => {
       try {
         const stop = subscribeToLecture(
           tracked.id,
           tracked.materialVersionId,
-          () => void refresh(tracked),
+          () => requestRefresh(true),
           (lecture) => applyLectureUpdate(tracked, lecture),
           () => void refreshSlides(tracked),
-          asAudience
+          asAudience,
+          // Realtime 연결 한도에 걸리거나 끊기면 폴링으로 따라가고, 다시 붙으면 평소대로 돌아간다.
+          (connected) => {
+            if (!active) return;
+            if (!connected) startPoll(REALTIME_FALLBACK_POLL_MS);
+            else if (asAudience) startPoll(PARTICIPANT_STATUS_POLL_MS);
+            else if (statusPoll) { clearInterval(statusPoll); statusPoll = null; }
+          }
         );
         if (stop) unsubscribe.push(stop);
       } catch (error) { console.error("Supabase authentication failed", error); }
@@ -238,15 +265,23 @@ export function SessionStore({ children }: { children: React.ReactNode }) {
     // fetchOwnedSessions/fetchLiveSession already returned an authoritative snapshot.
     // Re-fetching every lecture here caused O(lecture count) duplicate REST traffic.
     connect();
+    document.addEventListener("visibilitychange", onVisibilityChange);
+    let broadcastRefresh: ReturnType<typeof setTimeout> | null = null;
     if (asAudience) {
-      statusPoll = setInterval(() => {
-        // 다른 작성자의 questions 행은 RLS 때문에 Postgres Changes 이벤트가 오지
-        // 않을 수 있다. 공개 RPC 스냅샷으로 공감 순서와 종료 상태를 함께 보정한다.
-        void refresh(sessionsByIdRef.current.get(tracked.id) ?? tracked);
-      }, PARTICIPANT_STATUS_POLL_MS);
+      // 다른 작성자의 questions 행은 RLS 때문에 Postgres Changes 이벤트가 오지 않는다.
+      // 제출자가 보낸 broadcast 를 받으면 모두가 같은 순간 몰리지 않도록 0~10초 안에 질문만 다시 읽고,
+      // 느린 폴링이 공감 순서·종료 상태·놓친 신호를 보정한다. 창당 예약은 하나라 신호 스팸이 요청을 늘리지 못한다.
+      startPoll(PARTICIPANT_STATUS_POLL_MS);
+      triggers.set(tracked.id, () => {
+        if (broadcastRefresh) return;
+        broadcastRefresh = setTimeout(() => { broadcastRefresh = null; requestRefresh(false); }, Math.random() * BROADCAST_REFRESH_SPREAD_MS);
+      });
     }
     return () => {
       active = false;
+      triggers.delete(tracked.id);
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+      if (broadcastRefresh) clearTimeout(broadcastRefresh);
       if (statusPoll) clearInterval(statusPoll);
       unsubscribe.forEach((stop) => stop());
     };
@@ -314,7 +349,8 @@ export function SessionStore({ children }: { children: React.ReactNode }) {
       id: crypto.randomUUID(), courseId: crypto.randomUUID(), materialId: crypto.randomUUID(), materialVersionId,
       folderId: input.folderId,
       code: makeCode(), title: input.title, fileName: input.fileName,
-      status: "live", currentSlide: 0, presentationInteractions: true, presentationAutoplay: false, showQuestionPins: true, showPresentationQr: true, presentationQrPosition: "bottom-right",
+      status: "before", currentSlide: 0, presentationInteractions: true, presentationAutoplay: false, showQuestionPins: true, showPresentationQr: true, presentationQrPosition: "bottom-right",
+      allowQuestionReactions: true, allowEmojiReactions: true, startedAt: null,
       questionCategories: defaultQuestionCategorySettings(),
       createdAt: new Date().toISOString(), slides: input.slides, questions: []
     };
@@ -351,6 +387,8 @@ export function SessionStore({ children }: { children: React.ReactNode }) {
       else lectureSettingTargets.current.delete(sessionId);
     }
   }, [updateSession]);
+
+  const notifyQuestionsChanged = useCallback((sessionId: string) => refreshTriggers.current.get(sessionId)?.(), []);
 
   const loadLiveSession = useCallback((
     key: string,
@@ -444,6 +482,7 @@ export function SessionStore({ children }: { children: React.ReactNode }) {
     addQuestion: async (sessionId, input) => {
       const session = sessionsById.get(sessionId);
       if (!session) throw new Error("질문을 남길 강의를 찾지 못했습니다.");
+      if (session.status !== "live") throw new Error("종료된 강의에는 질문을 남길 수 없습니다.");
       if (!isParticipantPointAnchor(input)) throw new Error("참여자 질문은 PIN 위치에만 남길 수 있습니다.");
       const question: Question = {
         ...input,
@@ -455,7 +494,12 @@ export function SessionStore({ children }: { children: React.ReactNode }) {
         reactedByMe: false,
         createdAt: new Date().toISOString()
       };
-      if (classSessionPersistenceEnabled) await submitQuestion(session, question);
+      if (classSessionPersistenceEnabled) {
+        await submitQuestion(session, question);
+        // 다른 참여자는 RLS 때문에 이 질문의 DB 이벤트를 받지 못하므로 목록을 다시 읽으라고 알린다. 실패해도 보정 폴링이 따라잡는다.
+        void publishRealtimeReaction(lectureReactionTopic(sessionId), LECTURE_QUESTIONS_CHANGED_EVENT, {})
+          .catch((error) => console.error("Question change broadcast failed", error));
+      }
       updateSession(sessionId, (current) => ({
         ...current,
         questions: current.questions.some((item) => item.id === question.id)
@@ -542,9 +586,11 @@ export function SessionStore({ children }: { children: React.ReactNode }) {
       await write;
     },
     setStatus: async (sessionId, status) => {
-      const previous = sessionsById.get(sessionId)?.status;
+      const previous = sessionsById.get(sessionId);
       if (!previous) throw new Error("상태를 변경할 강의를 찾지 못했습니다.");
-      await saveLectureSettings(sessionId, { status }, { status: previous }, { status });
+      // BE가 LIVE 시작마다 started_at 을 다시 찍는다. 응답이 오기 전에도 경과 시간이 0부터 가도록 같은 값을 미리 둔다.
+      const startedAt = status === "live" ? new Date().toISOString() : previous.startedAt;
+      await saveLectureSettings(sessionId, { status, startedAt }, { status: previous.status, startedAt: previous.startedAt }, { status });
     },
     setPresentationAutoplay: async (sessionId, enabled) => {
       const previous = sessionsById.get(sessionId)?.presentationAutoplay;
@@ -555,6 +601,12 @@ export function SessionStore({ children }: { children: React.ReactNode }) {
       const previous = sessionsById.get(sessionId)?.showQuestionPins;
       if (previous === undefined) throw new Error("설정을 변경할 강의를 찾지 못했습니다.");
       await saveLectureSettings(sessionId, { showQuestionPins: visible }, { showQuestionPins: previous }, { show_question_pins: visible });
+    },
+    setReactionAllowed: async (sessionId, setting, allowed) => {
+      const previous = sessionsById.get(sessionId)?.[setting];
+      if (previous === undefined) throw new Error("설정을 변경할 강의를 찾지 못했습니다.");
+      const column = setting === "allowQuestionReactions" ? "allow_question_reactions" : "allow_emoji_reactions";
+      await saveLectureSettings(sessionId, { [setting]: allowed }, { [setting]: previous }, { [column]: allowed });
     },
     setPresentationQrPlacement: async (sessionId, position) => {
       const previous = sessionsById.get(sessionId);
@@ -569,10 +621,6 @@ export function SessionStore({ children }: { children: React.ReactNode }) {
         { show_presentation_qr: showPresentationQr, presentation_qr_position: presentationQrPosition }
       );
     },
-    setQuestionCategories: async (sessionId, settings) => {
-      if (classSessionPersistenceEnabled) await updateLecture(sessionId, { question_categories: settings });
-      updateSession(sessionId, (session) => ({ ...session, questionCategories: settings }));
-    },
     updateSlideNote: async (sessionId, slideId, body) => {
       if (classSessionPersistenceEnabled) await saveSlideInstructorNote(slideId, body);
       updateSession(sessionId, (session) => ({
@@ -581,6 +629,7 @@ export function SessionStore({ children }: { children: React.ReactNode }) {
       }));
     },
     setActiveSession: setActiveSessionId,
+    notifyQuestionsChanged,
     loadSessionByCode: (code) => loadLiveSession(
       `code:${code.toLowerCase()}`,
       sessionsByCode.get(code.toLowerCase()),
@@ -591,7 +640,7 @@ export function SessionStore({ children }: { children: React.ReactNode }) {
       sessionsById.get(sessionId),
       () => fetchLiveSessionById(sessionId)
     )
-  }), [createFolder, createSession, folders, foldersById, loadLiveSession, ready, saveLectureSettings, sessions, sessionsByCode, sessionsById, updateSession]);
+  }), [createFolder, createSession, folders, foldersById, loadLiveSession, notifyQuestionsChanged, ready, saveLectureSettings, sessions, sessionsByCode, sessionsById, updateSession]);
 
   return <SessionContext.Provider value={value}>{children}</SessionContext.Provider>;
 }

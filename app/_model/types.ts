@@ -111,8 +111,8 @@ export interface Profile {
 export const CLASS_FOLDER_NAME_MAX = 80;
 export const CLASS_FOLDER_COLOR_COUNT = 6;
 export const CLASS_FOLDER_DEFAULT_COLOR_INDEX = 2;
-export const CLASS_UNFILED_COLOR_INDEX = CLASS_FOLDER_DEFAULT_COLOR_INDEX;
-export const CLASS_FOLDER_COLOR_OPTIONS = [2, 3, 1, 5, 0] as const;
+export const CLASS_UNFILED_COLOR_INDEX = 0;
+export const CLASS_FOLDER_COLOR_OPTIONS = [2, 3, 1, 0] as const;
 export const CLASS_FOLDER_PURPOSES = ["qa", "feedback", "education", "brainstorming", "other"] as const;
 export type ClassFolderPurpose = typeof CLASS_FOLDER_PURPOSES[number];
 export const CLASS_FOLDER_DEFAULT_PURPOSE: ClassFolderPurpose = "qa";
@@ -232,7 +232,8 @@ export interface ClassSession {
   code: string;
   title: string;
   fileName: string;
-  status: "live" | "ended";
+  /** BE 수명 주기. 화면은 live 여부만 구분하고, pending은 아직 FE에서 만들지 않는다. */
+  status: "before" | "pending" | "live" | "ended";
   currentSlide: number;
   presentationInteractions: boolean;
   presentationAutoplay: boolean;
@@ -240,6 +241,11 @@ export interface ClassSession {
   showPresentationQr: boolean;
   presentationQrPosition: PresentationQrPosition;
   questionCategories: QuestionCategorySettings;
+  /** 참여자 공감(👍)과 실시간 이모지 반응 허용. BE가 공감 RPC에서 allow_question_reactions 를 강제한다. */
+  allowQuestionReactions: boolean;
+  allowEmojiReactions: boolean;
+  /** 마지막으로 LIVE를 시작한 시각. BE가 status를 live로 바꿀 때마다 다시 기록한다. */
+  startedAt: string | null;
   createdAt: string;
   slides: Slide[];
   questions: Question[];

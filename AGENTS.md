@@ -75,9 +75,25 @@ flow unless a task explicitly spans both products.
 ### Runtime and data boundaries
 
 - Stack: Next.js 16 App Router, React 19, TypeScript, plain CSS, Supabase JS.
-- Local development always uses the Supabase CLI-managed Docker stack. Start it
-  with `npm run supabase:start`; do not point local feature work at production.
-  Verify schema changes from a clean database with `npm run supabase:reset`.
+- Local development currently runs against production: `.env.local` points at the
+  production Supabase project and the REST proxy defaults to the production backend
+  (decided 2026-10-13). The local Supabase stack only replays FE migrations and lacks
+  backend-only migrations (`before`/`pending`, lifecycle RPCs); ignore that drift and
+  never treat `supabase:reset` as proof of production schema. Load tests and full
+  browser flows hit production: run them only in no-lecture hours, with user approval
+  and an automatic stop condition.
+- Business data goes through the OhPin Spring backend (`Team-Newdawn/ClassPin-BE`)
+  via the same-origin proxy `/api/rest/[...path]` (`REST_API_URL`, default
+  `https://ohpinbe.newdawn.co.kr`; production `NEXT_PUBLIC_DATA_MODE=rest`). The
+  backend repository is read-only for this project: hand backend changes over as a
+  guide, never edit it. Check API drift against the deployed spec
+  (`https://ohpinbe.newdawn.co.kr/v3/api-docs`) and the backend source; its Swagger
+  omits `status` on `PATCH /instructor/lectures/{id}` although the backend accepts it.
+  A proxy `502 REST API unavailable` means the Next server's fetch never reached the
+  backend (network/DNS/socket), not a backend error; backend errors pass through
+  with their own status.
+- Participant lecture state: 404 means missing, 204 (before start) and 410 (ended)
+  both mean closed (`LectureClosedError`).
 - Providers are composed in `app/layout.tsx`: language, auth, then session store.
 - Instructor path: `/login` -> Google OAuth -> `/auth/callback` -> `/admin/dashboard`.
 - Public participant path: `/join/[code]`; never place it behind the admin guard.
@@ -86,13 +102,29 @@ flow unless a task explicitly spans both products.
 - `app/_controller/session-store.tsx` is the UI boundary. In Supabase mode Postgres is
   authoritative and localStorage is only an account-scoped failure cache. In demo
   mode localStorage + BroadcastChannel are authoritative.
-- `app/_service/class-session-service.ts` owns Supabase reads/writes, while
+- `app/_service/class-session-service.ts` owns REST and Supabase reads/writes, while
   `app/_infrastructure/supabase` owns client construction. Every new owner-visible
   table or column needs a forward-only migration and RLS-compatible access.
 - Core model: Folder -> many ClassSession records; ClassSession maps to Course ->
   Lecture -> Material -> MaterialVersion -> Slides -> Questions/Answers.
 - Never expose `Slide.speakerNote` to participant queries; the repository currently
   omits notes on audience reads and that trust boundary must remain intact.
+- Load contract for live lectures (ported from `dev`): one coalesced session refresh
+  in flight; participants never subscribe to `questions` postgres_changes, they get a
+  `questions-changed` broadcast and refetch questions only after 0-10 s jitter;
+  participant status polling is 30 s and pauses while the tab is hidden, falling back
+  to 5 s polling on `CHANNEL_ERROR`/`TIMED_OUT`; join lookup retries with backoff and
+  jitter (max 5); `publishRealtimeReaction` reuses an already-subscribed channel.
+- Live audience count uses a heartbeat broadcast (participant tab -> instructor-only
+  topic `lecture-audience:{id}`, every 60 s, 150 s window), never Realtime Presence:
+  Presence fans every join/leave out to all participants (N^2 messages). The count is
+  an approximate per-tab display value, not attendance.
+- Deployment: pushing `dev` runs `.github/workflows/deploy-ec2.yml` to EC2. Repository
+  secrets are `EC2_HOST`, `EC2_USER`, `EC2_SSH_KEY`, `EC2_KNOWN_HOSTS`, and `ENV_FILE`
+  (one dotenv blob validated by `scripts/prepare-ec2-env.mjs`). Add server-only
+  variables such as `GROQ_API_KEY` as a line inside `ENV_FILE` (re-upload the whole
+  file); a new `NEXT_PUBLIC_*` also needs the script allowlist and a `Dockerfile` ARG
+  and must never hold a secret. Never echo secret values in logs or chat.
 
 ### Current product contract
 
@@ -100,18 +132,35 @@ flow unless a task explicitly spans both products.
   `/login`, signed-in instructors go to `/admin/dashboard`.
 - The main admin dashboard is folder-first, supports folder-name search, and has
   no persistent sidebar.
-- Opening a folder shows its material cards with a grid/list view switch and an
-  Insights tab in the page header; Insights is not a sidebar destination. Inside
-  that tab, one accessible dropdown switches between the folder aggregate and
-  each material's own insight scope.
+- Opening a folder shows its material cards with a grid/list view switch. The
+  folder page has no Insights tab (removed 2026-10-05).
 - PDF/PPT/PPTX source uploads accept up to 1 GiB. In Supabase mode the browser
   uses resumable Storage upload and `/api/convert` receives only the owner-scoped
   source path; do not send large source bytes through Cloud Run request bodies.
+- Source PDFs are read through `GET /api/pdf?path=…` with the requester's JWT, never
+  through per-participant signed URLs. The route keeps the existing live-only RLS
+  gate and a server disk cache; do not add a service-role bypass or long browser cache.
 - Opening a material shows the live player. Its folder rail can collapse, its right
   question panel can resize, and speaker notes sit below the slide.
-- A right-panel question item only selects its slide and highlights its PIN in
-  blue. Only clicking the PIN opens the detail dialog; answer and resolve actions
-  live in that dialog, never inline in the right panel.
+- New materials start not live. The folder's start button only opens the player;
+  the player's own start/end button changes LIVE state.
+- The right question panel starts with an AI summary of the current slide's
+  questions, shown only when that slide has questions. `POST /api/question-summary`
+  calls Groq with the server-only `GROQ_API_KEY` and returns 503 without it.
+- The player header shows the LIVE elapsed time from the backend `started_at` (reset
+  on every LIVE start) and the live audience count. The end-lecture dialog summarizes
+  duration, participants, and questions; elapsed time freezes when that dialog opens
+  and the values stay visible while the end is saving.
+- Lecture preparation toggles `allow_question_reactions` (empathy button) and
+  `allow_emoji_reactions` (emoji tools and reactions); the join page hides each
+  control when it is off.
+- On the join page, clicking a question card moves to its slide and shows only that
+  PIN; other participants' PINs show only while `showQuestionPins` is on.
+- A right-panel question item only selects its slide, dims the slide, and highlights
+  and enlarges its PIN in blue, expanding its cluster if needed. Only clicking a PIN opens the detail dialog; a PIN cluster opens
+  a popover (AI summary + questions); a popover item enlarges and raises its PIN,
+  and clicking that PIN opens the dialog. Answer and
+  resolve actions live in that dialog, never inline in the right panel.
 - While live questions are enabled, the presentation starts PIN reveal afresh on
   every slide visit and advances one second after every PIN is visible. PIN-free
   slides retain the three-second fallback. A new positioned question immediately
@@ -119,12 +168,16 @@ flow unless a task explicitly spans both products.
   including when it arrives on the current slide. PIN reveal and automatic movement
   pause while a question detail dialog is open; changing slides closes that dialog.
 - The live/stop state must be visually and textually explicit. The filmstrip has a
-  visible horizontal scrollbar, marks the active slide with an error-red border,
-  and ArrowLeft/ArrowRight navigate slides except while the user is editing text
-  or another form control. Speaker notes resize vertically with the native handle.
+  visible horizontal scrollbar, marks the active slide with a blue border, offers
+  slide deletion from a per-thumbnail menu, and ArrowLeft/ArrowRight navigate
+  slides except while the user is editing text or another form control. Speaker
+  notes default to two lines; dragging their top handle up grows them and shrinks
+  the slide.
 - Keep the stage toolbar at a stable minimum height while the question panel is
   resized; above the stacked breakpoint preserve at least 400px for the stage, and
   truncate its title/sync copy before allowing it to overlap the actions or canvas.
+- Question types are hidden everywhere (temporary): participants submit the
+  lecture's first enabled category; BE/DB still require `category`.
 - Do not restore the text-slide creator. Existing image slide append/delete behavior
   remains supported.
 - Preserve accessible names, focus-visible behavior, semantic tabs/switches, and
@@ -151,10 +204,10 @@ flow unless a task explicitly spans both products.
 ### Minimum completion gate
 
 1. Trace the affected route from UI through store/repository/migration and back.
-2. Start Docker, run `npm run supabase:start`, then verify a clean migration replay
-   with `npm run supabase:reset` before `npm run lint` and `npm run build`.
+2. Run `npm run lint` and `npm run build`. Replay migrations with
+   `npm run supabase:reset` only when the change adds an FE migration.
 3. Run the smallest targeted Node test for any new non-trivial pure logic.
-4. Exercise login redirect, folder open, grid/list switch, Insights tab, material
+4. Exercise login redirect, folder open, grid/list switch, material
    open, panel collapse/resize, note save, scrollbar, and keyboard slide navigation
    in the child workspace browser.
 5. Run `ponytail-review` on the final diff, apply safe simplifications, then repeat

@@ -1,4 +1,5 @@
 .root{position:relative;width:100%;aspect-ratio:16/9;background:var(--color-bg-surface);overflow:hidden;border-radius:4px;box-shadow:0 14px 40px rgba(0,0,0,.3)}
+.root :global(.slide-placement-control){position:absolute;inset:0;z-index:2;width:100%;height:100%;border:0;background:transparent;cursor:crosshair}.root :global(.slide-placement-control:focus-visible){outline:2px solid var(--color-brand);outline-offset:-4px}.root :global(.pin-cluster-list.align-left){left:0;transform:none}.root :global(.pin-cluster-list.align-right){left:auto;right:0;transform:none}.root :global(.pin-cluster-list.above){top:auto;bottom:50px}
 .root[role=button]{cursor:crosshair}
 .root>img{width:100%;height:100%;display:block;object-fit:contain}
 .pdfPage{position:absolute;z-index:1;inset:0;width:100%;height:100%;display:block;object-fit:contain;background:var(--color-bg-surface);opacity:0}
@@ -25,26 +26,13 @@
 .root :global(.question-tag){position:absolute;z-index:6;transform:translate(36px,calc(-50% - 17px));border:0;white-space:nowrap;box-shadow:var(--shadow-sm)}
 .root :global(.question-pin.selected + .question-tag:not(.answered):not(.question-bubble)){transform:translate(30px,calc(-50% - 17px))}
 .root :global(.question-tag:hover){filter:brightness(.97);box-shadow:var(--shadow-md)}
-.root :global(.question-displacement-lines){position:absolute;z-index:4;inset:0;width:100%;height:100%;overflow:visible;pointer-events:none}
-.root :global(.question-displacement-lines) line{stroke:rgba(255,255,255,.72);stroke-width:1.5;stroke-dasharray:3 3;vector-effect:non-scaling-stroke}
 :global(.class-presentation-canvas) .root :global(.question-pin.live){z-index:9;transform-origin:50% 84%;animation:live-pin-pop 1s cubic-bezier(.2,.8,.2,1)}
 :global(.class-presentation-canvas) .root :global(.question-region.live){z-index:9;border-color:var(--color-error);background:var(--color-error-bg);box-shadow:0 0 0 5px var(--color-error);animation:live-region-pop 1s cubic-bezier(.2,.8,.2,1)}
 :global(.class-presentation-canvas) .root :global(.question-region.live)>span,:global(.class-presentation-canvas) .root :global(.question-path-marker.live){z-index:9;background:var(--color-error);box-shadow:0 0 0 2px var(--color-bg-surface),0 0 0 5px var(--color-error);animation:live-marker-pop 1s cubic-bezier(.2,.8,.2,1)}
 :global(.class-presentation-canvas) .root :global(.question-path.live) polyline{stroke:var(--color-error);filter:drop-shadow(0 0 5px var(--color-error));animation:live-region-pop 1s cubic-bezier(.2,.8,.2,1)}
-:global(.class-presentation-canvas) .root :global(.question-bubble){--pin-bubble-offset:32px;width:max-content;height:auto;min-height:30px;max-width:clamp(132px,24vw,360px);padding:7px 11px;display:block;transform:translate(var(--pin-bubble-offset),calc(-50% - 17px));white-space:pre-wrap;text-align:left;font-size:clamp(15px,calc(1.05vw + 10px),20px);line-height:1.35;overflow-wrap:anywhere;border:1px solid currentColor;border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,.32)}
-:global(.class-presentation-canvas) .root :global(.question-bubble[hidden]){display:none}
 :global(.class-presentation-canvas) .root :global(.question-bubble-body){position:relative;z-index:2}
 :global(.class-presentation-canvas) .root :global(.question-bubble.empathy-fire){isolation:isolate;box-shadow:0 0 24px rgba(249,115,22,.72),0 8px 24px rgba(0,0,0,.32);animation:empathy-fire-glow 900ms ease-in-out infinite alternate}
 :global(.class-presentation-canvas) .root :global(.question-bubble.live){background:var(--color-error);color:var(--color-bg-surface)}
-:global(.class-presentation-canvas) .root :global(.question-bubble):before{content:"";position:absolute;left:-5px;top:50%;width:9px;height:9px;background:inherit;border-left:1px solid currentColor;border-bottom:1px solid currentColor;transform:translateY(-50%) rotate(45deg)}
-:global(.class-presentation-canvas) .root :global(.question-bubble.to-left){transform:translate(calc(-100% - var(--pin-bubble-offset)),calc(-50% - 17px))}
-:global(.class-presentation-canvas) .root :global(.question-bubble.to-left):before{left:auto;right:-5px;transform:translateY(-50%) rotate(225deg)}
-:global(.class-presentation-canvas) .root :global(.question-bubble.below){transform:translate(var(--pin-bubble-offset),8px)}
-:global(.class-presentation-canvas) .root :global(.question-bubble.below):before{top:0}
-:global(.class-presentation-canvas) .root :global(.question-bubble.to-left.below){transform:translate(calc(-100% - var(--pin-bubble-offset)),8px)}
-:global(.class-presentation-canvas) .root :global(.question-bubble.above){transform:translate(var(--pin-bubble-offset),calc(-100% + 8px))}
-:global(.class-presentation-canvas) .root :global(.question-bubble.above):before{top:auto;bottom:0}
-:global(.class-presentation-canvas) .root :global(.question-bubble.to-left.above){transform:translate(calc(-100% - var(--pin-bubble-offset)),calc(-100% + 8px))}
 :global(.class-presentation-canvas) .root :global(.question-fire-effect){position:absolute;z-index:1;left:50%;top:-23px;transform:translateX(-50%);width:max-content;pointer-events:none;font-size:clamp(19px,2vw,30px);line-height:1;letter-spacing:.15em;filter:drop-shadow(0 0 8px rgba(251,146,60,.92));animation:empathy-flame 850ms ease-in-out infinite alternate}
 :global(.class-presentation-canvas) .root :global(.question-empathy-count){position:relative;z-index:2;margin-left:8px;display:inline-flex;align-items:center;gap:2px;white-space:nowrap;font-size:calc(.72em + 3px);font-weight:800;font-variant-numeric:tabular-nums}
 @keyframes live-pin-pop{0%,100%{transform:translate(-50%,-84%) scale(1)}55%{transform:translate(-50%,-84%) scale(1.7)}}
@@ -52,3 +40,43 @@
 @keyframes live-marker-pop{0%,100%{transform:translate(-50%,-50%) scale(1)}55%{transform:translate(-50%,-50%) scale(1.7)}}
 @keyframes empathy-fire-glow{to{box-shadow:0 0 34px rgba(249,115,22,.96),0 8px 24px rgba(0,0,0,.32)}}
 @keyframes empathy-flame{from{transform:translate(-50%,3px) scale(.9) rotate(-2deg)}to{transform:translate(-50%,-3px) scale(1.06) rotate(2deg)}}
+.root :global(.question-pin){width:44px;height:44px;padding:6px;transform:translate(-50%,-50%);background:none;box-shadow:none;filter:none}
+.root :global(.question-pin-icon){width:32px;height:32px;filter:none}
+.root :global(.question-pin.selected){box-shadow:none;filter:none}
+.root :global(.question-pin.selected)::after{content:"";position:absolute;inset:8px;border-radius:50%;outline:2px solid var(--color-brand);outline-offset:3px;pointer-events:none}
+.root :global(.question-pin.live){animation:none}
+.root :global(.question-pin-marker){top:50%;left:50%;transform:translate(-50%,-50%)}
+.root :global(.pin-cluster){position:absolute;z-index:12;transform:translate(-50%,-50%)}
+.root :global(.pin-cluster summary){display:grid;place-items:center;width:44px;height:44px;list-style:none;border:4px solid var(--color-bg-surface);border-radius:50%;background:var(--color-brand);color:var(--color-bg-surface);font-size:14px;font-weight:700;box-shadow:0 0 0 6px var(--color-brand-subtle);cursor:pointer}
+.root :global(.pin-cluster summary::-webkit-details-marker){display:none}
+.root :global(.pin-cluster[open]){z-index:25}
+.root :global(.pin-cluster-list){position:absolute;top:50px;left:50%;transform:translateX(-50%);width:220px;max-height:240px;overflow:auto;background:var(--color-bg-surface);border:1px solid var(--color-border);border-radius:12px;box-shadow:var(--shadow-md);padding:6px}
+.root :global(.pin-cluster-list button){width:100%;min-height:44px;text-align:left;border:0;border-radius:8px;padding:8px;background:none;color:var(--color-text-primary);font-size:12px;line-height:1.5;overflow-wrap:anywhere}
+.root :global(.pin-cluster-list button:hover){background:var(--color-brand-subtle)}
+.root :global(.pin-cluster-list span){display:block;color:var(--color-brand);font-size:10px;margin-bottom:3px}
+.root:has(:global(.question-pin.selected),:global(.pin-cluster.selected)) :global(.question-pin):not(:global(.selected)),.root:has(:global(.question-pin.selected),:global(.pin-cluster.selected)) :global(.pin-cluster):not(:global(.selected)){opacity:.3}
+/* 강의 관리 플레이어와 발표 화면이 함께 쓰는 PIN 조작 디자인. onSelectCluster가 있으면 켜진다. */
+.root:global(.pin-manager) :global(.question-pin){width:44px;height:44px}
+.root:global(.pin-manager.focus-dim)::after{content:"";position:absolute;inset:0;z-index:15;background:rgb(11 18 38 / 45%);pointer-events:none}
+.root:global(.pin-manager.focus-dim) :global(.focused){z-index:20}
+.root:global(.pin-manager) :global(.pin-cluster-button){position:absolute;z-index:12;width:var(--cluster-size,32px);height:var(--cluster-size,32px);padding:0;transform:translate(-50%,-50%);border:3.5px solid var(--color-bg-surface);border-radius:50%;background:var(--color-brand);color:var(--color-text-inverse);font-size:14px;font-weight:700;box-shadow:none;transition:box-shadow 160ms}
+.root:global(.pin-manager) :global(.pin-cluster-button:hover),.root:global(.pin-manager) :global(.pin-cluster-button:focus-visible){box-shadow:0 0 0 11px rgb(15 98 254 / 20%),0 4px 12px rgb(15 97 255 / 28%)}
+.root:global(.pin-manager) :global(.question-pin.selected)::after{content:none}
+.root:global(.pin-manager) :global(.pin-cluster-expanded){position:absolute;z-index:20;width:116px;height:116px;transform:translate(-50%,-50%);border-radius:50%;background:rgb(15 98 254 / 16%);animation:pin-cluster-grow 260ms cubic-bezier(.2,.8,.2,1) both}
+.root:global(.pin-manager) :global(.pin-cluster-spot){position:absolute;left:50%;top:50%;width:18px;height:18px;margin:-9px;padding:0;border:3px solid var(--color-bg-surface);border-radius:50%;background:var(--color-brand);transform:translate(var(--spot-x),var(--spot-y));transition:box-shadow 160ms;animation:pin-spot-spread 360ms cubic-bezier(.2,.8,.2,1) both}.root:global(.pin-manager) :global(.pin-cluster-spot) span{position:absolute;right:-12px;top:-12px;display:grid;place-items:center;width:16px;height:16px;border:1px solid var(--color-brand);border-radius:50%;background:var(--color-bg-surface);color:var(--color-brand);font-size:10px;font-weight:700}.root:global(.pin-manager) :global(.pin-cluster-spot){scale:1;transition:scale 240ms cubic-bezier(.2,.8,.2,1),box-shadow 160ms}.root:global(.pin-manager) :global(.pin-cluster-spot.highlighted){z-index:2;scale:1.7;box-shadow:0 0 0 4px rgb(15 98 254 / 30%),0 4px 10px rgb(10 25 77 / 35%)}.root:global(.pin-manager) :global(.pin-cluster-spot.highlighted) span{background:var(--color-brand);color:var(--color-bg-surface)}.root:global(.pin-manager) :global(.pin-cluster-spot:hover),.root:global(.pin-manager) :global(.pin-cluster-spot:focus-visible){box-shadow:0 2px 6px rgb(10 25 77 / 30%)}
+.root:global(.pin-manager) :global(.question-bubble){display:flex;align-items:center;gap:6px;max-width:min(280px,45%);padding:6px 10px;border:0;border-radius:10px;background:var(--color-text-primary);color:var(--color-text-inverse);font-size:13px;font-weight:700;line-height:1.4;letter-spacing:-.01em;white-space:nowrap;transform:translate(18px,-50%);box-shadow:none;transition:box-shadow 160ms}.root:global(.pin-manager) :global(.question-bubble:hover),.root:global(.pin-manager) :global(.question-bubble:focus-visible){box-shadow:0 6px 16px rgb(5 15 46 / 25%);filter:none}
+.root:global(.pin-manager) :global(.question-bubble-body){min-width:0;overflow:hidden;text-overflow:ellipsis}
+/* 자리가 좁으면 말풍선 폭을 줄이고 본문을 최대 3줄로 감싼다. 폭은 slide-canvas.tsx가 정한다. */
+.root:global(.pin-manager) :global(.question-bubble.wrapped){white-space:normal}.root:global(.pin-manager) :global(.question-bubble.wrapped) :global(.question-bubble-body){display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:3;line-clamp:3;overflow-wrap:anywhere}
+.root:global(.pin-manager) :global(.question-empathy-count){display:none}
+.root:global(.pin-manager) :global(.question-tag-chip){flex:none;padding:0 5px;border-radius:4px;background:var(--color-brand);color:var(--color-text-inverse);font-size:11px}
+.root:global(.pin-manager) :global(.question-tag-more){flex:none;font-size:12px;font-weight:500;color:var(--pin-neutral-300)}
+.root:global(.pin-manager.focus-dim) :global(.question-bubble:not(.focused)){opacity:.55}
+.root:global(.pin-manager.focus-dim) :global(.question-bubble.focused){background:var(--color-bg-surface);color:var(--color-text-primary)}
+.root:global(.pin-manager.focus-dim) :global(.question-bubble.focused) :global(.question-tag-more){color:var(--color-text-tertiary)}
+.root:global(.pin-manager) :global(.question-pin-icon){visibility:hidden}
+.root:global(.pin-manager) :global(.question-pin)::before{content:"";position:absolute;left:50%;top:50%;width:20px;height:20px;margin:-10px;box-sizing:border-box;border:3px solid var(--color-bg-surface);border-radius:50%;background:var(--color-brand);transition:box-shadow 160ms}
+.root:global(.pin-manager) :global(.question-pin:hover)::before,.root:global(.pin-manager) :global(.question-pin:focus-visible)::before{box-shadow:0 2px 6px rgb(10 25 77 / 30%)}
+@keyframes pin-cluster-grow{from{opacity:0;transform:translate(-50%,-50%) scale(.3)}}
+@keyframes pin-spot-spread{from{opacity:0;transform:translate(0,0) scale(.5)}}
+@media(prefers-reduced-motion:reduce){.root:global(.pin-manager) :global(.pin-cluster-expanded),.root:global(.pin-manager) :global(.pin-cluster-spot){animation:none;transition:none}}

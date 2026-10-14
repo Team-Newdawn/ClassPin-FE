@@ -1,16 +1,19 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPointerEvent } from "react";
+import { usePinLabelMode } from "@/app/_controller/use-pin-label-mode";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { useHorizontalSlideWheel } from "@/app/_controller/use-horizontal-slide-wheel";
 import { useLanguage } from "@/app/_controller/language-context";
+import { useLectureReactions } from "@/app/_controller/use-lecture-reactions";
+import { useLiveAudienceCount, useLiveElapsed } from "@/app/_controller/use-live-audience";
 import { useSessions } from "@/app/_controller/session-store";
 import { slideIndexFromPageNumber } from "@/app/_model/class/presentation-rotation";
 import { groupQuestionsBySlide } from "@/app/_model/stats";
-import { CLASS_UNFILED_COLOR_INDEX, type PresentationQrPosition, type QuestionCategorySettings, type QuestionStatus } from "@/app/_model/types";
+import { CLASS_UNFILED_COLOR_INDEX, type PresentationQrPosition, type QuestionStatus } from "@/app/_model/types";
 
 type Tab = "live" | "questions";
-const PRESENTATION_QR_POSITIONS: readonly PresentationQrPosition[] = ["top-left", "top-right", "bottom-left", "bottom-right"];
+export const PRESENTATION_QR_POSITIONS: readonly PresentationQrPosition[] = ["top-left", "top-right", "bottom-left", "bottom-right"];
 const MOBILE_REMOTE_MEDIA = "(max-width: 600px)";
 
 export const MIN_QUESTION_PANEL = 300;
@@ -29,24 +32,40 @@ export function useSessionAdminController() {
   const { t } = useLanguage();
   const params = useParams<{ id: string }>();
   const search = useSearchParams();
+  const prepare = search.get("mode") === "prepare";
+  const [questionScope, setQuestionScope] = useState<"slide" | "all">("slide");
+  const [questionSort, setQuestionSort] = useState<"empathy" | "latest">("empathy");
+  const [showQuestionLabels, setShowQuestionLabels] = usePinLabelMode(params.id);
   const router = useRouter();
+  const [endConfirmOpen, setEndConfirmOpen] = useState(false);
+  const [startedToast, setStartedToast] = useState(false);
+  useEffect(() => {
+    if (!startedToast) return;
+    const timer = setTimeout(() => setStartedToast(false), 3000);
+    return () => clearTimeout(timer);
+  }, [startedToast]);
   const {
     folders,
     sessions,
     ready,
     deleteSlide,
-    answerQuestion,
-    resolveQuestion,
     setCurrentSlide,
     setStatus,
     setPresentationAutoplay,
     setShowQuestionPins,
+    setReactionAllowed,
     setPresentationQrPlacement,
-    setQuestionCategories,
     setActiveSession,
     updateSlideNote
   } = useSessions();
   const session = sessions.find((item) => item.id === params.id);
+  const { reactions: lectureReactions } = useLectureReactions(session?.id ?? null);
+  const liveReactions = session?.allowEmojiReactions ? lectureReactions : [];
+  // 종료 저장 중에도 상태가 먼저 ended 로 바뀌므로, 팝업이 열려 있는 동안은 요약 값을 유지한다.
+  // 경과 시간은 강의 종료를 누른 순간 멈추고, 계속 진행하면 다시 흐른다.
+  const counting = session?.status === "live" || endConfirmOpen;
+  const liveElapsed = useLiveElapsed(session?.startedAt, counting, endConfirmOpen);
+  const audienceCount = useLiveAudienceCount(session?.id ?? null, counting);
   const [tab, setTab] = useState<Tab>(search.get("tab") === "questions" ? "questions" : "live");
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [detailQuestionId, setDetailQuestionId] = useState<string | null>(null);
@@ -54,14 +73,15 @@ export function useSessionAdminController() {
   const [query, setQuery] = useState("");
   const [shareOpen, setShareOpen] = useState(false);
   const [mobileQuestionsOpen, setMobileQuestionsOpen] = useState(false);
-  const [answer, setAnswer] = useState("");
   const [copied, setCopied] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
+
+
   const [lectureSaving, setLectureSaving] = useState(false);
   const lectureSavingRef = useRef(false);
   const [presentationError, setPresentationError] = useState<string | null>(null);
   const [folderRailOpen, setFolderRailOpen] = useState(true);
-  const [questionPanelWidth, setQuestionPanelWidth] = useState(380);
+  const [questionPanelWidth, setQuestionPanelWidth] = useState(340);
   const playerWorkspaceRef = useRef<HTMLDivElement | null>(null);
   const resizeStart = useRef<{ x: number; width: number } | null>(null);
   const [noteDrafts, setNoteDrafts] = useState<Record<string, string>>({});
@@ -205,6 +225,7 @@ export function useSessionAdminController() {
   useEffect(() => {
     if (!session || tab !== "live" || detailQuestionId || shareOpen || deleteSlideId || mobileQuestionsOpen) return;
     const onKeyDown = (event: KeyboardEvent) => {
+      if (document.querySelector("dialog[open]")) return;
       if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
       if (event.altKey || event.ctrlKey || event.metaKey) return;
       const target = event.target instanceof HTMLElement ? event.target : null;
@@ -255,11 +276,9 @@ export function useSessionAdminController() {
   const openQuestionDetail = (questionId: string) => {
     setSelectedId(questionId);
     setDetailQuestionId(questionId);
-    setAnswer("");
   };
   const closeQuestionDetail = () => {
     setDetailQuestionId(null);
-    setAnswer("");
   };
   const selectQuestionFromList = (questionId: string, slideIndex: number) => {
     if (!session) return;
@@ -271,20 +290,6 @@ export function useSessionAdminController() {
     await navigator.clipboard.writeText(joinUrl);
     setCopied(true);
     window.setTimeout(() => setCopied(false), 1500);
-  };
-  const submitAnswer = () => {
-    if (!session || !detailQuestion || !answer.trim()) return;
-    const body = answer.trim();
-    setActionError(null);
-    void answerQuestion(session.id, detailQuestion.id, body)
-      .then(() => setAnswer(""))
-      .catch((error) => {
-        console.error(`Answer save failed: ${errorDetail(error)}`, error);
-        setActionError(t("session.saveAnswerError"));
-      });
-  };
-  const resolveDetailQuestion = () => {
-    if (session && detailQuestion) runAction(resolveQuestion(session.id, detailQuestion.id), t("session.saveQuestionError"));
   };
   const changeNoteDraft = (value: string) => {
     if (!session || !slide) return;
@@ -349,7 +354,8 @@ export function useSessionAdminController() {
     }
     const popup = window.open(
       `/admin/session/${session.id}/present`,
-      `pin-class-present-${session.id}`,
+      // A fixed name would keep reusing a tab Chrome created while the player was fullscreen.
+      "_blank",
       `popup=yes,width=${window.screen.availWidth},height=${window.screen.availHeight}`
     );
     if (!popup) {
@@ -361,8 +367,13 @@ export function useSessionAdminController() {
   };
 
   return {
+    prepare, questionScope, setQuestionScope, questionSort, setQuestionSort, showQuestionLabels, setShowQuestionLabels,
+    panelQuestions: [...(questionScope === "slide" ? slideQuestions : session?.questions ?? [])].sort((a, b) => questionSort === "empathy" ? b.reactionCount - a.reactionCount || b.createdAt.localeCompare(a.createdAt) || a.id.localeCompare(b.id) : b.createdAt.localeCompare(a.createdAt) || a.id.localeCompare(b.id)),
     ready,
     session,
+    liveReactions,
+    liveElapsed,
+    audienceCount,
     slide,
     folder,
     folderAccentIndex,
@@ -379,7 +390,6 @@ export function useSessionAdminController() {
     query,
     shareOpen,
     mobileQuestionsOpen,
-    answer,
     copied,
     actionError,
     lectureSaving,
@@ -405,7 +415,6 @@ export function useSessionAdminController() {
     closeShare: () => setShareOpen(false),
     openMobileQuestions: () => setMobileQuestionsOpen(true),
     closeMobileQuestions: () => setMobileQuestionsOpen(false),
-    changeAnswer: setAnswer,
     changeQuery: setQuery,
     changeFilter: setFilter,
     selectQuestion: setSelectedId,
@@ -415,19 +424,34 @@ export function useSessionAdminController() {
     changeSlide,
     handleSlidePageKeyDown,
     resetSlidePageInput,
-    toggleStatus: () => session && runLectureAction(() => setStatus(session.id, session.status === "live" ? "ended" : "live"), t("session.saveLectureError")),
+    endConfirmOpen,
+    closeEndConfirm: () => setEndConfirmOpen(false),
+    confirmEnd: () => session && runLectureAction(async () => {
+      await setStatus(session.id, "ended");
+      setEndConfirmOpen(false);
+      router.push(`/admin/session/${session.id}/report`);
+    }, t("session.saveLectureError")),
+    startPreparedLecture: () => session && runLectureAction(async () => {
+      for (const slideId of pendingNotesRef.current.keys()) saveSlideNote(slideId);
+      await noteSaveQueueRef.current;
+      if (pendingNotesRef.current.size) throw new Error(t("session.saveSpeakerNotesError"));
+      await setStatus(session.id, "live");
+      router.replace(`/admin/session/${session.id}`);
+    }, t("session.saveLectureError")),
+    startedToast,
+    toggleStatus: () => session && (session.status === "live" ? setEndConfirmOpen(true) : runLectureAction(async () => {
+      await setStatus(session.id, "live");
+      setStartedToast(true);
+    }, t("session.saveLectureError"))),
     togglePresentationAutoplay: () => session && runLectureAction(() => setPresentationAutoplay(session.id, !session.presentationAutoplay), t("session.saveAutoplayError")),
     toggleQuestionPins: () => session && runLectureAction(() => setShowQuestionPins(session.id, !session.showQuestionPins), t("session.savePinSettingError")),
+    toggleReactionAllowed: (setting: "allowQuestionReactions" | "allowEmojiReactions") => session && runLectureAction(() => setReactionAllowed(session.id, setting, !session[setting]), t("session.saveReactionSettingError")),
     changePresentationQrPlacement: (value: string) => {
       if (!session) return;
       const position = PRESENTATION_QR_POSITIONS.find((candidate) => candidate === value) ?? null;
       if (value !== "hidden" && position === null) return;
       runLectureAction(() => setPresentationQrPlacement(session.id, position), t("session.saveQrPositionError"));
     },
-    saveQuestionCategories: (settings: QuestionCategorySettings) => session ? setQuestionCategories(session.id, settings) : Promise.resolve(),
-    reportActionError: setActionError,
-    submitAnswer,
-    resolveDetailQuestion,
     changeNoteDraft,
     saveNoteOnBlur: () => slide && saveSlideNote(slide.id),
     openDeleteSlide: (slideId: string) => {

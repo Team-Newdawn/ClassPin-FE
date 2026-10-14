@@ -100,6 +100,9 @@ app/
 - `CFA-057` 첫 유효 화면 3초와 질문 제출 API p95 2초를 검증한다. 기준 데이터 크기, 브라우저, Supabase 환경과 측정 방법을 evidence에 기록한다.
 - `CFA-058` 위 구조로 목표를 충족하지 못한 안정된 조회만 단일 RPC 후보로 승격한다. 이번 리팩터링에서 새 RPC를 추측으로 추가하지 않는다.
 - `CFA-059` controller는 같은 key의 동시 요청을 병합하고 stale response가 최신 화면을 덮지 못하게 한다. 범용 캐시 dependency는 추가하지 않는다.
+- `CFA-059A` 세션 snapshot 재조회는 세션당 동시에 하나만 실행하고, 실행 중 들어온 요청은 끝난 뒤 한 번으로 합친다. participant는 `lectures`·`slides` 변경만 구독하고 `questions` 변경은 구독하지 않는다. 새 질문은 제출자가 기존 반응 broadcast 토픽에 `questions-changed` 신호를 보내고, 수신자는 0~10초 무작위 지연 뒤 질문 목록만 재조회한다(창당 예약 하나). broadcast는 재조회 신호로만 쓰고 payload를 화면 데이터로 쓰지 않는다. 보정 polling은 30초이며 화면이 보일 때만 실행하고, 화면이 다시 보이면 즉시 1회 전체 재조회한다. Realtime 채널이 실패하면 5초 polling으로 후퇴하고 다시 연결되면 복귀한다.
+- `CFA-059B` 강사 프로필(`/api/me`)은 사용자 id마다 한 번만 조회한다. 같은 사용자의 토큰 갱신 이벤트는 다시 조회하지 않으며, 조회 실패만 다음 인증 이벤트에서 다시 시도한다.
+- `CFA-059D` participant 참여 조회가 404이면 "세션을 찾을 수 없음", 204·410이면 종료 화면을 표시한다. 인증 제한·네트워크·5xx 실패는 최대 5회 지수 backoff(1~16초)와 0~3초 무작위 지연으로 자동 재시도한 뒤 다시 시도할 수 있는 실패 화면을 표시한다.
 
 ## 7. 데이터 권위, 보안과 실패 경계
 
@@ -155,6 +158,7 @@ app/
 - `CFA-096` `JsonNode` 응답은 Swagger 이름만으로 추정하지 않고 실제 BE controller/repository와 확인한다. 빈 204 응답, 404, 401/403, JSON·텍스트 오류를 처리한다. 낙관적 mutation 실패는 기존 rollback·오류 표시를 유지한다. 자동 mutation 재시도를 추가하지 않는다.
 - `CFA-097` audience 데이터에는 발표 메모·작성자 UUID를 추가하지 않는다. `is_mine`과 공감 desired-state를 기존 contract로 유지한다. 위치·카테고리·작성자 수정권한, owner 접근제어와 강사 전용 메모 경계를 훼손하지 않는다. Realtime 이후 재조회도 같은 REST 경계를 사용한다.
 - `CFA-098` 원본 업로드는 기존 resumable Storage 경로를 유지하고 변환에는 `sourcePath`/`fileName`만 전송한다. 기존 스트리밍 진행률·실패 처리·원본 정리를 보존한다. 삭제 후 Storage cleanup 계약을 실제 BE 응답으로 확인한다.
+- `CFA-098A` 원본 PDF 읽기는 서명 URL을 발급하지 않고 같은 origin의 `GET /api/pdf?path=<source_path>`를 사용한다. 이 Route Handler는 service role 없이 요청자 JWT를 그대로 Storage에 전달해 기존 RLS(소유자 또는 live 강의 참여자)를 매 요청 재적용하고, 바이트는 서버 디스크 캐시에서 `Cache-Control: no-store`로 내보낸다. 참여자마다 다른 토큰의 서명 URL이 CDN·브라우저 캐시를 타지 못해 참여자 수만큼 Storage egress가 발생하던 문제를 Storage 기준 자료당 1회 다운로드로 바꾸고, 강의를 끄면 다음 요청부터 403이 된다. 이미 받은 브라우저의 사본 회수는 범위 밖이다.
 - `CFA-099` 구현 완료 조건은 로컬 Supabase 시작·clean migration replay, lint/build, token 분리·요청 DTO·204/오류 처리·participant 메모 비노출에 대한 작은 runnable check, 로컬 BE 또는 mock을 통한 proxy/변환 스트림 검증, 기존 핵심 브라우저 흐름과 최종 Ponytail review다. 운영 로그인·실데이터 검증이 없으면 production-ready라고 주장하지 않는다.
 
 ### 구현·검증 경계
@@ -168,3 +172,10 @@ app/
 | CFA-099 | 기존 model tests, REST targeted check, 로컬 runtime | migration replay, lint/build, browser, Ponytail review |
 
 2026-09-28 사전 확인: FE `origin/feature-dev`와 현재 HEAD는 `e00739a`, BE `main`은 `86b65be858d1892d11da0f9d300240b6d25e2e71`다. 배포 OpenAPI는 29 operation을 제공하며 폴더 목적 DTO를 포함한다. BE source는 폴더 목적 projection과 자동재생 projection/PATCH를 포함한다. 배포 API의 무인증 강사·participant 요청은 각각 401이고 localhost 직접 preflight는 403이다. 이 결과는 인증된 end-to-end 검증을 대신하지 않는다.
+
+- `CFA-100` (2026-10-07 사용자 승인, BE `5abb1d5`) 강의 상태는 `before`·`pending`·`live`·`ended`다. 새 자료는 `before`로 만든다. 화면은 `live` 여부만 구분하고 `pending` 전환 UI는 만들지 않는다. 청중 입장(`join`, `lectures/{id}`)에서 204(시작 전)·410(종료)은 기존 참여 불가 화면으로, 404는 세션 없음으로 보낸다. 청중 `state`의 204·404·410은 `ended`로 바꾼다. REST 오류는 `RestError.status`로 HTTP 상태를 전달한다. 청중 질문 삭제, 공감·이모지 허용 토글, 시작 전 자동 입장은 이번 범위에서 제외한다.
+
+
+## 12. Figma UI 개편 (2026-10-02 사용자 승인)
+
+`docs/ohpin-figma-ui-redesign.md`를 UI 개편의 기준으로 적용한다. 과거 명세의 강사 답변·해결 UI와 사이드바 인사이트 요구는 이번 사용자 결정으로 대체한다. 본인 질문 수정, 폴더 목적, 언어 전환, 기존 REST·Auth·Storage·Realtime 경계와 참가자 발표자 노트 비노출은 유지한다. 새 Figma 의미 색상 토큰과 네 가지 폴더 표시 팔레트를 사용하며 기존 저장 값은 보존한다. 회차 분리·시작 전 대기·5분 자동 종료·제출 질문 삭제는 이번 구현에서 제외한다. UI를 먼저 개편하고, 즉시 다중 업로드·PIN 묶음·자동 발표 토글·간단한 리포트 연결은 설계의 후속 구현 단위로 진행한다. 간단한 리포트는 승인형 상세 AI 리포트와 별개이며, 제공되지 않은 회차·시간·참여 인원을 생성하거나 AI 응답을 꾸며내지 않는다.

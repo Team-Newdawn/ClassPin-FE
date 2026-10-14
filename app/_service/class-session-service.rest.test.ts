@@ -11,7 +11,6 @@ function loadServices() {
     auth: { getSession: async () => ({ data: { session: { access_token: anonymous ? "participant" : "owner", user: { id: "owner", is_anonymous: anonymous } } }, error: null }) },
     from: databaseCall, rpc: databaseCall,
     storage: { from: () => ({
-      createSignedUrls: async (paths: string[]) => ({ data: paths.map((path) => ({ path, signedUrl: `https://storage.invalid/${path}` })), error: null }),
       getPublicUrl: (path: string) => ({ data: { publicUrl: `https://storage.invalid/${path}` } }),
     }) },
   });
@@ -46,7 +45,7 @@ test("business services use REST DTOs, preserve settings, and strip participant 
   const requests: { url: string; method: string; token: string | null; body: Record<string, unknown> }[] = [];
   const folder = { id: "folder", name: "Folder", created_at: "2026-09-28", color_index: 2, purpose: "other", purpose_label: "Research" };
   const slide = { id: "slide", page_index: 0, material_version_id: "version", image_path: "owner/slide.jpg", source_page_index: null, slide_instructor_notes: [{ body: "private note" }] };
-  const lecture = { id: "lecture", course_id: "course", title: "Lecture", join_code: "PIN123", status: "live", current_page: 0, presentation_autoplay: true, presentation_interactions: true, show_question_pins: true, show_presentation_qr: true, presentation_qr_position: "bottom-right", created_at: "2026-09-28", materials: [{ id: "material", file_name: "deck.pptx", created_at: "2026-09-28", material_versions: [{ id: "version", version_no: 1, source_path: "owner/source.pptx", slides: [slide] }] }], questions: [] };
+  const lecture = { id: "lecture", course_id: "course", title: "Lecture", join_code: "PIN123", status: "live", current_page: 0, presentation_autoplay: true, presentation_interactions: true, show_question_pins: true, show_presentation_qr: true, presentation_qr_position: "bottom-right", allow_question_reactions: false, allow_emoji_reactions: true, created_at: "2026-09-28", materials: [{ id: "material", file_name: "deck.pptx", created_at: "2026-09-28", material_versions: [{ id: "version", version_no: 1, source_path: "owner/source.pptx", slides: [slide] }] }], questions: [] };
   const originalFetch = globalThis.fetch;
   globalThis.fetch = async (input, init) => {
     const url = String(input), method = init?.method ?? "GET";
@@ -55,6 +54,9 @@ test("business services use REST DTOs, preserve settings, and strip participant 
     if (url.endsWith("/folders")) response = method === "POST" ? folder : [folder];
     else if (url.endsWith("/courses")) response = [{ id: "course", folder_id: "folder", lectures: [lecture] }];
     else if (url.endsWith("/slides") && method === "GET") response = [slide];
+    else if (url.endsWith("/join/BEFORE1")) return new Response(null, { status: 204 });
+    else if (url.endsWith("/join/ENDED1") || url.endsWith("/participant/lectures/ended/state")) return Response.json({ error: "Gone" }, { status: 410 });
+    else if (url.endsWith("/join/NONE01")) return Response.json({ error: "Not found" }, { status: 404 });
     else if (url.endsWith("/join/PIN123") || url.endsWith("/participant/lectures/lecture") || url.endsWith("/state")) response = lecture;
     else if (url.endsWith("/questions") && method === "GET") response = [];
     else if (url.endsWith("/courses/course")) response = { deleted: true, cleanupPending: true };
@@ -71,13 +73,20 @@ test("business services use REST DTOs, preserve settings, and strip participant 
     assert.equal(session.presentationAutoplay, true);
     assert.equal(session.slides[0].speakerNote, "private note");
     const audience = await service.fetchLiveSession("PIN123");
+    assert.deepEqual([session.allowQuestionReactions, session.allowEmojiReactions, audience?.allowQuestionReactions], [false, true, false]);
     assert(audience);
     assert(!("speakerNote" in audience.slides[0]));
     assert(!("speakerNote" in (await service.fetchSessionSlides(audience, true))[0]));
     await service.fetchLectureSnapshot(audience, true);
+    // 청중 입장: 시작 전 204·종료 410은 참여 불가, 없는 강의 404는 null이다.
+    for (const code of ["BEFORE1", "ENDED1"]) await assert.rejects(service.fetchLiveSession(code), service.LectureClosedError);
+    assert.equal(await service.fetchLiveSession("NONE01"), null);
+    assert.equal((await service.fetchLectureSnapshot({ ...audience, id: "ended" }, true))?.status, "ended");
     await service.renameClassFolder("folder", "Updated");
     await service.moveSessionToFolder("course", null);
     await service.saveSlideInstructorNote("slide", "Note");
+    await service.updateLecture("lecture", { allow_emoji_reactions: false });
+    assert.deepEqual(requests.at(-1)?.body, { allow_emoji_reactions: false });
     await service.updateLecture("lecture", { presentation_autoplay: false, current_page: 1 });
     assert.deepEqual(requests.at(-1)?.body, { presentation_autoplay: false, current_page: 1 });
     const question = { id: "question", sessionId: "lecture", slideIndex: 0, x: 0.4, y: 0.6, anchorKind: "point" as const, category: "concept" as const, marker: "pin" as const, text: "Why?", status: "unanswered" as const, isMine: true, reactionCount: 0, reactedByMe: false, createdAt: "2026-09-28" };

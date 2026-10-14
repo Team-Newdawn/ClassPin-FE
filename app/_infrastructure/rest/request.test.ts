@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { createServer } from "node:http";
 import { test } from "node:test";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { restRequest } from "./request.ts";
+import { RestError, restRequest } from "./request.ts";
 
 const client = (token: string | null, anonymous = false) => ({
   auth: { getSession: async () => ({ data: { session: token ? {
@@ -37,7 +37,7 @@ test("REST forwards the caller JWT and JSON; empty success and API errors are ha
     assert.equal(requests[2].token, "Bearer audience");
     await assert.rejects(restRequest(client("owner"), "/instructor/denied"), /Access denied/);
     await assert.rejects(restRequest(client("owner"), "/instructor/failed"), /502.*upstream unavailable/);
-    await assert.rejects(restRequest(client("owner"), "/instructor/missing"), /404.*Not found/);
+    await assert.rejects(restRequest(client("owner"), "/instructor/missing"), (error) => error instanceof RestError && error.status === 404 && /Not found/.test(error.message));
     const count = requests.length;
     await assert.rejects(restRequest(client(null), "/instructor/folders"), /session/i);
     await assert.rejects(restRequest(client("audience", true), "/instructor/folders"), /instructor/i);

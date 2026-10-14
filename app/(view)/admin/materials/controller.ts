@@ -21,7 +21,7 @@ export function useMaterialsController() {
 
   const visible = useMemo(
     () => sessions
-      .filter((session) => (filter === "all" || session.status === filter) && `${session.title} ${session.fileName}`.toLowerCase().includes(query.toLowerCase()))
+      .filter((session) => (filter === "all" || (filter === "live") === (session.status === "live")) && `${session.title} ${session.fileName}`.toLowerCase().includes(query.toLowerCase()))
       .map((session) => ({ session, open: countBy(session.questions, "unanswered") })),
     [filter, query, sessions]
   );

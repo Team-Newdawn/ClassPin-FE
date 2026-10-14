@@ -6,14 +6,13 @@ import { LoadingScreen } from "@/app/component/loading-screen";
 import { ArrowRight, MessageCircleQuestion, Sparkles } from "@/app/component/icons";
 import { StatusBadge } from "@/app/component/status-badge";
 import { heatLevel } from "@/app/_model/stats";
-import { questionCategoryClass, questionMarkerEmoji } from "@/app/_model/types";
 import { useInsightsController } from "./controller";
 import styles from "./page.module.css";
 
 export default function InsightsPage() {
   const {
-    t, timeAgo, ready, scope, setScope, scopeOptions, questions, settingsFor, categoryLabel,
-    unanswered, hotspots, maxHeat, categories, maxCategory, improvementCandidates,
+    t, timeAgo, ready, scope, setScope, scopeOptions, questions,
+    unanswered, hotspots, maxHeat, improvementCandidates,
     openQuestions, pinRate, resolveRate, resolved
   } = useInsightsController();
   if (!ready) return <LoadingScreen />;
@@ -36,7 +35,6 @@ export default function InsightsPage() {
           <Kpi label={t("dashboard.resolveRate")} value={`${resolveRate}%`} hint={t("common.resolvedCount", { count: resolved })} tone="success" />
         </div>
 
-        <div className="section-grid">
           <section className="panel">
             <div className="panel-head"><div><h2>{t("insights.hotspots")}</h2><p>{t("insights.hotspotsHint")}</p></div><span className="heat-legend"><i className="heat-fill low" />{t("insights.low")}<i className="heat-fill mid" />{t("insights.mid")}<i className="heat-fill high" />{t("insights.high")}<i className="heat-fill critical" />{t("insights.critical")}</span></div>
             {hotspots.length ? (
@@ -55,20 +53,6 @@ export default function InsightsPage() {
             ) : <Empty message={t("dashboard.noAggregate")} hint={t("insights.noDensityHint")} />}
           </section>
 
-          <section className="panel">
-            <div className="panel-head"><div><h2>{t("insights.questionTypes")}</h2><p>{t("insights.categoryDistribution")}</p></div></div>
-            {categories.length ? (
-              <ul className="cat-list">
-                {categories.map((item) => (
-                  <li key={item.key}>
-                    <span className="cat-head"><em className={`category ${questionCategoryClass(settingsFor(item.key), item.key)}`}>{item.label}</em><b>{item.count}</b></span>
-                    <span className="cat-track"><i className={`cat-fill ${questionCategoryClass(settingsFor(item.key), item.key)}`} style={{ width: `${maxCategory ? (item.count / maxCategory) * 100 : 0}%` }} /></span>
-                  </li>
-                ))}
-              </ul>
-            ) : <Empty message={t("insights.noCategories")} hint={t("insights.noCategoriesHint")} />}
-          </section>
-        </div>
 
         <section className="panel">
           <div className="panel-head"><div><h2>{t("insights.improvementCandidates")}</h2><p>{t("insights.improvementRule")}</p></div><span className="panel-note"><Sparkles />{t("insights.traceable")}</span></div>
@@ -90,12 +74,11 @@ export default function InsightsPage() {
           <div className="panel-head"><div><h2>{t("insights.openQuestions")}</h2><p>{t("insights.waitingAnswers", { count: openQuestions.length })}</p></div></div>
           {openQuestions.length ? (
             <div className="question-table flat">
-              <div className="table-head"><span>{t("common.slide")}</span><span>{t("common.question")}</span><span>{t("common.category")}</span><span>{t("common.status")}</span><span>{t("common.createdAt")}</span><span /></div>
+              <div className="table-head"><span>{t("common.slide")}</span><span>{t("common.question")}</span><span>{t("common.status")}</span><span>{t("common.createdAt")}</span><span /></div>
               {openQuestions.slice(0, 8).map(({ question, session }) => (
                 <Link className="table-row" key={question.id} href={`/admin/session/${session.id}?tab=questions`}>
                   <span className="slide-cell"><b>{question.slideIndex + 1}</b><small>{session.title}</small></span>
                   <span className="question-text">{question.text}</span>
-                  <span><em className={`category ${questionCategoryClass(session.questionCategories, question.category)}`}>{questionMarkerEmoji(question.marker) && <i aria-hidden="true">{questionMarkerEmoji(question.marker)}</i>}{categoryLabel(question.category)}</em></span>
                   <span><StatusBadge status={question.status} /></span>
                   <span className="muted">{timeAgo(question.createdAt)}</span>
                   <span><ArrowRight /></span>

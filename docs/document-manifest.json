@@ -70,9 +70,9 @@
     },
     {
       "approval": {
-        "approved_at": "2026-09-28T06:31:03+00:00",
-        "approved_by": "Codex (minchanpark delegated document review and approval, 2026-09-28)",
-        "content_sha256": "8054fb943fcbd3c2107789e6364059acd0fd2bba3e5ce140a9a54ab9c9710964"
+        "approved_at": "2026-10-02T00:00:00+09:00",
+        "approved_by": "user (UI redesign implementation instruction)",
+        "content_sha256": "09c5e3440189f1f6dac0eed5b776077f4938f797efdf0772088d47d27190b26a"
       },
       "depends_on": [],
       "id": "class-frontend-architecture",
@@ -129,6 +129,26 @@
         "pin-feedback-storage-retirement"
       ],
       "status": "approved"
+    },
+    {
+      "id": "ohpin-figma-ui-redesign",
+      "path": "docs/ohpin-figma-ui-redesign.md",
+      "status": "approved",
+      "purpose": "Figma UI redesign, preserved frontend behavior, implementation order, and deferred backend contracts.",
+      "depends_on": [
+        "class-frontend-architecture"
+      ],
+      "informed_by": [
+        "prd"
+      ],
+      "required_for": [
+        "ohpin-ui-redesign"
+      ],
+      "approval": {
+        "approved_at": "2026-10-03T00:00:00+09:00",
+        "approved_by": "user (live player Figma decisions and backend proposals, 2026-10-03)",
+        "content_sha256": "fa28b6e2fe25ccdf26525ab328389effd294e427b67498da3520713395691f07"
+      }
     }
   ],
   "implementation_gate": {

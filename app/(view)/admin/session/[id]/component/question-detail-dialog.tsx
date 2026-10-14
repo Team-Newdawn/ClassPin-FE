@@ -1,27 +1,19 @@
 "use client";
 
 import { useEffect, useId, useRef } from "react";
-import { Check, X } from "@/app/component/icons";
+import { X } from "@/app/component/icons";
+import { trapDialogFocus } from "@/app/_lib/dialog-focus";
 import { useLanguage } from "@/app/_controller/language-context";
-import { StatusBadge } from "@/app/component/status-badge";
-import { questionCategoryClass, questionCategoryLabel, questionMarkerEmoji, type Question, type QuestionCategorySettings } from "@/app/_model/types";
+
+import type { Question } from "@/app/_model/types";
 import styles from "./question-detail-dialog.module.css";
 
-export function QuestionDetailDialog({ question, questionCategories, onClose, answerControls }: {
+export function QuestionDetailDialog({ question, onClose }: {
   question: Question;
-  questionCategories: QuestionCategorySettings;
   onClose: () => void;
-  answerControls?: {
-    draft: string;
-    onDraftChange: (value: string) => void;
-    onResolve: () => void;
-    onSubmit: () => void;
-  };
 }) {
-  const { t, categoryLabel: defaultCategoryLabel, timeAgo } = useLanguage();
-  const categoryLabel = questionCategoryLabel(questionCategories, question.category, defaultCategoryLabel);
+  const { t, timeAgo } = useLanguage();
   const titleId = useId();
-  const answerId = useId();
   const dialogRef = useRef<HTMLElement>(null);
   const onCloseRef = useRef(onClose);
 
@@ -59,42 +51,19 @@ export function QuestionDetailDialog({ question, questionCategories, onClose, an
         aria-modal="true"
         aria-labelledby={titleId}
         tabIndex={-1}
+        onKeyDown={trapDialogFocus}
       >
         <button type="button" className={styles.close} onClick={onClose} aria-label={t("question.closeDetail")}><X /></button>
         <div className="question-detail-heading">
-          <span className={`category ${questionCategoryClass(questionCategories, question.category)}`}>{questionMarkerEmoji(question.marker) && <i aria-hidden="true">{questionMarkerEmoji(question.marker)}</i>}{categoryLabel}</span>
           <span>{t("common.slideLabel", { number: question.slideIndex + 1 })}</span>
         </div>
-        <h2 id={titleId}>{t("question.questionAndAnswer")}</h2>
+        <h2 id={titleId}>{t("common.question")}</h2>
         <p className="question-detail-question">{question.text}</p>
         <div className="question-detail-meta">
-          <StatusBadge status={question.status} />
+          <span>👍 {question.reactionCount}</span>
           <time dateTime={question.createdAt}>{timeAgo(question.createdAt)}</time>
         </div>
-        <div className={`question-detail-answer ${question.answer ? "" : "pending"}`}>
-          <span>{t("question.instructorAnswer")}</span>
-          <p>{question.answer ?? t("question.noAnswer")}</p>
-        </div>
-        {answerControls ? (
-          <form className={styles.answerForm} onSubmit={(event) => {
-            event.preventDefault();
-            answerControls.onSubmit();
-          }}>
-            <label htmlFor={answerId}>{question.answer ? t("session.additionalAnswer") : t("session.quickAnswer")}</label>
-            <textarea
-              id={answerId}
-              value={answerControls.draft}
-              onChange={(event) => answerControls.onDraftChange(event.target.value)}
-              placeholder={t("session.answerPlaceholder")}
-            />
-            <div className={styles.answerActions}>
-              <button type="button" className="btn tertiary" onClick={answerControls.onResolve}><Check />{t("session.resolve")}</button>
-              <button type="submit" className="btn primary" disabled={!answerControls.draft.trim()}>{t("session.sendAnswer")}</button>
-            </div>
-          </form>
-        ) : (
-          <button type="button" className="btn primary large full" onClick={onClose}>{t("common.confirm")}</button>
-        )}
+        <button type="button" className="btn secondary" onClick={onClose}>{t("common.confirm")}</button>
       </section>
     </div>
   );

@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { defaultQuestionCategorySettings, type ClassSession } from "../types.ts";
-import { normalizeSessions, serializeSessionsForFailureCache } from "./session.ts";
+import { formatElapsed, normalizeSessions, serializeSessionsForFailureCache } from "./session.ts";
 
 const session = (id: string): ClassSession => ({
   id,
@@ -16,6 +16,9 @@ const session = (id: string): ClassSession => ({
   showQuestionPins: true,
   showPresentationQr: true,
   presentationQrPosition: "bottom-right",
+  allowQuestionReactions: true,
+  allowEmojiReactions: true,
+  startedAt: null,
   questionCategories: defaultQuestionCategorySettings(),
   createdAt: "2026-08-29T00:00:00.000Z",
   slides: [],
@@ -39,4 +42,8 @@ test("세션 중복을 제거하고 이미 정규화된 배열은 그대로 반�
   const list = [session("one")];
   assert.equal(normalizeSessions(list), list);
   assert.deepEqual(normalizeSessions([list[0], session("one"), session("two")]).map(({ id }) => id), ["one", "two"]);
+});
+
+test("LIVE 경과 시간은 한 시간 전까지 mm:ss, 이후 h:mm:ss 이고 음수는 0이다", () => {
+  assert.deepEqual([5_000, 3_599_999, 3_723_000, -2_000].map(formatElapsed), ["00:05", "59:59", "1:02:03", "00:00"]);
 });

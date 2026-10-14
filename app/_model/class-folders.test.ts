@@ -21,7 +21,7 @@ test("강의 폴더 이름을 trim하고 1~80자로 제한한다", () => {
 });
 
 test("저장된 폴더 색상을 유지하고 기존 무색 데이터만 순서로 보정한다", () => {
-  assert.deepEqual(CLASS_FOLDER_COLOR_OPTIONS, [2, 3, 1, 5, 0]);
+  assert.deepEqual(CLASS_FOLDER_COLOR_OPTIONS, [2, 3, 1, 0]);
   assert.deepEqual(Array.from({ length: 8 }, (_, index) => classFolderColorIndexForOrder(index)), [0, 1, 2, 3, 4, 5, 0, 1]);
   assert.equal(normalizeClassFolderColorIndex(4, 0), 4);
   assert.equal(normalizeClassFolderColorIndex(undefined, 7), 1);

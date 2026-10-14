@@ -1,7 +1,7 @@
 import { isParticipantPointAnchor, isQuestionMarker, normalizeClassFolderColorIndex, normalizeClassFolderName, normalizeClassFolderPurpose, normalizeClassFolderPurposeLabel, normalizeQuestionCategorySettings, type ClassFolder, type ClassSession, type CreateClassFolderInput, type NormalizedPoint, type Question, type QuestionCategorySettings, type Slide } from "@/app/_model/types";
 import { ensureAnonymousUser, getAudienceSupabaseClient, getSessionUser, getSupabaseClient, supabaseConfigured } from "@/app/_infrastructure/supabase/client";
 
-import { restRequest } from "@/app/_infrastructure/rest/request";
+import { RestError, restRequest } from "@/app/_infrastructure/rest/request";
 export const classSessionPersistenceEnabled = supabaseConfigured;
 
 type LectureRow = {
@@ -17,12 +17,16 @@ type LectureRow = {
   show_presentation_qr: boolean;
   presentation_qr_position: ClassSession["presentationQrPosition"];
   question_categories: unknown;
+  allow_question_reactions: boolean;
+  allow_emoji_reactions: boolean;
+  started_at: string | null;
   created_at: string;
 };
 
 export type LectureRealtimeRow = Pick<LectureRow,
   "current_page" | "status" | "presentation_interactions" | "presentation_autoplay" | "show_question_pins" |
-  "show_presentation_qr" | "presentation_qr_position" | "question_categories"
+  "show_presentation_qr" | "presentation_qr_position" | "question_categories" |
+  "allow_question_reactions" | "allow_emoji_reactions" | "started_at"
 >;
 
 type ClassFolderRow = {
@@ -109,20 +113,13 @@ type AudienceLectureGraphRow = LectureRow & {
   }>;
 };
 
-const PDF_URL_TTL_SECONDS = 12 * 60 * 60;
-
-async function createPdfUrlMap(client: NonNullable<ReturnType<typeof getSupabaseClient>>, paths: string[]) {
-  const uniquePaths = [...new Set(paths)];
-  if (!uniquePaths.length) return new Map<string, string>();
-  const { data, error } = await client.storage.from("course-materials").createSignedUrls(uniquePaths, PDF_URL_TTL_SECONDS);
-  if (error) throw error;
-  const urls = new Map<string, string>();
-  data.forEach((item) => {
-    if (item.path && item.signedUrl) urls.set(item.path, item.signedUrl);
-  });
-  if (urls.size !== uniquePaths.length) throw new Error("PDF 원본을 읽을 수 없습니다.");
-  return urls;
-}
+/**
+ * 원본 PDF 는 서명 URL 대신 같은 origin 의 프록시로 읽는다. 참여자마다 다른 토큰의 서명 URL 은
+ * CDN·브라우저 캐시를 전혀 타지 못해 사람 수만큼 Storage egress 가 나갔다. 프록시는 요청마다
+ * 요청자 토큰으로 RLS(소유자 또는 live 강의 참여자)를 다시 통과시키고 서버 디스크에 한 번만 받는다.
+ */
+const pdfProxyUrl = (sourcePath: string, audience: boolean) =>
+  `/api/pdf?path=${encodeURIComponent(sourcePath)}${audience ? "&audience=1" : ""}`;
 
 function toSlide(
   client: NonNullable<ReturnType<typeof getSupabaseClient>>,
@@ -320,12 +317,6 @@ export async function fetchOwnedSessions(): Promise<ClassSession[]> {
   const client = getSupabaseClient();
   if (!client) return [];
   const courses = await restRequest<OwnedCourseGraphRow[]>(client, "/instructor/courses");
-  const pdfUrls = await createPdfUrlMap(client, courses.flatMap((course) => course.lectures.flatMap((lecture) =>
-    lecture.materials.flatMap((material) => material.material_versions
-      .filter((version) => version.slides.some((slide) => slide.source_page_index !== null))
-      .map((version) => version.source_path))
-  )));
-
   return courses
     .flatMap((course) => course.lectures.map((lecture) => ({ course, lecture })))
     .sort((a, b) => b.lecture.created_at.localeCompare(a.lecture.created_at))
@@ -338,7 +329,7 @@ export async function fetchOwnedSessions(): Promise<ClassSession[]> {
         .map((slide): Slide => {
           const noteValue = slide.slide_instructor_notes;
           const note = Array.isArray(noteValue) ? noteValue[0] : noteValue;
-          return toSlide(client, slide, pdfUrls.get(version.source_path), note?.body ?? "");
+          return toSlide(client, slide, pdfProxyUrl(version.source_path, false), note?.body ?? "");
         });
       const questions = toQuestions(lecture.questions, lecture.id, slides);
       return [{
@@ -358,6 +349,9 @@ export async function fetchOwnedSessions(): Promise<ClassSession[]> {
         showPresentationQr: lecture.show_presentation_qr,
         presentationQrPosition: lecture.presentation_qr_position,
         questionCategories: normalizeQuestionCategorySettings(lecture.question_categories),
+        allowQuestionReactions: lecture.allow_question_reactions,
+        allowEmojiReactions: lecture.allow_emoji_reactions,
+        startedAt: lecture.started_at,
         createdAt: lecture.created_at,
         slides,
         questions
@@ -372,23 +366,27 @@ export async function saveSlideInstructorNote(slideId: string, body: string) {
   await restRequest(client, `/instructor/slides/${encodeURIComponent(slideId)}/note`, "PUT", { body });
 }
 
+/** 청중 입장 시 강의가 시작 전(204)이거나 종료(410)됐다. 없는 강의(404)와 구분한다. */
+export class LectureClosedError extends Error {}
+
 async function fetchLiveSessionBy(column: "id" | "join_code", value: string): Promise<ClassSession | null> {
   const client = getAudienceSupabaseClient();
   if (!client) return null;
   await ensureAnonymousUser();
   const path = column === "join_code" ? `/participant/join/${encodeURIComponent(value)}` : `/participant/lectures/${encodeURIComponent(value)}`;
-  const lecture = await restRequest<AudienceLectureGraphRow | null>(client, path);
-  if (!lecture) return null;
+  const lecture = await restRequest<AudienceLectureGraphRow | undefined>(client, path).catch((error: unknown) => {
+    if (error instanceof RestError && error.status === 404) return null;
+    if (error instanceof RestError && error.status === 410) return undefined;
+    throw error;
+  });
+  if (lecture === null) return null;
+  if (!lecture) throw new LectureClosedError("Lecture is not live");
   const material = lecture.materials[0];
   const version = material && [...material.material_versions].sort((a, b) => b.version_no - a.version_no)[0];
   if (!material || !version) return null;
-  const pdfUrls = await createPdfUrlMap(
-    client,
-    version.slides.some((slide) => slide.source_page_index !== null) ? [version.source_path] : [],
-  );
   const slides: Slide[] = [...version.slides]
     .sort((a, b) => a.page_index - b.page_index)
-    .map((slide) => toSlide(client, slide, pdfUrls.get(version.source_path)));
+    .map((slide) => toSlide(client, slide, pdfProxyUrl(version.source_path, true)));
   const session: ClassSession = {
     id: lecture.id,
     folderId: null,
@@ -406,6 +404,9 @@ async function fetchLiveSessionBy(column: "id" | "join_code", value: string): Pr
     showPresentationQr: lecture.show_presentation_qr,
     presentationQrPosition: lecture.presentation_qr_position,
     questionCategories: normalizeQuestionCategorySettings(lecture.question_categories),
+    allowQuestionReactions: lecture.allow_question_reactions,
+    allowEmojiReactions: lecture.allow_emoji_reactions,
+    startedAt: lecture.started_at,
     createdAt: lecture.created_at,
     slides,
     questions: []
@@ -467,13 +468,15 @@ export async function markQuestionResolved(questionId: string) {
 
 export async function updateLecture(sessionId: string, values: {
   current_page?: number;
-  status?: "live" | "ended";
+  status?: ClassSession["status"];
   presentation_interactions?: boolean;
   presentation_autoplay?: boolean;
   show_question_pins?: boolean;
   show_presentation_qr?: boolean;
   presentation_qr_position?: ClassSession["presentationQrPosition"];
   question_categories?: QuestionCategorySettings;
+  allow_question_reactions?: boolean;
+  allow_emoji_reactions?: boolean;
 }) {
   const client = getSupabaseClient();
   if (!client) return;
@@ -486,7 +489,8 @@ export function subscribeToLecture(
   onQuestionsRefresh: () => void,
   onLectureUpdate: (lecture: LectureRealtimeRow) => void,
   onSlidesRefresh: () => void,
-  asAudience = false
+  asAudience = false,
+  onConnectionChange?: (connected: boolean) => void
 ): (() => void) | null {
   const client = asAudience ? getAudienceSupabaseClient() : getSupabaseClient();
   if (!client) return null;
@@ -494,10 +498,14 @@ export function subscribeToLecture(
   // reconnect before an asynchronous removeChannel() has finished, so give
   // every subscription its own topic to avoid mutating a subscribed channel.
   let channel = client.channel(`lecture:${sessionId}:${crypto.randomUUID()}`)
-    .on("postgres_changes", { event: "*", schema: "public", table: "questions", filter: `lecture_id=eq.${sessionId}` }, onQuestionsRefresh)
     .on("postgres_changes", { event: "UPDATE", schema: "public", table: "lectures", filter: `id=eq.${sessionId}` }, (payload) => {
       onLectureUpdate(payload.new as LectureRealtimeRow);
     });
+  // 참여자는 RLS 때문에 자기 질문 행의 이벤트만 받는다. 변경마다 참여자 수만큼 RLS 검사가 돌지
+  // 않도록 참여자는 questions 를 구독하지 않고 broadcast 신호와 보정 폴링으로 목록을 맞춘다.
+  if (!asAudience) {
+    channel = channel.on("postgres_changes", { event: "*", schema: "public", table: "questions", filter: `lecture_id=eq.${sessionId}` }, onQuestionsRefresh);
+  }
   if (materialVersionId) {
     channel = channel.on("postgres_changes", {
       event: "*",
@@ -506,17 +514,27 @@ export function subscribeToLecture(
       filter: `material_version_id=eq.${materialVersionId}`
     }, onSlidesRefresh);
   }
-  channel.subscribe();
+  channel.subscribe((status) => {
+    if (status === "SUBSCRIBED") onConnectionChange?.(true);
+    else if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") onConnectionChange?.(false);
+  });
   return () => { void client.removeChannel(channel); };
 }
 
-export async function fetchLectureSnapshot(session: ClassSession, asAudience = false): Promise<Pick<ClassSession, "currentSlide" | "status" | "presentationInteractions" | "presentationAutoplay" | "showQuestionPins" | "showPresentationQr" | "presentationQrPosition" | "questionCategories" | "questions"> | null> {
+type LectureSnapshot = Pick<ClassSession, "currentSlide" | "status" | "presentationInteractions" | "presentationAutoplay" | "showQuestionPins" | "showPresentationQr" | "presentationQrPosition" | "questionCategories" | "allowQuestionReactions" | "allowEmojiReactions" | "startedAt" | "questions">;
+
+/** questionsOnly 는 broadcast 뒤 재조회처럼 질문 목록만 필요할 때 /state 요청을 건너뛴다. */
+export async function fetchLectureSnapshot(session: ClassSession, asAudience = false, questionsOnly = false): Promise<(Partial<LectureSnapshot> & Pick<LectureSnapshot, "questions">) | null> {
   const client = asAudience ? getAudienceSupabaseClient() : getSupabaseClient();
   if (!client) return null;
   if (asAudience) await ensureAnonymousUser();
   const base = `/${asAudience ? "participant" : "instructor"}/lectures/${encodeURIComponent(session.id)}`;
   const [lecture, data] = await Promise.all([
-    restRequest<LectureRow | null>(client, `${base}/state`),
+    // 청중 state는 시작 전 204, 종료 410, 없음 404다. 모두 참여 불가로 보고 아래에서 ended로 바꾼다.
+    questionsOnly ? undefined : restRequest<LectureRow | null>(client, `${base}/state`).catch((error: unknown) => {
+      if (asAudience && error instanceof RestError && (error.status === 404 || error.status === 410)) return null;
+      throw error;
+    }),
     restRequest<QuestionRow[]>(client, `${base}/questions`),
   ]);
   const questions = toQuestions(
@@ -524,6 +542,7 @@ export async function fetchLectureSnapshot(session: ClassSession, asAudience = f
     session.id,
     session.slides
   );
+  if (questionsOnly) return { questions };
   return {
     currentSlide: lecture?.current_page ?? session.currentSlide,
     status: asAudience && !lecture ? "ended" : (lecture?.status as ClassSession["status"]) ?? session.status,
@@ -533,6 +552,9 @@ export async function fetchLectureSnapshot(session: ClassSession, asAudience = f
     showPresentationQr: lecture?.show_presentation_qr ?? session.showPresentationQr,
     presentationQrPosition: (lecture?.presentation_qr_position as ClassSession["presentationQrPosition"]) ?? session.presentationQrPosition,
     questionCategories: normalizeQuestionCategorySettings(lecture?.question_categories ?? session.questionCategories),
+    allowQuestionReactions: lecture?.allow_question_reactions ?? session.allowQuestionReactions,
+    allowEmojiReactions: lecture?.allow_emoji_reactions ?? session.allowEmojiReactions,
+    startedAt: lecture ? lecture.started_at : session.startedAt,
     questions
   };
 }

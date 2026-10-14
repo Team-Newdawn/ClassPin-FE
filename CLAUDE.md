@@ -2,6 +2,8 @@
 
 @AGENTS.md
 
+Reply to the user in Korean.
+
 ## Token-efficient launch
 
 Start Claude Code for this repository with

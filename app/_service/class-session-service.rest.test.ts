@@ -7,9 +7,16 @@ import ts from "typescript";
 // Load the existing Next alias imports without adding a test runner dependency.
 function loadServices() {
   const databaseCall = () => { throw new Error("Direct Supabase business CRUD is forbidden"); };
+  // Lecture settings go straight to the RPC until the BE PATCH accepts partial bodies.
+  const rpcCalls: { name: string; args: unknown }[] = [];
+  const lectureRpc = async (name: string, args: unknown) => {
+    if (name !== "ohpin_update_lecture_settings") databaseCall();
+    rpcCalls.push({ name, args });
+    return { data: null, error: null };
+  };
   const client = (anonymous: boolean) => ({
     auth: { getSession: async () => ({ data: { session: { access_token: anonymous ? "participant" : "owner", user: { id: "owner", is_anonymous: anonymous } } }, error: null }) },
-    from: databaseCall, rpc: databaseCall,
+    from: databaseCall, rpc: anonymous ? databaseCall : lectureRpc,
     storage: { from: () => ({
       getPublicUrl: (path: string) => ({ data: { publicUrl: `https://storage.invalid/${path}` } }),
     }) },
@@ -37,11 +44,12 @@ function loadServices() {
     }, loaded.exports, loaded);
     return loaded.exports;
   };
-  return { ...load("app/_service/class-session-service.ts"), ...load("app/_service/platform-experience-service.ts") };
+  return { ...load("app/_service/class-session-service.ts"), ...load("app/_service/platform-experience-service.ts"), rpcCalls };
 }
 
 test("business services use REST DTOs, preserve settings, and strip participant notes", async () => {
-  const service = loadServices() as typeof import("./class-session-service") & typeof import("./platform-experience-service");
+  const service = loadServices() as typeof import("./class-session-service") & typeof import("./platform-experience-service") & { rpcCalls: { name: string; args: unknown }[] };
+  const lectureSettings = () => (service.rpcCalls.at(-1)?.args as { settings: unknown } | undefined)?.settings;
   const requests: { url: string; method: string; token: string | null; body: Record<string, unknown> }[] = [];
   const folder = { id: "folder", name: "Folder", created_at: "2026-09-28", color_index: 2, purpose: "other", purpose_label: "Research" };
   const slide = { id: "slide", page_index: 0, material_version_id: "version", image_path: "owner/slide.jpg", source_page_index: null, slide_instructor_notes: [{ body: "private note" }] };
@@ -87,9 +95,9 @@ test("business services use REST DTOs, preserve settings, and strip participant 
     await service.moveSessionToFolder("course", null);
     await service.saveSlideInstructorNote("slide", "Note");
     await service.updateLecture("lecture", { allow_emoji_reactions: false });
-    assert.deepEqual(requests.at(-1)?.body, { allow_emoji_reactions: false });
+    assert.deepEqual(lectureSettings(), { allow_emoji_reactions: false });
     await service.updateLecture("lecture", { presentation_autoplay: false, current_page: 1 });
-    assert.deepEqual(requests.at(-1)?.body, { presentation_autoplay: false, current_page: 1 });
+    assert.deepEqual(service.rpcCalls.at(-1), { name: "ohpin_update_lecture_settings", args: { target_lecture_id: "lecture", settings: { presentation_autoplay: false, current_page: 1 } } });
     const question = { id: "question", sessionId: "lecture", slideIndex: 0, x: 0.4, y: 0.6, anchorKind: "point" as const, category: "concept" as const, marker: "pin" as const, text: "Why?", status: "unanswered" as const, isMine: true, reactionCount: 0, reactedByMe: false, createdAt: "2026-09-28" };
     await service.submitQuestion(session, question);
     assert.deepEqual(requests.at(-1)?.body, { id: "question", slideId: "slide", x: 0.4, y: 0.6, category: "concept", marker: "pin", text: "Why?" });
@@ -102,10 +110,12 @@ test("business services use REST DTOs, preserve settings, and strip participant 
     await service.markQuestionResolved("question");
     await service.persistSession({ ...session, presentationAutoplay: false }, "owner/source.pptx");
     const material = requests.at(-1)?.body;
+    assert.equal(material?.status, "before");
+    assert.deepEqual(lectureSettings(), { status: "live" });
     assert.equal(material?.sourcePath, "owner/source.pptx");
     assert.deepEqual(material?.slides, [{ id: "slide", pageIndex: 0, imagePath: "owner/slide.jpg", sourcePageIndex: null }]);
     await service.persistSession(session, "owner/source.pptx");
-    assert.deepEqual(requests.at(-1)?.body, { presentation_autoplay: true });
+    assert.deepEqual(lectureSettings(), { status: "live", presentation_autoplay: true });
     await service.submitLectureExperienceResponse("PIN123", "Helpful", "More examples");
     assert.deepEqual(requests.at(-1)?.body, { code: "PIN123", experience: "Helpful", improvement: "More examples" });
     assert.equal((await service.deleteClassSession("course")).cleanupPending, true);

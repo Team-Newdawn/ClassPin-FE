@@ -219,12 +219,13 @@ export async function persistSession(session: ClassSession, sourcePath?: string)
     id: session.id, courseId: session.courseId, materialId: session.materialId, materialVersionId: session.materialVersionId,
     folderId: session.folderId, title: session.title, fileName: session.fileName,
     sourcePath: sourcePath ?? `${user.id}/${session.id}/${session.fileName}`,
-    code: session.code, status: session.status, currentSlide: session.currentSlide,
+    // BE는 생성 시 "before"만 받으므로, 만든 뒤 lecture PATCH로 현재 상태를 반영한다.
+    code: session.code, status: "before", currentSlide: session.currentSlide,
     presentationInteractions: session.presentationInteractions, showQuestionPins: session.showQuestionPins,
     showPresentationQr: session.showPresentationQr, presentationQrPosition: session.presentationQrPosition,
     questionCategories: session.questionCategories, slides,
   });
-  if (session.presentationAutoplay) await updateLecture(session.id, { presentation_autoplay: true });
+  await updateLecture(session.id, { status: session.status, ...(session.presentationAutoplay ? { presentation_autoplay: true } : {}) });
 }
 
 const toClassFolder = (folder: ClassFolderRow): ClassFolder => {
@@ -483,7 +484,11 @@ export async function updateLecture(sessionId: string, values: {
 }) {
   const client = getSupabaseClient();
   if (!client) return;
-  await restRequest(client, `/instructor/lectures/${encodeURIComponent(sessionId)}`, "PATCH", values);
+  // ponytail: BE PATCH /instructor/lectures/{id} 가 일부 필드만 담은 본문을 전부 400으로 거절한다
+  // (UpdateLectureRequest 의 Nulls.FAIL). BE 가 같은 검증·소유자 확인을 위임하는 RPC 를 직접 호출하고,
+  // BE 가 고쳐지면 restRequest 로 되돌린다.
+  const { error } = await client.rpc("ohpin_update_lecture_settings", { target_lecture_id: sessionId, settings: values });
+  if (error) throw error;
 }
 
 export function subscribeToLecture(

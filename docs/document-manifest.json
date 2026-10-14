@@ -70,9 +70,9 @@
     },
     {
       "approval": {
-        "approved_at": "2026-10-02T00:00:00+09:00",
-        "approved_by": "user (UI redesign implementation instruction)",
-        "content_sha256": "09c5e3440189f1f6dac0eed5b776077f4938f797efdf0772088d47d27190b26a"
+        "approved_at": "2026-10-11T08:00:00+00:00",
+        "approved_by": "minchanpark (CFA-097A, CFA-098A design approved in session, 2026-10-11)",
+        "content_sha256": "c1de289deb7b537de879749e96ed041f6eaf6e6ab34c244af466c6f2b5f4814c"
       },
       "depends_on": [],
       "id": "class-frontend-architecture",

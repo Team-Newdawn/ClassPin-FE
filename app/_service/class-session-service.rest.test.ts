@@ -53,7 +53,7 @@ test("business services use REST DTOs, preserve settings, and strip participant 
   const requests: { url: string; method: string; token: string | null; body: Record<string, unknown> }[] = [];
   const folder = { id: "folder", name: "Folder", created_at: "2026-09-28", color_index: 2, purpose: "other", purpose_label: "Research" };
   const slide = { id: "slide", page_index: 0, material_version_id: "version", image_path: "owner/slide.jpg", source_page_index: null, slide_instructor_notes: [{ body: "private note" }] };
-  const lecture = { id: "lecture", course_id: "course", title: "Lecture", join_code: "PIN123", status: "live", current_page: 0, presentation_autoplay: true, presentation_interactions: true, show_question_pins: true, show_presentation_qr: true, presentation_qr_position: "bottom-right", allow_question_reactions: false, allow_emoji_reactions: true, created_at: "2026-09-28", materials: [{ id: "material", file_name: "deck.pptx", created_at: "2026-09-28", material_versions: [{ id: "version", version_no: 1, source_path: "owner/source.pptx", slides: [slide] }] }], questions: [] };
+  const lecture = { id: "lecture", course_id: "course", title: "Lecture", join_code: "PIN123", status: "live", current_page: 0, presentation_autoplay: true, presentation_interactions: true, show_question_pins: true, show_presentation_qr: true, presentation_qr_position: "bottom-right", allow_question_reactions: false, allow_emoji_reactions: true, created_at: "2026-09-28", materials: [{ id: "material", file_name: "deck.pptx", created_at: "2026-09-28", material_versions: [{ id: "version", version_no: 1, source_path: "owner/source.pptx", slides: [slide] }] }], questions: [{ id: "existing", slide_id: "slide", category: "concept", marker: "pin", raw_text: "Why?", status: "unanswered", created_at: "2026-09-28", answers: [{ body: "latest", created_at: "2026-09-30" }, { body: "older", created_at: "2026-09-28" }, { body: "latest tie", created_at: "2026-09-30" }] }] };
   const originalFetch = globalThis.fetch;
   globalThis.fetch = async (input, init) => {
     const url = String(input), method = init?.method ?? "GET";
@@ -77,7 +77,12 @@ test("business services use REST DTOs, preserve settings, and strip participant 
     assert.equal(folders[0].purposeLabel, "Research");
     await service.createClassFolder({ name: " Folder ", colorIndex: 2, purpose: "other", purposeLabel: " Research " });
     assert.deepEqual(requests.at(-1)?.body, { name: "Folder", colorIndex: 2, purpose: "other", purposeLabel: "Research" });
+    lecture.materials.push({ ...lecture.materials[0], id: "newer-material", created_at: "2026-10-01" });
+    lecture.materials[0].material_versions.push({ ...lecture.materials[0].material_versions[0], id: "same-version", slides: [] });
     const [session] = await service.fetchOwnedSessions();
+    assert.equal(session.materialId, "material");
+    assert.equal(session.materialVersionId, "version");
+    assert.equal(session.questions[0].answer, "latest tie");
     assert.equal(session.presentationAutoplay, true);
     assert.equal(session.slides[0].speakerNote, "private note");
     const audience = await service.fetchLiveSession("PIN123");
@@ -116,6 +121,11 @@ test("business services use REST DTOs, preserve settings, and strip participant 
     assert.deepEqual(material?.slides, [{ id: "slide", pageIndex: 0, imagePath: "owner/slide.jpg", sourcePageIndex: null }]);
     await service.persistSession(session, "owner/source.pptx");
     assert.deepEqual(lectureSettings(), { status: "live", presentation_autoplay: true });
+    const writes = service.rpcCalls.length;
+    await service.persistSession({ ...session, status: "before", presentationAutoplay: false }, "owner/source.pptx");
+    assert.equal(service.rpcCalls.length, writes, "new before materials must not write the same status again");
+    await service.persistSession({ ...session, status: "before", presentationAutoplay: true }, "owner/source.pptx");
+    assert.deepEqual(lectureSettings(), { presentation_autoplay: true });
     await service.submitLectureExperienceResponse("PIN123", "Helpful", "More examples");
     assert.deepEqual(requests.at(-1)?.body, { code: "PIN123", experience: "Helpful", improvement: "More examples" });
     assert.equal((await service.deleteClassSession("course")).cleanupPending, true);

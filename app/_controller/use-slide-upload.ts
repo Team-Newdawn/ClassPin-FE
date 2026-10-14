@@ -16,7 +16,10 @@ const PREVIEW_AFTER_MS = 2000;
 
 /** 도착 순서가 뒤섞여 오므로 페이지 번호 순서로 끼워 넣는다. */
 function insertByPage(list: Slide[], slide: Slide): Slide[] {
-  return [...list, slide].sort((a, b) => a.pageIndex - b.pageIndex);
+  const index = list.findIndex((item) => item.pageIndex > slide.pageIndex);
+  const next = [...list];
+  next.splice(index < 0 ? list.length : index, 0, slide);
+  return next;
 }
 
 /**

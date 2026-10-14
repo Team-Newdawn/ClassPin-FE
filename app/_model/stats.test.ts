@@ -10,6 +10,7 @@ test("종료 리포트는 동률과 삭제된 슬라이드의 질문을 보존�
   assert.equal(report.unmapped, 1);
   assert.equal(report.reactionCount, 9);
   assert.equal(report.questionCount, 3);
+  assert.equal(summarizeEndReport(200_000, []).maximum, 0);
   const empty = summarizeEndReport(0, []);
   assert.deepEqual(empty.topSlides, []);
   assert.equal(empty.maximum, 0);

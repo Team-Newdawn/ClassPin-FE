@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useLanguage } from "@/app/_controller/language-context";
 import type { Question } from "@/app/_model/types";
 import { summarizeQuestions, toSummaryItems, type SummaryPurpose } from "@/app/_service/question-summary-service";
@@ -11,12 +11,17 @@ import styles from "./pin-cluster-popover.module.css";
 export function usePinCluster(slideId: string | undefined, questions: readonly Question[]) {
   const [cluster, setCluster] = useState<{ slideId: string; ids: string[]; highlightedId: string | null } | null>(null);
   const expandedIds = cluster && cluster.slideId === slideId ? cluster.ids : undefined;
+  const questionsById = useMemo(() => new Map(questions.map((question) => [question.id, question])), [questions]);
+  const clusterQuestions = useMemo(() => expandedIds?.flatMap((id) => {
+    const question = questionsById.get(id);
+    return question ? [question] : [];
+  }) ?? [], [expandedIds, questionsById]);
   return {
     expandedIds,
     // 팝오버 목록에서 고른 PIN. 펼친 PIN 중 이것만 커지고 맨 앞으로 나온다.
     highlightedId: expandedIds ? cluster!.highlightedId : null,
     highlightPin: (id: string) => setCluster((current) => current && { ...current, highlightedId: id }),
-    clusterQuestions: expandedIds?.flatMap((id) => questions.filter((question) => question.id === id)) ?? [],
+    clusterQuestions,
     openCluster: (ids: string[]) => { if (slideId) setCluster({ slideId, ids, highlightedId: null }); },
     closeCluster: () => {
       const first = expandedIds?.[0];
@@ -68,7 +73,8 @@ export function PinClusterPopover({ questions, folder, summary, highlightedId, o
   const ref = useRef<HTMLElement>(null);
   const [sort, setSort] = useState<"empathy" | "newest">("empathy");
   // questions는 PIN 번호와 같은 공감순이다. 최신순으로 바꿔도 번호는 PIN에 붙은 번호를 유지한다.
-  const sorted = sort === "newest" ? [...questions].sort((a, b) => b.createdAt.localeCompare(a.createdAt)) : questions;
+  const sorted = useMemo(() => sort === "newest" ? [...questions].sort((a, b) => b.createdAt.localeCompare(a.createdAt)) : questions, [questions, sort]);
+  const numbers = useMemo(() => new Map(questions.map((question, index) => [question.id, index + 1])), [questions]);
 
   useEffect(() => {
     const closeOutside = (event: PointerEvent) => {
@@ -100,7 +106,7 @@ export function PinClusterPopover({ questions, folder, summary, highlightedId, o
         </select>
       </div>
       {sorted.map((question) => <button key={question.id} type="button" aria-pressed={question.id === highlightedId} onClick={() => onHighlight(question.id)}>
-        <span className={styles.number} aria-hidden="true">{questions.indexOf(question) + 1}</span>
+        <span className={styles.number} aria-hidden="true">{numbers.get(question.id)}</span>
         <span className={styles.text}>{question.text}</span>
         <span className={styles.empathy} aria-label={t("question.empathyCount", { count: question.reactionCount })}><Image src="/assets/design/cluster-thumb.svg" width={12} height={12} alt="" />{question.reactionCount}</span>
       </button>)}

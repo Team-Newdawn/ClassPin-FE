@@ -19,12 +19,14 @@ export function useMaterialsController() {
   const [query, setQuery] = useState("");
   const { phase, uploadPct, error: uploadError, slides, total, showPreview, busy, start } = useSlideUpload();
 
-  const visible = useMemo(
-    () => sessions
-      .filter((session) => (filter === "all" || (filter === "live") === (session.status === "live")) && `${session.title} ${session.fileName}`.toLowerCase().includes(query.toLowerCase()))
-      .map((session) => ({ session, open: countBy(session.questions, "unanswered") })),
-    [filter, query, sessions]
-  );
+  const materials = useMemo(() => sessions.map((session) => ({
+    session, open: countBy(session.questions, "unanswered"), searchText: `${session.title} ${session.fileName}`.toLowerCase()
+  })), [sessions]);
+  const visible = useMemo(() => {
+    const needle = query.toLowerCase();
+    return materials.filter(({ session, searchText }) =>
+      (filter === "all" || (filter === "live") === (session.status === "live")) && searchText.includes(needle));
+  }, [filter, query, materials]);
 
   const pick = (file?: File) => {
     if (inputRef.current) inputRef.current.value = "";

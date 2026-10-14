@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPointerEvent } from "react";
+import { questionsByEmpathy, questionsByNewest } from "@/app/_model/question-reactions";
 import { usePinLabelMode } from "@/app/_controller/use-pin-label-mode";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { useHorizontalSlideWheel } from "@/app/_controller/use-horizontal-slide-wheel";
@@ -58,7 +59,7 @@ export function useSessionAdminController() {
     setActiveSession,
     updateSlideNote
   } = useSessions();
-  const session = sessions.find((item) => item.id === params.id);
+  const session = useMemo(() => sessions.find((item) => item.id === params.id), [params.id, sessions]);
   const { reactions: lectureReactions } = useLectureReactions(session?.id ?? null);
   const liveReactions = session?.allowEmojiReactions ? lectureReactions : [];
   // 종료 저장 중에도 상태가 먼저 ended 로 바뀌므로, 팝업이 열려 있는 동안은 요약 값을 유지한다.
@@ -117,8 +118,10 @@ export function useSessionAdminController() {
     noteSaveTimersRef.current.clear();
   }, []);
 
-  const visibleQuestions = useMemo(() => session?.questions.filter((question) =>
-    (filter === "all" || question.status === filter) && question.text.toLowerCase().includes(query.toLowerCase())) ?? [], [filter, query, session]);
+  const visibleQuestions = useMemo(() => {
+    const needle = query.toLowerCase();
+    return session?.questions.filter((question) => (filter === "all" || question.status === filter) && question.text.toLowerCase().includes(needle)) ?? [];
+  }, [filter, query, session?.questions]);
 
   const runAction = (action: Promise<void>, message: string) => {
     setActionError(null);
@@ -257,16 +260,21 @@ export function useSessionAdminController() {
   const folder = folders.find((item) => item.id === session?.folderId);
   const folderAccentIndex = folder?.colorIndex ?? CLASS_UNFILED_COLOR_INDEX;
   const folderHref = `/admin/folders/${folder?.id ?? "unfiled"}`;
-  const folderSessions = sessions.filter((item) => item.folderId === (session?.folderId ?? null));
+  const folderSessions = useMemo(() => sessions.filter((item) => item.folderId === (session?.folderId ?? null)), [session?.folderId, sessions]);
   const questionsBySlide = useMemo(() => groupQuestionsBySlide(session?.questions ?? []), [session?.questions]);
   const questionCounts = useMemo(() => (session?.questions ?? []).reduce((counts, question) => {
     if (question.status === "unanswered") counts.unanswered += 1;
     if (question.status === "resolved") counts.resolved += 1;
     return counts;
   }, { total: session?.questions.length ?? 0, unanswered: 0, resolved: 0 }), [session?.questions]);
-  const slideQuestions = questionsBySlide.get(session?.currentSlide ?? -1) ?? [];
-  const selected = session?.questions.find((question) => question.id === selectedId);
-  const detailQuestion = session?.questions.find((question) => question.id === detailQuestionId);
+  const slideQuestions = useMemo(() => questionsBySlide.get(session?.currentSlide ?? -1) ?? [], [questionsBySlide, session?.currentSlide]);
+  const questionsById = useMemo(() => new Map(session?.questions.map((question) => [question.id, question])), [session?.questions]);
+  const selected = questionsById.get(selectedId ?? "");
+  const detailQuestion = questionsById.get(detailQuestionId ?? "");
+  const panelQuestions = useMemo(() => {
+    const questions = questionScope === "slide" ? slideQuestions : session?.questions ?? [];
+    return questionSort === "empathy" ? questionsByEmpathy(questions) : questionsByNewest(questions);
+  }, [questionScope, questionSort, session?.questions, slideQuestions]);
   const noteDraft = slide ? noteDrafts[slide.id] ?? slide.speakerNote ?? "" : "";
   const noteDirty = Boolean(slide && noteDraft !== (slide.speakerNote ?? ""));
   const deleteTarget = deleteSlideId ? session?.slides.find((item) => item.id === deleteSlideId) : null;
@@ -368,7 +376,7 @@ export function useSessionAdminController() {
 
   return {
     prepare, questionScope, setQuestionScope, questionSort, setQuestionSort, showQuestionLabels, setShowQuestionLabels,
-    panelQuestions: [...(questionScope === "slide" ? slideQuestions : session?.questions ?? [])].sort((a, b) => questionSort === "empathy" ? b.reactionCount - a.reactionCount || b.createdAt.localeCompare(a.createdAt) || a.id.localeCompare(b.id) : b.createdAt.localeCompare(a.createdAt) || a.id.localeCompare(b.id)),
+    panelQuestions,
     ready,
     session,
     liveReactions,

@@ -8,6 +8,7 @@ import { PinLogo } from "@/app/component/pin-logo";
 import { WorkspaceAccount } from "@/app/component/workspace-header";
 import { useLanguage } from "@/app/_controller/language-context";
 import type { ClassFolder } from "@/app/_model/types";
+import { useMemo } from "react";
 import styles from "./folder-tree-sidebar.module.css";
 
 export function FolderTreeSidebar({ folders, open, activeFolderId, onToggle }: {
@@ -18,6 +19,11 @@ export function FolderTreeSidebar({ folders, open, activeFolderId, onToggle }: {
 }) {
   const { t } = useLanguage();
   const { sessions } = useSessions();
+  const materialCounts = useMemo(() => {
+    const counts = new Map<string | null, number>();
+    for (const session of sessions) counts.set(session.folderId, (counts.get(session.folderId) ?? 0) + 1);
+    return counts;
+  }, [sessions]);
   return <aside className={`${styles.root} folder-tree-sidebar ${open ? "" : styles.collapsed}`} aria-label={t("folders.myFolders")}>
     <div className="folder-tree-brand">
       <PinLogo href="/admin/dashboard" />
@@ -33,7 +39,7 @@ export function FolderTreeSidebar({ folders, open, activeFolderId, onToggle }: {
           <Link href={`/admin/folders/${folder.id}`} title={folder.name} aria-label={t("folders.openFolder", { name: folder.name })} aria-current={folder.id === activeFolderId ? "page" : undefined}>
             <span className={[styles.color, styles["color" + folder.colorIndex]].join(" ")} aria-hidden="true" />
             <span className="folder-tree-name">{folder.name}</span>
-            <small>{sessions.filter((session) => session.folderId === folder.id).length}</small>
+            <small>{materialCounts.get(folder.id) ?? 0}</small>
           </Link>
         </li>)}
       </ul>

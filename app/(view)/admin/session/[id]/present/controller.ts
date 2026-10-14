@@ -50,9 +50,9 @@ export function useSessionPresentationController() {
   const { positionedQuestions, questionsBySlide } = useMemo(() => {
     const questions = (session?.questions ?? []).filter((question): question is PositionedQuestion => question.x !== null && question.y !== null);
     return { positionedQuestions: questions, questionsBySlide: groupQuestionsBySlide(questions) };
-  }, [session]);
+  }, [session?.questions]);
   const positionedQuestionIds = useMemo(() => positionedQuestions.map((question) => question.id), [positionedQuestions]);
-  const positionedQuestionKey = positionedQuestionIds.join("|");
+  const positionedQuestionKey = useMemo(() => positionedQuestionIds.join("|"), [positionedQuestionIds]);
   const pageQuestions = useMemo(
     () => questionsBySlide.get(currentSlide ?? -1) ?? EMPTY_POSITIONED_QUESTIONS,
     [currentSlide, questionsBySlide]

@@ -36,7 +36,7 @@ export default function JoinSession() {
     sendEmojiReaction
   } = controller;
   const composing = composerOpen && !viewingQuestion;
-  const showCoach = !tapped && !composerOpen && !session.questions.some((question) => question.isMine);
+  const showCoach = !tapped && !composerOpen && !controller.hasOwnQuestions;
 
   return (
     <main className={`${styles.root} student-shell student-slide-shell ${composing ? "composing" : ""}`} onPointerDown={() => setTapped(true)}>

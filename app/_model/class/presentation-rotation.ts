@@ -169,10 +169,16 @@ export function placeBubbles(bubbles: readonly BubbleRequest[], pins: readonly P
   };
   const items = new Map(bubbles.map((bubble) => [bubble.id, { bubble, adjacent: adjacentCandidates(bubble, width, height) }]));
   // 겹침 여부만 보면 되는 곳은 첫 겹침에서 멈춘다. 격자 후보가 수천 개라 면적 합산보다 훨씬 싸다.
-  const blocked = (box: Rectangle) => pins.some((other) => rectanglesOverlap(box, other.bounds)) || [...boxes.values()].some((other) => rectanglesOverlap(box, other));
+  const blocked = (box: Rectangle) => {
+    if (pins.some((other) => rectanglesOverlap(box, other.bounds))) return true;
+    for (const other of boxes.values()) if (rectanglesOverlap(box, other)) return true;
+    return false;
+  };
   const placeAnywhere = ({ bubble, adjacent }: { bubble: BubbleRequest; adjacent: Candidate[] }) => {
+    const adjacentOpen = adjacent.find((candidate) => !blocked(candidate));
+    if (adjacentOpen) { boxes.set(bubble.id, adjacentOpen); return; }
     const distant = distantCandidates(bubble, width, height);
-    const open = adjacent.find((candidate) => !blocked(candidate)) ?? distant.find((candidate) => !blocked(candidate));
+    const open = distant.find((candidate) => !blocked(candidate));
     // 빈자리가 슬라이드 어디에도 없으면 PIN 옆 자리 중 겹침이 가장 적은 곳에 둔다.
     const fallback = () => (adjacent.length ? adjacent : distant).reduce((best, candidate) => cost(candidate) < cost(best) ? candidate : best);
     boxes.set(bubble.id, open ?? fallback());

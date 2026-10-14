@@ -113,7 +113,13 @@ export function useJoinSessionController() {
 
   const current = slideIndex ?? session?.currentSlide ?? 0;
   const questionsBySlide = useMemo(() => groupQuestionsBySlide(session?.questions ?? []), [session?.questions]);
+  const questionsById = useMemo(() => new Map(session?.questions.map((question) => [question.id, question])), [session?.questions]);
+  const hasOwnQuestions = useMemo(() => session?.questions.some((question) => question.isMine) ?? false, [session?.questions]);
   const slideQuestions = useMemo(() => questionsBySlide.get(current) ?? EMPTY_QUESTIONS, [current, questionsBySlide]);
+  const focusedPins = useMemo(() => {
+    const question = questionsById.get(selectedQuestionId ?? "");
+    return question?.slideIndex === current && (question.isMine || session?.showQuestionPins) ? [question] : [];
+  }, [current, questionsById, selectedQuestionId, session?.showQuestionPins]);
   const submittedQuestions = useMemo(() => {
     const questions = questionScope === "all" ? session?.questions ?? EMPTY_QUESTIONS : slideQuestions;
     return questionSort === "empathy" ? questionsByEmpathy(questions) : questionsByNewest(questions);
@@ -139,7 +145,8 @@ export function useJoinSessionController() {
   const slide = session.slides[current] ?? session.slides[0];
   if (!slide) return { state: "missing" as const, t };
   const draftQuestion = draftQuestions[slide.id];
-  const viewingQuestion = viewingQuestionId ? slideQuestions.find((question) => question.id === viewingQuestionId) : null;
+  const viewed = questionsById.get(viewingQuestionId ?? "");
+  const viewingQuestion = viewed?.slideIndex === current ? viewed : null;
   // ponytail: 질문 유형 선택 UI는 숨기고 강의에서 켜진 첫 유형을 고정 주입한다. BE·DB가 category를 요구하지 않게 되면 필드째 삭제한다.
   const defaultCategory = enabledQuestionCategories(session.questionCategories)[0] ?? "concept";
   const draftText = draftQuestion?.text ?? "";
@@ -167,14 +174,14 @@ export function useJoinSessionController() {
 
 
   const selectQuestion = (questionId: string) => {
-    const question = session.questions.find((item) => item.id === questionId);
+    const question = questionsById.get(questionId);
     if (!question) return;
     if (activeTool === "emoji") setActiveTool("pin");
     setSelectedQuestionId((currentId) => currentId === question.id ? null : question.id);
     if (question.slideIndex !== current) setSlideIndex(question.slideIndex);
   };
   const startEditingQuestion = (questionId: string) => {
-    const question = session.questions.find((item) => item.id === questionId);
+    const question = questionsById.get(questionId);
     if (!question) return;
     setSelectedQuestionId(question.id);
     const questionSlide = session.slides[question.slideIndex];
@@ -367,6 +374,7 @@ export function useJoinSessionController() {
     state: "live" as const,
     t,
     timeAgo,
+    hasOwnQuestions,
     finalHref,
     session,
     liveReactions: session.allowEmojiReactions ? lectureReactions : [],
@@ -385,7 +393,7 @@ export function useJoinSessionController() {
     toast,
     selectedQuestionId,
     // 질문 카드를 누르면 그 질문 PIN 하나만 보인다. 다른 사람 질문 위치는 강사가 질문 핀 공개를 켰을 때만 보인다.
-    focusedPins: slideQuestions.filter((question) => question.id === selectedQuestionId && (question.isMine || session.showQuestionPins)),
+    focusedPins,
     questionSort,
     questionScope,
     setQuestionScope,

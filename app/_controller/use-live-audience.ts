@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { formatElapsed } from "@/app/_model/class/session";
 import { LECTURE_AUDIENCE_EVENT, lectureAudienceTopic } from "@/app/_model/lecture-reactions";
 import { publishRealtimeReaction, subscribeToRealtimeReactions } from "@/app/_service/realtime-reaction-service";
@@ -15,18 +15,32 @@ const ACTIVE_WINDOW_MS = 150_000;
 export function useAudienceHeartbeat(lectureId: string | null) {
   useEffect(() => {
     if (!lectureId) return;
-    const id = crypto.randomUUID();
+    let id = crypto.randomUUID();
+    let left = false;
     const send = () => {
       if (document.visibilityState === "hidden") return;
+      if (left) id = crypto.randomUUID();
+      left = false;
       void publishRealtimeReaction(lectureAudienceTopic(lectureId), LECTURE_AUDIENCE_EVENT, { id })
         .catch((error) => console.error("Audience heartbeat failed", error));
+    };
+    const leave = () => {
+      if (left) return;
+      left = true;
+      void publishRealtimeReaction(lectureAudienceTopic(lectureId), LECTURE_AUDIENCE_EVENT, { id, left: true }, true)
+        .catch((error) => console.error("Audience departure failed", error));
     };
     send();
     const timer = setInterval(send, HEARTBEAT_MS);
     document.addEventListener("visibilitychange", send);
+    window.addEventListener("pagehide", leave);
+    window.addEventListener("pageshow", send);
     return () => {
       clearInterval(timer);
       document.removeEventListener("visibilitychange", send);
+      window.removeEventListener("pagehide", leave);
+      window.removeEventListener("pageshow", send);
+      leave();
     };
   }, [lectureId]);
 }
@@ -42,15 +56,20 @@ export function useLiveAudienceCount(lectureId: string | null, live: boolean) {
     let active = true;
     let close: (() => void) | undefined;
     const lastSeen = new Map<string, number>();
+    const departed = new Set<string>();
     const recount = () => {
       const now = Date.now();
       lastSeen.forEach((seenAt, id) => { if (now - seenAt > ACTIVE_WINDOW_MS) lastSeen.delete(id); });
       if (active) setCount(lastSeen.size);
     };
     void subscribeToRealtimeReactions(lectureAudienceTopic(lectureId), LECTURE_AUDIENCE_EVENT, (payload) => {
-      const id = (payload as { id?: unknown } | null)?.id;
-      if (typeof id !== "string" || id.length > 64) return;
-      lastSeen.set(id, Date.now());
+      const message = payload as { id?: unknown; left?: unknown } | null;
+      const id = message?.id;
+      if (typeof id !== "string" || !id || id.length > 64) return;
+      if (message?.left === true) {
+        departed.add(id);
+        lastSeen.delete(id);
+      } else if (!departed.has(id)) lastSeen.set(id, Date.now());
       recount();
     }, (error) => console.error("Audience count channel failed", error)).then((stop) => {
       if (active) close = stop;
@@ -69,10 +88,18 @@ export function useLiveAudienceCount(lectureId: string | null, live: boolean) {
 /** LIVE 경과 시간(mm:ss 또는 h:mm:ss). LIVE가 아니거나 시작 시각을 모르면 null. paused 동안은 마지막 값에 멈춘다. */
 export function useLiveElapsed(startedAt: string | null | undefined, live: boolean, paused = false) {
   const [now, setNow] = useState(() => Date.now());
+  const clock = useRef({ now, pausedMs: 0 });
   useEffect(() => {
-    if (!live || paused) return;
-    const timer = setInterval(() => setNow(Date.now()), 1_000);
+    clock.current = { now: Date.now(), pausedMs: 0 };
+  }, [startedAt]);
+  useEffect(() => {
+    if (!live) return;
+    if (paused) return () => { clock.current.pausedMs = Date.now() - clock.current.now; };
+    const timer = setInterval(() => {
+      clock.current.now = Date.now() - clock.current.pausedMs;
+      setNow(clock.current.now);
+    }, 1_000);
     return () => clearInterval(timer);
-  }, [live, paused]);
+  }, [live, paused, startedAt]);
   return live && startedAt ? formatElapsed(now - Date.parse(startedAt)) : null;
 }

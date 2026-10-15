@@ -45,7 +45,7 @@ export function SessionEndReport({ session, folder }: { session: ClassSession; f
 
   return <main className={styles.root}>
     <header className={styles.topBar}>
-      <Link href={`/admin/session/${session.id}`} className={styles.back} aria-label={t("report.back")}><Image src="/assets/design/report-back.svg" width={16} height={16} alt="" /></Link>
+      <Link href={`/admin/folders/${session.folderId ?? "unfiled"}`} className={styles.back} aria-label={t("session.backToFolder")}><Image src="/assets/design/report-back.svg" width={16} height={16} alt="" /></Link>
       <div className={styles.title}><small>{t("report.kicker")}</small><h1>{session.title}</h1></div>
       <button type="button" className={`btn primary ${styles.pdf}`} onClick={() => window.print()}><Image src="/assets/design/report-download.svg" width={16} height={16} alt="" />{t("report.print")}</button>
     </header>

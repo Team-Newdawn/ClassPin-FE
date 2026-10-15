@@ -1,6 +1,7 @@
 "use client";
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
+import { usePathname } from "next/navigation";
 import { useAuth } from "@/app/_controller/auth-context";
 import { defaultQuestionCategorySettings, isParticipantPointAnchor, normalizeClassFolderColorIndex, normalizeClassFolderName, normalizeClassFolderPurpose, normalizeClassFolderPurposeLabel, normalizeQuestionCategorySettings, type ClassFolder, type ClassSession, type CreateClassFolderInput, type ParticipantQuestionInput, type PresentationQrPosition, type Question, type Slide } from "@/app/_model/types";
 import { withQuestionReaction } from "@/app/_model/question-reactions";
@@ -105,6 +106,7 @@ const readFolders = (key: string) => {
 
 export function SessionStore({ children }: { children: React.ReactNode }) {
   const { loading: authLoading, user, isAdmin } = useAuth();
+  const participantRoute = usePathname().startsWith("/join/");
   const [sessions, setSessions] = useState<ClassSession[]>([]);
   const [folders, setFolders] = useState<ClassFolder[]>([]);
   const [ready, setReady] = useState(false);
@@ -148,7 +150,7 @@ export function SessionStore({ children }: { children: React.ReactNode }) {
       queueMicrotask(() => { if (active) setReady(false); });
       return () => { active = false; };
     }
-    if (authUserId && !authIsAnonymous && isAdmin) {
+    if (authUserId && !authIsAnonymous && isAdmin && !participantRoute) {
       ownerId.current = authUserId;
       queueMicrotask(() => { if (active) setReady(false); });
       const cached = readCachedSessions(authUserId);
@@ -182,7 +184,7 @@ export function SessionStore({ children }: { children: React.ReactNode }) {
       setReady(true);
     });
     return () => { active = false; };
-  }, [authIsAnonymous, authLoading, authUserId, isAdmin]);
+  }, [authIsAnonymous, authLoading, authUserId, isAdmin, participantRoute]);
 
   const subscriptionKey = activeSessionId && sessionsById.get(activeSessionId)?.courseId ? activeSessionId : "";
   useEffect(() => {
@@ -299,7 +301,7 @@ export function SessionStore({ children }: { children: React.ReactNode }) {
     };
     // Session question changes do not recreate subscriptions; only the stable id set does.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ready, subscriptionKey]);
+  }, [ready, subscriptionKey, participantRoute]);
 
   useEffect(() => {
     if (!ready) return;

@@ -75,9 +75,11 @@ flow unless a task explicitly spans both products.
 ### Runtime and data boundaries
 
 - Stack: Next.js 16 App Router, React 19, TypeScript, plain CSS, Supabase JS.
-- Local development currently runs against production: `.env.local` points at the
-  production Supabase project and the REST proxy defaults to the production backend
-  (decided 2026-10-13). The local Supabase stack only replays FE migrations and lacks
+- Env files: `.env.local` holds the local Supabase + local backend (`npm run dev`);
+  `.env.production.local` holds the remote Supabase + remote backend
+  (`npm run dev:remote`, or `build`/`start`). Next.js fills keys missing from the
+  active file from `.env.local`, so keep both files complete (decided 2026-10-15).
+  The local Supabase stack only replays FE migrations and lacks
   backend-only migrations (`before`/`pending`, lifecycle RPCs); ignore that drift and
   never treat `supabase:reset` as proof of production schema. Load tests and full
   browser flows hit production: run them only in no-lecture hours, with user approval

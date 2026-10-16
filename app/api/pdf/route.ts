@@ -32,7 +32,22 @@ export async function GET(request: Request) {
     return data;
   });
   const { size } = await stat(file);
-  return new Response(Readable.toWeb(createReadStream(file)) as ReadableStream, {
-    headers: { "Content-Type": "application/pdf", "Content-Length": String(size), "Cache-Control": "no-store" },
+  // PDF.js 는 Accept-Ranges 가 있어야 파일 끝의 xref 와 필요한 페이지만 먼저 받아 첫 화면을 그린다.
+  // 없으면 전체를 받은 뒤에야 렌더한다. suffix range(`bytes=-n`)는 PDF.js 가 보내지 않으므로 전체 응답으로 둔다.
+  const range = /^bytes=(\d+)-(\d*)$/.exec(request.headers.get("range") ?? "");
+  const start = range ? Number(range[1]) : 0;
+  const end = range?.[2] ? Math.min(Number(range[2]), size - 1) : size - 1;
+  if (range && start > end) {
+    return new Response(null, { status: 416, headers: { "Content-Range": `bytes */${size}` } });
+  }
+  return new Response(Readable.toWeb(createReadStream(file, range ? { start, end } : undefined)) as ReadableStream, {
+    status: range ? 206 : 200,
+    headers: {
+      "Content-Type": "application/pdf",
+      "Content-Length": String(end - start + 1),
+      "Accept-Ranges": "bytes",
+      "Cache-Control": "no-store",
+      ...(range ? { "Content-Range": `bytes ${start}-${end}/${size}` } : {}),
+    },
   });
 }

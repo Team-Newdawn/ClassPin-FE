@@ -145,9 +145,9 @@
         "ohpin-ui-redesign"
       ],
       "approval": {
-        "approved_at": "2026-10-03T00:00:00+09:00",
-        "approved_by": "user (live player Figma decisions and backend proposals, 2026-10-03)",
-        "content_sha256": "fa28b6e2fe25ccdf26525ab328389effd294e427b67498da3520713395691f07"
+        "approved_at": "2026-10-15T00:00:00+09:00",
+        "approved_by": "user (live player Figma decisions and backend proposals, 2026-10-03; browser LIVE auto-end 9.4 approved in session, 2026-10-15)",
+        "content_sha256": "2a31d6379701e8ddf35b9ea93660b66ba083b5090979cbf06708baa37effad09"
       }
     }
   ],

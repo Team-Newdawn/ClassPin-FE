@@ -148,6 +148,10 @@ flow unless a task explicitly spans both products.
   question panel can resize, and speaker notes sit below the slide.
 - New materials start not live. The folder's start button only opens the player;
   the player's own start/end button changes LIVE state.
+- Leaving a LIVE player inside the app ends the lecture after 60 minutes unless
+  that tab returns or another tab still holds its `player:{id}` or
+  `presentation:{id}` Web Lock (browser timer, temporary; closing the tab keeps
+  LIVE until a server-side expiry exists).
 - The right question panel starts with an AI summary of the current slide's
   questions, shown only when that slide has questions. `POST /api/question-summary`
   calls Groq with the server-only `GROQ_API_KEY` and returns 503 without it.

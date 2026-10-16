@@ -8,6 +8,7 @@ import { useHorizontalSlideWheel } from "@/app/_controller/use-horizontal-slide-
 import { useLanguage } from "@/app/_controller/language-context";
 import { useLectureReactions } from "@/app/_controller/use-lecture-reactions";
 import { useLiveAudienceCount, useLiveElapsed } from "@/app/_controller/use-live-audience";
+import { useLiveAutoEnd } from "@/app/_controller/use-live-auto-end";
 import { useSessions } from "@/app/_controller/session-store";
 import { slideIndexFromPageNumber } from "@/app/_model/class/presentation-rotation";
 import { groupQuestionsBySlide } from "@/app/_model/stats";
@@ -112,6 +113,7 @@ export function useSessionAdminController() {
     setActiveSession(params.id);
     return () => setActiveSession(null);
   }, [params.id, setActiveSession]);
+  useLiveAutoEnd(params.id, session?.status === "live", setStatus);
 
   useEffect(() => () => {
     noteSaveTimersRef.current.forEach((timer) => clearTimeout(timer));

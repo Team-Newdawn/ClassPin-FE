@@ -21,7 +21,7 @@ async function pdfRequestHeaders(url: string) {
   return token ? { Authorization: `Bearer ${token}` } : undefined;
 }
 
-function createDocument(url: string): CachedDocument {
+function createDocument(url: string, key: string, thumbnail: boolean): CachedDocument {
   const entry = { disposed: false, refs: 0 } as CachedDocument;
   entry.promise = Promise.all([import("pdfjs-dist/webpack.mjs"), pdfRequestHeaders(url)])
     .then(([pdfjs, httpHeaders]) => {
@@ -33,22 +33,26 @@ function createDocument(url: string): CachedDocument {
         iccUrl: "/pdfjs/iccs/",
         standardFontDataUrl: "/pdfjs/standard_fonts/",
         wasmUrl: "/pdfjs/wasm/",
+        // 썸네일은 그릴 페이지에 필요한 구간만 Range 로 받는다. 기본값은 파일 전체를 계속 내려받는다.
+        ...(thumbnail ? { disableStream: true, disableAutoFetch: true } : {}),
       });
       entry.loadingTask = loadingTask;
       return loadingTask.promise;
     })
     .catch((error) => {
-      if (documents.get(url) === entry) documents.delete(url);
+      if (documents.get(key) === entry) documents.delete(key);
       throw error;
     });
   return entry;
 }
 
-export function acquirePdfDocument(url: string) {
-  let entry = documents.get(url);
+/** 썸네일은 같은 url 의 전체 문서가 이미 열려 있으면 그것을 같이 쓰고, 없을 때만 따로 연다. */
+export function acquirePdfDocument(url: string, thumbnail = false) {
+  const key = thumbnail && !documents.has(url) ? `${url}#thumbnail` : url;
+  let entry = documents.get(key);
   if (!entry) {
-    entry = createDocument(url);
-    documents.set(url, entry);
+    entry = createDocument(url, key, key !== url);
+    documents.set(key, entry);
   }
   if (entry.cleanup) clearTimeout(entry.cleanup);
   entry.refs += 1;
@@ -62,9 +66,9 @@ export function acquirePdfDocument(url: string) {
       entry!.refs -= 1;
       if (entry!.refs > 0) return;
       entry!.cleanup = setTimeout(() => {
-        if (entry!.refs > 0 || documents.get(url) !== entry) return;
+        if (entry!.refs > 0 || documents.get(key) !== entry) return;
         entry!.disposed = true;
-        documents.delete(url);
+        documents.delete(key);
         void entry!.loadingTask?.destroy();
       }, CLEANUP_DELAY_MS);
     },

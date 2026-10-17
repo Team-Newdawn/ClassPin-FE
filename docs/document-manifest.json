@@ -145,9 +145,31 @@
         "ohpin-ui-redesign"
       ],
       "approval": {
-        "approved_at": "2026-10-15T00:00:00+09:00",
-        "approved_by": "user (live player Figma decisions and backend proposals, 2026-10-03; browser LIVE auto-end 9.4 approved in session, 2026-10-15)",
-        "content_sha256": "2a31d6379701e8ddf35b9ea93660b66ba083b5090979cbf06708baa37effad09"
+        "approved_at": "2026-10-17T00:00:00+09:00",
+        "approved_by": "user (live player Figma decisions and backend proposals, 2026-10-03; browser LIVE auto-end 9.4 approved in session, 2026-10-15; participant tablet and popup UI approved in session, 2026-10-17)",
+        "content_sha256": "a7502cee3c964174e2ad0409557f6c7dea6b1d1e4eba0c280b708b19c7e48093"
+      }
+    },
+    {
+      "id": "lecture-roles-and-remote",
+      "path": "docs/lecture-roles-and-remote.md",
+      "status": "approved",
+      "purpose": "Folder/file owner-editor-viewer roles, in-platform invite approval, owner-only live control, the login-free single-device presentation remote, and the backend handover.",
+      "depends_on": [
+        "class-frontend-architecture",
+        "ohpin-figma-ui-redesign"
+      ],
+      "informed_by": [
+        "prd"
+      ],
+      "required_for": [
+        "lecture-remote",
+        "lecture-roles-sharing"
+      ],
+      "approval": {
+        "approved_at": "2026-10-16T00:00:00+09:00",
+        "approved_by": "minchanpark (remote LRR-020~025 approved in session, 2026-10-16; roles/invites chapters 1, 3, 4 need re-approval before stage 2)",
+        "content_sha256": "5eb370060f82e450d9aed4d98ffe8405e7bea79c7255c5811998c171860b460e"
       }
     }
   ],

@@ -500,6 +500,36 @@ export async function updateLecture(sessionId: string, values: {
   if (error) throw error;
 }
 
+export type LectureRemoteHolder = "none" | "waiting" | "connected";
+export type LectureRemoteState = { currentSlide: number; slideCount: number; live: boolean; title: string };
+
+// 리모컨 RPC는 FE 마이그레이션 소유라 CFA-097A처럼 Supabase 세션으로 직접 호출한다.
+export async function issueLectureRemote(sessionId: string) {
+  const client = getSupabaseClient();
+  if (!client) throw new Error("Supabase is not configured.");
+  const { data, error } = await client.rpc("ohpin_issue_lecture_remote", { target_lecture_id: sessionId });
+  if (error) throw error;
+  return data as string;
+}
+
+export async function getLectureRemoteHolder(sessionId: string): Promise<LectureRemoteHolder> {
+  const client = getSupabaseClient();
+  if (!client) throw new Error("Supabase is not configured.");
+  const { data, error } = await client.from("lecture_remotes").select("holder_id").eq("lecture_id", sessionId).maybeSingle();
+  if (error) throw error;
+  return !data ? "none" : data.holder_id ? "connected" : "waiting";
+}
+
+/** 링크를 처음 연 익명 세션이 리모컨을 차지한다. step 0은 차지와 상태 조회만 한다. */
+export async function controlLectureRemote(token: string, step: -1 | 0 | 1): Promise<LectureRemoteState> {
+  const client = getAudienceSupabaseClient();
+  if (!client) throw new Error("Supabase is not configured.");
+  await ensureAnonymousUser();
+  const { data, error } = await client.rpc("ohpin_remote_control", { remote_token: token, step });
+  if (error) throw error;
+  return { currentSlide: data.current_page, slideCount: data.slide_count, live: data.status === "live", title: data.title };
+}
+
 export function subscribeToLecture(
   sessionId: string,
   materialVersionId: string | undefined,

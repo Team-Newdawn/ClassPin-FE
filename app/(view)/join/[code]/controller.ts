@@ -307,6 +307,7 @@ export function useJoinSessionController() {
     setViewingQuestionId(null);
     setSubmitError(null);
     setComposerOpen(false);
+    if (composerOpen) (document.querySelector<HTMLButtonElement>(".draft-pin, .question-pin.selected") ?? document.querySelector<HTMLButtonElement>(".student-ask-button"))?.focus();
   };
 
 

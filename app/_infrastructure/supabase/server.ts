@@ -13,10 +13,10 @@ export const supabaseServerConfigured = Boolean(
  * 서비스 키를 쓰면 RLS 를 통째로 우회하므로, 업로드 경로가 정말 그 사용자의
  * 폴더인지 storage 정책이 검증하도록 사용자 토큰을 그대로 전달한다.
  */
-export function getSupabaseClientForToken(accessToken: string): SupabaseClient | null {
+export function getSupabaseClientForToken(accessToken: string, range?: string): SupabaseClient | null {
   if (!supabaseServerConfigured) return null;
   return createClient(url!, publishableKey!, {
     auth: { persistSession: false, autoRefreshToken: false },
-    global: { headers: { Authorization: `Bearer ${accessToken}` } },
+    global: { headers: { Authorization: `Bearer ${accessToken}`, ...(range ? { Range: range } : {}) } },
   });
 }

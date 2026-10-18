@@ -21,10 +21,10 @@ async function pdfRequestHeaders(url: string) {
   return token ? { Authorization: `Bearer ${token}` } : undefined;
 }
 
-function createDocument(url: string, key: string, thumbnail: boolean): CachedDocument {
+function createDocument(url: string, key: string, httpHeaders?: Record<string, string>): CachedDocument {
   const entry = { disposed: false, refs: 0 } as CachedDocument;
-  entry.promise = Promise.all([import("pdfjs-dist/webpack.mjs"), pdfRequestHeaders(url)])
-    .then(([pdfjs, httpHeaders]) => {
+  entry.promise = import("pdfjs-dist/webpack.mjs")
+    .then((pdfjs) => {
       if (entry.disposed) throw new Error("PDF 로드가 취소됐습니다.");
       const loadingTask = pdfjs.getDocument({
         url,
@@ -33,8 +33,10 @@ function createDocument(url: string, key: string, thumbnail: boolean): CachedDoc
         iccUrl: "/pdfjs/iccs/",
         standardFontDataUrl: "/pdfjs/standard_fonts/",
         wasmUrl: "/pdfjs/wasm/",
-        // 썸네일은 그릴 페이지에 필요한 구간만 Range 로 받는다. 기본값은 파일 전체를 계속 내려받는다.
-        ...(thumbnail ? { disableStream: true, disableAutoFetch: true } : {}),
+        // 모든 화면이 같은 문서/worker를 사용하고, 현재 페이지에 필요한 구간만 받는다.
+        worker: pdfjs.PDFWorker.create({ port: pdfjs.GlobalWorkerOptions.workerPort! }),
+        disableStream: true,
+        disableAutoFetch: true,
       });
       entry.loadingTask = loadingTask;
       return loadingTask.promise;
@@ -46,31 +48,36 @@ function createDocument(url: string, key: string, thumbnail: boolean): CachedDoc
   return entry;
 }
 
-/** 썸네일은 같은 url 의 전체 문서가 이미 열려 있으면 그것을 같이 쓰고, 없을 때만 따로 연다. */
-export function acquirePdfDocument(url: string, thumbnail = false) {
-  const key = thumbnail && !documents.has(url) ? `${url}#thumbnail` : url;
-  let entry = documents.get(key);
-  if (!entry) {
-    entry = createDocument(url, key, key !== url);
-    documents.set(key, entry);
-  }
-  if (entry.cleanup) clearTimeout(entry.cleanup);
-  entry.refs += 1;
-
+/** 썸네일과 큰 화면이 같은 URL·토큰의 문서를 공유한다. */
+export function acquirePdfDocument(url: string) {
+  // 페이지를 바꿀 때 현재 토큰을 확인한다. 긴 강의에서 갱신 전 JWT로 Range를 요청하지 않는다.
+  const lease = pdfRequestHeaders(url).then((headers) => {
+    const key = `${url}#${headers?.Authorization ?? ""}`;
+    let entry = documents.get(key);
+    if (!entry) {
+      entry = createDocument(url, key, headers);
+      documents.set(key, entry);
+    }
+    if (entry.cleanup) clearTimeout(entry.cleanup);
+    entry.refs += 1;
+    return { key, entry };
+  });
   let released = false;
   return {
-    promise: entry.promise,
+    promise: lease.then(({ entry }) => entry.promise),
     release() {
       if (released) return;
       released = true;
-      entry!.refs -= 1;
-      if (entry!.refs > 0) return;
-      entry!.cleanup = setTimeout(() => {
-        if (entry!.refs > 0 || documents.get(key) !== entry) return;
-        entry!.disposed = true;
-        documents.delete(key);
-        void entry!.loadingTask?.destroy();
-      }, CLEANUP_DELAY_MS);
+      return lease.then(({ key, entry }) => {
+        entry.refs -= 1;
+        if (entry.refs > 0) return;
+        entry.cleanup = setTimeout(() => {
+          if (entry.refs > 0 || documents.get(key) !== entry) return;
+          entry.disposed = true;
+          documents.delete(key);
+          void entry.loadingTask?.destroy();
+        }, CLEANUP_DELAY_MS);
+      }).catch(() => { /* 인증 조회가 실패하면 정리할 문서가 없다. */ });
     },
   };
 }

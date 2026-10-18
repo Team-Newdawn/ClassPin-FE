@@ -92,7 +92,7 @@ export function PdfPage({ url, pageNumber, label, eager = false }: { url: string
     const container = canvas?.parentElement;
     if (!visible || !canvas || !container) return;
 
-    const documentHandle = acquirePdfDocument(url, !eager);
+    const documentHandle = acquirePdfDocument(url);
     let cancelled = false;
     let frame = 0;
     let sequence = 0;

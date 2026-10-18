@@ -70,9 +70,9 @@
     },
     {
       "approval": {
-        "approved_at": "2026-10-11T08:00:00+00:00",
-        "approved_by": "minchanpark (CFA-097A, CFA-098A design approved in session, 2026-10-11)",
-        "content_sha256": "c1de289deb7b537de879749e96ed041f6eaf6e6ab34c244af466c6f2b5f4814c"
+        "approved_at": "2026-10-18T00:00:00+09:00",
+        "approved_by": "minchanpark (CFA-097A, CFA-098A design approved in session, 2026-10-11); PDF loading regression CFA-098B requested in session, 2026-10-18",
+        "content_sha256": "484c94b37eeb3cdfaec4216648024478ab815402d28a55651f5058db85213632"
       },
       "depends_on": [],
       "id": "class-frontend-architecture",

@@ -17,14 +17,23 @@ const inflight = new Map<string, Promise<string>>();
  * 기다린다. 원본 경로는 UUID 라 바뀌지 않으므로 신선도는 mtime 으로만 본다.
  * ponytail: 청소는 새 파일을 받을 때 같은 폴더의 오래된 파일을 지우는 정도다. 디스크가 문제되면 LRU 상한을 둔다.
  */
+export async function findCachedFile(
+  key: string,
+  { dir = DEFAULT_DIR, maxAgeMs = DEFAULT_MAX_AGE_MS } = {},
+): Promise<string | null> {
+  const file = path.join(dir, createHash("sha1").update(key).digest("hex"));
+  const info = await stat(file).catch(() => null);
+  return info && Date.now() - info.mtimeMs < maxAgeMs ? file : null;
+}
+
 export async function cachedFile(
   key: string,
   fetchStream: () => Promise<ReadableStream>,
   { dir = DEFAULT_DIR, maxAgeMs = DEFAULT_MAX_AGE_MS } = {},
 ): Promise<string> {
+  const cached = await findCachedFile(key, { dir, maxAgeMs });
+  if (cached) return cached;
   const file = path.join(dir, createHash("sha1").update(key).digest("hex"));
-  const info = await stat(file).catch(() => null);
-  if (info && Date.now() - info.mtimeMs < maxAgeMs) return file;
   let pending = inflight.get(file);
   if (!pending) {
     pending = (async () => {
@@ -37,13 +46,19 @@ export async function cachedFile(
         await rm(part, { force: true });
         throw error;
       }
-      await sweep(dir, maxAgeMs, file);
+      // 청소가 첫 화면을 막거나 구간 요청마다 디스크 전체를 훑지 않도록 한다.
+      if (Date.now() >= nextSweepAt) {
+        nextSweepAt = Date.now() + 60_000;
+        void sweep(dir, maxAgeMs, file).catch(() => {});
+      }
       return file;
     })().finally(() => inflight.delete(file));
     inflight.set(file, pending);
   }
   return pending;
 }
+
+let nextSweepAt = 0;
 
 async function sweep(dir: string, maxAgeMs: number, keep: string) {
   for (const name of await readdir(dir).catch(() => [] as string[])) {

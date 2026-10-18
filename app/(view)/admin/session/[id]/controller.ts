@@ -37,7 +37,7 @@ export function useSessionAdminController() {
   const prepare = search.get("mode") === "prepare";
   const [questionScope, setQuestionScope] = useState<"slide" | "all">("slide");
   const [questionSort, setQuestionSort] = useState<"empathy" | "latest">("empathy");
-  const [showQuestionLabels, setShowQuestionLabels] = usePinLabelMode(params.id);
+  const [showQuestionLabels, saveShowQuestionLabels] = usePinLabelMode(params.id);
   const router = useRouter();
   const [endConfirmOpen, setEndConfirmOpen] = useState(false);
   const [startedToast, setStartedToast] = useState(false);
@@ -377,7 +377,7 @@ export function useSessionAdminController() {
   };
 
   return {
-    prepare, questionScope, setQuestionScope, questionSort, setQuestionSort, showQuestionLabels, setShowQuestionLabels,
+    prepare, questionScope, setQuestionScope, questionSort, setQuestionSort, showQuestionLabels, setShowQuestionLabels: (visible: boolean) => runAction(saveShowQuestionLabels(visible), t("session.savePinSettingError")),
     panelQuestions,
     ready,
     session,

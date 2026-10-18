@@ -7,6 +7,7 @@ import {
   getLectureRemoteHolder,
   issueLectureRemote,
   type LectureRemoteHolder,
+  type LectureRemoteSettings,
   type LectureRemoteState
 } from "@/app/_service/class-session-service";
 
@@ -75,19 +76,22 @@ const subscribeHash = (onChange: () => void) => {
 /** `/remote#{token}` 화면. 토큰은 서버 로그·Referer에 남지 않도록 fragment에서만 읽는다. */
 export function useLectureRemote() {
   const token = useSyncExternalStore(subscribeHash, () => window.location.hash.slice(1), () => null);
-  // 같은 탭에서 #토큰만 바뀌어도 이전 링크의 차단·화면 상태를 끌고 오지 않도록 토큰별로 둔다.
-  const [view, setView] = useState({ token, lecture: null as LectureRemoteState | null, blocked: null as "inUse" | "revoked" | null, syncError: false });
-  if (view.token !== token) setView({ token, lecture: null, blocked: null, syncError: false });
-  const { lecture, blocked, syncError } = view;
+  const initialView = { token, lecture: null as LectureRemoteState | null, blocked: null as "inUse" | "revoked" | null, syncError: false, busy: false, questionsOpen: false };
+  const [view, setView] = useState(initialView);
+  if (view.token !== token) setView(initialView);
+  const { lecture, blocked, syncError, busy, questionsOpen } = view;
   const latestRequestRef = useRef(0);
+  const writeBusyRef = useRef(false);
 
-  const send = useCallback((step: -1 | 0 | 1) => {
-    if (!token) return;
+  const send = useCallback((step: -1 | 0 | 1, settings: LectureRemoteSettings = {}) => {
+    if (!token || writeBusyRef.current) return;
+    const writing = step !== 0 || Object.keys(settings).length > 0;
+    if (writing) writeBusyRef.current = true;
     const request = ++latestRequestRef.current;
     const apply = (change: Partial<typeof view>) => {
       if (request === latestRequestRef.current) setView((current) => current.token === token ? { ...current, ...change } : current);
     };
-    void controlLectureRemote(token, step).then((next) => apply({ lecture: next, syncError: false }), (error) => {
+    void controlLectureRemote(token, step, settings, questionsOpen).then((next) => apply({ lecture: next, syncError: false }), (error) => {
       const message = errorMessage(error);
       if (message === "remote_in_use") apply({ blocked: "inUse" });
       else if (message === "remote_revoked") apply({ blocked: "revoked" });
@@ -95,8 +99,13 @@ export function useLectureRemote() {
         console.error(`Remote control failed: ${message}`, error);
         apply({ syncError: true });
       }
+    }).finally(() => {
+      if (writing) {
+        writeBusyRef.current = false;
+        apply({ busy: false });
+      }
     });
-  }, [token]);
+  }, [questionsOpen, token]);
 
   useEffect(() => {
     if (!token || blocked) return;
@@ -113,5 +122,15 @@ export function useLectureRemote() {
   const state = token === null ? "loading"
     : token === "" ? "revoked"
       : blocked ?? (lecture ? "ready" : syncError ? "offline" : "loading");
-  return { state, lecture, syncError, previous: () => send(-1), next: () => send(1) };
+  const write = (step: -1 | 0 | 1, settings: LectureRemoteSettings = {}) => {
+    if (!token || writeBusyRef.current) return;
+    setView((current) => ({ ...current, busy: true }));
+    send(step, settings);
+  };
+  return {
+    state, lecture, syncError, busy, questionsOpen,
+    previous: () => write(-1), next: () => write(1),
+    changeSettings: (settings: LectureRemoteSettings) => write(0, settings),
+    setQuestionsOpen: (open: boolean) => setView((current) => ({ ...current, questionsOpen: open })),
+  };
 }

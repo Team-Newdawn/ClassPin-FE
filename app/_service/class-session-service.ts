@@ -14,6 +14,7 @@ type LectureRow = {
   presentation_interactions: boolean;
   presentation_autoplay: boolean;
   show_question_pins: boolean;
+  show_question_labels?: boolean;
   show_presentation_qr: boolean;
   presentation_qr_position: ClassSession["presentationQrPosition"];
   question_categories: unknown;
@@ -24,7 +25,7 @@ type LectureRow = {
 };
 
 export type LectureRealtimeRow = Pick<LectureRow,
-  "current_page" | "status" | "presentation_interactions" | "presentation_autoplay" | "show_question_pins" |
+  "current_page" | "status" | "presentation_interactions" | "presentation_autoplay" | "show_question_pins" | "show_question_labels" |
   "show_presentation_qr" | "presentation_qr_position" | "question_categories" |
   "allow_question_reactions" | "allow_emoji_reactions" | "started_at"
 >;
@@ -327,6 +328,9 @@ export async function fetchOwnedSessions(): Promise<ClassSession[]> {
   const client = getSupabaseClient();
   if (!client) return [];
   const courses = await restRequest<OwnedCourseGraphRow[]>(client, "/instructor/courses");
+  const labels = await client.from("lectures").select("id,show_question_labels").in("id", courses.flatMap((course) => course.lectures.map((lecture) => lecture.id)));
+  if (labels.error) throw labels.error;
+  const labelsById = new Map((labels.data ?? []).map((lecture) => [lecture.id, lecture.show_question_labels]));
   return courses
     .flatMap((course) => course.lectures.map((lecture) => ({ course, lecture })))
     .sort((a, b) => b.lecture.created_at.localeCompare(a.lecture.created_at))
@@ -358,6 +362,7 @@ export async function fetchOwnedSessions(): Promise<ClassSession[]> {
         presentationInteractions: lecture.presentation_interactions,
         presentationAutoplay: lecture.presentation_autoplay,
         showQuestionPins: lecture.show_question_pins,
+        showQuestionLabels: labelsById.get(lecture.id) ?? false,
         showPresentationQr: lecture.show_presentation_qr,
         presentationQrPosition: lecture.presentation_qr_position,
         questionCategories: normalizeQuestionCategorySettings(lecture.question_categories),
@@ -485,6 +490,7 @@ export async function updateLecture(sessionId: string, values: {
   presentation_interactions?: boolean;
   presentation_autoplay?: boolean;
   show_question_pins?: boolean;
+  show_question_labels?: boolean;
   show_presentation_qr?: boolean;
   presentation_qr_position?: ClassSession["presentationQrPosition"];
   question_categories?: QuestionCategorySettings;
@@ -496,12 +502,31 @@ export async function updateLecture(sessionId: string, values: {
   // ponytail: BE PATCH /instructor/lectures/{id} 가 일부 필드만 담은 본문을 전부 400으로 거절한다
   // (UpdateLectureRequest 의 Nulls.FAIL). BE 가 같은 검증·소유자 확인을 위임하는 RPC 를 직접 호출하고,
   // BE 가 고쳐지면 restRequest 로 되돌린다.
-  const { error } = await client.rpc("ohpin_update_lecture_settings", { target_lecture_id: sessionId, settings: values });
+  // 이 FE 소유 표시 설정은 기존 owner RLS로 저장한다. BE 업무 설정 RPC에는 보내지 않는다.
+  const { show_question_labels, ...settings } = values;
+  if (show_question_labels !== undefined) {
+    const { error } = await client.from("lectures").update({ show_question_labels }).eq("id", sessionId).select("id").single();
+    if (error) throw error;
+  }
+  if (!Object.keys(settings).length) return;
+  const { error } = await client.rpc("ohpin_update_lecture_settings", { target_lecture_id: sessionId, settings });
   if (error) throw error;
 }
 
 export type LectureRemoteHolder = "none" | "waiting" | "connected";
-export type LectureRemoteState = { currentSlide: number; slideCount: number; live: boolean; title: string };
+export type LectureRemoteSettings = {
+  show_question_pins?: boolean;
+  show_question_labels?: boolean;
+  show_presentation_qr?: boolean;
+  presentation_qr_position?: ClassSession["presentationQrPosition"];
+};
+export type LectureRemoteState = {
+  currentSlide: number; slideCount: number; live: boolean; title: string;
+  showQuestionPins: boolean; showQuestionLabels: boolean;
+  showPresentationQr: boolean; presentationQrPosition: ClassSession["presentationQrPosition"];
+  questionCount: number;
+  questions?: { id: string; text: string; slideIndex: number | null }[];
+};
 
 // 리모컨 RPC는 FE 마이그레이션 소유라 CFA-097A처럼 Supabase 세션으로 직접 호출한다.
 export async function issueLectureRemote(sessionId: string) {
@@ -521,13 +546,21 @@ export async function getLectureRemoteHolder(sessionId: string): Promise<Lecture
 }
 
 /** 링크를 처음 연 익명 세션이 리모컨을 차지한다. step 0은 차지와 상태 조회만 한다. */
-export async function controlLectureRemote(token: string, step: -1 | 0 | 1): Promise<LectureRemoteState> {
+export async function controlLectureRemote(token: string, step: -1 | 0 | 1, settings: LectureRemoteSettings = {}, includeQuestions = false): Promise<LectureRemoteState> {
   const client = getAudienceSupabaseClient();
   if (!client) throw new Error("Supabase is not configured.");
   await ensureAnonymousUser();
-  const { data, error } = await client.rpc("ohpin_remote_control", { remote_token: token, step });
+  const { data, error } = await client.rpc("ohpin_remote_control", { remote_token: token, step, settings, include_questions: includeQuestions });
   if (error) throw error;
-  return { currentSlide: data.current_page, slideCount: data.slide_count, live: data.status === "live", title: data.title };
+  return {
+    currentSlide: data.current_page, slideCount: data.slide_count, live: data.status === "live", title: data.title,
+    showQuestionPins: data.show_question_pins, showQuestionLabels: data.show_question_labels,
+    showPresentationQr: data.show_presentation_qr, presentationQrPosition: data.presentation_qr_position,
+    questionCount: data.question_count,
+    questions: data.questions?.map((question: { id: string; text: string; slide_index: number | null }) => ({
+      id: question.id, text: question.text, slideIndex: question.slide_index,
+    })),
+  };
 }
 
 export function subscribeToLecture(
@@ -568,7 +601,7 @@ export function subscribeToLecture(
   return () => { void client.removeChannel(channel); };
 }
 
-type LectureSnapshot = Pick<ClassSession, "currentSlide" | "status" | "presentationInteractions" | "presentationAutoplay" | "showQuestionPins" | "showPresentationQr" | "presentationQrPosition" | "questionCategories" | "allowQuestionReactions" | "allowEmojiReactions" | "startedAt" | "questions">;
+type LectureSnapshot = Pick<ClassSession, "currentSlide" | "status" | "presentationInteractions" | "presentationAutoplay" | "showQuestionPins" | "showQuestionLabels" | "showPresentationQr" | "presentationQrPosition" | "questionCategories" | "allowQuestionReactions" | "allowEmojiReactions" | "startedAt" | "questions">;
 
 /** questionsOnly 는 broadcast 뒤 재조회처럼 질문 목록만 필요할 때 /state 요청을 건너뛴다. */
 export async function fetchLectureSnapshot(session: ClassSession, asAudience = false, questionsOnly = false): Promise<(Partial<LectureSnapshot> & Pick<LectureSnapshot, "questions">) | null> {
@@ -576,14 +609,16 @@ export async function fetchLectureSnapshot(session: ClassSession, asAudience = f
   if (!client) return null;
   if (asAudience) await ensureAnonymousUser();
   const base = `/${asAudience ? "participant" : "instructor"}/lectures/${encodeURIComponent(session.id)}`;
-  const [lecture, data] = await Promise.all([
+  const [lecture, data, labels] = await Promise.all([
     // 청중 state는 시작 전 204, 종료 410, 없음 404다. 모두 참여 불가로 보고 아래에서 ended로 바꾼다.
     questionsOnly ? undefined : restRequest<LectureRow | null>(client, `${base}/state`).catch((error: unknown) => {
       if (asAudience && error instanceof RestError && (error.status === 404 || error.status === 410)) return null;
       throw error;
     }),
     restRequest<QuestionRow[]>(client, `${base}/questions`),
+    asAudience || questionsOnly ? null : client.from("lectures").select("show_question_labels").eq("id", session.id).single(),
   ]);
+  if (labels?.error) throw labels.error;
   const questions = toQuestions(
     Array.isArray(data) ? data as unknown as QuestionRow[] : [],
     session.id,
@@ -596,6 +631,7 @@ export async function fetchLectureSnapshot(session: ClassSession, asAudience = f
     presentationInteractions: lecture?.presentation_interactions ?? session.presentationInteractions,
     presentationAutoplay: lecture?.presentation_autoplay ?? session.presentationAutoplay,
     showQuestionPins: lecture?.show_question_pins ?? session.showQuestionPins,
+    showQuestionLabels: labels?.data?.show_question_labels ?? session.showQuestionLabels ?? false,
     showPresentationQr: lecture?.show_presentation_qr ?? session.showPresentationQr,
     presentationQrPosition: (lecture?.presentation_qr_position as ClassSession["presentationQrPosition"]) ?? session.presentationQrPosition,
     questionCategories: normalizeQuestionCategorySettings(lecture?.question_categories ?? session.questionCategories),

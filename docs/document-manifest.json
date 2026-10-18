@@ -146,8 +146,8 @@
       ],
       "approval": {
         "approved_at": "2026-10-17T00:00:00+09:00",
-        "approved_by": "user (live player Figma decisions and backend proposals, 2026-10-03; browser LIVE auto-end 9.4 approved in session, 2026-10-15; participant tablet and popup UI approved in session, 2026-10-17)",
-        "content_sha256": "a7502cee3c964174e2ad0409557f6c7dea6b1d1e4eba0c280b708b19c7e48093"
+        "approved_by": "user (live player Figma decisions and backend proposals, 2026-10-03; browser LIVE auto-end 9.4 approved in session, 2026-10-15; participant tablet and popup UI approved in session, 2026-10-17); /remote display mode persistence requested in session, 2026-10-17",
+        "content_sha256": "26fea14b5422efad8ebc0aa9baa52e803d4cb751b9fe20d82552d93370bf6182"
       }
     },
     {
@@ -167,9 +167,9 @@
         "lecture-roles-sharing"
       ],
       "approval": {
-        "approved_at": "2026-10-16T00:00:00+09:00",
-        "approved_by": "minchanpark (remote LRR-020~025 approved in session, 2026-10-16; roles/invites chapters 1, 3, 4 need re-approval before stage 2)",
-        "content_sha256": "5eb370060f82e450d9aed4d98ffe8405e7bea79c7255c5811998c171860b460e"
+        "approved_at": "2026-10-18T00:00:00+09:00",
+        "approved_by": "minchanpark (LRR-020~025 approved 2026-10-16; /remote display controls and question sheet LRR-026 requested and route corrected in session 2026-10-17; /remote responsive one-screen layout LRR-027 requested 2026-10-18; role/invite chapters still require stage 2 approval)",
+        "content_sha256": "cb8882059f665c6c40a4ab1df5cf0b966957e160b01a5611dd7e90fdd3f9603f"
       }
     }
   ],

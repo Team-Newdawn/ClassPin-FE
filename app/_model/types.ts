@@ -238,6 +238,7 @@ export interface ClassSession {
   presentationInteractions: boolean;
   presentationAutoplay: boolean;
   showQuestionPins: boolean;
+  showQuestionLabels?: boolean;
   showPresentationQr: boolean;
   presentationQrPosition: PresentationQrPosition;
   questionCategories: QuestionCategorySettings;

@@ -191,6 +191,12 @@ flow unless a task explicitly spans both products.
   truncate its title/sync copy before allowing it to overlap the actions or canvas.
 - Question types are hidden everywhere (temporary): participants submit the
   lecture's first enabled category; BE/DB still require `category`.
+- The presentation remote (`/remote#token`, public, no login; spec
+  `docs/lecture-roles-and-remote.md`) is issued only by the owner from the lecture
+  management page. The first anonymous browser to open it holds it and others see
+  "in use"; it moves `current_page` one step via `ohpin_remote_control` only while
+  LIVE. Reissuing or leaving LIVE revokes it. Never show its link on the projected
+  presentation.
 - Do not restore the text-slide creator. Existing image slide append/delete behavior
   remains supported.
 - Preserve accessible names, focus-visible behavior, semantic tabs/switches, and

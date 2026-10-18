@@ -4,7 +4,9 @@ import Image from "next/image";
 import Link from "next/link";
 import { useState } from "react";
 import { QRCodeSVG } from "qrcode.react";
-import { ArrowLeft, Check, ChevronDown, ChevronLeft, ChevronRight, FileText, GripVertical, ListFilter, MessageCircleQuestion, Monitor, MoreHorizontal, PanelLeftClose, PanelLeftOpen, Pencil, Play, QrCode, Search, Square, Trash2, X } from "@/app/component/icons";
+import { ArrowLeft, Check, ChevronDown, ChevronLeft, ChevronRight, FileText, GripVertical, ListFilter, MessageCircleQuestion, Monitor, MoreHorizontal, PanelLeftClose, PanelLeftOpen, Pencil, Play, QrCode, Search, Smartphone, Square, Trash2, X } from "@/app/component/icons";
+import { lectureRemoteAvailable } from "@/app/_controller/use-lecture-remote";
+import { RemoteDialog } from "./component/remote-dialog";
 import { useLanguage } from "@/app/_controller/language-context";
 import { LoadingScreen } from "@/app/component/loading-screen";
 import { QuestionCard } from "./component/question-card";
@@ -41,6 +43,7 @@ export default function SessionAdmin() {
   const [pageDraft, setPageDraft] = useState("");
   const [menuSlideId, setMenuSlideId] = useState<string | null>(null);
   const [noteHeight, setNoteHeight] = useState(NOTE_MIN_HEIGHT);
+  const [remoteOpen, setRemoteOpen] = useState(false);
   // 위로 끌면 노트가 커지고, 그리드의 슬라이드 행이 그만큼 줄어든다.
   const resizeNote = (delta: number) => setNoteHeight((height) => Math.round(Math.min(Math.max(height + delta, NOTE_MIN_HEIGHT), window.innerHeight * .4)));
   const { expandedIds, highlightedId, highlightPin, clusterQuestions, openCluster, closeCluster } = usePinCluster(controller.slide?.id, controller.session?.questions ?? []);
@@ -106,6 +109,7 @@ export default function SessionAdmin() {
           <div className="top-actions">
             {!live && session.questions.length > 0 && <Link className="btn secondary" href={`/admin/session/${session.id}/report`}>{t("report.title")}</Link>}
             <button type="button" className="btn secondary" onClick={openShare}><QrCode aria-hidden="true" />{t("session.joinQr")}</button>
+            {lectureRemoteAvailable && <button type="button" className="btn secondary" onClick={() => setRemoteOpen(true)}><Smartphone aria-hidden="true" />{t("session.remote")}</button>}
             <button type="button" className={`btn ${live ? "primary" : "secondary"} presentation-launch`} onClick={openPresentation} title={t("session.openSlideshow")}><Monitor aria-hidden="true" />{t("session.openPresentation")}</button>
             <span className="top-actions-divider" aria-hidden="true" />
             <button type="button" className={`btn ${live ? "lecture-end" : "primary"}`} disabled={lectureSaving} onClick={toggleStatus}>{live ? <><Square aria-hidden="true" />{t("session.endLecture")}</> : <><Play aria-hidden="true" />{t(lectureSaving ? "folders.startingLive" : "session.startLecture")}</>}</button>
@@ -326,6 +330,7 @@ export default function SessionAdmin() {
           <div className="share-actions"><button type="button" className="btn secondary" onClick={() => { closeShare(); openPresentation(); }}>{t("session.showQrOnPresentation")}</button><button type="button" className="btn secondary" autoFocus onClick={closeShare}>{t("common.close")}</button></div>
         </section>
       </div>}
+      {remoteOpen && <RemoteDialog key={session.id} sessionId={session.id} onClose={() => setRemoteOpen(false)} />}
       {mobileQuestionsOpen && <div className="modal-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) closeMobileQuestions(); }}>
         <section className="mobile-questions-sheet" role="dialog" aria-modal="true" aria-labelledby="mobile-questions-title">
           <button type="button" className="modal-close" onClick={closeMobileQuestions} aria-label={t("session.closeQuestions")}><X /></button>

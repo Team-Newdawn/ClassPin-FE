@@ -4,7 +4,7 @@ import { useState, type CSSProperties } from "react";
 import Image from "next/image";
 import Link from "next/link";
 const pinIcon = { src: "/assets/design/question-pin.svg", width: 32, height: 32 };
-import { ArrowRight, Check, ChevronDown, ChevronLeft, ChevronRight, MapPin, MoreHorizontal, Send, SmilePlus, ThumbsUp, Trash2, X } from "@/app/component/icons";
+import { ArrowRight, Check, ChevronDown, ChevronLeft, ChevronRight, MapPin, SmilePlus, Trash2, X } from "@/app/component/icons";
 import { LanguageSwitcher } from "@/app/component/language-switcher";
 import { LoadingScreen } from "@/app/component/loading-screen";
 import { PinLogo } from "@/app/component/pin-logo";
@@ -35,11 +35,10 @@ export default function JoinSession() {
     selectTool, changeSlide, syncToLiveSlide, selectQuestionSort, toggleQuestionReaction,
     sendEmojiReaction
   } = controller;
-  const composing = composerOpen && !viewingQuestion;
   const showCoach = !tapped && !composerOpen && !controller.hasOwnQuestions;
 
   return (
-    <main className={`${styles.root} student-shell student-slide-shell ${composing ? "composing" : ""}`} onPointerDown={() => setTapped(true)}>
+    <main className={`${styles.root} student-shell student-slide-shell`} onPointerDown={() => setTapped(true)} onKeyDown={(event) => { if (event.key === "Escape" && composerOpen) closeComposer(); }}>
       <button type="button" className="student-ask-button btn primary" onClick={() => { selectTool("pin"); placeDraftTag(.5, .5); }}><MapPin aria-hidden="true" />{t("student.askOnSlide")}</button>
       <div className="student-guide class-feedback-guide">
         <div><b>{session.title}<em>{t("session.liveLabel")}</em></b><span>{t("student.feedbackGuide")}</span></div>
@@ -75,7 +74,6 @@ export default function JoinSession() {
               </SlideCanvas>
             </div>
           </div>
-          {composing && !editingQuestionId && <p className="participant-drag-hint" aria-hidden="true">✋ {t("student.dragHint")}</p>}
           <div className="participant-controls">
             <div className="participant-page-navigation participant-pages" aria-label={t("student.chooseQuestionSlide")}>
               <button type="button" disabled={current === 0} onClick={() => changeSlide(current - 1)} aria-label={t("session.previousSlide")}><ChevronLeft aria-hidden="true" /></button>
@@ -132,9 +130,9 @@ export default function JoinSession() {
                     aria-label={question.isMine ? t("student.empathyOwn") : t(question.reactedByMe ? "student.empathyRemove" : "student.empathyAdd", { count: question.reactionCount })}
                     aria-busy={reactionPending}
                     disabled={question.isMine || reactionPending}
-                  ><ThumbsUp aria-hidden="true" /><b>{question.reactionCount}</b></button>}
+                  ><span className="student-empathy-icon" aria-hidden="true" /><b>{question.reactionCount}</b></button>}
                   {question.isMine && <>
-                    <button type="button" className="student-question-more" popoverTarget={menuId} aria-label={t("student.questionMenu")} onClick={(event) => { const box = event.currentTarget.getBoundingClientRect(); const menu = document.getElementById(menuId); if (menu) Object.assign(menu.style, { left: `${box.right}px`, top: `${box.bottom + 4}px` }); }}><MoreHorizontal aria-hidden="true" /></button>
+                    <button type="button" className="student-question-more" popoverTarget={menuId} aria-label={t("student.questionMenu")} onClick={(event) => { const box = event.currentTarget.getBoundingClientRect(); const menu = document.getElementById(menuId); if (menu) Object.assign(menu.style, { left: `${box.right}px`, top: `${box.bottom + 4}px` }); }}><Image src="/assets/design/participant-more.svg" width={16} height={16} alt="" aria-hidden="true" /></button>
                     <div id={menuId} popover="auto" className="student-question-menu" role="menu">
                       <button type="button" role="menuitem" onClick={(event) => { event.currentTarget.closest<HTMLElement>("[popover]")?.hidePopover(); startEditingQuestion(question.id); }}>{t("student.editQuestion")}</button>
                       <button type="button" role="menuitem" className="danger" disabled title={t("student.deleteUnavailable")}><Trash2 aria-hidden="true" />{t("student.deleteQuestion")}</button>
@@ -152,7 +150,7 @@ export default function JoinSession() {
       {captureShielded && <button type="button" className="capture-shield" autoFocus onClick={() => setCaptureShielded(false)}>{t("student.captureShieldResume")}</button>}
       <div className="student-toast-region" role="status">{toast && <div className="student-toast"><span><Check aria-hidden="true" /></span>{toast}</div>}</div>
       {composerOpen && <div className={`student-modal-backdrop ${viewingQuestion ? "modal-blocking" : "sheet"}`} onMouseDown={(event) => { if (event.target === event.currentTarget) closeComposer(); }}>
-        <section className="student-question-modal" role="dialog" aria-modal={viewingQuestion ? true : undefined} aria-labelledby="question-modal-title" onKeyDown={(event) => { if (event.key === "Escape") closeComposer(); if (viewingQuestion) trapDialogFocus(event); }}>
+        <section className="student-question-modal" role="dialog" aria-modal={viewingQuestion ? true : undefined} aria-labelledby="question-modal-title" onKeyDown={(event) => { if (viewingQuestion) trapDialogFocus(event); }}>
           {viewingQuestion ? <div className="student-answer-view">
             <button type="button" className="icon-btn modal-close" onClick={closeComposer} aria-label={t("student.closeComposer")}><X /></button>
             <h2 id="question-modal-title">{t("student.myQuestion")}</h2>
@@ -162,12 +160,13 @@ export default function JoinSession() {
             <span className="student-sheet-handle" aria-hidden="true" />
             <div className="student-sheet-title">
               <div><h2 id="question-modal-title">{editingQuestionId ? t("student.editPrompt") : t("student.askHere")}</h2><small>{t("student.askHereMeta", { number: current + 1 })}</small></div>
-              <button type="button" onClick={closeComposer} aria-label={t("student.closeComposer")}><X aria-hidden="true" /></button>
+              <button type="button" onClick={closeComposer} aria-label={t("student.closeComposer")}><Image src="/assets/design/participant-close.svg" width={18} height={18} alt="" aria-hidden="true" /></button>
             </div>
             <div className="textarea-wrap"><textarea autoFocus aria-label={t("student.optionalQuestion")} aria-describedby="student-empty-hint" value={draftText} onChange={(event) => updateDraftText(event.target.value)} maxLength={300} placeholder={t("student.placeholder")} /><span>{draftText.length} / 300</span></div>
             <p id="student-empty-hint" className="student-empty-hint">{t("student.emptyHint")}</p>
+            <p className="student-pin-hint">{t("student.pinHint")}</p>
             {submitError && <div className="student-submit-error" role="alert">{submitError}</div>}
-            <button type="button" className="btn primary large full student-send-button" onClick={() => void submit()} disabled={submitting}>{submitting ? <span className="spinner" /> : <Send aria-hidden="true" />}{editingQuestionId ? t("student.sendEdited") : t("student.sendQuestion")}</button>
+            <button type="button" className="btn primary large full student-send-button" onClick={() => void submit()} disabled={submitting}>{submitting ? <span className="spinner" /> : <Image src="/assets/design/participant-send.svg" width={18} height={18} alt="" aria-hidden="true" />}{editingQuestionId ? t("student.sendEdited") : t("student.sendQuestion")}</button>
           </>}
         </section>
       </div>}

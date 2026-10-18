@@ -14,9 +14,33 @@ function loadServices() {
     rpcCalls.push({ name, args });
     return { data: null, error: null };
   };
+  const remoteRpc = async (name: string, args: { include_questions: boolean }) => {
+    assert.equal(name, "ohpin_remote_control");
+    rpcCalls.push({ name, args });
+    return { data: {
+      current_page: 1, slide_count: 3, status: "live", title: "Remote",
+      show_question_pins: true, show_question_labels: true, show_presentation_qr: false,
+      presentation_qr_position: "top-left", question_count: 1, speaker_note: "private",
+      questions: args.include_questions ? [{ id: "q", text: "Why?", slide_index: 0, author_id: "private" }] : null,
+    }, error: null };
+  };
+  let showLabels = true;
+  const labelRow = () => ({ data: { id: "lecture", show_question_labels: showLabels }, error: null });
+  const labelTable = {
+    select: (columns: string) => {
+      assert(["id,show_question_labels", "show_question_labels"].includes(columns));
+      return columns.includes(",") ? { in: async () => ({ data: [labelRow().data], error: null }) }
+        : { eq: () => ({ single: async () => labelRow() }) };
+    },
+    update: (values: { show_question_labels: boolean }) => {
+      assert.deepEqual(Object.keys(values), ["show_question_labels"]);
+      showLabels = values.show_question_labels;
+      return { eq: () => ({ select: () => ({ single: async () => labelRow() }) }) };
+    },
+  };
   const client = (anonymous: boolean) => ({
     auth: { getSession: async () => ({ data: { session: { access_token: anonymous ? "participant" : "owner", user: { id: "owner", is_anonymous: anonymous } } }, error: null }) },
-    from: databaseCall, rpc: anonymous ? databaseCall : lectureRpc,
+    from: (table: string) => { if (anonymous || table !== "lectures") databaseCall(); return labelTable; }, rpc: anonymous ? remoteRpc : lectureRpc,
     storage: { from: () => ({
       getPublicUrl: (path: string) => ({ data: { publicUrl: `https://storage.invalid/${path}` } }),
     }) },
@@ -84,6 +108,19 @@ test("business services use REST DTOs, preserve settings, and strip participant 
     assert.equal(session.materialVersionId, "version");
     assert.equal(session.questions[0].answer, "latest tie");
     assert.equal(session.presentationAutoplay, true);
+    assert.equal(session.showQuestionLabels, true);
+    await service.updateLecture("lecture", { show_question_labels: false });
+    assert.equal((await service.fetchLectureSnapshot(session))?.showQuestionLabels, false);
+    const remote = await service.controlLectureRemote("remote-token", 0, { show_question_labels: true }, true);
+    assert.deepEqual(service.rpcCalls.at(-1), { name: "ohpin_remote_control", args: {
+      remote_token: "remote-token", step: 0, settings: { show_question_labels: true }, include_questions: true,
+    } });
+    assert.equal(remote.showQuestionLabels, true);
+    assert.equal(remote.presentationQrPosition, "top-left");
+    assert.equal(remote.questionCount, 1);
+    assert.deepEqual(remote.questions, [{ id: "q", text: "Why?", slideIndex: 0 }]);
+    assert(!("speaker_note" in remote));
+    assert.equal((await service.controlLectureRemote("remote-token", 0)).questions, undefined);
     assert.equal(session.slides[0].speakerNote, "private note");
     const audience = await service.fetchLiveSession("PIN123");
     assert.deepEqual([session.allowQuestionReactions, session.allowEmojiReactions, audience?.allowQuestionReactions], [false, true, false]);

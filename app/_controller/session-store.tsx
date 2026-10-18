@@ -38,6 +38,7 @@ type Store = {
   setStatus: (sessionId: string, status: ClassSession["status"]) => Promise<void>;
   setPresentationAutoplay: (sessionId: string, enabled: boolean) => Promise<void>;
   setShowQuestionPins: (sessionId: string, visible: boolean) => Promise<void>;
+  setShowQuestionLabels: (sessionId: string, visible: boolean) => Promise<void>;
   setReactionAllowed: (sessionId: string, setting: "allowQuestionReactions" | "allowEmojiReactions", allowed: boolean) => Promise<void>;
   setPresentationQrPlacement: (sessionId: string, position: PresentationQrPosition | null) => Promise<void>;
   updateSlideNote: (sessionId: string, slideId: string, body: string) => Promise<void>;
@@ -69,7 +70,7 @@ const PARTICIPANT_FALLBACK_POLL_MS = 15_000;
 const PARTICIPANT_FALLBACK_SPREAD_MS = 5_000;
 const BROADCAST_REFRESH_SPREAD_MS = 10_000;
 type LectureSettingPatch = Partial<Pick<ClassSession,
-  "status" | "presentationAutoplay" | "showQuestionPins" | "showPresentationQr" | "presentationQrPosition" | "allowQuestionReactions" | "allowEmojiReactions" | "startedAt"
+  "status" | "presentationAutoplay" | "showQuestionPins" | "showQuestionLabels" | "showPresentationQr" | "presentationQrPosition" | "allowQuestionReactions" | "allowEmojiReactions" | "startedAt"
 >>;
 
 const errorDetail = (error: unknown) => {
@@ -231,6 +232,7 @@ export function SessionStore({ children }: { children: React.ReactNode }) {
         presentationInteractions: lecture.presentation_interactions,
         presentationAutoplay: lecture.presentation_autoplay,
         showQuestionPins: lecture.show_question_pins,
+        showQuestionLabels: lecture.show_question_labels,
         showPresentationQr: lecture.show_presentation_qr,
         presentationQrPosition: lecture.presentation_qr_position,
         questionCategories: normalizeQuestionCategorySettings(lecture.question_categories),
@@ -609,6 +611,11 @@ export function SessionStore({ children }: { children: React.ReactNode }) {
       const previous = sessionsById.get(sessionId)?.showQuestionPins;
       if (previous === undefined) throw new Error("설정을 변경할 강의를 찾지 못했습니다.");
       await saveLectureSettings(sessionId, { showQuestionPins: visible }, { showQuestionPins: previous }, { show_question_pins: visible });
+    },
+    setShowQuestionLabels: async (sessionId, visible) => {
+      const session = sessionsById.get(sessionId);
+      if (!session) throw new Error("설정을 변경할 강의를 찾지 못했습니다.");
+      await saveLectureSettings(sessionId, { showQuestionLabels: visible }, { showQuestionLabels: session.showQuestionLabels ?? false }, { show_question_labels: visible });
     },
     setReactionAllowed: async (sessionId, setting, allowed) => {
       const previous = sessionsById.get(sessionId)?.[setting];

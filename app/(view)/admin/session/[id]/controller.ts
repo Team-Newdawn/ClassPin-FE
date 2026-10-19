@@ -3,6 +3,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPointerEvent } from "react";
 import { questionsByEmpathy, questionsByNewest } from "@/app/_model/question-reactions";
 import { usePinLabelMode } from "@/app/_controller/use-pin-label-mode";
+import { usePresentationOptions } from "@/app/_controller/use-presentation-options";
+import { QR_POSITIONS, type PresentationOptions, type QrPosition, type QuestionDisplayMode } from "@/app/_model/presentation-options";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { useHorizontalSlideWheel } from "@/app/_controller/use-horizontal-slide-wheel";
 import { useLanguage } from "@/app/_controller/language-context";
@@ -10,7 +12,7 @@ import { useLectureReactions } from "@/app/_controller/use-lecture-reactions";
 import { useLiveAudienceCount, useLiveElapsed } from "@/app/_controller/use-live-audience";
 import { useLiveAutoEnd } from "@/app/_controller/use-live-auto-end";
 import { useSessions } from "@/app/_controller/session-store";
-import { slideIndexFromPageNumber } from "@/app/_model/class/presentation-rotation";
+import { findNewestIncomingPin, slideIndexFromPageNumber } from "@/app/_model/class/presentation-rotation";
 import { groupQuestionsBySlide } from "@/app/_model/stats";
 import { CLASS_UNFILED_COLOR_INDEX, type PresentationQrPosition, type QuestionStatus } from "@/app/_model/types";
 
@@ -55,12 +57,29 @@ export function useSessionAdminController() {
     setStatus,
     setPresentationAutoplay,
     setShowQuestionPins,
+    setQuestionDisplay,
     setReactionAllowed,
     setPresentationQrPlacement,
     setActiveSession,
     updateSlideNote
   } = useSessions();
   const session = useMemo(() => sessions.find((item) => item.id === params.id), [params.id, sessions]);
+  const [presentationOptions, savePresentationOptions] = usePresentationOptions(session);
+  const [liveQuestionId, setLiveQuestionId] = useState<string | null>(null);
+  const previousPins = useRef<{ sessionId?: string; ids: string[] }>({ ids: [] });
+  useEffect(() => {
+    const questions = (session?.questions ?? []).filter((question) => question.x !== null && question.y !== null);
+    const previous = previousPins.current;
+    previousPins.current = { sessionId: session?.id, ids: questions.map((question) => question.id) };
+    if (previous.sessionId !== session?.id || !session?.showQuestionPins) return;
+    const incoming = findNewestIncomingPin(questions, previous.ids);
+    if (incoming) queueMicrotask(() => setLiveQuestionId(incoming.id));
+  }, [session?.id, session?.questions, session?.showQuestionPins]);
+  useEffect(() => {
+    if (!liveQuestionId) return;
+    const timer = setTimeout(() => setLiveQuestionId(null), 5000);
+    return () => clearTimeout(timer);
+  }, [liveQuestionId]);
   const { reactions: lectureReactions } = useLectureReactions(session?.id ?? null);
   const liveReactions = session?.allowEmojiReactions ? lectureReactions : [];
   // 종료 저장 중에도 상태가 먼저 ended 로 바뀌므로, 팝업이 열려 있는 동안은 요약 값을 유지한다.
@@ -70,7 +89,6 @@ export function useSessionAdminController() {
   const audienceCount = useLiveAudienceCount(session?.id ?? null, counting);
   const [tab, setTab] = useState<Tab>(search.get("tab") === "questions" ? "questions" : "live");
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [detailQuestionId, setDetailQuestionId] = useState<string | null>(null);
   const [filter, setFilter] = useState<QuestionStatus | "all">("all");
   const [query, setQuery] = useState("");
   const [shareOpen, setShareOpen] = useState(false);
@@ -193,6 +211,7 @@ export function useSessionAdminController() {
     if (!session) return;
     const currentSlideId = session.slides[session.currentSlide]?.id;
     if (currentSlideId) saveSlideNote(currentSlideId);
+    if (index !== session.currentSlide) setSelectedId(null);
     runAction(setCurrentSlide(session.id, index), t("session.saveSlideError"));
   };
   const resetSlidePageInput = (input: HTMLInputElement) => {
@@ -228,9 +247,10 @@ export function useSessionAdminController() {
   }, [search, session, setCurrentSlide]);
 
   useEffect(() => {
-    if (!session || tab !== "live" || detailQuestionId || shareOpen || deleteSlideId || mobileQuestionsOpen) return;
+    if (!session || tab !== "live" || shareOpen || deleteSlideId || mobileQuestionsOpen) return;
     const onKeyDown = (event: KeyboardEvent) => {
       if (document.querySelector("dialog[open]")) return;
+      if (event.key === "Escape") { setSelectedId(null); return; }
       if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
       if (event.altKey || event.ctrlKey || event.metaKey) return;
       const target = event.target instanceof HTMLElement ? event.target : null;
@@ -238,6 +258,7 @@ export function useSessionAdminController() {
       const next = session.currentSlide + (event.key === "ArrowRight" ? 1 : -1);
       if (next < 0 || next >= session.slides.length) return;
       event.preventDefault();
+      setSelectedId(null);
       void setCurrentSlide(session.id, next).catch((error) => {
         console.error("Keyboard slide navigation failed", error);
         setActionError(t("session.saveSlideError"));
@@ -245,7 +266,7 @@ export function useSessionAdminController() {
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [deleteSlideId, detailQuestionId, mobileQuestionsOpen, session, setCurrentSlide, shareOpen, t, tab]);
+  }, [deleteSlideId, mobileQuestionsOpen, session, setCurrentSlide, shareOpen, t, tab]);
 
   useEffect(() => {
     if (tab !== "live") return;
@@ -272,7 +293,6 @@ export function useSessionAdminController() {
   const slideQuestions = useMemo(() => questionsBySlide.get(session?.currentSlide ?? -1) ?? [], [questionsBySlide, session?.currentSlide]);
   const questionsById = useMemo(() => new Map(session?.questions.map((question) => [question.id, question])), [session?.questions]);
   const selected = questionsById.get(selectedId ?? "");
-  const detailQuestion = questionsById.get(detailQuestionId ?? "");
   const panelQuestions = useMemo(() => {
     const questions = questionScope === "slide" ? slideQuestions : session?.questions ?? [];
     return questionSort === "empathy" ? questionsByEmpathy(questions) : questionsByNewest(questions);
@@ -283,13 +303,6 @@ export function useSessionAdminController() {
   const deleteTargetQuestionCount = deleteTarget ? questionsBySlide.get(deleteTarget.pageIndex)?.length ?? 0 : 0;
   const joinUrl = typeof window === "undefined" || !session ? "" : `${window.location.origin}/join/${session.code}`;
 
-  const openQuestionDetail = (questionId: string) => {
-    setSelectedId(questionId);
-    setDetailQuestionId(questionId);
-  };
-  const closeQuestionDetail = () => {
-    setDetailQuestionId(null);
-  };
   const selectQuestionFromList = (questionId: string, slideIndex: number) => {
     if (!session) return;
     changeSlide(slideIndex);
@@ -393,7 +406,6 @@ export function useSessionAdminController() {
     questionCounts,
     slideQuestions,
     selected,
-    detailQuestion,
     visibleQuestions,
     tab,
     filter,
@@ -428,8 +440,6 @@ export function useSessionAdminController() {
     changeQuery: setQuery,
     changeFilter: setFilter,
     selectQuestion: setSelectedId,
-    openQuestionDetail,
-    closeQuestionDetail,
     selectQuestionFromList,
     changeSlide,
     handleSlidePageKeyDown,
@@ -456,11 +466,24 @@ export function useSessionAdminController() {
     togglePresentationAutoplay: () => session && runLectureAction(() => setPresentationAutoplay(session.id, !session.presentationAutoplay), t("session.saveAutoplayError")),
     toggleQuestionPins: () => session && runLectureAction(() => setShowQuestionPins(session.id, !session.showQuestionPins), t("session.savePinSettingError")),
     toggleReactionAllowed: (setting: "allowQuestionReactions" | "allowEmojiReactions") => session && runLectureAction(() => setReactionAllowed(session.id, setting, !session[setting]), t("session.saveReactionSettingError")),
+    presentationOptions, liveQuestionId,
+    changePresentationOptions: (patch: Partial<PresentationOptions>) => {
+      setActionError(null);
+      try { savePresentationOptions(patch); }
+      catch { setActionError(t("session.qrEditError")); }
+    },
+    changeQuestionDisplayMode: (mode: QuestionDisplayMode) => session && runLectureAction(async () => {
+      await setQuestionDisplay(session.id, mode !== "off", mode === "questions" || mode === "bubbles");
+      savePresentationOptions({ questionBubbles: mode === "bubbles" });
+    }, t("session.savePinSettingError")),
     changePresentationQrPlacement: (value: string) => {
-      if (!session) return;
-      const position = PRESENTATION_QR_POSITIONS.find((candidate) => candidate === value) ?? null;
-      if (value !== "hidden" && position === null) return;
-      runLectureAction(() => setPresentationQrPlacement(session.id, position), t("session.saveQrPositionError"));
+      if (!session || (value !== "hidden" && !QR_POSITIONS.includes(value as QrPosition))) return;
+      runLectureAction(async () => {
+        if (value === "hidden") { await setPresentationQrPlacement(session.id, null); return; }
+        const corner = PRESENTATION_QR_POSITIONS.find((candidate) => candidate === value);
+        await setPresentationQrPlacement(session.id, corner ?? session.presentationQrPosition);
+        savePresentationOptions({ qrPosition: value as QrPosition, qrBasePosition: corner ?? session.presentationQrPosition, qrOffset: null });
+      }, t("session.saveQrPositionError"));
     },
     changeNoteDraft,
     saveNoteOnBlur: () => slide && saveSlideNote(slide.id),

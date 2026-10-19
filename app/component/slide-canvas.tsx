@@ -13,15 +13,16 @@ import { questionMarkerEmoji, type Question, type Slide } from "@/app/_model/typ
 import { PdfPage } from "./pdf-page";
 import styles from "./slide-canvas.module.css";
 
-// 자리가 좁을 때 말풍선이 바꿀 수 있는 모양. 앞쪽부터 시도한다: 폭을 줄여 최대 3줄로 감싸기 → 더 좁은 한 줄(넘치면 …).
-const BUBBLE_SHAPES = [{ maxWidth: 180, wrap: true }, { maxWidth: 120, wrap: true }, { maxWidth: 90, wrap: true }, { maxWidth: 110, wrap: false }, { maxWidth: 80, wrap: false }];
+// 본문 전체를 감싼 실제 높이로 배치한다. 좁은 폭 다음에는 넓은 폭도 시도한다.
+const BUBBLE_WIDTHS = [180, 480, 640];
 
-export const SlideCanvas = memo(function SlideCanvas({ slide, questions = [], visibleQuestionIds, selectedId, liveQuestionId, onSelectPin, onSelectCluster, expandedIds, highlightedId, dimmed = false, onCanvasClick, showQuestionLabels = false, showPins = true, compact = false, children }: {
+export const SlideCanvas = memo(function SlideCanvas({ slide, questions = [], visibleQuestionIds, selectedId, liveQuestionId, livePinEffect, onSelectPin, onSelectCluster, expandedIds, highlightedId, dimmed = false, onCanvasClick, showQuestionLabels = false, showPins = true, compact = false, children }: {
   slide: Slide;
   questions?: Question[];
   visibleQuestionIds?: readonly string[];
   selectedId?: string | null;
   liveQuestionId?: string | null;
+  livePinEffect?: "collapse" | "hold";
   onSelectPin?: (id: string) => void;
   /** 강사 플레이어·발표 화면: 묶음을 펼침 목록 대신 콜백으로 넘기고, 같은 PIN 조작 디자인(pin-manager)을 쓴다. */
   onSelectCluster?: (ids: string[]) => void;
@@ -36,8 +37,13 @@ export const SlideCanvas = memo(function SlideCanvas({ slide, questions = [], vi
 }) {
   const { t } = useLanguage();
   const rootRef = useRef<HTMLDivElement>(null);
-  const lastPlacement = useRef<{ key: string; placements: ReturnType<typeof placeBubbles> } | null>(null);
+  const lastPlacement = useRef<{ key: string; scale: number; placements: ReturnType<typeof placeBubbles> } | null>(null);
   const [size, setSize] = useState({ width: 0, height: 0 });
+  const [arrivedPins, setArrivedPins] = useState({ slideId: slide.id, ids: [] as string[] });
+  if (arrivedPins.slideId !== slide.id) setArrivedPins({ slideId: slide.id, ids: [] });
+  else if (livePinEffect && liveQuestionId && !arrivedPins.ids.includes(liveQuestionId)) {
+    setArrivedPins({ slideId: slide.id, ids: [...arrivedPins.ids, liveQuestionId] });
+  }
   useEffect(() => {
     const root = rootRef.current;
     if (!root || compact) return;
@@ -49,43 +55,62 @@ export const SlideCanvas = memo(function SlideCanvas({ slide, questions = [], vi
     const visibleIds = visibleQuestionIds && new Set(visibleQuestionIds);
     return questions.filter((q) => q.x !== null && q.y !== null && (!visibleIds || visibleIds.has(q.id)));
   }, [questions, visibleQuestionIds]);
-  const clusters = useMemo(() => clusterPins(visiblePins.filter((q) => q.anchorKind !== "box" && q.anchorKind !== "path"), size.width, size.height).filter((group) => group.length > 1), [visiblePins, size.width, size.height]);
+  const clusters = useMemo(() => clusterPins(visiblePins.filter((q) => q.anchorKind !== "box" && q.anchorKind !== "path" && !(livePinEffect && (q.id === liveQuestionId || arrivedPins.ids.includes(q.id)))), size.width, size.height).filter((group) => group.length > 1), [visiblePins, size.width, size.height, arrivedPins.ids, livePinEffect, liveQuestionId]);
   const clusteredIds = useMemo(() => new Set(clusters.flatMap((group) => group.map((q) => q.id))), [clusters]);
   // 말풍선 실제 크기를 재서 PIN 주변의 겹치지 않는 자리로 옮긴다. 모든 말풍선을 표시한다.
   useLayoutEffect(() => {
     const root = rootRef.current;
-    if (!root || !showQuestionLabels) return;
-    const origin = root.getBoundingClientRect();
+    if (!root) return;
+    if (!showQuestionLabels && !(dimmed && selectedId) && !(liveQuestionId && livePinEffect)) return;
+    const origin = { width: root.clientWidth, height: root.clientHeight };
+    if (!origin.width || !origin.height) return;
     const pins = [...root.querySelectorAll<HTMLElement>("[data-bubble-anchor]")].map((pin) => {
-      const box = pin.getBoundingClientRect();
-      return { id: pin.dataset.bubbleAnchor!, bounds: { left: box.left - origin.left, right: box.right - origin.left, top: box.top - origin.top, bottom: box.bottom - origin.top } };
+      // 도착 애니메이션 중에도 최종 크기로 배치해 확대되는 PIN과 말풍선이 겹치지 않게 한다.
+      const transform = new DOMMatrixReadOnly(getComputedStyle(pin).transform);
+      const left = pin.offsetLeft + transform.m41;
+      const top = pin.offsetTop + transform.m42;
+      return { id: pin.dataset.bubbleAnchor!, bounds: { left, right: left + pin.offsetWidth, top, bottom: top + pin.offsetHeight } };
     });
     const bubbles = [...root.querySelectorAll<HTMLElement>("[data-bubble-for]")];
-    const activeKey = [liveQuestionId, selectedId].map((id) => id && bubbles.find((bubble) => bubble.dataset.bubbleFor!.split(" ").includes(id))?.dataset.bubbleFor).find(Boolean) ?? null;
-    // 기본 모양과 BUBBLE_SHAPES 중 기본보다 좁은 모양들의 실제 크기를 잰다.
-    // ponytail: 말풍선마다 모양 여러 개를 측정해 렌더마다 reflow가 생긴다. 말풍선이 수백 개가 되면 텍스트 길이로 크기를 추정한다.
-    const apply = (bubble: HTMLElement, shape?: (typeof BUBBLE_SHAPES)[number]) => {
-      bubble.style.maxWidth = shape ? `${shape.maxWidth}px` : "";
-      bubble.classList.toggle("wrapped", Boolean(shape?.wrap));
+    const activeKey = [liveQuestionId, selectedId, livePinEffect ? arrivedPins.ids.at(-1) : null].map((id) => id && bubbles.find((bubble) => bubble.dataset.bubbleFor!.split(" ").includes(id))?.dataset.bubbleFor).find(Boolean) ?? null;
+    // 본문 전체를 측정하고, 빈자리가 부족할 때만 글자와 여백을 함께 줄인다.
+    const variants = [...new Set([Math.min(280, origin.width * .45), ...BUBBLE_WIDTHS.filter((width) => width < origin.width - 8), Math.max(1, origin.width - 8)])];
+    const apply = (bubble: HTMLElement, scale: number, width: number) => {
+      bubble.style.setProperty("--bubble-scale", String(scale));
+      bubble.style.maxWidth = `${width * scale}px`;
     };
     const pinsById = new Map(pins.map((pin) => [pin.id, pin]));
-    const requests = bubbles.flatMap((bubble) => {
+    const measure = (scale: number) => bubbles.flatMap((bubble) => {
       const pin = pinsById.get(bubble.dataset.bubbleFor!);
       if (!pin) return [];
-      apply(bubble);
-      const variants = [undefined, ...BUBBLE_SHAPES.filter((shape) => shape.maxWidth < bubble.offsetWidth)];
-      const shapes = variants.map((shape) => { apply(bubble, shape); return { width: bubble.offsetWidth, height: bubble.offsetHeight }; });
-      return [{ id: pin.id, x: bubble.offsetLeft, y: bubble.offsetTop, shapes, pin: pin.bounds, element: bubble, variants }];
+      const shapes = variants.map((width) => { apply(bubble, scale, width); return { width: bubble.offsetWidth, height: bubble.offsetHeight }; });
+      return [{ id: pin.id, x: bubble.offsetLeft, y: bubble.offsetTop, shapes, pin: pin.bounds, element: bubble }];
     });
-    // 같은 입력이면 지난 배치를 다시 쓴다. 발표 중 PIN 공개 타이머처럼 배치와 무관한 렌더에서 계산을 건너뛴다.
+    let requests = measure(1);
     const key = JSON.stringify([origin.width, origin.height, activeKey, pins, requests.map(({ element, ...request }) => (void element, request))]);
-    if (lastPlacement.current?.key !== key) lastPlacement.current = { key, placements: placeBubbles(requests, pins, origin.width, origin.height, activeKey) };
-    for (const { id, element, variants } of requests) {
-      const placement = lastPlacement.current.placements.get(id)!;
-      apply(element, variants[placement.shape]);
-      element.style.transform = `translate(${placement.x}px, ${placement.y}px)`;
+    if (lastPlacement.current?.key !== key) {
+      let scale = 1;
+      let placements = placeBubbles(requests, pins, origin.width, origin.height, activeKey);
+      for (let attempt = 0; attempt < 24 && requests.some(({ id, y, shapes }) => {
+        const placement = placements.get(id)!;
+        return y + placement.y + shapes[placement.shape].height > origin.height;
+      }); attempt++) {
+        scale *= .8;
+        requests = measure(scale);
+        placements = placeBubbles(requests, scale > .02 ? pins : [], origin.width, origin.height, activeKey);
+      }
+      lastPlacement.current = { key, scale, placements };
     }
-  }, [clusters, compact, dimmed, expandedIds, highlightedId, liveQuestionId, selectedId, showPins, showQuestionLabels, size, t, visiblePins]);
+    const { scale, placements } = lastPlacement.current;
+    for (const { id, element } of requests) {
+      const placement = placements.get(id)!;
+      apply(element, scale, variants[placement.shape]);
+      element.style.transform = `translate(${placement.x}px, ${placement.y}px)`;
+      element.style.setProperty("--bubble-x", `${placement.x}px`);
+      element.style.setProperty("--bubble-y", `${placement.y}px`);
+      element.style.transformOrigin = `${-placement.x}px ${-placement.y}px`;
+    }
+  }, [arrivedPins.ids, clusters, compact, dimmed, expandedIds, highlightedId, liveQuestionId, livePinEffect, selectedId, showPins, showQuestionLabels, size, t, visiblePins]);
   const click = (event: React.MouseEvent<HTMLButtonElement>) => {
     if (!onCanvasClick) return;
     const box = event.currentTarget.getBoundingClientRect();
@@ -93,7 +118,7 @@ export const SlideCanvas = memo(function SlideCanvas({ slide, questions = [], vi
   };
 
   return (
-    <div ref={rootRef} className={`${styles.root} slide-canvas ${compact ? "compact" : ""} ${onSelectCluster ? "pin-manager" : ""} ${dimmed ? "focus-dim" : ""}`}>
+    <div ref={rootRef} data-live-effect={livePinEffect} className={`${styles.root} slide-canvas ${compact ? "compact" : ""} ${onSelectCluster ? "pin-manager" : ""} ${dimmed ? "focus-dim" : ""}`}>
       {/* Generated slide URLs are runtime assets and intentionally bypass Next image optimization. */}
       {slide.imageUrl
         ? <img src={slide.imageUrl} alt={t("common.slideNumber", { number: slide.pageIndex + 1 })} />
@@ -121,6 +146,7 @@ export const SlideCanvas = memo(function SlideCanvas({ slide, questions = [], vi
                   />
                 </svg>
                 <button
+                  data-bubble-anchor={q.id}
                   className={`question-path-marker ${markerEmoji ? "emoji-pin" : ""} ${selectedId === q.id ? "selected" : ""} ${isLive ? "live" : ""}`}
                   style={{ left: `${q.x! * 100}%`, top: `${q.y! * 100}%` }}
                   onClick={() => onSelectPin?.(q.id)}
@@ -131,6 +157,7 @@ export const SlideCanvas = memo(function SlideCanvas({ slide, questions = [], vi
               </>
             ) : isBox ? (
               <button
+                data-bubble-anchor={q.id}
                 className={`question-region ${selectedId === q.id ? "selected" : ""} ${isLive ? "live" : ""}`}
                 style={{ left: `${q.x! * 100}%`, top: `${q.y! * 100}%`, width: `${q.width! * 100}%`, height: `${q.height! * 100}%` }}
                 onClick={() => onSelectPin?.(q.id)}
@@ -144,7 +171,7 @@ export const SlideCanvas = memo(function SlideCanvas({ slide, questions = [], vi
                 <span className={`question-pin-marker ${markerEmoji ? "emoji" : ""}`} aria-hidden="true">{markerEmoji}</span>
               </button>
             )}
-            {showQuestionLabels && (
+            {(showQuestionLabels || (onSelectCluster && dimmed && selectedId === q.id) || (isLive && livePinEffect)) && (
               <button
                 className={`question-tag question-bubble ${isBox || isPath ? "region-tag" : ""} ${q.reactionCount >= 5 ? "empathy-fire" : ""} ${isLive ? "live" : ""} ${selectedId === q.id ? "focused" : ""}`}
                 style={{ left: `${position.x! * 100}%`, top: `${position.y! * 100}%` }}
@@ -164,10 +191,11 @@ export const SlideCanvas = memo(function SlideCanvas({ slide, questions = [], vi
         const x = group.reduce((sum, pin) => sum + pin.x!, 0) / group.length;
         const y = group.reduce((sum, pin) => sum + pin.y!, 0) / group.length;
         const selected = group.some((pin) => pin.id === selectedId || pin.id === liveQuestionId);
+        const isLive = group.some((pin) => pin.id === liveQuestionId);
+        const style = { left: `${x * 100}%`, top: `${y * 100}%`, "--cluster-size": `${Math.min(24 + group.length * 4, 56)}px` } as React.CSSProperties;
         if (onSelectCluster) {
           const ordered = [...group].sort((a, b) => b.reactionCount - a.reactionCount);
           const ids = ordered.map((pin) => pin.id);
-          const style = { left: `${x * 100}%`, top: `${y * 100}%` };
           // 오른쪽 패널에서 고른 질문(highlightedId)이 묶음 안에 있으면 묶음을 풀어 그 PIN을 보여 준다.
           if (expandedIds?.some((id) => ids.includes(id)) || (highlightedId && ids.includes(highlightedId))) {
             // 각 PIN을 묶음 중심에서 자기 실제 좌표로 이동시킨다(확대·재배치 없음).
@@ -177,14 +205,14 @@ export const SlideCanvas = memo(function SlideCanvas({ slide, questions = [], vi
             </div>;
           }
           return <Fragment key={ids.join("|")}>
-            <button type="button" className={`pin-cluster-button ${selected ? "selected focused" : ""}`} style={{ ...style, "--cluster-size": `${Math.min(24 + group.length * 4, 56)}px` } as React.CSSProperties} data-cluster-ids={ids.join(" ")} data-bubble-anchor={ids.join(" ")} onClick={() => onSelectCluster(ids)} aria-label={t("question.clusterCount", { count: group.length })}>{group.length}</button>
-            {showQuestionLabels && <button type="button" className={`question-tag question-bubble cluster-tag ${selected ? "focused" : ""}`} style={style} data-bubble-for={ids.join(" ")} onClick={() => onSelectCluster(ids)} aria-label={t("question.clusterCount", { count: group.length })}>
+            <button type="button" className={`pin-cluster-button ${isLive ? "live" : ""} ${selected ? "selected focused" : ""}`} style={style} data-cluster-ids={ids.join(" ")} data-bubble-anchor={ids.join(" ")} onClick={() => onSelectCluster(ids)} aria-label={t("question.clusterCount", { count: group.length })}><span aria-hidden="true">{group.length}</span></button>
+            {showQuestionLabels && <button type="button" className={`question-tag question-bubble cluster-tag ${isLive ? "live" : ""} ${selected ? "focused" : ""}`} style={style} data-bubble-for={ids.join(" ")} onClick={() => onSelectCluster(ids)} aria-label={t("question.clusterCount", { count: group.length })}>
               <span className="question-bubble-body">{ordered[0].text}</span><span className="question-tag-more">{t("question.clusterMore", { count: group.length - 1 })}</span>
             </button>}
           </Fragment>;
         }
-        return <details key={group.map((pin) => pin.id).sort().join("|")} className={`pin-cluster ${selected ? "selected" : ""}`} style={{ left: `${x * 100}%`, top: `${y * 100}%` }}>
-          <summary aria-label={t("question.clusterCount", { count: group.length })}>{group.length}</summary>
+        return <details key={group.map((pin) => pin.id).sort().join("|")} className={`pin-cluster ${selected ? "selected" : ""}`} style={style}>
+          <summary aria-label={t("question.clusterCount", { count: group.length })}><span aria-hidden="true">{group.length}</span></summary>
           <div className={`pin-cluster-list ${x < .25 ? "align-left" : x > .75 ? "align-right" : ""} ${y > .65 ? "above" : ""}`}>{group.map((pin) => <button key={pin.id} type="button" onClick={(event) => { const details = event.currentTarget.closest("details"); if (details) details.open = false; onSelectPin?.(pin.id); }}>{pin.text}</button>)}</div>
         </details>;
       })}

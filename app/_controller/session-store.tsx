@@ -39,6 +39,7 @@ type Store = {
   setPresentationAutoplay: (sessionId: string, enabled: boolean) => Promise<void>;
   setShowQuestionPins: (sessionId: string, visible: boolean) => Promise<void>;
   setShowQuestionLabels: (sessionId: string, visible: boolean) => Promise<void>;
+  setQuestionDisplay: (sessionId: string, pins: boolean, labels: boolean) => Promise<void>;
   setReactionAllowed: (sessionId: string, setting: "allowQuestionReactions" | "allowEmojiReactions", allowed: boolean) => Promise<void>;
   setPresentationQrPlacement: (sessionId: string, position: PresentationQrPosition | null) => Promise<void>;
   updateSlideNote: (sessionId: string, slideId: string, body: string) => Promise<void>;
@@ -616,6 +617,14 @@ export function SessionStore({ children }: { children: React.ReactNode }) {
       const session = sessionsById.get(sessionId);
       if (!session) throw new Error("설정을 변경할 강의를 찾지 못했습니다.");
       await saveLectureSettings(sessionId, { showQuestionLabels: visible }, { showQuestionLabels: session.showQuestionLabels ?? false }, { show_question_labels: visible });
+    },
+    setQuestionDisplay: async (sessionId, pins, labels) => {
+      const previous = sessionsById.get(sessionId);
+      if (!previous) throw new Error("설정을 변경할 강의를 찾지 못했습니다.");
+      await saveLectureSettings(sessionId,
+        { showQuestionPins: pins, showQuestionLabels: labels },
+        { showQuestionPins: previous.showQuestionPins, showQuestionLabels: previous.showQuestionLabels ?? false },
+        { show_question_pins: pins, show_question_labels: labels });
     },
     setReactionAllowed: async (sessionId, setting, allowed) => {
       const previous = sessionsById.get(sessionId)?.[setting];

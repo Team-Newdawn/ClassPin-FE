@@ -1,13 +1,14 @@
 "use client";
 
 import Image from "next/image";
-import { Pencil, Search, Plus } from "@/app/component/icons";
+import { Search, Plus } from "@/app/component/icons";
 import { AdminSearch } from "@/app/component/admin-search";
 import { LoadingScreen } from "@/app/component/loading-screen";
 import { FolderTreeSidebar } from "@/app/component/folder-tree-sidebar";
 import type { TranslationKey } from "@/app/_model/i18n";
 import { CLASS_FOLDER_COLOR_OPTIONS, CLASS_FOLDER_PURPOSE_LABEL_MAX, type ClassFolderPurpose } from "@/app/_model/types";
 import { FolderCard } from "./component/folder-card";
+import { FolderDeleteDialog } from "./component/folder-delete-dialog";
 import { UNFILED_ID, useDashboardController } from "./controller";
 import styles from "./page.module.css";
 
@@ -33,13 +34,19 @@ export default function DashboardPage() {
     setFolderColorIndex, folderPurpose, setFolderPurpose, folderPurposeLabel, setFolderPurposeLabel, query, setQuery,
     folderError, savingFolder, deletingFolderId, folderActionError, sidebarOpen, toggleSidebar,
     requestUpload,
-    submitFolder, openFolderEditor, closeFolderEditor, removeFolder, visibleSummaries
+    submitFolder, openFolderEditor, closeFolderEditor, removeFolder, visibleSummaries,
+    folderToDelete, setFolderToDelete, folderPreferences, folderNotice, changeFolderAppearance, copyFolderLink, renameFolder, hasLiveMaterial, setFolderActionError
   } = useDashboardController();
 
   if (!ready) return <LoadingScreen />;
   const selectedPurpose = folderPurposeOptions.find((option) => option.value === folderPurpose) ?? folderPurposeOptions[0];
 
-  const folderCards = visibleSummaries.map((folder) => <FolderCard key={folder.id} folder={folder} view={view} deleting={deletingFolderId === folder.id} onRename={folder.id === UNFILED_ID ? undefined : () => openFolderEditor(folder)} onDelete={folder.id === UNFILED_ID ? undefined : () => void removeFolder(folder)} />);
+  const folderCards = visibleSummaries.map((folder) => <FolderCard key={folder.id} folder={folder} view={view} deleting={deletingFolderId === folder.id}
+    pinned={folderPreferences[folder.id]?.pinned === true} canCopyLink={hasLiveMaterial(folder.id)}
+    onRename={folder.id === UNFILED_ID ? undefined : (name) => renameFolder(folder, name)}
+    onDelete={folder.id === UNFILED_ID ? undefined : () => { setFolderActionError(null); setFolderToDelete(folder); }}
+    onPin={() => changeFolderAppearance(folder, { pinned: folderPreferences[folder.id]?.pinned !== true })}
+    onColor={(colorIndex) => changeFolderAppearance(folder, { colorIndex })} onCopyLink={() => void copyFolderLink(folder)} />);
 
   return (
     <main className={`${styles.root} folder-workspace folder-dashboard-shell ${sidebarOpen ? "" : "sidebar-collapsed"}`}>
@@ -54,11 +61,12 @@ export default function DashboardPage() {
             <div className="folder-dashboard-actions">
               <AdminSearch className="folder-dashboard-search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder={t("folders.search")} />
               <button type="button" className="btn folder-upload-button" onClick={requestUpload}><Image src="/assets/icons/upload_icon.svg" alt="" width={34} height={24} />{t("folders.uploadUnfiled")}</button>
-              <button type="button" className="btn primary" onClick={() => openFolderEditor("new")}><Image src="/assets/icons/folder_icon.svg" alt="" width={29} height={24} />{t("folders.newFolder")}</button>
+              <button type="button" className="btn primary" onClick={() => openFolderEditor()}><Image src="/assets/icons/folder_icon.svg" alt="" width={29} height={24} />{t("folders.newFolder")}</button>
             </div>
           </div>
 
-          {folderActionError && <div className="session-folder-error" role="alert">{folderActionError}</div>}
+          {folderActionError && !folderToDelete && <div className="session-folder-error" role="alert">{folderActionError}</div>}
+          {folderNotice && <p role="status">{folderNotice}</p>}
 
 
           <section className="folder-section" aria-labelledby="folder-list-title">
@@ -82,12 +90,12 @@ export default function DashboardPage() {
                     <tbody>{folderCards}</tbody>
                   </table>
                 </div>
-                {!query && <button type="button" className={styles.addFolderRow} onClick={() => openFolderEditor("new")}>+ {t("folders.createNew")}</button>}
+                {!query && <button type="button" className={styles.addFolderRow} onClick={() => openFolderEditor()}>+ {t("folders.createNew")}</button>}
               </div>
             ) : (
               <div className="folder-grid">
                 {folderCards}
-                {!query && <button type="button" className={styles.newFolderTile} onClick={() => openFolderEditor("new")}><Plus /><span>{t("folders.create")}</span></button>}
+                {!query && <button type="button" className={styles.newFolderTile} onClick={() => openFolderEditor()}><Plus /><span>{t("folders.create")}</span></button>}
               </div>
             ) : <div className="panel folder-empty"><Search /><b>{t("folders.noMatch")}</b><span>{t("folders.changeSearch")}</span></div>}
           </section>
@@ -98,8 +106,8 @@ export default function DashboardPage() {
         <div className="modal-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) closeFolderEditor(); }}>
           <section className={`share-modal folder-modal ${styles.createModal}`} role="dialog" aria-modal="true" aria-labelledby="folder-editor-title" aria-describedby="folder-editor-description" onKeyDown={(event) => { if (event.key === "Escape") closeFolderEditor(); }}>
             <header className={styles.createModalHeader}>
-              <h2 id="folder-editor-title">{t(folderEditor === "new" ? "folders.newFolderTitle" : "folders.renameTitle")}</h2>
-              <p id="folder-editor-description">{t(folderEditor === "new" ? "folders.newFolderDescription" : "folders.renameDescription")}</p>
+              <h2 id="folder-editor-title">{t("folders.newFolderTitle")}</h2>
+              <p id="folder-editor-description">{t("folders.newFolderDescription")}</p>
             </header>
             <form className={`folder-form ${styles.createForm}`} onSubmit={submitFolder}>
               <label className="folder-field">
@@ -136,12 +144,13 @@ export default function DashboardPage() {
               {folderError && <div className="session-folder-error" role="alert">{folderError}</div>}
               <div className="folder-modal-actions">
                 <button type="button" className="btn secondary" onClick={closeFolderEditor} disabled={savingFolder}>{t("folders.cancel")}</button>
-                <button type="submit" className="btn primary" disabled={savingFolder || !folderName.trim()}>{savingFolder ? <span className="spinner" /> : folderEditor !== "new" && <Pencil />}{savingFolder ? t(folderEditor === "new" ? "folders.creating" : "folders.renaming") : t(folderEditor === "new" ? "folders.create" : "folders.renameSave")}</button>
+                <button type="submit" className="btn primary" disabled={savingFolder || !folderName.trim()}>{savingFolder && <span className="spinner" />}{t(savingFolder ? "folders.creating" : "folders.create")}</button>
               </div>
             </form>
           </section>
         </div>
       )}
+      {folderToDelete && <FolderDeleteDialog folder={folderToDelete} saving={Boolean(deletingFolderId)} error={folderActionError} onClose={() => { if (!deletingFolderId) { setFolderToDelete(null); setFolderActionError(null); } }} onDelete={(contents) => void removeFolder(contents)} />}
       {uploadOpen && <MaterialUploadDialog onClose={closeUpload} />}
     </main>
   );

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { advancePinPlayback, canRotatePinPlayback, crossedPinMilestone, findNewestIncomingPin, nextPresentationSlide, presentationAutoplayDelay, rectanglesOverlap, resolvePinDisplayPositions, placeBubbles, slideIndexFromPageNumber } from "./presentation-rotation.ts";
+import { advancePinPlayback, canRotatePinPlayback, crossedPinMilestone, findIncomingPins, findNewestIncomingPin, nextPresentationSlide, presentationAutoplayDelay, rectanglesOverlap, resolvePinDisplayPositions, placeBubbles, slideIndexFromPageNumber } from "./presentation-rotation.ts";
 
 test("PIN 총합이 새 10단위를 넘으면 건너뛴 구간 중 가장 높은 값을 고른다", () => {
   assert.equal(crossedPinMilestone(9, 10), 10);
@@ -66,6 +66,10 @@ test("발표 슬라이드를 순환하고 기존 snapshot에 없던 최신 PIN�
   assert.equal(nextPresentationSlide(0, 0), 0);
   assert.equal(findNewestIncomingPin(pins, ["known"]), pins[0]);
   assert.equal(findNewestIncomingPin(pins, pins.map((pin) => pin.id)), null);
+  const batch = [{ id: "newer", slideIndex: 1 }, ...pins];
+  assert.deepEqual(findIncomingPins(batch, ["known"]), batch.slice(0, 2));
+  assert.deepEqual(findIncomingPins(batch.map((pin) => ({ ...pin, reactionCount: 5 })), batch.map((pin) => pin.id)), []);
+  assert.deepEqual(findIncomingPins([], ["known"]), []);
 });
 
 test("자동 넘김은 설정·PIN 노출·상세 dialog 상태에 맞는 지연만 반환한다", () => {
@@ -138,4 +142,34 @@ test("말풍선은 겹치지 않게 자기 PIN에 붙이고, 빈자리가 없어
   const edge = pin("e", 150, 25);
   const narrow = placeBubbles([{ id: "e", x: 150, y: 25, pin: edge.bounds, shapes: [{ width: 200, height: 24 }, { width: 90, height: 44 }] }], [edge], 260, 50, null);
   assert.deepEqual(narrow.get("e"), { x: 16, y: -22, shape: 1 });
+});
+
+test("긴 말풍선은 전체 높이로 측정하고 공간 부족을 호출자에 알린다", () => {
+  const pin = { id: "anchor", bounds: { left: 140, right: 160, top: 90, bottom: 110 } };
+  const requests = [0, 1, 2].map((index) => ({
+    id: String(index), x: 150, y: 100, pin: pin.bounds,
+    shapes: [{ width: 180, height: 500 }, { width: 280, height: 240 }],
+  }));
+  const placed = placeBubbles(requests, [pin], 300, 180, "0");
+  const boxes = requests.map((request) => {
+    const { x, y, shape } = placed.get(request.id)!;
+    return { left: request.x + x, top: request.y + y, right: request.x + x + request.shapes[shape].width, bottom: request.y + y + request.shapes[shape].height };
+  });
+  for (const [index, box] of boxes.entries()) {
+    assert.ok(box.left >= 0 && box.right <= 300);
+    assert.equal(rectanglesOverlap(box, pin.bounds), false);
+    for (const other of boxes.slice(index + 1)) assert.equal(rectanglesOverlap(box, other), false);
+  }
+  assert.ok(boxes[2].bottom > 180, "공간 부족을 알려 더 작은 크기로 재배치할 수 있다");
+  const smaller = requests.map((request) => ({ ...request, shapes: request.shapes.map(({ width, height }) => ({ width: width / 5, height: height / 5 })) }));
+  const fitted = placeBubbles(smaller, [pin], 300, 180, "0");
+  const fittedBoxes = smaller.map((request) => {
+    const { x, y, shape } = fitted.get(request.id)!;
+    return { left: request.x + x, top: request.y + y, right: request.x + x + request.shapes[shape].width, bottom: request.y + y + request.shapes[shape].height };
+  });
+  for (const [index, box] of fittedBoxes.entries()) {
+    assert.ok(box.left >= 0 && box.right <= 300 && box.top >= 0 && box.bottom <= 180);
+    assert.equal(rectanglesOverlap(box, pin.bounds), false);
+    for (const other of fittedBoxes.slice(index + 1)) assert.equal(rectanglesOverlap(box, other), false);
+  }
 });

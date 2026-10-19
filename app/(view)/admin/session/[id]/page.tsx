@@ -1,6 +1,7 @@
 "use client";
 
 import Image from "next/image";
+import { PresentationControls } from "./component/presentation-controls";
 import Link from "next/link";
 import { useState } from "react";
 import { QRCodeSVG } from "qrcode.react";
@@ -10,10 +11,9 @@ import { RemoteDialog } from "./component/remote-dialog";
 import { useLanguage } from "@/app/_controller/language-context";
 import { LoadingScreen } from "@/app/component/loading-screen";
 import { QuestionCard } from "./component/question-card";
-import { QuestionDetailDialog } from "./component/question-detail-dialog";
 import { SlideCanvas } from "@/app/component/slide-canvas";
 import { StatusBadge } from "@/app/component/status-badge";
-import { MAX_QUESTION_PANEL, MIN_QUESTION_PANEL, PRESENTATION_QR_POSITIONS, useSessionAdminController } from "./controller";
+import { MAX_QUESTION_PANEL, MIN_QUESTION_PANEL, useSessionAdminController } from "./controller";
 import styles from "./page.module.css";
 import { LecturePreparation } from "./component/lecture-preparation";
 import { PinClusterPopover, QuestionSummary, usePinCluster } from "./component/pin-cluster-popover";
@@ -48,14 +48,14 @@ export default function SessionAdmin() {
   const resizeNote = (delta: number) => setNoteHeight((height) => Math.round(Math.min(Math.max(height + delta, NOTE_MIN_HEIGHT), window.innerHeight * .4)));
   const { expandedIds, highlightedId, highlightPin, clusterQuestions, openCluster, closeCluster } = usePinCluster(controller.slide?.id, controller.session?.questions ?? []);
   const {
-    prepare, questionScope, setQuestionScope, questionSort, setQuestionSort, panelQuestions, showQuestionLabels, setShowQuestionLabels,
+    prepare, questionScope, setQuestionScope, questionSort, setQuestionSort, panelQuestions, showQuestionLabels,
     ready, session, liveReactions, liveElapsed, audienceCount, slide, folder, folderAccentIndex, folderHref, folderSessions, questionsBySlide, questionCounts, slideQuestions,
-    selected, detailQuestion, visibleQuestions, tab, filter, query, shareOpen, mobileQuestionsOpen, copied,
+    selected, visibleQuestions, tab, filter, query, shareOpen, mobileQuestionsOpen, copied,
     actionError, lectureSaving, presentationError, folderRailOpen, questionPanelWidth, noteDraft,
     noteDirty, noteSavingSlideId, noteSavedSlideId, deleteTarget, deletingSlide,
     deleteSlideError, deleteTargetQuestionCount, joinUrl, playerWorkspaceRef, filmstripRef,
     handleSlideWheel, toggleFolderRail, openShare,
-    closeShare, openMobileQuestions, closeMobileQuestions, changeQuery, changeFilter, selectQuestion, openQuestionDetail, closeQuestionDetail,
+    closeShare, openMobileQuestions, closeMobileQuestions, changeQuery, changeFilter, selectQuestion,
     selectQuestionFromList, changeSlide, handleSlidePageKeyDown, resetSlidePageInput,
     endConfirmOpen, closeEndConfirm, confirmEnd, toggleStatus, startedToast, togglePresentationAutoplay, toggleQuestionPins,
     changePresentationQrPlacement,
@@ -71,7 +71,6 @@ export default function SessionAdmin() {
   if (prepare) return <LecturePreparation controller={controller} />;
 
   const live = session.status === "live";
-  const qrPositionLabel = (position: string) => t(position === "top-left" ? "session.qrTopLeft" : position === "top-right" ? "session.qrTopRight" : position === "bottom-left" ? "session.qrBottomLeft" : "session.qrBottomRight");
   const pageTarget = slideIndexFromPageNumber(pageDraft, session.slides.length);
   const noteStatus = noteSavingSlideId === slide.id
     ? t("session.speakerNotesSaving")
@@ -129,37 +128,11 @@ export default function SessionAdmin() {
               <div className="stage-toolbar">
                 <div className="stage-toolbar-status"><span className={`status-dot ${session.status}`} /><b title={session.title}>{session.title}</b></div>
                 <div className="stage-toolbar-actions">
-                  <div className="stage-control pin-display-toggle" role="group" aria-labelledby="pin-display-label"><span id="pin-display-label">{t("session.questionDisplay")}</span><SessionToggle checked={session.showQuestionPins} label={t(session.showQuestionPins ? "session.turnPinsOff" : "session.turnPinsOn")} onClick={toggleQuestionPins} /><span className="stage-segmented"><button type="button" disabled={!session.showQuestionPins} aria-pressed={!showQuestionLabels} onClick={() => setShowQuestionLabels(false)}>{t("session.pinsOnly")}</button><button type="button" disabled={!session.showQuestionPins} aria-pressed={showQuestionLabels} onClick={() => setShowQuestionLabels(true)}>{t("session.pinsAndQuestions")}</button></span></div>
-                  <div className="stage-control stage-qr-control">
-                    <span>{t("session.qrCode")}</span>
-                    <SessionToggle checked={session.showPresentationQr} label={t("session.qrCode")} onClick={() => changePresentationQrPlacement(session.showPresentationQr ? "hidden" : session.presentationQrPosition)} />
-                    <i className="stage-control-divider" aria-hidden="true" />
-                    <button type="button" className="stage-qr-placement" popoverTarget="qr-position-menu" disabled={!session.showPresentationQr} aria-haspopup="menu" aria-label={`${t("session.qrLocation")}: ${qrPositionLabel(session.presentationQrPosition)}`} onClick={(event) => {
-                      const box = event.currentTarget.getBoundingClientRect();
-                      const menu = document.getElementById("qr-position-menu");
-                      if (menu) Object.assign(menu.style, { left: `${box.right}px`, top: `${box.bottom + 6}px` });
-                    }}>
-                      <span>{t("session.qrLocation")}</span>
-                      <i className="qr-corner-icon" data-position={session.presentationQrPosition} aria-hidden="true" />
-                      <b>{qrPositionLabel(session.presentationQrPosition)}</b>
-                      <ChevronDown aria-hidden="true" />
-                    </button>
-                    <div id="qr-position-menu" popover="auto" className="qr-position-menu" role="menu" aria-label={t("session.qrLocation")} onToggle={(event) => { if (event.newState === "open") event.currentTarget.querySelector<HTMLElement>("[aria-checked=true]")?.focus(); }} onKeyDown={(event) => {
-                      if (event.key !== "ArrowDown" && event.key !== "ArrowUp") return;
-                      event.preventDefault();
-                      const items = [...event.currentTarget.querySelectorAll<HTMLElement>("[role=menuitemradio]")];
-                      const index = items.indexOf(document.activeElement as HTMLElement);
-                      items[(index + (event.key === "ArrowDown" ? 1 : items.length - 1)) % items.length]?.focus();
-                    }}>
-                      {PRESENTATION_QR_POSITIONS.map((position) => <button key={position} type="button" role="menuitemradio" aria-checked={session.presentationQrPosition === position} onClick={(event) => { event.currentTarget.closest<HTMLElement>("[popover]")?.hidePopover(); changePresentationQrPlacement(position); }}>
-                        <i className="qr-corner-icon" data-position={position} aria-hidden="true" /><span>{qrPositionLabel(position)}</span>{session.presentationQrPosition === position && <Check aria-hidden="true" />}
-                      </button>)}
-                    </div>
-                  </div>
+                  <PresentationControls controller={controller} />
                 </div>
               </div>
               <div className="stage-canvas-wrap" onWheel={handleSlideWheel} onClick={(event) => { if (!(event.target as Element).closest("button, [role='dialog']")) selectQuestion(null); }}>
-                <SlideCanvas slide={slide} questions={slideQuestions} selectedId={selected?.id} onSelectPin={openQuestionDetail} onSelectCluster={(ids) => { selectQuestion(null); openCluster(ids); }} expandedIds={expandedIds} highlightedId={highlightedId ?? selected?.id} dimmed={Boolean(expandedIds) || selected?.slideIndex === session.currentSlide} showQuestionLabels={showQuestionLabels} showPins={session.showQuestionPins}>
+                <SlideCanvas slide={slide} questions={slideQuestions} liveQuestionId={controller.liveQuestionId} selectedId={selected?.id} onSelectPin={(id) => expandedIds?.includes(id) ? highlightPin(id) : selectQuestion(selected?.id === id ? null : id)} onSelectCluster={(ids) => { selectQuestion(null); openCluster(ids); }} expandedIds={expandedIds} highlightedId={highlightedId ?? selected?.id} dimmed={Boolean(expandedIds) || selected?.slideIndex === session.currentSlide} showQuestionLabels={showQuestionLabels} showPins={session.showQuestionPins}>
                   {clusterQuestions.length > 0 && <PinClusterPopover key={expandedIds!.join("|")} questions={clusterQuestions} folder={controller.folder ?? null} highlightedId={highlightedId} onHighlight={highlightPin} onClose={closeCluster} />}
                 </SlideCanvas>
               </div>
@@ -285,7 +258,22 @@ export default function SessionAdmin() {
                 <div className="panel-heading">
                 <h2>{t("session.liveQuestions")}</h2>
                 </div>
-                <div className="question-panel-tabs" role="tablist" aria-label={t("session.questionScope")}><button type="button" role="tab" aria-selected={questionScope === "slide"} onClick={() => setQuestionScope("slide")}>{t("session.thisSlide")} {slideQuestions.length}</button><button type="button" role="tab" aria-selected={questionScope === "all"} onClick={() => setQuestionScope("all")}>{t("common.all")} {session.questions.length}</button></div><select className="question-sort" aria-label={t("student.sortQuestions")} value={questionSort} onChange={(event) => setQuestionSort(event.target.value === "latest" ? "latest" : "empathy")}><option value="empathy">{t("student.sortByEmpathy")}</option><option value="latest">{t("student.sortByNewest")}</option></select>
+                <div className="question-panel-tabs" role="tablist" aria-label={t("session.questionScope")}><button type="button" role="tab" aria-selected={questionScope === "slide"} onClick={() => setQuestionScope("slide")}>{t("session.thisSlide")} {slideQuestions.length}</button><button type="button" role="tab" aria-selected={questionScope === "all"} onClick={() => setQuestionScope("all")}>{t("common.all")} {session.questions.length}</button></div><button type="button" className="question-sort" popoverTarget="question-sort-menu" aria-haspopup="menu" aria-label={`${t("student.sortQuestions")}: ${t(questionSort === "empathy" ? "student.sortByEmpathy" : "student.sortByNewest")}`} onClick={(event) => {
+                  const box = event.currentTarget.getBoundingClientRect();
+                  const menu = document.getElementById("question-sort-menu");
+                  if (menu) Object.assign(menu.style, { left: `${Math.max(8, Math.min(box.right - 150, window.innerWidth - 158))}px`, top: `${Math.max(8, Math.min(box.bottom + 6, window.innerHeight - 98))}px` });
+                }}>{t(questionSort === "empathy" ? "student.sortByEmpathy" : "student.sortByNewest")}<ChevronDown aria-hidden="true" /></button>
+                <div id="question-sort-menu" popover="auto" className="question-sort-menu" role="menu" aria-label={t("student.sortQuestions")} onToggle={(event) => { if (event.newState === "open") event.currentTarget.querySelector<HTMLElement>("[aria-checked=true]")?.focus(); }} onKeyDown={(event) => {
+                  if (event.key !== "ArrowDown" && event.key !== "ArrowUp") return;
+                  event.preventDefault();
+                  const items = [...event.currentTarget.querySelectorAll<HTMLElement>("[role=menuitemradio]")];
+                  const index = items.indexOf(document.activeElement as HTMLElement);
+                  items[(index + (event.key === "ArrowDown" ? 1 : items.length - 1)) % items.length]?.focus();
+                }}>
+                  {(["empathy", "latest"] as const).map((sort) => <button key={sort} type="button" role="menuitemradio" aria-checked={questionSort === sort} onClick={(event) => { setQuestionSort(sort); event.currentTarget.closest<HTMLElement>("[popover]")?.hidePopover(); document.querySelector<HTMLButtonElement>(".question-sort")?.focus(); }}>
+                    <span aria-hidden="true">{questionSort === sort ? "✓" : ""}</span>{t(sort === "empathy" ? "student.sortByEmpathy" : "student.sortByNewest")}
+                  </button>)}
+                </div>
                 <div className="question-stack">{slideQuestions.length > 0 && <QuestionSummary questions={slideQuestions} folder={controller.folder ?? null} className="slide-question-summary" />}{panelQuestions.length ? panelQuestions.map((q) => <QuestionCard key={q.id} question={q} selected={selected?.id === q.id} onClick={() => selectQuestionFromList(q.id, q.slideIndex)} />) : <div className={`no-questions ${live ? "live" : ""}`}><span><MessageCircleQuestion aria-hidden="true" /></span><b>{t(live ? "session.waitingQuestions" : "session.waitingFirstQuestion")}</b><small>{t(live ? "session.waitingQuestionsHint" : "session.waitingFirstQuestionHint")}</small></div>}</div></>
               <div className="live-question-reactions" aria-hidden="true">
                 {liveReactions.map((reaction) => <span key={reaction.id} style={{ left: `${reaction.left}%`, animationDelay: `${reaction.delay}ms` }}>{reaction.emoji}</span>)}
@@ -301,10 +289,6 @@ export default function SessionAdmin() {
         )}
       </main>
 
-      {detailQuestion && <QuestionDetailDialog
-        question={detailQuestion}
-        onClose={closeQuestionDetail}
-      />}
       {deleteTarget && <div className="modal-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) closeDeleteSlide(); }}>
         <section className="delete-slide-modal" role="alertdialog" aria-modal="true" aria-labelledby="delete-slide-title" aria-describedby="delete-slide-description">
           <button type="button" className="modal-close" disabled={deletingSlide} onClick={closeDeleteSlide} aria-label={t("common.cancel")}><X /></button>

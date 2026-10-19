@@ -1,21 +1,14 @@
 "use client";
 
-import { QRCodeSVG } from "qrcode.react";
+import type { CSSProperties } from "react";
+import { PresentationQr } from "../component/presentation-qr";
 import { ChevronLeft, ChevronRight, Maximize2, Minimize2, X } from "@/app/component/icons";
 import { LanguageSwitcher } from "@/app/component/language-switcher";
-import { QuestionDetailDialog } from "../component/question-detail-dialog";
 import { PinClusterPopover } from "../component/pin-cluster-popover";
 import { SlideCanvas } from "@/app/component/slide-canvas";
-import type { PresentationQrPosition } from "@/app/_model/types";
 import { useSessionPresentationController } from "./controller";
 import styles from "./page.module.css";
 
-const QR_POSITION_CLASS: Record<PresentationQrPosition, string> = {
-  "top-left": "top-left",
-  "top-right": "top-right",
-  "bottom-left": "bottom-left",
-  "bottom-right": "bottom-right"
-};
 
 export default function SessionPresentation() {
   const {
@@ -27,7 +20,7 @@ export default function SessionPresentation() {
     session,
     slide,
     currentSlide,
-    detailQuestion,
+    selectedPinId,
     joinUrl,
     pageQuestions,
     visibleQuestionIds,
@@ -41,9 +34,9 @@ export default function SessionPresentation() {
     actionError,
     stageRef,
     revealControls,
-    openQuestionDetail,
-    closeQuestionDetail,
-    showQuestionLabels,
+    selectPin,
+    clearPinSelection,
+    showQuestionLabels, presentationOptions, savePresentationOptions,
     folder,
     expandedIds,
     highlightedId,
@@ -62,27 +55,29 @@ export default function SessionPresentation() {
   if (!ready) return <main className={`${styles.root} presentation-shell presentation-message`}><span className="spinner" /></main>;
   if (!session) return <main className={`${styles.root} presentation-shell presentation-message`}><h1>{t("session.notFound")}</h1><button className="presentation-text-button" onClick={goHome}>{t("common.homeBack")}</button></main>;
   if (!slide) return <main className={`${styles.root} presentation-shell presentation-message`}><h1>{t("presentation.noSlides")}</h1><button className="presentation-text-button" onClick={goBackToAdmin}>{t("presentation.backToAdmin")}</button></main>;
-  const qrPositionClass = QR_POSITION_CLASS[session.presentationQrPosition] ?? QR_POSITION_CLASS["bottom-right"];
+  const qrPositionClass = presentationOptions.qrPosition;
 
   return (
     <main
       ref={stageRef}
       className={`${styles.root} presentation-shell class-presentation-shell ${session.showPresentationQr ? `qr-${qrPositionClass}` : ""} ${controlsVisible ? "controls-visible" : ""}`}
+      style={{ "--presentation-qr-size": `${presentationOptions.qrSize + 16}px` } as CSSProperties}
       onMouseMove={revealControls}
       onPointerDown={revealControls}
     >
-      <div className="presentation-slide class-presentation-slide class-presentation-canvas" aria-label={`${session.title} · ${t("common.slideNumber", { number: currentSlide + 1 })}`}>
+      <div className="presentation-slide class-presentation-slide class-presentation-canvas" onClick={(event) => { if (!(event.target as Element).closest("button, [role='dialog']")) clearPinSelection(); }} aria-label={`${session.title} · ${t("common.slideNumber", { number: currentSlide + 1 })}`}>
         <SlideCanvas
           slide={slide}
           questions={pageQuestions}
           visibleQuestionIds={visibleQuestionIds}
           selectedId={activeQuestionId}
           liveQuestionId={liveQuestionId}
-          onSelectPin={openQuestionDetail}
+          livePinEffect={presentationOptions.questionMode === "pins" ? "collapse" : "hold"}
+          onSelectPin={selectPin}
           onSelectCluster={openCluster}
           expandedIds={expandedIds}
           highlightedId={highlightedId}
-          dimmed={Boolean(expandedIds || detailQuestion)}
+          dimmed={Boolean(expandedIds || selectedPinId)}
           showPins={session.showQuestionPins}
           showQuestionLabels={session.showQuestionPins && showQuestionLabels}
         >
@@ -90,14 +85,7 @@ export default function SessionPresentation() {
         </SlideCanvas>
       </div>
 
-      {session.showPresentationQr && <aside
-        className={`presentation-join-qr ${qrPositionClass}`}
-        role="img"
-        aria-label={`${t("presentation.joinQrAria")} · ${session.code}`}
-      >
-        <QRCodeSVG value={joinUrl} size={108} bgColor="#ffffff" fgColor="#101827" level="M" />
-        <div><span>{t("presentation.scanToJoin")}</span><b>{session.code}</b></div>
-      </aside>}
+      {session.showPresentationQr && <PresentationQr options={presentationOptions} onChange={savePresentationOptions} joinUrl={joinUrl} code={session.code} />}
 
       <div className="class-presentation-reactions" aria-hidden="true">
         {liveReactions.map((reaction) => <span
@@ -132,7 +120,6 @@ export default function SessionPresentation() {
         <span className="presentation-hint">{t(canControl ? "presentation.hint" : "presentation.followerHint")}</span>
       </footer>
 
-      {session.showQuestionPins && detailQuestion && <QuestionDetailDialog question={detailQuestion} onClose={closeQuestionDetail} />}
     </main>
   );
 }

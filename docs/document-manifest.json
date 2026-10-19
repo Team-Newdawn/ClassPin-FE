@@ -145,16 +145,38 @@
         "ohpin-ui-redesign"
       ],
       "approval": {
-        "approved_at": "2026-10-17T00:00:00+09:00",
-        "approved_by": "user (live player Figma decisions and backend proposals, 2026-10-03; browser LIVE auto-end 9.4 approved in session, 2026-10-15; participant tablet and popup UI approved in session, 2026-10-17); /remote display mode persistence requested in session, 2026-10-17",
-        "content_sha256": "26fea14b5422efad8ebc0aa9baa52e803d4cb751b9fe20d82552d93370bf6182"
+        "approved_at": "2026-10-19T00:00:00+09:00",
+        "approved_by": "user (live player Figma decisions and backend proposals, 2026-10-03; browser LIVE auto-end 9.4 approved in session, 2026-10-15; participant tablet and popup UI approved in session, 2026-10-17); /remote display mode persistence requested in session, 2026-10-17; owner-only persisted end reports with editor/viewer read-only access requested in session, 2026-10-18; folder menus, inline rename, delete choices, QR layout and four question display modes requested 2026-10-19; LIVE material join link confirmed 2026-10-19; lecture management question display and QR layout panel Figma 1237:1068 requested 2026-10-19",
+        "content_sha256": "fbbac343f661ae1d1c56e07cd39a106599db7bbf3940bcd0254b27e04c6cba83"
       }
     },
     {
       "id": "lecture-roles-and-remote",
       "path": "docs/lecture-roles-and-remote.md",
       "status": "approved",
-      "purpose": "Folder/file owner-editor-viewer roles, in-platform invite approval, owner-only live control, the login-free single-device presentation remote, and the backend handover.",
+      "purpose": "Owner-issued, login-free single-device presentation remote: issuance, display controls, question sheet, revocation, responsive layout, and verification. Account roles are owned by account-structure-implementation.",
+      "depends_on": [
+        "class-frontend-architecture",
+        "ohpin-figma-ui-redesign",
+        "account-structure-implementation"
+      ],
+      "informed_by": [
+        "prd"
+      ],
+      "required_for": [
+        "lecture-remote"
+      ],
+      "approval": {
+        "approved_at": "2026-10-18T00:00:00+09:00",
+        "approved_by": "minchanpark (LRR-020~025 approved 2026-10-16; /remote display controls and question sheet requested 2026-10-17; responsive layout requested 2026-10-18; account roles and implementation guidance separated at user request 2026-10-18)",
+        "content_sha256": "9e74e937e5e7b3ea71bee788b472ae1f90d488d0793de8c271294870eec25252"
+      }
+    },
+    {
+      "id": "account-structure-implementation",
+      "path": "docs/account-structure-implementation.md",
+      "status": "approved",
+      "purpose": "Separate account and resource roles, invitation authorization, owner-only persisted lecture end reports, private slide images, scoped editor uploads, and FE/BE/DB implementation and rollout guidance.",
       "depends_on": [
         "class-frontend-architecture",
         "ohpin-figma-ui-redesign"
@@ -163,13 +185,16 @@
         "prd"
       ],
       "required_for": [
-        "lecture-remote",
-        "lecture-roles-sharing"
+        "lecture-roles-sharing",
+        "account-resource-authorization",
+        "stored-lecture-end-report",
+        "private-slide-images",
+        "shared-material-upload"
       ],
       "approval": {
         "approved_at": "2026-10-18T00:00:00+09:00",
-        "approved_by": "minchanpark (LRR-020~025 approved 2026-10-16; /remote display controls and question sheet LRR-026 requested and route corrected in session 2026-10-17; /remote responsive one-screen layout LRR-027 requested 2026-10-18; role/invite chapters still require stage 2 approval)",
-        "content_sha256": "cb8882059f665c6c40a4ab1df5cf0b966957e160b01a5611dd7e90fdd3f9603f"
+        "approved_by": "minchanpark (separate account-structure implementation guidance requested 2026-10-18, including owner-only saved end reports and read-only editor/viewer access, and private image bucket design; implementation and production cutover remain pending)",
+        "content_sha256": "99cc219573c557f94b154f316a90db5a077ddaf42501ca93749aad713681f493"
       }
     }
   ],

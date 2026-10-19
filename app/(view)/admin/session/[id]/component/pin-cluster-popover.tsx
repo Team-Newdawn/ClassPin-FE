@@ -86,6 +86,10 @@ export function PinClusterPopover({ questions, folder, summary, highlightedId, o
     return () => document.removeEventListener("pointerdown", closeOutside);
   }, [onClose]);
 
+  useEffect(() => {
+    ref.current?.querySelector<HTMLElement>("[aria-pressed=true]")?.scrollIntoView({ block: "nearest", inline: "nearest" });
+  }, [highlightedId, sort]);
+
   const x = questions.reduce((sum, question) => sum + (question.x ?? 0), 0) / questions.length;
   return <section
     ref={ref}

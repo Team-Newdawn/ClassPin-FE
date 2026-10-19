@@ -167,7 +167,7 @@ export const SlideCanvas = memo(function SlideCanvas({ slide, questions = [], vi
               </button>
             ) : (
               <button className={`question-pin ${isSelected ? "selected focused" : ""} ${isLive ? "live" : ""}`} style={{ left: `${position.x! * 100}%`, top: `${position.y! * 100}%` }} data-bubble-anchor={q.id} onClick={() => onSelectPin?.(q.id)} aria-label={t("question.pinAria", { text: q.text })}>
-                <img className="question-pin-icon" src="/assets/design/question-pin.svg" alt="" aria-hidden="true" draggable={false} />
+                <img className="question-pin-icon" src="/assets/design/question-pin.svg?v=732542ce" alt="" aria-hidden="true" draggable={false} />
                 <span className={`question-pin-marker ${markerEmoji ? "emoji" : ""}`} aria-hidden="true">{markerEmoji}</span>
               </button>
             )}

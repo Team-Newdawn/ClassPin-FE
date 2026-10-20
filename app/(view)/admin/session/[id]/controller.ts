@@ -467,14 +467,14 @@ export function useSessionAdminController() {
     toggleQuestionPins: () => session && runLectureAction(() => setShowQuestionPins(session.id, !session.showQuestionPins), t("session.savePinSettingError")),
     toggleReactionAllowed: (setting: "allowQuestionReactions" | "allowEmojiReactions") => session && runLectureAction(() => setReactionAllowed(session.id, setting, !session[setting]), t("session.saveReactionSettingError")),
     presentationOptions, liveQuestionId,
-    changePresentationOptions: (patch: Partial<PresentationOptions>) => {
+    changePresentationOptions: async (patch: Partial<PresentationOptions>) => {
       setActionError(null);
-      try { savePresentationOptions(patch); }
+      try { await savePresentationOptions(patch); }
       catch { setActionError(t("session.qrEditError")); }
     },
     changeQuestionDisplayMode: (mode: QuestionDisplayMode) => session && runLectureAction(async () => {
       await setQuestionDisplay(session.id, mode !== "off", mode === "questions" || mode === "bubbles");
-      savePresentationOptions({ questionBubbles: mode === "bubbles" });
+      await savePresentationOptions({ questionBubbles: mode === "bubbles" });
     }, t("session.savePinSettingError")),
     changePresentationQrPlacement: (value: string) => {
       if (!session || (value !== "hidden" && !QR_POSITIONS.includes(value as QrPosition))) return;
@@ -482,7 +482,7 @@ export function useSessionAdminController() {
         if (value === "hidden") { await setPresentationQrPlacement(session.id, null); return; }
         const corner = PRESENTATION_QR_POSITIONS.find((candidate) => candidate === value);
         await setPresentationQrPlacement(session.id, corner ?? session.presentationQrPosition);
-        savePresentationOptions({ qrPosition: value as QrPosition, qrBasePosition: corner ?? session.presentationQrPosition, qrOffset: null });
+        await savePresentationOptions({ qrPosition: value as QrPosition, qrBasePosition: corner ?? session.presentationQrPosition, qrOffset: null });
       }, t("session.saveQrPositionError"));
     },
     changeNoteDraft,

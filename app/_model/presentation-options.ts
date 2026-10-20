@@ -14,7 +14,8 @@ export type PresentationOptions = {
 
 export const clampQrSize = (size: number) => Math.round(Math.min(160, Math.max(64, Number.isFinite(size) ? size : 96)));
 
-export function presentationOptions(session: ClassSession | undefined, saved: Partial<PresentationOptions>) {
+export function presentationOptions(session: Pick<ClassSession, "presentationQrPosition" | "presentationOptions" | "showQuestionPins" | "showQuestionLabels"> | undefined, saved: Partial<PresentationOptions>) {
+  saved = session?.presentationOptions ?? saved;
   const position = saved.qrBasePosition === session?.presentationQrPosition && QR_POSITIONS.includes(saved.qrPosition as QrPosition)
     ? saved.qrPosition! : session?.presentationQrPosition ?? "bottom-right";
   const offset = saved.qrBasePosition === session?.presentationQrPosition ? saved.qrOffset : null;

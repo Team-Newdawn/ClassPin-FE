@@ -25,16 +25,18 @@ function loadServices() {
     }, error: null };
   };
   let showLabels = true;
-  const labelRow = () => ({ data: { id: "lecture", show_question_labels: showLabels }, error: null });
+  let savedPresentationOptions = { qrSize: 96 };
+  const labelRow = () => ({ data: { id: "lecture", show_question_labels: showLabels, presentation_options: savedPresentationOptions }, error: null });
   const labelTable = {
     select: (columns: string) => {
-      assert(["id,show_question_labels", "show_question_labels"].includes(columns));
-      return columns.includes(",") ? { in: async () => ({ data: [labelRow().data], error: null }) }
+      assert(["id,show_question_labels,presentation_options", "show_question_labels,presentation_options"].includes(columns));
+      return columns.startsWith("id,") ? { in: async () => ({ data: [labelRow().data], error: null }) }
         : { eq: () => ({ single: async () => labelRow() }) };
     },
-    update: (values: { show_question_labels: boolean }) => {
-      assert.deepEqual(Object.keys(values), ["show_question_labels"]);
-      showLabels = values.show_question_labels;
+    update: (values: { show_question_labels?: boolean; presentation_options?: { qrSize: number } }) => {
+      assert(Object.keys(JSON.parse(JSON.stringify(values))).every(key => ["show_question_labels", "presentation_options"].includes(key)));
+      if (values.show_question_labels !== undefined) showLabels = values.show_question_labels;
+      if (values.presentation_options) savedPresentationOptions = values.presentation_options;
       return { eq: () => ({ select: () => ({ single: async () => labelRow() }) }) };
     },
   };
@@ -110,6 +112,9 @@ test("business services use REST DTOs, preserve settings, and strip participant 
     assert.equal(session.presentationAutoplay, true);
     assert.equal(session.showQuestionLabels, true);
     await service.updateLecture("lecture", { show_question_labels: false });
+    assert.equal((await service.fetchOwnedSessions())[0].presentationOptions?.qrSize, 96);
+    await service.updateLecture("lecture", { presentation_options: { qrSize: 64 } });
+    assert.equal((await service.fetchOwnedSessions())[0].presentationOptions?.qrSize, 64);
     assert.equal((await service.fetchLectureSnapshot(session))?.showQuestionLabels, false);
     const remote = await service.controlLectureRemote("remote-token", 0, { show_question_labels: true }, true);
     assert.deepEqual(service.rpcCalls.at(-1), { name: "ohpin_remote_control", args: {

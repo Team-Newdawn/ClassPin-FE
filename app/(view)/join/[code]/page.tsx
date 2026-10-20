@@ -3,7 +3,7 @@
 import { useState, type CSSProperties } from "react";
 import Image from "next/image";
 import Link from "next/link";
-const pinIcon = { src: "/assets/design/question-pin.svg", width: 32, height: 32 };
+const pinIcon = { src: "/assets/design/question-pin.svg?v=732542ce", width: 32, height: 32 };
 import { ArrowRight, Check, ChevronDown, ChevronLeft, ChevronRight, MapPin, SmilePlus, Trash2, X } from "@/app/component/icons";
 import { LanguageSwitcher } from "@/app/component/language-switcher";
 import { LoadingScreen } from "@/app/component/loading-screen";

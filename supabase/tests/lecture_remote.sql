@@ -1,6 +1,6 @@
 begin;
 
-select plan(34);
+select plan(55);
 
 insert into auth.users (
   instance_id, id, aud, role, email, encrypted_password, email_confirmed_at,
@@ -61,6 +61,29 @@ select throws_ok($$select public.ohpin_remote_control(current_setting('test.old_
 select throws_ok($$select public.ohpin_remote_control(current_setting('test.old_token'), 0, '{"show_question_pins":"false"}')$$, '22023', null, 'boolean types are validated');
 select throws_ok($$select public.ohpin_remote_control(current_setting('test.old_token'), 0, '{"presentation_qr_position":"center"}')$$, '22023', null, 'QR locations are validated');
 select throws_ok($$select public.ohpin_remote_control(current_setting('test.old_token'), 0, '{"show_question_labels":null}')$$, '22023', null, 'null settings are rejected');
+
+select is(public.ohpin_remote_control(current_setting('test.old_token'), 0, '{"show_question_pins":true,"show_question_labels":true,"presentation_options":{"questionBubbles":true,"qrPosition":"top-center","qrBasePosition":"top-left","qrSize":64,"qrEditable":true,"qrOffset":null}}')->'presentation_options', '{"questionBubbles":true,"qrPosition":"top-center","qrBasePosition":"top-left","qrSize":64,"qrEditable":true,"qrOffset":null}'::jsonb, 'holder controls Bubble, center, S size and adjustment');
+select is(public.ohpin_remote_control(current_setting('test.old_token'), 0, '{"presentation_options":{"qrSize":96}}')->'presentation_options'->>'qrSize', '96', 'medium size');
+select is(public.ohpin_remote_control(current_setting('test.old_token'), 0, '{"presentation_options":{"qrSize":160}}')->'presentation_options'->>'qrSize', '160', 'large size');
+select is(public.ohpin_remote_control(current_setting('test.old_token'), 0)->'presentation_options'->>'questionBubbles', 'true', 'partial changes preserve Bubble mode');
+select is(public.ohpin_remote_control(current_setting('test.old_token'), 0, '{"presentation_options":{"qrPosition":"bottom-center"}}')->'presentation_options'->>'qrPosition', 'bottom-center', 'bottom center');
+select is(public.ohpin_remote_control(current_setting('test.old_token'), 0, '{"presentation_options":{"qrEditable":false}}')->'presentation_options'->>'qrEditable', 'false', 'adjustment can be disabled');
+select is(public.ohpin_remote_control(current_setting('test.old_token'), 0, '{"presentation_options":{"qrOffset":{"x":0.25,"y":1}}}')->'presentation_options'->'qrOffset', '{"x":0.25,"y":1}'::jsonb, 'manual offset persists');
+select throws_ok($$select public.ohpin_remote_control(current_setting('test.old_token'), 0, '{"presentation_options":null}')$$, '22023', null, 'invalid presentation options rejected');
+select throws_ok($$select public.ohpin_remote_control(current_setting('test.old_token'), 0, '{"presentation_options":[]}')$$, '22023', null, 'invalid presentation options rejected');
+select throws_ok($$select public.ohpin_remote_control(current_setting('test.old_token'), 0, '{"presentation_options":{"qrSize":63}}')$$, '22023', null, 'invalid presentation options rejected');
+select throws_ok($$select public.ohpin_remote_control(current_setting('test.old_token'), 0, '{"presentation_options":{"qrSize":161}}')$$, '22023', null, 'invalid presentation options rejected');
+select throws_ok($$select public.ohpin_remote_control(current_setting('test.old_token'), 0, '{"presentation_options":{"qrSize":64.5}}')$$, '22023', null, 'invalid presentation options rejected');
+select throws_ok($$select public.ohpin_remote_control(current_setting('test.old_token'), 0, '{"presentation_options":{"qrSize":"64"}}')$$, '22023', null, 'invalid presentation options rejected');
+select throws_ok($$select public.ohpin_remote_control(current_setting('test.old_token'), 0, '{"presentation_options":{"qrEditable":null}}')$$, '22023', null, 'invalid presentation options rejected');
+select throws_ok($$select public.ohpin_remote_control(current_setting('test.old_token'), 0, '{"presentation_options":{"questionBubbles":1}}')$$, '22023', null, 'invalid presentation options rejected');
+select throws_ok($$select public.ohpin_remote_control(current_setting('test.old_token'), 0, '{"presentation_options":{"qrPosition":"center"}}')$$, '22023', null, 'invalid presentation options rejected');
+select throws_ok($$select public.ohpin_remote_control(current_setting('test.old_token'), 0, '{"presentation_options":{"qrBasePosition":"top-center"}}')$$, '22023', null, 'invalid presentation options rejected');
+select throws_ok($$select public.ohpin_remote_control(current_setting('test.old_token'), 0, '{"presentation_options":{"qrOffset":{"x":-0.1,"y":0}}}')$$, '22023', null, 'invalid presentation options rejected');
+select throws_ok($$select public.ohpin_remote_control(current_setting('test.old_token'), 0, '{"presentation_options":{"qrOffset":{"x":0}}}')$$, '22023', null, 'invalid presentation options rejected');
+select throws_ok($$select public.ohpin_remote_control(current_setting('test.old_token'), 0, '{"presentation_options":{"qrOffset":{"x":0,"y":0,"z":0}}}')$$, '22023', null, 'invalid presentation options rejected');
+select throws_ok($$select public.ohpin_remote_control(current_setting('test.old_token'), 0, '{"presentation_options":{"status":"ended"}}')$$, '22023', null, 'invalid presentation options rejected');
+
 select is(public.ohpin_remote_control(current_setting('test.old_token'), 0)->>'question_count', '1', 'poll includes question count');
 select is(public.ohpin_remote_control(current_setting('test.old_token'), 0)->'questions', 'null'::jsonb, 'closed sheet does not fetch question text');
 select set_config('test.question_snapshot', public.ohpin_remote_control(current_setting('test.old_token'), 0, '{}', true)::text, true);

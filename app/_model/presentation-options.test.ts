@@ -18,6 +18,16 @@ test("remote position changes supersede a browser center override", () => {
   assert.equal(presentationOptions({ ...session, presentationQrPosition: "top-left" }, { qrPosition: "top-center", qrBasePosition: "bottom-right" }).qrPosition, "top-left");
 });
 
+test("persisted remote options supersede browser preferences and preserve all controls", () => {
+  const persisted = { qrPosition: "top-center", qrBasePosition: "bottom-right", qrSize: 64, qrEditable: true, questionBubbles: true, qrOffset: { x: 0.25, y: 0.5 } } as const;
+  const result = presentationOptions({ ...session, showQuestionLabels: true, presentationOptions: persisted }, { qrSize: 160, questionBubbles: false });
+  assert.equal(result.qrSize, 64);
+  assert.equal(result.qrPosition, "top-center");
+  assert.equal(result.qrEditable, true);
+  assert.equal(result.questionMode, "bubbles");
+  assert.deepEqual(result.qrOffset, { x: 0.25, y: 0.5 });
+});
+
 test("question modes respect server visibility and label controls", () => {
   assert.equal(presentationOptions(session, {}).questionMode, "pins");
   assert.equal(presentationOptions({ ...session, showQuestionLabels: true }, {}).questionMode, "questions");

@@ -145,9 +145,9 @@
         "ohpin-ui-redesign"
       ],
       "approval": {
-        "approved_at": "2026-10-19T00:00:00+09:00",
-        "approved_by": "user (live player Figma decisions and backend proposals, 2026-10-03; browser LIVE auto-end 9.4 approved in session, 2026-10-15; participant tablet and popup UI approved in session, 2026-10-17); /remote display mode persistence requested in session, 2026-10-17; owner-only persisted end reports with editor/viewer read-only access requested in session, 2026-10-18; folder menus, inline rename, delete choices, QR layout and four question display modes requested 2026-10-19; LIVE material join link confirmed 2026-10-19; lecture management question display and QR layout panel Figma 1237:1068 requested 2026-10-19",
-        "content_sha256": "fbbac343f661ae1d1c56e07cd39a106599db7bbf3940bcd0254b27e04c6cba83"
+        "approved_at": "2026-10-20T00:00:00+09:00",
+        "approved_by": "user (live player Figma decisions and backend proposals, 2026-10-03; browser LIVE auto-end 9.4 approved in session, 2026-10-15; participant tablet and popup UI approved in session, 2026-10-17); /remote display mode persistence requested in session, 2026-10-17; owner-only persisted end reports with editor/viewer read-only access requested in session, 2026-10-18; folder menus, inline rename, delete choices, QR layout and four question display modes requested 2026-10-19; LIVE material join link confirmed 2026-10-19; lecture management question display and QR layout panel Figma 1237:1068 requested 2026-10-19; remote Bubble and complete QR options plus 64px layout fix requested 2026-10-20",
+        "content_sha256": "e6c9ee2744191062b2258cb3a88e796822fb57e04322f13c7852de36f5c30d65"
       }
     },
     {
@@ -167,9 +167,9 @@
         "lecture-remote"
       ],
       "approval": {
-        "approved_at": "2026-10-18T00:00:00+09:00",
-        "approved_by": "minchanpark (LRR-020~025 approved 2026-10-16; /remote display controls and question sheet requested 2026-10-17; responsive layout requested 2026-10-18; account roles and implementation guidance separated at user request 2026-10-18)",
-        "content_sha256": "9e74e937e5e7b3ea71bee788b472ae1f90d488d0793de8c271294870eec25252"
+        "approved_at": "2026-10-20T00:00:00+09:00",
+        "approved_by": "minchanpark (LRR-020~025 approved 2026-10-16; /remote display controls and question sheet requested 2026-10-17; responsive layout requested 2026-10-18; account roles and implementation guidance separated at user request 2026-10-18); remote Bubble and complete QR options plus 64px layout fix requested 2026-10-20",
+        "content_sha256": "eb8f63e8b6b21ca4d0e0df4d4352632b780b1687179628d533580c3e9f12135f"
       }
     },
     {

@@ -39,6 +39,7 @@ type Store = {
   setPresentationAutoplay: (sessionId: string, enabled: boolean) => Promise<void>;
   setShowQuestionPins: (sessionId: string, visible: boolean) => Promise<void>;
   setShowQuestionLabels: (sessionId: string, visible: boolean) => Promise<void>;
+  setPresentationOptions: (sessionId: string, options: NonNullable<ClassSession["presentationOptions"]>) => Promise<void>;
   setQuestionDisplay: (sessionId: string, pins: boolean, labels: boolean) => Promise<void>;
   setReactionAllowed: (sessionId: string, setting: "allowQuestionReactions" | "allowEmojiReactions", allowed: boolean) => Promise<void>;
   setPresentationQrPlacement: (sessionId: string, position: PresentationQrPosition | null) => Promise<void>;
@@ -71,7 +72,7 @@ const PARTICIPANT_FALLBACK_POLL_MS = 15_000;
 const PARTICIPANT_FALLBACK_SPREAD_MS = 5_000;
 const BROADCAST_REFRESH_SPREAD_MS = 10_000;
 type LectureSettingPatch = Partial<Pick<ClassSession,
-  "status" | "presentationAutoplay" | "showQuestionPins" | "showQuestionLabels" | "showPresentationQr" | "presentationQrPosition" | "allowQuestionReactions" | "allowEmojiReactions" | "startedAt"
+  "status" | "presentationAutoplay" | "showQuestionPins" | "showQuestionLabels" | "presentationOptions" | "showPresentationQr" | "presentationQrPosition" | "allowQuestionReactions" | "allowEmojiReactions" | "startedAt"
 >>;
 
 const errorDetail = (error: unknown) => {
@@ -234,6 +235,7 @@ export function SessionStore({ children }: { children: React.ReactNode }) {
         presentationAutoplay: lecture.presentation_autoplay,
         showQuestionPins: lecture.show_question_pins,
         showQuestionLabels: lecture.show_question_labels,
+        presentationOptions: lecture.presentation_options ?? undefined,
         showPresentationQr: lecture.show_presentation_qr,
         presentationQrPosition: lecture.presentation_qr_position,
         questionCategories: normalizeQuestionCategorySettings(lecture.question_categories),
@@ -612,6 +614,11 @@ export function SessionStore({ children }: { children: React.ReactNode }) {
       const previous = sessionsById.get(sessionId)?.showQuestionPins;
       if (previous === undefined) throw new Error("설정을 변경할 강의를 찾지 못했습니다.");
       await saveLectureSettings(sessionId, { showQuestionPins: visible }, { showQuestionPins: previous }, { show_question_pins: visible });
+    },
+    setPresentationOptions: async (sessionId, options) => {
+      const session = sessionsById.get(sessionId);
+      if (!session) throw new Error("설정을 변경할 강의를 찾지 못했습니다.");
+      await saveLectureSettings(sessionId, { presentationOptions: options }, { presentationOptions: session.presentationOptions }, { presentation_options: options });
     },
     setShowQuestionLabels: async (sessionId, visible) => {
       const session = sessionsById.get(sessionId);

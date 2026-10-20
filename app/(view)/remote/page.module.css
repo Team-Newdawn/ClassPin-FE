@@ -10,15 +10,36 @@
 .toggle{display:flex;align-items:center;justify-content:space-between;gap:12px;width:100%;min-height:44px;padding:0;border:0;background:transparent;color:inherit;font:inherit;font-weight:600;text-align:left}
 .toggle b{display:grid;place-items:center;min-width:52px;min-height:30px;border-radius:999px;background:var(--color-bg-subtle);color:var(--color-text-secondary);font-size:12px}
 .toggle[aria-checked="true"] b{background:var(--color-brand);color:var(--color-text-inverse)}
-.modes{display:grid;grid-template-columns:1fr 1fr;gap:4px;padding:4px;border-radius:10px;background:var(--color-bg-subtle)}
-.modes button{min-height:44px;padding:8px;border:0;border-radius:8px;background:transparent;color:var(--color-text-secondary);font:inherit;font-size:14px;font-weight:600}
+.modes{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:4px;padding:4px;border-radius:10px;background:var(--color-bg-subtle)}
+.modes button{word-break:keep-all;min-height:44px;padding:8px;border:0;border-radius:8px;background:transparent;color:var(--color-text-secondary);font:inherit;font-size:14px;font-weight:600}
 .modes button[aria-pressed="true"]{background:var(--color-brand);color:var(--color-text-inverse)}
-.placement{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:8px;font-size:14px}
-.placement select{max-width:100%;min-height:44px;padding:8px 12px;border:1px solid var(--color-border-strong);border-radius:8px;background:var(--color-bg-surface);color:inherit;font:inherit}
+.settings h2{margin:0;font-size:16px;line-height:24px}
+.settings hr{width:100%;margin:4px 0;border:0;border-top:1px solid var(--color-border)}
+.positions{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px 8px}
+.positions button{display:grid;gap:6px;min-width:0;padding:0;border:0;background:transparent;color:var(--color-text-secondary);font:inherit;font-size:12px;font-weight:600}
+.thumbnail{position:relative;display:block;height:48px;border:1px solid var(--color-border);border-radius:8px;background:var(--color-bg-subtle)}
+.thumbnail::after{content:"";position:absolute;width:12px;height:12px;border-radius:2px;background:var(--color-text-tertiary)}
+.positions [data-position^=top] .thumbnail::after{top:6px}
+.positions [data-position^=bottom] .thumbnail::after{bottom:6px}
+.positions [data-position$=left] .thumbnail::after{left:6px}
+.positions [data-position$=right] .thumbnail::after{right:6px}
+.positions [data-position$=center] .thumbnail::after{left:calc(50% - 6px)}
+.positions [aria-pressed=true]{color:var(--color-brand)}
+.positions [aria-pressed=true] .thumbnail{border-color:var(--color-brand);box-shadow:inset 0 0 0 1px var(--color-brand);background:var(--color-brand-subtle)}
+.positions [aria-pressed=true] .thumbnail::after{background:var(--color-brand)}
+.sizes{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));padding:4px;border-radius:10px;background:var(--color-bg-subtle)}
+.sizes button{display:grid;gap:2px;min-height:48px;padding:6px;border:0;border-radius:8px;background:transparent;color:var(--color-text-secondary);font:inherit}
+.sizes small{font-size:12px}
+.sizes [aria-pressed=true]{background:var(--color-bg-surface);color:var(--color-text-primary);box-shadow:var(--shadow-sm)}
+.switchTrack{flex:none;width:36px;height:22px;padding:3px;border-radius:999px;background:var(--color-text-tertiary)}
+.switchTrack::after{content:"";display:block;width:16px;height:16px;border-radius:50%;background:var(--color-bg-surface);transition:transform .15s}
+.toggle[aria-checked=true] .switchTrack{background:var(--color-brand)}
+.toggle[aria-checked=true] .switchTrack::after{transform:translateX(14px)}
+.editHint{margin:0;font-size:13px;line-height:20px;color:var(--color-text-tertiary)}
 .questionsButton{display:flex;align-items:center;gap:12px;min-height:48px;padding:8px 16px;border:1px solid var(--color-border);border-radius:12px;background:var(--color-bg-surface);color:inherit;font:inherit;text-align:left}
 .questionsButton b{margin-left:auto;color:var(--color-brand);font-variant-numeric:tabular-nums}
-.root button:disabled,.placement select:disabled{opacity:.45;cursor:not-allowed}
-.root button:focus-visible,.placement select:focus-visible{outline:2px solid var(--color-brand);outline-offset:3px}
+.root button:disabled{opacity:.45;cursor:not-allowed}
+.root button:focus-visible{outline:2px solid var(--color-brand);outline-offset:3px}
 .dialog{inset:0;width:100%;max-width:none;height:100dvh;max-height:none;margin:0;padding:0;border:0;background:transparent}
 .dialog[open]{display:grid;align-items:end}
 .dialog::backdrop{background:color-mix(in srgb,var(--color-bg-inverse) 40%,transparent)}

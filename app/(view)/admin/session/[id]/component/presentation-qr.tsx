@@ -10,7 +10,7 @@ type Layout = ReturnType<typeof presentationOptions>;
 
 export function PresentationQr({ options, onChange, joinUrl, code }: {
   options: Layout;
-  onChange: (patch: Partial<PresentationOptions>) => void;
+  onChange: (patch: Partial<PresentationOptions>) => Promise<void>;
   joinUrl: string;
   code: string;
 }) {
@@ -21,8 +21,8 @@ export function PresentationQr({ options, onChange, joinUrl, code }: {
   const [error, setError] = useState(false);
   const size = preview?.qrSize ?? options.qrSize;
   const offset = preview?.qrOffset ?? options.qrOffset;
-  const save = (patch: Partial<PresentationOptions>) => {
-    try { onChange(patch); setError(false); } catch { setError(true); }
+  const save = async (patch: Partial<PresentationOptions>) => {
+    try { await onChange(patch); setError(false); } catch { setError(true); }
   };
   const offsetAt = (left: number, top: number, box: DOMRect, parent: DOMRect) => ({
     x: Math.min(1, Math.max(0, left / Math.max(1, parent.width - box.width))),
@@ -60,7 +60,7 @@ export function PresentationQr({ options, onChange, joinUrl, code }: {
     const step = event.shiftKey ? 16 : 4;
     save({ qrOffset: offsetAt(box.left - parent.left + (event.key === "ArrowLeft" ? -step : event.key === "ArrowRight" ? step : 0), box.top - parent.top + (event.key === "ArrowUp" ? -step : event.key === "ArrowDown" ? step : 0), box, parent) });
   };
-  const style = { "--qr-size": `${size}px`, ...(offset ? { left: `calc((100% - ${size + 16}px) * ${offset.x})`, top: `calc((100% - ${size + 46}px) * ${offset.y})`, right: "auto", bottom: "auto", transform: "none" } : {}) } as CSSProperties;
+  const style = { "--qr-size": `${size}px`, "--qr-code-font-size": `${Math.min(16, size / (code.length || 1) * 1.25)}px`, ...(offset ? { left: `calc((100% - ${size + 16}px) * ${offset.x})`, top: `calc((100% - ${size + 46}px) * ${offset.y})`, right: "auto", bottom: "auto", transform: "none" } : {}) } as CSSProperties;
 
   return <aside ref={ref} className={styles.root} data-position={options.qrPosition} data-editable={options.qrEditable} style={style}
     aria-label={`${t("presentation.joinQrAria")} · ${code}`} onPointerDown={start} onPointerMove={move} onPointerUp={finish} onPointerCancel={() => { gesture.current = null; setPreview(null); }}>

@@ -168,8 +168,8 @@
       ],
       "approval": {
         "approved_at": "2026-10-20T00:00:00+09:00",
-        "approved_by": "minchanpark (LRR-020~025 approved 2026-10-16; /remote display controls and question sheet requested 2026-10-17; responsive layout requested 2026-10-18; account roles and implementation guidance separated at user request 2026-10-18); remote Bubble and complete QR options plus 64px layout fix requested 2026-10-20",
-        "content_sha256": "eb8f63e8b6b21ca4d0e0df4d4352632b780b1687179628d533580c3e9f12135f"
+        "approved_by": "minchanpark (LRR-020~025 approved 2026-10-16; /remote display controls and question sheet requested 2026-10-17; responsive layout requested 2026-10-18; account roles and implementation guidance separated at user request 2026-10-18); remote Bubble and complete QR options plus 64px layout fix requested 2026-10-20; remote and management PIN mode synchronization fix requested 2026-10-20",
+        "content_sha256": "68f28deee0289bd570dd742f79e0f7e69e7e52259f206c57322137bc9d4cf721"
       }
     },
     {

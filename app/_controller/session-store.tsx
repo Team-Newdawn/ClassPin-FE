@@ -274,8 +274,8 @@ export function SessionStore({ children }: { children: React.ReactNode }) {
           (connected) => {
             if (!active) return;
             if (!connected) startPoll(asAudience ? PARTICIPANT_FALLBACK_POLL_MS + Math.random() * PARTICIPANT_FALLBACK_SPREAD_MS : REALTIME_FALLBACK_POLL_MS);
-            else if (asAudience) startPoll(PARTICIPANT_STATUS_POLL_MS);
-            else if (statusPoll) { clearInterval(statusPoll); statusPoll = null; }
+            // Realtime can stay connected while an UPDATE is missed.
+            else startPoll(asAudience ? PARTICIPANT_STATUS_POLL_MS : REALTIME_FALLBACK_POLL_MS);
           }
         );
         if (stop) unsubscribe.push(stop);

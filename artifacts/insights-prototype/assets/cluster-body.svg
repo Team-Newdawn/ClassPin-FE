@@ -1,0 +1,21 @@
+<svg preserveAspectRatio="none" overflow="visible" style="display: block;" width="43.435" height="43.9553" viewBox="0 0 43.435 43.9553" fill="none" xmlns="http://www.w3.org/2000/svg">
+<g id="Blue soft glass &#194;&#183; vector body" filter="url(#filter0_d_0_25)">
+<path id="Vector" d="M5.45996 35.7003V20.5803C5.45996 10.5003 13.86 3.78027 24.36 3.78027C34.02 3.78027 39.06 10.9203 39.06 19.7403C39.06 29.8203 30.24 37.3803 20.58 37.3803H7.55996C6.15996 37.3803 5.45996 36.8203 5.45996 35.7003Z" fill="url(#paint0_linear_0_25)" fill-opacity="0.91" stroke-width="0.35" stroke="#1976D0" stroke-opacity="0.18"/>
+</g>
+<defs>
+<filter id="filter0_d_0_25" x="-4.2" y="-2" width="50.4" height="50.4" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+<feFlood flood-opacity="0" result="BackgroundImageFix"/>
+<feColorMatrix in="SourceAlpha" type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 127 0" result="hardAlpha"/>
+<feOffset dy="2.2"/>
+<feGaussianBlur stdDeviation="2.1"/>
+<feColorMatrix type="matrix" values="0 0 0 0 0.035 0 0 0 0 0.18 0 0 0 0 0.44 0 0 0 0.17 0"/>
+<feBlend mode="normal" in2="BackgroundImageFix" result="effect1_dropShadow_0_25"/>
+<feBlend mode="normal" in="SourceGraphic" in2="effect1_dropShadow_0_25" result="shape"/>
+</filter>
+<linearGradient id="paint0_linear_0_25" x1="10.5" y1="35.3643" x2="35.364" y2="6.80427" gradientUnits="userSpaceOnUse">
+<stop stop-color="#1479DF"/>
+<stop offset="0.55" stop-color="#2186E8"/>
+<stop offset="1" stop-color="#2C90EF"/>
+</linearGradient>
+</defs>
+</svg>

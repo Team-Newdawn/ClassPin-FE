@@ -51,6 +51,7 @@ export function SessionEndReport({ session, folder }: { session: ClassSession; f
     </header>
     <div className={styles.content}>
       <p className={styles.meta}>{t("report.scope")}</p>
+      {session.status === "ended" && session.materialId && <Link className="btn primary" href={`/admin/insights?material=${session.materialId}`}>슬라이드·PIN 인사이트 분석</Link>}
       <dl className={styles.metrics}>
         <div><dt>{t("report.questions")}</dt><dd><b>{questionCount}</b>{t("report.unitQuestions")}</dd></div>
         <div><dt>{t("report.empathy")}</dt><dd><b>{reactionCount}</b>{t("report.unitEmpathy")}</dd></div>

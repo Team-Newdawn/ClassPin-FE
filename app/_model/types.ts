@@ -118,6 +118,22 @@ export type ClassFolderPurpose = typeof CLASS_FOLDER_PURPOSES[number];
 export const CLASS_FOLDER_DEFAULT_PURPOSE: ClassFolderPurpose = "qa";
 export const CLASS_FOLDER_PURPOSE_LABEL_MAX = 40;
 
+// 폴더 사용 목적에 맞춰 요약 관점을 정한다. 목적이 없으면(미분류 자료) 이 줄을 넣지 않는다.
+const PURPOSE_CONTEXT: Record<ClassFolderPurpose, { ko: string; en: string }> = {
+  qa: { ko: "Q&A: 궁금한 점과 헷갈린 점을 중심으로 정리합니다.", en: "Q&A: focus on open questions and points of confusion." },
+  feedback: { ko: "피드백: 항목을 질문보다 의견으로 보고, 좋았던 점·불편한 점과 개선 요청을 중심으로 정리합니다.", en: "Feedback: treat items as opinions rather than questions; focus on what worked, what did not, and requested improvements." },
+  education: { ko: "교육: 학습자가 이해하지 못한 개념과 보충 설명이 필요한 지점을 중심으로 정리합니다.", en: "Education: focus on concepts learners did not understand and where extra explanation is needed." },
+  brainstorming: { ko: "브레인스토밍: 항목을 아이디어로 보고, 반복되는 주제와 발전시킬 만한 아이디어를 중심으로 정리합니다.", en: "Brainstorming: treat items as ideas; focus on recurring themes and ideas worth developing." },
+  other: { ko: "기타: 아래 이름의 목적에 맞는 관점으로 정리합니다.", en: "Other: summarize from the perspective of the purpose named below." },
+};
+
+export const classFolderPurposeLine = (purpose: ClassFolderPurpose | null, label: string | null, locale: "ko" | "en") => {
+  if (!purpose) return "";
+  const clean = label?.replace(/["\n\r]/g, " ");
+  const name = purpose === "other" && clean ? (locale === "ko" ? ` 목적 이름: "${clean}".` : ` Purpose name: "${clean}".`) : "";
+  return `\n${locale === "ko" ? "이 자료가 속한 폴더의 사용 목적" : "Purpose of the folder this material belongs to"} — ${PURPOSE_CONTEXT[purpose][locale]}${name}`;
+};
+
 export function normalizeClassFolderName(value: string) {
   const name = value.trim();
   const length = [...name].length;

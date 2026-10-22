@@ -8,6 +8,22 @@
 
 이 문서는 승인된 제품 흐름과 근거 의미를 구현하는 시스템 경계를 정의한다. 화면 구성과 근거 판정 규칙은 각각 `ai-report-product`, `ai-report-evidence`를 따르며 이 문서에서 재정의하지 않는다.
 
+## 2026-10-21 속도 우선 재설계
+
+사용자 결정으로 `insights-ai-foundation.md` 10절이 이 문서의 AIR-SYS-050~054(단계 상태 전이, slide unit 비평, 전체 실패), snapshot·worker·lease·비용 견적, OpenRouter adapter 요구를 테스트 기간 동안 대체한다. 소유자 검사, speaker note 제외, 서버 전용 키 규칙은 유지한다.
+
+## 2026-10-21 공급자 결정 변경
+
+사용자가 동일한 `GROQ_API_KEY`로 Qwen 이미지 분석과 GPT-OSS 텍스트 검토를 진행하도록 승인했다. 이 절이 아래 OpenRouter 관련 항목보다 우선한다.
+
+- AIR-SYS-004/070~076: 직접 Groq Chat Completions API와 내장 fetch를 사용한다. 이미지 분석은 `qwen/qwen3.8-27b`, 텍스트 검토·합성·대화는 `openai/gpt-oss-120b`로 고정한다. 두 모델은 서버 전용 `GROQ_API_KEY`를 공유한다. 모델 자동 전환은 없다.
+- Qwen의 JSON Schema 출력은 best-effort이며 코드 검증을 반드시 거친다. GPT-OSS에는 strict JSON Schema를 사용한다. 잘린 응답·usage 누락·schema/출처 불일치는 실패로 처리한다. Qwen 요청은 최대 이미지 3개이며, 전체 이미지·overlay·질문별 crop을 단위별로 나누되 근거를 버리지 않는다.
+- OpenRouter 전용 provider routing 설정은 Groq에 보내지 않는다. `cache: no-store`는 HTTP 캐시 제어이며 공급자의 데이터 보존 설정을 보장하지 않는다. 실자료 활성화 전에 Groq 조직 Data Controls의 ZDR 설정을 확인한다. 내부 OCR·비식별화, source mapping 제외, 로그 금지는 유지한다.
+- GPT-OSS는 이미지를 재검증하지 않는다. 이미지 검증 정책은 근거 명세의 같은 날짜 변경을 따른다. 공개 API·브라우저에서 키를 받거나 노출하지 않는다.
+- 가격 quote·비용 상한·영속 작업·worker·원자적 snapshot·강사 확정 조건은 유지한다. 모델 연결 테스트만으로 운영 생성 기능을 활성화하지 않는다.
+
+근거: [Groq Vision](https://console.groq.com/docs/vision), [Qwen 3.8](https://console.groq.com/docs/model/qwen/qwen3.8-27b), [Groq Data](https://console.groq.com/docs/your-data). 모델 목록 및 두 모델의 합성 fixture 실호출 확인. Qwen은 현재 preview이므로 출시 평가와 고정 모델 가용성 확인이 필요하다.
+
 ## 1. 시스템 원칙과 구성
 
 - `AIR-SYS-001` Supabase Postgres를 리포트 상태, snapshot, canonical 분석, revision, 검증 결과와 비용 기록의 권위 원본으로 사용한다.

@@ -12,7 +12,7 @@
 .grid .fileName{display:none}
 .stats{display:flex;flex-wrap:wrap;gap:4px;margin-top:2px;font-size:13px;line-height:1.5;color:var(--color-text-secondary)}
 .stats>span+span::before{content:"·";margin-right:4px}
-.controls{display:flex;align-items:center;gap:8px}
+.controls{display:flex;align-items:center;gap:8px}.start{flex:1}.grid .start{height:44px}.actionIcon{display:grid;place-items:center;flex:none;width:44px;height:44px;border:1px solid var(--color-border-strong);border-radius:10px;background:var(--color-bg-surface)}.actionIcon:focus-visible{outline:2px solid var(--color-brand);outline-offset:2px}
 .grid .actions{padding:0 18px 18px}
 .actions :global(.btn){text-decoration:none;height:40px;padding:0 20px;font-size:14px;line-height:normal;border-radius:10px;white-space:nowrap}
 .actions :global(.btn) img{width:12px;height:12px}

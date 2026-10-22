@@ -155,6 +155,11 @@ flow unless a task explicitly spans both products.
 - The right question panel starts with an AI summary of the current slide's
   questions, shown only when that slide has questions. `POST /api/question-summary`
   calls Groq with the server-only `GROQ_API_KEY` and returns 503 without it.
+- Instructor insights (`/admin/insights`, `app/api/admin/ai-reports/*`) analyze the stored
+  source PDF plus redacted questions with Claude (`CLAUDE_API_KEY`, server-only; model
+  `INSIGHT_CLAUDE_MODEL`, default `claude-haiku-5-5`) inside Next `after()`: poppler renders each page to a JPEG plus its text layer, one call per
+  20-page chunk in parallel (PIN positions as image pixels), one merge call, code-only validation, no worker or critic.
+  Design and superseded rules: `docs/insights-ai-foundation.md` section 10.
 - The player header shows the LIVE elapsed time from the backend `started_at` (reset
   on every LIVE start) and the live audience count. The end-lecture dialog summarizes
   duration, participants, and questions; elapsed time freezes when that dialog opens

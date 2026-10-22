@@ -1,4 +1,4 @@
-.root{position:relative;width:100%;aspect-ratio:16/9;background:var(--color-bg-surface);overflow:hidden;border-radius:4px;box-shadow:0 14px 40px rgba(0,0,0,.3)}
+.root{--pin-unit:1px;--pin-size:calc(32 * var(--pin-unit));--pin-hit-size:max(44px,calc(44 * var(--pin-unit)));position:relative;width:100%;aspect-ratio:16/9;background:var(--color-bg-surface);overflow:hidden;border-radius:4px;box-shadow:0 14px 40px rgba(0,0,0,.3)}
 .root :global(.slide-placement-control){position:absolute;inset:0;z-index:2;width:100%;height:100%;border:0;background:transparent;cursor:crosshair}.root :global(.slide-placement-control:focus-visible){outline:2px solid var(--color-brand);outline-offset:-4px}.root :global(.pin-cluster-list.align-left){left:0;transform:none}.root :global(.pin-cluster-list.align-right){left:auto;right:0;transform:none}.root :global(.pin-cluster-list.above){top:auto;bottom:calc(max(44px,var(--cluster-size)) + 6px)}
 .root[role=button]{cursor:crosshair}
 .root>img{width:100%;height:100%;display:block;object-fit:contain}
@@ -11,8 +11,8 @@
 :global(.class-presentation-canvas) .root :global(.question-pin){width:54px;height:59px}
 .root :global(.question-pin.selected){z-index:8}
 .root :global(.question-pin-icon){position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
-.root :global(.question-pin-marker){position:absolute;left:50%;top:43.5%;transform:translate(-50%,-50%);font-size:12px;font-weight:700;line-height:1;pointer-events:none}
-.root :global(.question-pin-marker.emoji){font-size:15px}
+.root :global(.question-pin-marker){position:absolute;left:50%;top:43.5%;transform:translate(-50%,-50%);font-size:calc(12 * var(--pin-unit));font-weight:700;line-height:1;pointer-events:none}
+.root :global(.question-pin-marker.emoji){font-size:calc(15 * var(--pin-unit))}
 .root :global(.question-region){position:absolute;z-index:5;padding:0;border:2px solid var(--color-brand);border-radius:8px;background:rgba(52,120,246,.12);box-shadow:inset 0 0 0 1px rgba(255,255,255,.55)}
 .root :global(.question-region:hover){background:rgba(52,120,246,.18)}
 .root :global(.question-region.selected){z-index:8;border-color:var(--pin-blue-700);box-shadow:0 0 0 3px rgba(52,120,246,.2),inset 0 0 0 1px rgba(255,255,255,.7)}
@@ -32,7 +32,6 @@
 :global(.class-presentation-canvas) .root :global(.question-path.live) polyline{stroke:var(--color-error);filter:drop-shadow(0 0 5px var(--color-error));animation:live-region-pop 1s cubic-bezier(.2,.8,.2,1)}
 :global(.class-presentation-canvas) .root :global(.question-bubble-body){position:relative;z-index:2}
 :global(.class-presentation-canvas) .root :global(.question-bubble.empathy-fire){isolation:isolate;box-shadow:0 0 24px rgba(249,115,22,.72),0 8px 24px rgba(0,0,0,.32);animation:empathy-fire-glow 900ms ease-in-out infinite alternate}
-:global(.class-presentation-canvas) .root :global(.question-bubble.live){background:var(--color-error);color:var(--color-bg-surface)}
 :global(.class-presentation-canvas) .root :global(.question-fire-effect){position:absolute;z-index:1;left:50%;top:-23px;transform:translateX(-50%);width:max-content;pointer-events:none;font-size:clamp(19px,2vw,30px);line-height:1;letter-spacing:.15em;filter:drop-shadow(0 0 8px rgba(251,146,60,.92));animation:empathy-flame 850ms ease-in-out infinite alternate}
 :global(.class-presentation-canvas) .root :global(.question-empathy-count){position:relative;z-index:2;margin-left:8px;display:inline-flex;align-items:center;gap:2px;white-space:nowrap;font-size:calc(.72em + 3px);font-weight:800;font-variant-numeric:tabular-nums}
 @keyframes live-pin-pop{0%,100%{transform:translate(-50%,-50%) scale(1)}55%{transform:translate(-50%,-50%) scale(1.7)}}
@@ -41,14 +40,15 @@
 @keyframes empathy-fire-glow{to{box-shadow:0 0 34px rgba(249,115,22,.96),0 8px 24px rgba(0,0,0,.32)}}
 @keyframes empathy-flame{from{transform:translate(-50%,3px) scale(.9) rotate(-2deg)}to{transform:translate(-50%,-3px) scale(1.06) rotate(2deg)}}
 .root :global(.question-pin){width:44px;height:44px;padding:6px;transform:translate(-50%,-50%);background:none;box-shadow:none;filter:none}
-.root :global(.question-pin-icon){inset:6px;width:32px;height:32px;filter:none;transition:filter 160ms}
+.root :global(.question-pin-icon){inset:calc((100% - var(--pin-size)) / 2);width:var(--pin-size);height:var(--pin-size);filter:none;transition:filter 160ms}
 .root :global(.question-pin.selected){box-shadow:none;filter:none}
 .root :global(.question-pin.selected)::after{content:"";position:absolute;inset:8px;border-radius:50%;outline:2px solid var(--color-brand);outline-offset:3px;pointer-events:none}
 .root :global(.question-pin.live){animation:none}
 .root :global(.question-pin-marker){top:50%;left:50%;transform:translate(-50%,-50%)}
 .root :global(.pin-cluster){position:absolute;z-index:12;transform:translate(-50%,-50%)}
 .root :global(.pin-cluster summary){position:relative}
-.root :global(.pin-cluster summary),.root :global(.pin-cluster-button){display:block;width:max(44px,var(--cluster-size));height:max(44px,var(--cluster-size));padding:0;list-style:none;border:0;background:url("/assets/design/question-pin.svg?v=732542ce") center / var(--cluster-size) var(--cluster-size) no-repeat;cursor:pointer}
+.root :global(.pin-cluster.selected),.root :global(.pin-cluster-button.selected),.root :global(.pin-cluster-spot.highlighted){--pin-image:url("/assets/design/pin_selected.svg?v=3f409ad0")}
+.root :global(.pin-cluster summary),.root :global(.pin-cluster-button){display:block;width:max(44px,var(--cluster-size));height:max(44px,var(--cluster-size));padding:0;list-style:none;border:0;background:var(--pin-image,url("/assets/design/pin_notselected.svg?v=d7d07244")) center / var(--cluster-size) var(--cluster-size) no-repeat;cursor:pointer}
 .root :global(.pin-cluster summary span),.root :global(.pin-cluster-button span){position:absolute;inset:0;display:grid;place-items:center;color:var(--color-text-inverse);font-size:clamp(11px,calc(var(--cluster-size) / 3),18px);font-weight:700;line-height:1;font-variant-numeric:tabular-nums;text-shadow:0 1px 2px var(--color-text-primary);pointer-events:none}
 .root :global(.pin-cluster summary:hover),.root :global(.pin-cluster summary:focus-visible),.root :global(.pin-cluster-button:hover),.root :global(.pin-cluster-button:focus-visible){filter:drop-shadow(0 2px 3px rgb(10 25 77 / 30%))}
 .root :global(.pin-cluster summary::-webkit-details-marker){display:none}
@@ -59,20 +59,21 @@
 .root :global(.pin-cluster-list span){display:block;color:var(--color-brand);font-size:10px;margin-bottom:3px}
 .root:not(:global(.pin-manager)):has(:global(.question-pin.selected),:global(.pin-cluster.selected)) :global(.question-pin):not(:global(.selected)),.root:not(:global(.pin-manager)):has(:global(.question-pin.selected),:global(.pin-cluster.selected)) :global(.pin-cluster):not(:global(.selected)){opacity:.3}
 /* 강의 관리 플레이어와 발표 화면이 함께 쓰는 PIN 조작 디자인. onSelectCluster가 있으면 켜진다. */
-.root:global(.pin-manager) :global(.question-pin){width:44px;height:44px}
+.root:global(.pin-manager){container-type:inline-size;--pin-unit:.1cqw}
+.root:global(.pin-manager) :global(.question-pin){width:var(--pin-hit-size);height:var(--pin-hit-size)}
 .root:global(.pin-manager.focus-dim)::after{content:"";position:absolute;inset:0;z-index:15;background:rgb(11 18 38 / 45%);backdrop-filter:blur(2px);pointer-events:none}
 .root:global(.pin-manager.focus-dim) :global(.focused){z-index:20}
 .root :global(.pin-cluster-button){position:absolute;z-index:12;transform:translate(-50%,-50%)}
 .root:global(.pin-manager) :global(.question-pin.selected)::after,:global(.student-canvas) .root :global(.question-pin.selected)::after{content:none}
-.root:global(.pin-manager) :global(.pin-cluster-expanded){position:absolute;z-index:20;width:116px;height:116px;transform:translate(-50%,-50%);border-radius:50%;background:rgb(15 98 254 / 16%);animation:pin-cluster-fade 260ms cubic-bezier(.2,.8,.2,1) both}
-.root:global(.pin-manager) :global(.pin-cluster-spot){position:absolute;left:calc(50% + var(--spot-x));top:calc(50% + var(--spot-y));width:44px;height:44px;margin:-22px;padding:0;border:0;background:url("/assets/design/question-pin.svg?v=732542ce") center / 32px 32px no-repeat;animation:pin-spot-pop 360ms cubic-bezier(.2,.8,.2,1) both}.root:global(.pin-manager) :global(.pin-cluster-spot) span{position:absolute;right:0;top:0;display:grid;place-items:center;width:16px;height:16px;border:1px solid var(--color-brand);border-radius:50%;background:var(--color-bg-surface);color:var(--color-brand);font-size:10px;font-weight:700}.root:global(.pin-manager) :global(.pin-cluster-spot){scale:1;transition:scale 240ms cubic-bezier(.2,.8,.2,1),filter 160ms}.root:global(.pin-manager) :global(.pin-cluster-spot.highlighted){z-index:2;scale:1.7;filter:drop-shadow(0 0 4px rgb(15 98 254 / 60%))}.root:global(.pin-manager) :global(.pin-cluster-spot.highlighted) span{background:var(--color-brand);color:var(--color-bg-surface)}.root:global(.pin-manager) :global(.pin-cluster-spot:hover),.root:global(.pin-manager) :global(.pin-cluster-spot:focus-visible){filter:drop-shadow(0 2px 3px rgb(10 25 77 / 30%))}
-.root:global(.pin-manager) :global(.question-bubble){display:flex;align-items:center;gap:calc(6px * var(--bubble-scale,1));max-width:min(280px,45%);padding:calc(6px * var(--bubble-scale,1)) calc(10px * var(--bubble-scale,1));border:0;border-radius:calc(10px * var(--bubble-scale,1));background:var(--color-text-primary);color:var(--color-text-inverse);font-size:calc(13px * var(--bubble-scale,1));font-weight:700;line-height:1.4;letter-spacing:-.01em;text-align:left;white-space:pre-wrap;overflow-wrap:anywhere;transform:translate(18px,-50%);box-shadow:none;transition:box-shadow 160ms}.root:global(.pin-manager) :global(.question-bubble:hover),.root:global(.pin-manager) :global(.question-bubble:focus-visible){box-shadow:0 6px 16px rgb(5 15 46 / 25%);filter:none}
+.root:global(.pin-manager) :global(.pin-cluster-expanded){position:absolute;z-index:20;width:calc(116 * var(--pin-unit));height:calc(116 * var(--pin-unit));transform:translate(-50%,-50%);border-radius:50%;background:rgb(15 98 254 / 16%);animation:pin-cluster-fade 260ms cubic-bezier(.2,.8,.2,1) both}
+.root:global(.pin-manager) :global(.pin-cluster-spot){position:absolute;left:calc(50% + var(--spot-x));top:calc(50% + var(--spot-y));width:var(--pin-hit-size);height:var(--pin-hit-size);margin:calc(var(--pin-hit-size) / -2);padding:0;border:0;background:var(--pin-image,url("/assets/design/pin_notselected.svg?v=d7d07244")) center / var(--pin-size) var(--pin-size) no-repeat;animation:pin-spot-pop 360ms cubic-bezier(.2,.8,.2,1) both}.root:global(.pin-manager) :global(.pin-cluster-spot) span{position:absolute;right:0;top:0;display:grid;place-items:center;width:16px;height:16px;border:1px solid var(--color-brand);border-radius:50%;background:var(--color-bg-surface);color:var(--color-brand);font-size:10px;font-weight:700}.root:global(.pin-manager) :global(.pin-cluster-spot){scale:1;transition:scale 240ms cubic-bezier(.2,.8,.2,1),filter 160ms}.root:global(.pin-manager) :global(.pin-cluster-spot.highlighted){z-index:2;scale:1.7;filter:drop-shadow(0 0 4px rgb(15 98 254 / 60%))}.root:global(.pin-manager) :global(.pin-cluster-spot.highlighted) span{background:var(--color-brand);color:var(--color-bg-surface)}.root:global(.pin-manager) :global(.pin-cluster-spot:hover),.root:global(.pin-manager) :global(.pin-cluster-spot:focus-visible){filter:drop-shadow(0 2px 3px rgb(10 25 77 / 30%))}
+.root:global(.pin-manager) :global(.question-bubble){display:flex;align-items:center;gap:calc(6px * var(--bubble-scale,1));max-width:min(280px,45%);padding:calc(5px * var(--bubble-scale,1)) calc(9px * var(--bubble-scale,1));border:calc(1px * var(--bubble-scale,1)) solid rgb(166 208 255 / 58%);border-radius:calc(17px * var(--bubble-scale,1));background:rgb(234 245 255 / 77%);color:var(--color-text-primary);font-size:calc(13px * var(--bubble-scale,1));font-weight:700;line-height:1.4;letter-spacing:-.01em;text-align:left;white-space:pre-wrap;overflow-wrap:anywhere;transform:translate(18px,-50%);box-shadow:none;transition:filter 160ms}.root:global(.pin-manager) :global(.question-bubble:hover),.root:global(.pin-manager) :global(.question-bubble:focus-visible){box-shadow:none;filter:drop-shadow(0 6px 16px rgb(5 15 46 / 25%))}
 .root:global(.pin-manager) :global(.question-bubble-body){min-width:0;white-space:pre-wrap;overflow-wrap:anywhere}
 .root:global(.pin-manager) :global(.question-empathy-count){display:none}
 .root:global(.pin-manager) :global(.question-tag-chip){flex:none;padding:0 5px;border-radius:4px;background:var(--color-brand);color:var(--color-text-inverse);font-size:11px}
-.root:global(.pin-manager) :global(.question-tag-more){flex:none;font-size:calc(12px * var(--bubble-scale,1));font-weight:500;color:var(--pin-neutral-300)}
+.root:global(.pin-manager) :global(.question-tag-more){flex:none;font-size:calc(12px * var(--bubble-scale,1));font-weight:500;color:var(--color-text-secondary)}
 .root:global(.pin-manager.focus-dim) :global(.question-bubble:not(.focused)){opacity:.55}
-.root:global(.pin-manager.focus-dim) :global(.question-bubble.focused){background:var(--color-bg-surface);color:var(--color-text-primary)}
+.root:global(.pin-manager) :global(.question-bubble.focused),.root:global(.pin-manager) :global(.question-bubble.live){background:rgb(183 219 255 / 86%);border-color:rgb(0 114 255 / 90%)}
 .root:global(.pin-manager.focus-dim) :global(.question-bubble.focused) :global(.question-tag-more){color:var(--color-text-tertiary)}
 .root:global(.pin-manager) :global(.question-pin:hover .question-pin-icon),.root:global(.pin-manager) :global(.question-pin:focus-visible .question-pin-icon){filter:drop-shadow(0 2px 3px rgb(10 25 77 / 30%))}
 @keyframes pin-cluster-fade{from{opacity:0}}
@@ -86,10 +87,10 @@
 @media(prefers-reduced-motion:reduce){.root :global(.question-pin.live),.root :global(.pin-cluster-button.live),.root :global(.question-bubble.live){animation:none;outline:2px solid var(--color-brand);outline-offset:3px}}
 
 :global(.class-presentation-canvas) .root[data-live-effect] :global(.question-pin.live){transform-origin:50% 50%;animation:incoming-pin 360ms cubic-bezier(.2,.8,.2,1) both}
-:global(.class-presentation-canvas) .root[data-live-effect] :global(.question-bubble.live){z-index:12;background:var(--color-text-primary);color:var(--color-text-inverse);animation:incoming-bubble 360ms 120ms cubic-bezier(.2,.8,.2,1) both}
+:global(.class-presentation-canvas) .root[data-live-effect] :global(.question-bubble.live){z-index:12;animation:incoming-bubble 360ms 120ms cubic-bezier(.2,.8,.2,1) both}
 :global(.class-presentation-canvas) .root[data-live-effect=collapse] :global(.question-bubble.live){animation:incoming-bubble 360ms 120ms cubic-bezier(.2,.8,.2,1) both,incoming-bubble-fold 400ms 2800ms ease-in forwards}
 :global(.class-presentation-canvas) .root[data-live-effect]:global(.focus-dim) :global(.live){animation-play-state:paused}
-:global(.class-presentation-canvas) .root[data-live-effect]:global(.focus-dim) :global(.question-bubble.focused){z-index:20;background:var(--color-bg-surface);color:var(--color-text-primary);animation:none;opacity:1}
+:global(.class-presentation-canvas) .root[data-live-effect]:global(.focus-dim) :global(.question-bubble.focused){z-index:20;animation:none;opacity:1}
 @keyframes incoming-pin{from{opacity:0;transform:translate(-50%,-50%) scale(.15)}to{opacity:1;transform:translate(-50%,-50%) scale(1)}}
 @keyframes incoming-bubble{from{opacity:0;transform:translate(var(--bubble-x,18px),var(--bubble-y,-50%)) scale(.15)}to{opacity:1;transform:translate(var(--bubble-x,18px),var(--bubble-y,-50%)) scale(1)}}
 @keyframes incoming-bubble-fold{to{opacity:0;transform:translate(var(--bubble-x,18px),var(--bubble-y,-50%)) scale(.02)}}

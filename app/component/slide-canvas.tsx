@@ -167,7 +167,7 @@ export const SlideCanvas = memo(function SlideCanvas({ slide, questions = [], vi
               </button>
             ) : (
               <button className={`question-pin ${isSelected ? "selected focused" : ""} ${isLive ? "live" : ""}`} style={{ left: `${position.x! * 100}%`, top: `${position.y! * 100}%` }} data-bubble-anchor={q.id} onClick={() => onSelectPin?.(q.id)} aria-label={t("question.pinAria", { text: q.text })}>
-                <img className="question-pin-icon" src="/assets/design/question-pin.svg?v=732542ce" alt="" aria-hidden="true" draggable={false} />
+                <img className="question-pin-icon" src={isSelected ? "/assets/design/pin_selected.svg?v=3f409ad0" : "/assets/design/pin_notselected.svg?v=d7d07244"} alt="" aria-hidden="true" draggable={false} />
                 <span className={`question-pin-marker ${markerEmoji ? "emoji" : ""}`} aria-hidden="true">{markerEmoji}</span>
               </button>
             )}
@@ -192,7 +192,7 @@ export const SlideCanvas = memo(function SlideCanvas({ slide, questions = [], vi
         const y = group.reduce((sum, pin) => sum + pin.y!, 0) / group.length;
         const selected = group.some((pin) => pin.id === selectedId || pin.id === liveQuestionId);
         const isLive = group.some((pin) => pin.id === liveQuestionId);
-        const style = { left: `${x * 100}%`, top: `${y * 100}%`, "--cluster-size": `${Math.min(24 + group.length * 4, 56)}px` } as React.CSSProperties;
+        const style = { left: `${x * 100}%`, top: `${y * 100}%`, "--cluster-size": `calc(${Math.min(24 + group.length * 4, 56)} * var(--pin-unit))` } as React.CSSProperties;
         if (onSelectCluster) {
           const ordered = [...group].sort((a, b) => b.reactionCount - a.reactionCount);
           const ids = ordered.map((pin) => pin.id);

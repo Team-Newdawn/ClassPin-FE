@@ -145,9 +145,9 @@
         "ohpin-ui-redesign"
       ],
       "approval": {
-        "approved_at": "2026-10-20T00:00:00+09:00",
-        "approved_by": "user (live player Figma decisions and backend proposals, 2026-10-03; browser LIVE auto-end 9.4 approved in session, 2026-10-15; participant tablet and popup UI approved in session, 2026-10-17); /remote display mode persistence requested in session, 2026-10-17; owner-only persisted end reports with editor/viewer read-only access requested in session, 2026-10-18; folder menus, inline rename, delete choices, QR layout and four question display modes requested 2026-10-19; LIVE material join link confirmed 2026-10-19; lecture management question display and QR layout panel Figma 1237:1068 requested 2026-10-19; remote Bubble and complete QR options plus 64px layout fix requested 2026-10-20",
-        "content_sha256": "e6c9ee2744191062b2258cb3a88e796822fb57e04322f13c7852de36f5c30d65"
+        "approved_at": "2026-10-22T00:00:00+09:00",
+        "approved_by": "user (live player Figma decisions and backend proposals, 2026-10-03; browser LIVE auto-end 9.4 approved in session, 2026-10-15; participant tablet and popup UI approved in session, 2026-10-17); /remote display mode persistence requested in session, 2026-10-17; owner-only persisted end reports with editor/viewer read-only access requested in session, 2026-10-18; folder menus, inline rename, delete choices, QR layout and four question display modes requested 2026-10-19; LIVE material join link confirmed 2026-10-19; lecture management question display and QR layout panel Figma 1237:1068 requested 2026-10-19; remote Bubble and complete QR options plus 64px layout fix requested 2026-10-20; instructor and slideshow PIN sizing relative to rendered slide requested 2026-10-21; participant neutral comment wording and PIN tip anchoring requested 2026-10-22; participant list comment wording and lecture management live-comment and display-option labels requested 2026-10-22",
+        "content_sha256": "7d97aed0df315b36227b8d5e1411be585e3ad2735a30b18b93e54d695c91b2ca"
       }
     },
     {

@@ -47,6 +47,9 @@ export default function LectureRemote() {
       <button type="button" className="btn secondary" disabled={disabled || currentSlide <= 0} onClick={previous}><ChevronLeft aria-hidden="true" />{t("remote.previous")}</button>
       <button type="button" className="btn primary" disabled={disabled || currentSlide >= slideCount - 1} onClick={next}>{t("remote.next")}<ChevronRight aria-hidden="true" /></button>
     </div>
+    <button type="button" className={styles.questionsButton} disabled={!live} onClick={() => setQuestionsOpen(true)} aria-haspopup="dialog" aria-expanded={questionsOpen} aria-controls="remote-questions">
+      <MessageCircleQuestion aria-hidden="true" /><span>{t("session.questionList")}</span><b>{lecture.questionCount}</b>
+    </button>
     <section className={styles.settings} aria-label={t("remote.displaySettings")}>
       <button type="button" className={styles.toggle} role="switch" aria-checked={lecture.showQuestionPins} disabled={disabled} onClick={() => changeSettings({ show_question_pins: !lecture.showQuestionPins })}><span>{t("session.questionDisplay")}</span><b>{lecture.showQuestionPins ? "ON" : "OFF"}</b></button>
       <div className={styles.modes} role="group" aria-label={t("session.questionDisplay")}>
@@ -71,9 +74,6 @@ export default function LectureRemote() {
       <button type="button" className={styles.toggle} role="switch" aria-checked={options.qrEditable} disabled={disabled || !lecture.showPresentationQr} onClick={() => changeOptions({ qrEditable: !options.qrEditable })}><span>{t("session.qrEditable")}</span><i className={styles.switchTrack} aria-hidden="true" /></button>
       <p className={styles.editHint}>{t("session.qrEditHint")}</p>
     </section>
-    <button type="button" className={styles.questionsButton} disabled={!live} onClick={() => setQuestionsOpen(true)} aria-haspopup="dialog" aria-expanded={questionsOpen} aria-controls="remote-questions">
-      <MessageCircleQuestion aria-hidden="true" /><span>{t("session.questionList")}</span><b>{lecture.questionCount}</b>
-    </button>
     {questionsOpen && <dialog id="remote-questions" ref={attachQuestionsRef} className={styles.dialog} aria-labelledby="remote-questions-title" onClose={() => setQuestionsOpen(false)} onCancel={(event) => { event.preventDefault(); closeQuestions(); }} onClick={(event) => { if (event.target === event.currentTarget) closeQuestions(); }}>
       <section className={styles.sheet}>
         <header className={styles.sheetHeader}>

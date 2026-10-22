@@ -3,7 +3,7 @@
 import { useState, type CSSProperties } from "react";
 import Image from "next/image";
 import Link from "next/link";
-const pinIcon = { src: "/assets/design/question-pin.svg?v=732542ce", width: 32, height: 32 };
+const pinIcon = { src: "/assets/design/pin_selected.svg?v=3f409ad0", width: 32, height: 32 };
 import { ArrowRight, Check, ChevronDown, ChevronLeft, ChevronRight, MapPin, SmilePlus, Trash2, X } from "@/app/component/icons";
 import { LanguageSwitcher } from "@/app/component/language-switcher";
 import { LoadingScreen } from "@/app/component/loading-screen";
@@ -101,12 +101,12 @@ export default function JoinSession() {
             <span>{t("student.questionsHiddenCount", { count: slideQuestions.length })}</span>
             <button type="button" className="student-hide-questions" aria-label={t("student.showQuestions")} aria-expanded={false} aria-controls="student-question-list" onClick={() => setQuestionsHidden(false)}><EyeOff aria-hidden="true" /></button>
           </div> : <header className="student-feedback-head">
-            <div className="student-scope-tabs" role="tablist" aria-label={t("session.questionScope")}>
+            <div className="student-scope-tabs" role="tablist" aria-label={t("student.commentScope")}>
               <button type="button" role="tab" aria-selected={questionScope === "slide"} aria-controls="student-question-list" onClick={() => setQuestionScope("slide")}>{t("session.thisSlide")} {slideQuestions.length}</button>
               <button type="button" role="tab" aria-selected={questionScope === "all"} aria-controls="student-question-list" onClick={() => setQuestionScope("all")}>{t("common.all")} {session.questions.length}</button>
             </div>
             <div className="student-feedback-head-actions">
-              <label className="student-sort"><span className="sr-only">{t("student.sortQuestions")}</span><select value={questionSort} onChange={(event) => selectQuestionSort(event.target.value)}>
+              <label className="student-sort"><span className="sr-only">{t("student.sortComments")}</span><select value={questionSort} onChange={(event) => selectQuestionSort(event.target.value)}>
                 <option value="empathy">{t("student.sortByEmpathy")}</option>
                 <option value="newest">{t("student.sortByNewest")}</option>
               </select><ChevronDown aria-hidden="true" /></label>

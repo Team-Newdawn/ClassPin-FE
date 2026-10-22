@@ -1,6 +1,6 @@
 import { createClient } from "@supabase/supabase-js";
 import { translate } from "../../_model/i18n.ts";
-import { CLASS_FOLDER_DEFAULT_PURPOSE, CLASS_FOLDER_PURPOSE_LABEL_MAX, CLASS_FOLDER_PURPOSES, type ClassFolderPurpose } from "../../_model/types.ts";
+import { CLASS_FOLDER_DEFAULT_PURPOSE, CLASS_FOLDER_PURPOSE_LABEL_MAX, CLASS_FOLDER_PURPOSES, classFolderPurposeLine, type ClassFolderPurpose } from "../../_model/types.ts";
 
 const MAX_QUESTION_LENGTH = 300;
 // 강의 외 용도(회의·피드백 등)도 있어 작성자나 질문 행위를 서술하지 않고 내용만 쓰게 한다.
@@ -51,21 +51,6 @@ const parseReport = (content: string): ReportSections | null => {
 
 type Item = { text: string; page: number | null; reactions: number };
 
-// 폴더 사용 목적에 맞춰 요약 관점을 정한다. 목적이 없으면(미분류 자료) 이 줄을 넣지 않는다.
-const PURPOSE_CONTEXT: Record<ClassFolderPurpose, { ko: string; en: string }> = {
-  qa: { ko: "Q&A: 궁금한 점과 헷갈린 점을 중심으로 정리합니다.", en: "Q&A: focus on open questions and points of confusion." },
-  feedback: { ko: "피드백: 항목을 질문보다 의견으로 보고, 좋았던 점·불편한 점과 개선 요청을 중심으로 정리합니다.", en: "Feedback: treat items as opinions rather than questions; focus on what worked, what did not, and requested improvements." },
-  education: { ko: "교육: 학습자가 이해하지 못한 개념과 보충 설명이 필요한 지점을 중심으로 정리합니다.", en: "Education: focus on concepts learners did not understand and where extra explanation is needed." },
-  brainstorming: { ko: "브레인스토밍: 항목을 아이디어로 보고, 반복되는 주제와 발전시킬 만한 아이디어를 중심으로 정리합니다.", en: "Brainstorming: treat items as ideas; focus on recurring themes and ideas worth developing." },
-  other: { ko: "기타: 아래 이름의 목적에 맞는 관점으로 정리합니다.", en: "Other: summarize from the perspective of the purpose named below." },
-};
-
-const purposeLine = (purpose: ClassFolderPurpose | null, label: string | null, locale: "ko" | "en") => {
-  if (!purpose) return "";
-  const name = purpose === "other" && label ? (locale === "ko" ? ` 목적 이름: "${label}".` : ` Purpose name: "${label}".`) : "";
-  return `\n${locale === "ko" ? "이 자료가 속한 폴더의 사용 목적" : "Purpose of the folder this material belongs to"} — ${PURPOSE_CONTEXT[purpose][locale]}${name}`;
-};
-
 const parseItems = (value: unknown, maxItems: number): Item[] | null => {
   if (!Array.isArray(value) || value.length === 0 || value.length > maxItems) return null;
   const items: Item[] = [];
@@ -97,7 +82,7 @@ export async function POST(request: Request) {
   if (purpose !== null && !(typeof purpose === "string" && (CLASS_FOLDER_PURPOSES as readonly string[]).includes(purpose))) return Response.json({ error: "Invalid purpose" }, { status: 400 });
   const rawLabel = body?.purposeLabel ?? null;
   if (rawLabel !== null && !(typeof rawLabel === "string" && [...rawLabel.trim()].length <= CLASS_FOLDER_PURPOSE_LABEL_MAX)) return Response.json({ error: "Invalid purpose" }, { status: 400 });
-  const purposeLabel = purpose === "other" && typeof rawLabel === "string" && rawLabel.trim() ? rawLabel.trim().replace(/["\n\r]/g, " ") : null;
+  const purposeLabel = purpose === "other" && typeof rawLabel === "string" && rawLabel.trim() ? rawLabel.trim() : null;
   const mode = MODES[body?.mode === "report" ? "report" : "cluster"];
   const items = parseItems(body?.items, mode.maxItems);
   if (!items) return Response.json({ error: "Invalid questions" }, { status: 400 });
@@ -111,7 +96,7 @@ export async function POST(request: Request) {
         model: "openai/gpt-oss-120b", temperature: 0.3, max_completion_tokens: mode.maxTokens, reasoning_effort: "low", include_reasoning: false,
         ...(mode.json ? { response_format: { type: "json_object" } } : {}),
         messages: [
-          { role: "system", content: mode.prompt(items.length, body?.locale === "en" ? "en" : "ko", (purpose as ClassFolderPurpose | null) ?? CLASS_FOLDER_DEFAULT_PURPOSE) + purposeLine(purpose as ClassFolderPurpose | null, purposeLabel, body?.locale === "en" ? "en" : "ko") },
+          { role: "system", content: mode.prompt(items.length, body?.locale === "en" ? "en" : "ko", (purpose as ClassFolderPurpose | null) ?? CLASS_FOLDER_DEFAULT_PURPOSE) + classFolderPurposeLine(purpose as ClassFolderPurpose | null, purposeLabel, body?.locale === "en" ? "en" : "ko") },
           { role: "user", content: items.map((item, index) => `${index + 1}. [p.${item.page ?? "-"} · 👍${item.reactions}] ${item.text}`).join("\n") },
         ],
       }),

@@ -2,9 +2,9 @@
   "artifacts": [
     {
       "approval": {
-        "approved_at": "2026-08-26T07:04:47+00:00",
-        "approved_by": "minchan_CTO",
-        "content_sha256": "983db425e870a587d4b5c8ed284709787dc824128567b2c3b63bb2995b68b36a"
+        "approved_at": "2026-10-21T00:00:00+09:00",
+        "approved_by": "minchan_CTO; minchanpark (Groq Qwen image analysis + GPT-OSS text review with instructor visual confirmation approved in session, 2026-10-21)",
+        "content_sha256": "12ce0625bf1c82a6c4aa9a174670e863b481b8557eaa769f7e44d17d19af849f"
       },
       "depends_on": [],
       "id": "ai-report-product",
@@ -22,9 +22,9 @@
     },
     {
       "approval": {
-        "approved_at": "2026-08-26T15:07:22+00:00",
-        "approved_by": "minchan_CTO",
-        "content_sha256": "15a504a46f154308fd6fdac6a05d2e9291dabcf5438d513ad3283d77a430f035"
+        "approved_at": "2026-10-21T00:00:00+09:00",
+        "approved_by": "minchan_CTO; minchanpark (Groq Qwen image analysis + GPT-OSS text review with instructor visual confirmation approved in session, 2026-10-21)",
+        "content_sha256": "14dbf21d045c8cb7c4fec7793b162e6c59dc86dd52d650c89b218ecc535086cf"
       },
       "depends_on": [
         "ai-report-product"
@@ -45,9 +45,9 @@
     },
     {
       "approval": {
-        "approved_at": "2026-08-26T16:02:54+00:00",
-        "approved_by": "minchan_CTO",
-        "content_sha256": "afc138a9187614237769cfeb4f24c3337a16387f13fcffd17021c7ac660c9519"
+        "approved_at": "2026-10-21T00:00:00+09:00",
+        "approved_by": "minchan_CTO; minchanpark (Groq Qwen image analysis + GPT-OSS text review with instructor visual confirmation approved in session, 2026-10-21)",
+        "content_sha256": "baad6ab34bcf51c8005da1b9f3a837cdd6bbaaa2f073b86615d8a2ea456efd94"
       },
       "depends_on": [
         "ai-report-product",
@@ -195,6 +195,50 @@
         "approved_at": "2026-10-18T00:00:00+09:00",
         "approved_by": "minchanpark (separate account-structure implementation guidance requested 2026-10-18, including owner-only saved end reports and read-only editor/viewer access, and private image bucket design; implementation and production cutover remain pending)",
         "content_sha256": "99cc219573c557f94b154f316a90db5a077ddaf42501ca93749aad713681f493"
+      }
+    },
+    {
+      "id": "insights-ai-foundation",
+      "path": "docs/insights-ai-foundation.md",
+      "status": "approved",
+      "purpose": "Insight decisions and phased implementation; owner-only source readiness inspection and Groq model connection.",
+      "depends_on": [
+        "ai-report-product",
+        "ai-report-evidence",
+        "ai-report-system"
+      ],
+      "informed_by": [
+        "prd"
+      ],
+      "required_for": [
+        "insight-source-preparation",
+        "insight-groq-connection"
+      ],
+      "approval": {
+        "approved_at": "2026-10-21T00:00:00+09:00",
+        "approved_by": "minchanpark (implementation decisions delegated; Groq Qwen and GPT-OSS setup approved in session)",
+        "content_sha256": "dabab3628dc6f0ce780bc15a5e472d66c1d7820dbe17152bae44a46a29c1d00d"
+      }
+    },
+    {
+      "id": "insights-rest-snapshot",
+      "path": "docs/insights-rest-snapshot.md",
+      "status": "approved",
+      "purpose": "Server-captured REST snapshots without backend changes.",
+      "depends_on": [
+        "insights-ai-foundation"
+      ],
+      "informed_by": [
+        "prd"
+      ],
+      "required_for": [
+        "insight-snapshot-persistence",
+        "insight-platform-integration"
+      ],
+      "approval": {
+        "approved_at": "2026-10-21T00:00:00+09:00",
+        "approved_by": "minchanpark (backend-free workaround approved in session; implementation decisions delegated); platform integration and testing requested in session",
+        "content_sha256": "0eecd2ed1b0a6aa94c8486a25b59dec95486a2cab3f0101e31732869bd1398f9"
       }
     }
   ],

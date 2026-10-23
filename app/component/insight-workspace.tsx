@@ -16,9 +16,10 @@ const emphasized = (text: string) => text.split(/\*\*([\s\S]+?)\*\*/g).map((part
 const messages: Record<string, string> = {
   ANALYSIS_NOT_CONFIGURED: "분석 서버에 Claude API 키가 설정되지 않았습니다.", REPORT_STORAGE_NOT_CONFIGURED: "분석 저장소 설정이 필요합니다.",
   LECTURE_NOT_ENDED: "강의를 종료한 뒤 분석할 수 있습니다.", SOURCE_NOT_FOUND: "자료가 삭제되었거나 접근 권한이 없습니다.",
-  SOURCE_TOO_LARGE: "자료가 너무 커서 분석할 수 없습니다(600쪽 이하, 조각당 20MB).", SOURCE_DOWNLOAD_FAILED: "원본 PDF를 읽지 못했습니다.",
+  SOURCE_TOO_LARGE: "자료가 너무 커서 분석할 수 없습니다(600쪽, 200MB 이하).", ANALYSIS_INTERRUPTED: "분석이 중간에 멈췄습니다(서버 재시작 등). 다시 분석해 주세요.", ANALYSIS_CANCELLED: "분석을 중지했습니다.", SOURCE_DOWNLOAD_FAILED: "원본 자료를 읽지 못했습니다.",
   AI_REFUSED: "AI가 이 자료의 분석을 거부했습니다.", AI_TRUNCATED: "AI 응답이 잘렸습니다. 다시 분석해 주세요.", AI_INVALID_OUTPUT: "AI 응답 형식이 올바르지 않습니다. 다시 분석해 주세요.",
   AI_UNAVAILABLE: "AI 서비스에 연결하지 못했습니다. 잠시 후 다시 시도해 주세요.", REPORT_NOT_READY: "분석이 끝난 뒤 사용할 수 있습니다.",
+  DAILY_LIMIT: "오늘 분석 횟수(2회)를 모두 사용했습니다. 내일 다시 시도해 주세요.", CHAT_LIMIT: "이 리포트의 AI 대화 횟수(5회)를 모두 사용했습니다.",
   CONFIRMATION_REQUIRED: "리포트를 확정한 뒤 내보낼 수 있습니다.", ANALYSIS_FAILED: "분석을 완료하지 못했습니다. 다시 분석해 주세요.",
 };
 export async function insightFetch(path: string, init?: RequestInit) {
@@ -43,7 +44,7 @@ export function InsightWorkspace() {
   const [reports, setReports] = useState<InsightReportView[]>([]), [report, setReport] = useState<InsightReportView | null>(null);
   const [tab, setTab] = useState(0), [slideIndex, setSlideIndex] = useState(0), [selectedPin, setSelectedPin] = useState<string | null>(null);
   const [error, setError] = useState(""), [busy, setBusy] = useState(false), [draft, setDraft] = useState("");
-  const [pending, setPending] = useState<{ question: string; answer: string } | null>(null), chatEnd = useRef<HTMLDivElement>(null);
+  const [pending, setPending] = useState<{ question: string; answer: string } | null>(null), chatEnd = useRef<HTMLDivElement>(null), composer = useRef<HTMLTextAreaElement>(null);
   const session = sessions.find((session) => session.materialId === material);
   const slides = session?.slides ?? [], slide = slides[slideIndex];
   const body = report?.body ?? null, analysis = body?.slides.find((item) => item.page === slideIndex + 1);
@@ -112,6 +113,8 @@ export function InsightWorkspace() {
   });
   const chat = [...(report?.messages ?? []), ...(pending ? [{ role: "user", text: pending.question }, { role: "assistant", text: pending.answer }] : [])];
   useEffect(() => { chatEnd.current?.scrollIntoView({ block: "nearest" }); }, [pending, report?.messages, tab]);
+  // Grow the prompt with its lines (CSS caps it at 160px, then it scrolls); also shrinks back when a send clears it.
+  useEffect(() => { const box = composer.current; if (box) { box.style.height = "auto"; box.style.height = `${box.scrollHeight}px`; } }, [draft, tab]);
   const goTo = (page: number, pin: string | null = null) => { setSlideIndex(Math.max(0, Math.min(slides.length - 1, page - 1))); setSelectedPin(pin); };
   const questionButton = (id: string) => {
     const question = body?.questions.find((item) => item.id === id);
@@ -164,33 +167,39 @@ export function InsightWorkspace() {
             <button className="btn primary" disabled={!material || session?.status !== "ended" || busy} onClick={() => void start()}>{busy ? "요청 중…" : "분석 시작"}</button>
             {session && session.status !== "ended" && <p>강의를 종료한 뒤 분석할 수 있습니다.</p>}
           </div>}
-          {report?.status === "running" && <div role="status" className={styles.state}><p>자료를 읽고 분석하는 중입니다…</p><progress /><p>창을 닫아도 분석은 계속됩니다.</p></div>}
+          {report?.status === "running" && <div role="status" className={styles.state}><p>자료를 읽고 분석하는 중입니다…</p><progress /><p>창을 닫아도 분석은 계속됩니다.</p>
+            <button className="btn secondary" disabled={busy} onClick={() => void act(() => post({ action: "cancel" }))}>{busy ? "중지하는 중…" : "분석 중지"}</button></div>}
           {report?.status === "failed" && <div role="alert" className={styles.state}><p>{messages[report.error ?? ""] ?? messages.ANALYSIS_FAILED}</p>
             <button className="btn secondary" disabled={busy} onClick={() => void start()}>다시 분석</button></div>}
           {body && <><div className={styles.meta}><span className={styles.badge} data-tone={report!.status === "confirmed" ? "done" : undefined}>{report!.status === "confirmed" ? "확정됨" : "확정 전"}</span>
               {body.category && <span className={styles.badge} data-tone="brand">AI 판단 · {body.category}</span>}
+              {body.failedPages?.length ? <span className={styles.badge} data-tone="warn">슬라이드 {body.failedPages.length}장 분석 실패</span> : null}
               <small>{new Date(report!.createdAt).toLocaleString("ko-KR")} · 슬라이드 {body.slides.length} · 질문 {body.questions.length}</small></div>
             {tab === 0 && <><section className={styles.aiCard}><h2><Image src="/assets/design/report-sparkle.svg" width={16} height={16} alt="" />AI 요약</h2><p>{body.overall.summary}</p></section>
               {body.overall.hotspots.length > 0 && <section className={styles.card}><h2>질문이 몰린 슬라이드</h2><ol>{body.overall.hotspots.map((item) => <li key={item.page}><button onClick={() => goTo(item.page)}>슬라이드 {item.page}</button>{item.reason}</li>)}</ol></section>}
               {body.overall.suggestions.length > 0 && <section className={styles.card}><h2>개선 제안</h2><ol>{body.overall.suggestions.map((item, index) => <li key={index}><span aria-hidden="true">{index + 1}</span>{item}</li>)}</ol></section>}</>}
             {tab === 1 && <section className={styles.card}><h2>슬라이드 {slideIndex + 1}</h2>
-              {analysis ? <><p>{analysis.topic || "PDF에 없는 이미지 슬라이드입니다."}</p>
+              {analysis ? <><p>{body.failedPages?.includes(analysis.page) ? "이 슬라이드는 AI 분석에 실패했습니다. 다시 분석하면 채워질 수 있습니다." : analysis.topic || "이 슬라이드의 분석 결과가 없습니다. 다시 분석해 주세요."}</p>
                 <small>질문 {analysis.metrics.questions} · 미답변 {analysis.metrics.unanswered} · 공감 {analysis.metrics.reactions}</small>
                 {analysis.content && <><h3>내용 정리</h3><p>{analysis.content}</p></>}
                 {analysis.questionSummary && <><h3>질문 정리</h3><p>{analysis.questionSummary}</p></>}
                 {analysis.suggestion && <><h3>개선 제안</h3><p>{analysis.suggestion}</p></>}
                 {body.questions.filter((item) => item.page === slideIndex + 1).map((item) => questionButton(item.id))}</> : <p>이 슬라이드의 분석이 없습니다.</p>}</section>}
             {tab === 2 && body.groups.map((group) => <section className={styles.card} key={group.title}><h2>{group.title}</h2>{group.summary && <p>{group.summary}</p>}{group.questionIds.map(questionButton)}</section>)}
-            {tab === 3 && <><p className={styles.hint}>분석 결과와 질문 목록을 근거로 답합니다. 근거가 없으면 없다고 답합니다.</p>
+            {tab === 3 && <><div className={styles.chatHead}><p className={styles.hint}>분석 결과와 질문 목록을 근거로 답합니다. 근거가 없으면 없다고 답합니다.</p>
+                {(report?.messages?.length ?? 0) > 0 && <button className="btn tertiary" disabled={busy}
+                  onClick={() => { if (confirm("지금까지의 대화를 지우고 새 대화를 시작할까요?")) void act(() => post({ action: "reset" })); }}>새 대화</button>}</div>
               <div role="log" aria-label="AI 대화 기록" aria-busy={Boolean(pending)} className={styles.chat}>
                 {chat.map((entry, index) => <article key={index} aria-label={entry.role === "user" ? "강사" : "AI"}
                   className={`${entry.role === "user" ? styles.userBubble : styles.aiBubble} ${pending && index === chat.length - 1 ? styles.streaming : ""}`}>{entry.role === "user" ? entry.text : entry.text ? emphasized(entry.text) : "답변을 준비하는 중…"}</article>)}
                 <div ref={chatEnd} />
               </div>
               <form onSubmit={(event) => { event.preventDefault(); if (draft.trim() && !busy) void send(draft.trim()); }}>
-                <label htmlFor="insight-instruction">질문</label><textarea id="insight-instruction" value={draft} maxLength={2000} rows={2} placeholder="Enter로 전송, Shift+Enter로 줄바꿈"
-                  onChange={(event) => setDraft(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) { event.preventDefault(); event.currentTarget.form?.requestSubmit(); } }} />
-                <button className="btn primary" disabled={busy || !draft.trim()}>{busy ? "답변 중…" : "전송"}</button>
+                <div className={styles.composer}>
+                  <textarea ref={composer} aria-label="AI에게 질문 (Enter로 전송, Shift+Enter로 줄바꿈)" value={draft} maxLength={2000} rows={1} placeholder="무엇이든 물어보세요"
+                    onChange={(event) => setDraft(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) { event.preventDefault(); event.currentTarget.form?.requestSubmit(); } }} />
+                  <button className={styles.send} aria-label={busy ? "답변 중" : "전송"} disabled={busy || !draft.trim()}><span aria-hidden="true">↑</span></button>
+                </div>
               </form></>}
           </>}
           {tab !== 3 && <footer>AI 분석은 가림 처리한 질문·답변과 강의 자료 PDF를 사용합니다. 수치는 코드가 계산합니다.</footer>}

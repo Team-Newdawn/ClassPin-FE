@@ -9,8 +9,17 @@ type Material = Source["materials"][number];
 type Question = InsightReportBody["questions"][number] & { x: number | null; y: number | null };
 
 // 20 images per request keeps Claude's normal per-image limits and the prompt under Haiku's 100K-token price tier.
-export const PAGES_PER_CHUNK = 20, MAX_PAGES = 600;
-/** A rendered PDF page: JPEG on disk, its pixel size, and the page's extracted text (empty when unreadable). */
+export const PAGES_PER_CHUNK = 20, MAX_PAGES = 600, CHUNKS_IN_FLIGHT = 6;
+/** Runs at most `n` tasks at once, in call order; a failed task frees its slot. */
+export const limiter = (n: number) => {
+  let free = n;
+  const waiting: (() => void)[] = [];
+  return async <T,>(task: () => Promise<T>) => {
+    if (free) free--; else await new Promise<void>((resolve) => waiting.push(resolve));
+    try { return await task(); } finally { const next = waiting.shift(); if (next) next(); else free++; }
+  };
+};
+/** A slide (or PDF page) as a JPEG on disk, its pixel size, and its extracted text (empty for image slides or when unreadable). */
 export type SlidePage = { page: number; width: number; height: number; file: string; text: string };
 const model = () => process.env.INSIGHT_CLAUDE_MODEL || "claude-haiku-5-5";
 const client = () => {
@@ -73,7 +82,7 @@ const describeQuestion = (q: Question, image?: SlidePage) => `- ${image && q.x !
   q.answers.map((answer) => `\n  답변: ${answer}`).join("");
 
 export async function analyzeInsight(source: Source, material: Material, images: readonly SlidePage[], purpose: string, signal?: AbortSignal): Promise<InsightReportBody> {
-  const slides = material.slides.map((slide) => ({ id: slide.id, page: slide.pageIndex + 1, pdfPage: slide.sourcePageIndex === null ? null : slide.sourcePageIndex + 1,
+  const slides = material.slides.map((slide) => ({ id: slide.id, page: slide.pageIndex + 1,
     metrics: source.evidence.find((item) => item.slideId === slide.id)!.metrics }));
   const pageOf = new Map(slides.map((slide) => [slide.id, slide.page]));
   const questions: Question[] = material.questions.map((q) => ({ id: q.id, page: pageOf.get(q.slideId)!, text: redactInsightText(q.text),
@@ -81,27 +90,32 @@ export async function analyzeInsight(source: Source, material: Material, images:
     x: q.anchor?.kind === "point" || q.anchor?.kind === "box" ? q.anchor.x : null, y: q.anchor?.kind === "point" || q.anchor?.kind === "box" ? q.anchor.y : null }));
   const imageOf = new Map(images.map((image) => [image.page, image]));
   const chunks: { from: number; to: number }[] = [];
-  for (let from = 1; from <= images.length; from += PAGES_PER_CHUNK) chunks.push({ from, to: Math.min(images.length, from + PAGES_PER_CHUNK - 1) });
+  for (let from = 1; from <= slides.length; from += PAGES_PER_CHUNK) chunks.push({ from, to: Math.min(slides.length, from + PAGES_PER_CHUNK - 1) });
   type Item = { page: number; topic: string; content: string; questionSummary: string; suggestion: string };
   const slideSchema = object({ category: text, slides: array(object({ page: { type: "integer" }, topic: text, content: text, questionSummary: text, suggestion: text })) });
   const listing = (items: typeof slides) => items.map((slide) => {
     const own = questions.filter((q) => q.page === slide.page);
-    const image = slide.pdfPage === null ? undefined : imageOf.get(slide.pdfPage);
+    const image = imageOf.get(slide.page);
     return `슬라이드 ${slide.page}${image ? "" : " (이미지 없음)"}: ${own.length ? "\n" + own.map((q) => describeQuestion(q, image)).join("\n") : "질문 없음"}`;
   }).join("\n");
-  const parts = await Promise.all(chunks.map(async (chunk, index) => {
-    const mine = slides.filter((slide) => slide.pdfPage !== null ? slide.pdfPage >= chunk.from && slide.pdfPage <= chunk.to : index === chunks.length - 1);
-    if (!mine.length) return { category: null, slides: [] as Item[] };
+  // Each chunk in flight holds ~20MB of base64 images, so at most CHUNKS_IN_FLIGHT; decks up to 120 pages still go in one round.
+  const chunkSlot = limiter(CHUNKS_IN_FLIGHT);
+  const parts = await Promise.all(chunks.map((chunk) => chunkSlot(async () => {
+    const mine = slides.filter((slide) => slide.page >= chunk.from && slide.page <= chunk.to);
     // Claude reads images best before the text and with each image labeled; extracted text guards exact wording and numbers.
-    const shown = await Promise.all(mine.flatMap((slide) => { const image = slide.pdfPage === null ? undefined : imageOf.get(slide.pdfPage); return image ? [{ slide, image }] : []; })
+    const shown = await Promise.all(mine.flatMap((slide) => { const image = imageOf.get(slide.page); return image ? [{ slide, image }] : []; })
       .map(async ({ slide, image }): Promise<Anthropic.ContentBlockParam[]> => [
         { type: "text", text: `슬라이드 ${slide.page} (이미지 ${image.width}x${image.height}px):` },
         { type: "image", source: { type: "base64", media_type: "image/jpeg", data: (await readFile(image.file)).toString("base64") } },
         ...(image.text ? [{ type: "text" as const, text: `<slide_text page="${slide.page}">\n${image.text}\n</slide_text>` }] : [])]));
     const prompt = `위 이미지는 슬라이드 원본이고, slide_text는 그 슬라이드에서 추출한 글자다(배치는 대략적이며 정확한 문구·숫자 확인용). 먼저 자료를 보고 이것이 어떤 자리의 자료인지(예: 대학 강의, 투자 설명회) 스스로 판단해 category에 짧은 이름으로 쓰고, 그 자리의 청중과 목적에 맞는 관점으로 아래 슬라이드마다 slides 항목을 하나씩 만들어라.${purpose ? ` ${purpose}` : ""} page는 슬라이드 번호다. topic은 슬라이드가 말하는 핵심 한 줄, questionSummary는 그 슬라이드의 질문들이 무엇을 묻는지 PIN이 가리키는 요소와 연결해 두세 문장, suggestion은 질문에 비춘 강의 개선 제안 한 문장이다. PIN 좌표는 그 슬라이드 이미지 기준 픽셀(원점 왼쪽 위)이다. 질문이 없는 슬라이드는 content에 슬라이드 내용을 두세 문장으로 단순하게 정리만 하고(평가·제안 없이), questionSummary와 suggestion은 빈 문자열. 질문이 있는 슬라이드는 content를 빈 문자열로 둔다.\n\n${listing(mine)}`;
     return ask<{ category?: unknown; slides?: unknown }>({ step: "slides", schema: slideSchema, text: prompt, slides: shown.flat(), signal })
-      .then((value) => ({ category: value.category, slides: Array.isArray(value.slides) ? value.slides as Item[] : [] }));
-  }));
+      .then((value) => ({ category: value.category, slides: Array.isArray(value.slides) ? value.slides as Item[] : [], failed: [] as number[], error: null as unknown }),
+        // One failed chunk leaves only its slides empty; the report still shows every other slide.
+        (error: unknown) => ({ category: null, slides: [] as Item[], failed: mine.map((slide) => slide.page), error }));
+  })));
+  const failedPages = parts.flatMap((part) => part.failed);
+  if (failedPages.length === slides.length) throw parts.find((part) => part.failed.length)!.error;
   const category = pickCategory(parts.map((part) => part.category));
   const byPage = new Map(parts.flatMap((part) => part.slides).filter((item) => item && typeof item === "object").map((item) => [Number(item.page), item]));
   const bodySlides = slides.map((slide) => { const item = byPage.get(slide.page);
@@ -121,7 +135,7 @@ export async function analyzeInsight(source: Source, material: Material, images:
     .filter((group) => group.title && group.questionIds.length);
   const rest = questions.filter((_, i) => !used.has(i + 1)).map((q) => q.id);
   if (rest.length) groups.push({ title: "기타 질문", summary: "", questionIds: rest });
-  return { schemaVersion: 2, model: model(), ...(category ? { category } : {}), ...(purpose ? { purpose } : {}), slides: bodySlides,
+  return { schemaVersion: 2, model: model(), ...(category ? { category } : {}), ...(purpose ? { purpose } : {}), ...(failedPages.length ? { failedPages } : {}), slides: bodySlides,
     questions: questions.map((q) => ({ id: q.id, page: q.page, text: q.text, answers: q.answers, reactions: q.reactions, status: q.status })),
     overall: { summary: clip(merged.overall?.summary, 2000),
       hotspots: list(merged.overall?.hotspots).filter((item: Record<string, unknown>) => pages.has(Number(item?.page))).slice(0, 5)
@@ -153,19 +167,16 @@ const VIEW_SLIDES: Anthropic.Tool = { name: "view_slides", strict: true,
  * view_slides result: each requested slide as the same image + extracted text the analysis saw, plus its PINs in that
  * image's pixels labeled with the chat context's question numbers, and notes for slides it cannot show.
  */
-export async function viewSlides(material: Material, body: InsightReportBody, render: (pdfPages: number[]) => Promise<SlidePage[]>, input: unknown): Promise<Exclude<Anthropic.ToolResultBlockParam["content"], undefined>> {
+export async function viewSlides(material: Material, body: InsightReportBody, render: (pages: number[]) => Promise<SlidePage[]>, input: unknown): Promise<Exclude<Anthropic.ToolResultBlockParam["content"], undefined>> {
   const slideCount = body.slides.length;
   if (material.slides.length !== slideCount) return "자료가 분석 이후 바뀌어 원본 슬라이드를 볼 수 없다. 분석 결과로만 답한다.";
   const requested = Array.isArray((input as { pages?: unknown })?.pages) ? (input as { pages: unknown[] }).pages : [];
   const pages = [...new Set(requested.filter((page): page is number => typeof page === "number" && Number.isInteger(page) && page >= 1 && page <= slideCount))].slice(0, 3);
-  const shown = pages.map((page) => ({ page, slide: material.slides.find((slide) => slide.pageIndex + 1 === page)! }));
-  const inPdf = shown.filter((item) => item.slide.sourcePageIndex !== null), missing = shown.filter((item) => item.slide.sourcePageIndex === null).map((item) => item.page);
-  const notes = [missing.length ? `슬라이드 ${missing.join(", ")}는 PDF에 없는 이미지 슬라이드라 볼 수 없다.` : "", pages.length ? "" : `볼 수 있는 슬라이드 번호는 1~${slideCount}다.`].filter(Boolean).join(" ");
-  if (!inPdf.length) return notes;
-  const images = new Map((await render(inPdf.map((item) => item.slide.sourcePageIndex! + 1))).map((image) => [image.page, image]));
+  if (!pages.length) return `볼 수 있는 슬라이드 번호는 1~${slideCount}다.`;
+  const images = new Map((await render(pages)).map((image) => [image.page, image]));
   const number = new Map(body.questions.map((q, i) => [q.id, i + 1]));
-  const blocks = await Promise.all(inPdf.map(async ({ page, slide }): Promise<(Anthropic.TextBlockParam | Anthropic.ImageBlockParam)[]> => {
-    const image = images.get(slide.sourcePageIndex! + 1);
+  const blocks = await Promise.all(pages.map(async (page): Promise<(Anthropic.TextBlockParam | Anthropic.ImageBlockParam)[]> => {
+    const slide = material.slides.find((item) => item.pageIndex + 1 === page)!, image = images.get(page);
     if (!image) return [{ type: "text", text: `슬라이드 ${page}는 불러오지 못했다.` }];
     const pins = material.questions.filter((q) => q.slideId === slide.id && number.has(q.id) && (q.anchor?.kind === "point" || q.anchor?.kind === "box"))
       .map((q) => `질문 ${number.get(q.id)}: PIN (${Math.round((q.anchor as { x: number }).x * image.width)}, ${Math.round((q.anchor as { y: number }).y * image.height)})px`);
@@ -174,7 +185,7 @@ export async function viewSlides(material: Material, body: InsightReportBody, re
       { type: "text", text: [image.text && `<slide_text page="${page}">\n${image.text}\n</slide_text>`,
         pins.length ? `이 슬라이드의 PIN(이미지 기준 픽셀, 원점 왼쪽 위; 질문 번호는 대화 자료의 질문 번호):\n${pins.join("\n")}` : "이 슬라이드에는 위치가 있는 PIN이 없다."].filter(Boolean).join("\n") }];
   }));
-  return [...blocks.flat(), ...(notes ? [{ type: "text" as const, text: notes }] : [])];
+  return blocks.flat();
 }
 
 /** Slides the message names ("2페이지", "3번 슬라이드", "슬라이드 4", "이 슬라이드" = the one on screen), in order, at most 3. */
@@ -193,7 +204,10 @@ export async function* chatInsight(body: InsightReportBody, history: InsightMess
   // Slides the instructor names are attached up front instead of trusting the model to ask for them.
   const named = slidesMentioned(message, currentPage, body.slides.length), attached = named.length ? await view({ pages: named }) : [];
   const text = currentPage ? `(강사가 지금 보고 있는 슬라이드: ${currentPage})\n${message}` : message;
-  const messages: Anthropic.MessageParam[] = [...history.slice(-20).map((item) => ({ role: item.role, content: item.text })),
+  // Last 20 turns, then drop the oldest user/assistant pairs until they fit ~20K chars so long answers can't bloat the prompt.
+  const recent = history.slice(-20);
+  while (recent.length && recent.reduce((size, item) => size + item.text.length, 0) > 20_000) recent.splice(0, 2);
+  const messages: Anthropic.MessageParam[] = [...recent.map((item) => ({ role: item.role, content: item.text })),
     { role: "user", content: typeof attached === "string" ? `${attached}\n\n${text}` : [...attached as Anthropic.ContentBlockParam[], { type: "text", text }] }];
   let said = false;
   for (let round = 0; ; round++) {

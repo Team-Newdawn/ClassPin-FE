@@ -1,9 +1,8 @@
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import { boundedJson, insightOwner, insightStorage, insightResponse, insightFailure, reportView, readOwnedInsightSource, renderSlidePages, InsightRequestError } from "../../../../_service/insight-request.ts";
+import { boundedJson, insightOwner, insightStorage, insightResponse, insightFailure, reportView, readOwnedInsightSource, renderMaterialSlides, runningAnalyses, InsightRequestError } from "../../../../_service/insight-request.ts";
 import { chatInsight, viewSlides } from "../../../../_service/insight-claude.ts";
-import { cachedFile } from "../../../../_infrastructure/pdf-cache.ts";
 import type { InsightMessage, InsightReportBody } from "../../../../_model/insight-report.ts";
 
 export const runtime = "nodejs";
@@ -33,28 +32,41 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
       if (result.error || !result.data) throw new InsightRequestError("REPORT_NOT_READY", 409);
       return insightResponse(reportView(result.data));
     }
+    if (body?.action === "cancel") {
+      const result = await db.from("ai_insight_reports").update({ status: "failed", error: "ANALYSIS_CANCELLED" })
+        .eq("id", id).eq("status", "running").select("*").maybeSingle();
+      if (result.error) throw new InsightRequestError("REPORT_STORAGE_UNAVAILABLE", 503);
+      runningAnalyses.get(id)?.abort();
+      // Already finished or failed: show its current state instead of an error.
+      return insightResponse(reportView(result.data ?? row));
+    }
+    if (body?.action === "reset") {
+      // Text is wiped; blank turns stay so a new conversation can't reset the per-report question limit.
+      const messages = ((row.messages as InsightMessage[]) ?? []).map(({ role, createdAt }) => ({ role, text: "", createdAt, cleared: true as const }));
+      const result = await db.from("ai_insight_reports").update({ messages }).eq("id", id).select("*").single();
+      if (result.error) throw new InsightRequestError("REPORT_STORAGE_UNAVAILABLE", 503);
+      return insightResponse(reportView(result.data));
+    }
     if (body?.action === "chat") {
       const message = typeof body.message === "string" ? body.message.trim() : "";
       if (!message || message.length > 2000) throw new InsightRequestError("INVALID_REQUEST", 400);
       if (!["ready", "confirmed"].includes(row.status)) throw new InsightRequestError("REPORT_NOT_READY", 409);
       if (!process.env.CLAUDE_API_KEY) throw new InsightRequestError("ANALYSIS_NOT_CONFIGURED", 503);
       const history = (row.messages as InsightMessage[]) ?? [];
+      // ponytail: flat 5 questions per report until billing plans exist; two tabs sending at once can each pass this check. `next dev` has no limit.
+      if (process.env.NODE_ENV !== "development" && history.filter((item) => item.role === "user").length >= 5) throw new InsightRequestError("CHAT_LIMIT", 429);
       const report = row.body as InsightReportBody, stop = new AbortController(), signal = AbortSignal.any([request.signal, stop.signal, AbortSignal.timeout(90_000)]);
       const slide = Number.isInteger(body.slide) && (body.slide as number) >= 1 && (body.slide as number) <= report.slides.length ? body.slide as number : null;
       // The source is read with the instructor's JWT only when the model asks to see slides.
       let material: Promise<Awaited<ReturnType<typeof readOwnedInsightSource>>["materials"][number]> | undefined;
       const view = async (input: unknown) => {
         material ??= readOwnedInsightSource(authorization, [row.material_id], signal).then((source) => source.materials[0]);
-        const { sourcePath } = await material, work = await mkdtemp(path.join(tmpdir(), "insight-chat-"));
+        const owned = await material, work = await mkdtemp(path.join(tmpdir(), "insight-chat-"));
         try {
-          return await viewSlides(await material, report, async (pages) => renderSlidePages(await cachedFile(sourcePath, async () => {
-            const file = await db.storage.from("course-materials").download(sourcePath).asStream();
-            if (file.error || !file.data) throw new Error("SOURCE_DOWNLOAD_FAILED");
-            return file.data;
-          }), work, pages), input);
+          return await viewSlides(owned, report, (pages) => renderMaterialSlides(owned, work, pages), input);
         } finally { await rm(work, { recursive: true, force: true }); }
       };
-      const answer = chatInsight(report, history, message, slide, view, signal);
+      const answer = chatInsight(report, history.filter((item) => !item.cleared), message, slide, view, signal);
       const encoder = new TextEncoder();
       // Text deltas stream as plain text; the turn is saved only once the full answer arrives, otherwise the stream errors.
       return new Response(new ReadableStream({
@@ -67,7 +79,7 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
             const result = await db.from("ai_insight_reports").update({ messages }).eq("id", id);
             if (result.error) throw new Error("REPORT_STORAGE_UNAVAILABLE");
             controller.close();
-          } catch (error) { controller.error(error); }
+          } catch (error) { if (!stop.signal.aborted) controller.error(error); } // a cancelled stream is already closed
         },
         cancel() { stop.abort(); },
       }), { headers: { "Content-Type": "text/plain; charset=utf-8", "Cache-Control": "no-store", "X-Accel-Buffering": "no" } });

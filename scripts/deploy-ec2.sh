@@ -63,7 +63,11 @@ trap cleanup EXIT
 trap 'exit 130' INT
 trap 'exit 143' TERM HUP
 
-# Load and validate before stopping any live container. No global image/system prune.
+# Each release image brings its own ~1 GB apt layer; drop ohpin-fe images no container (live, previous) still uses
+# before loading another. Only this app's images: no global image/system prune.
+docker image ls "$app" --format '{{.Repository}}:{{.Tag}}' | grep -vxF -f <(docker ps -a --format '{{.Image}}') \
+  | xargs -r docker rmi >/dev/null 2>&1 || true
+# Load and validate before stopping any live container.
 gzip -dc "$release_dir/image.tar.gz" | docker load >/dev/null
 docker image inspect "$image" >/dev/null
 # Shared with the BE compose project so REST_API_URL can be http://ohpin-be:8080. Create-then-inspect tolerates a concurrent BE deploy.

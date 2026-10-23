@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { pickCategory, chatContext, viewSlides, slideImageEdge, readableText, slidesMentioned } from "./insight-claude.ts";
+import { pickCategory, chatContext, viewSlides, slideImageEdge, readableText, slidesMentioned, limiter } from "./insight-claude.ts";
 
 test("slideImageEdge keeps every page within Claude's 1568px / 1568-token image budget", () => {
   const tokens = (w: number, h: number) => Math.ceil(w / 28) * Math.ceil(h / 28);
@@ -39,7 +39,7 @@ test("chatContext refers to questions by number, never by UUID", () => {
   assert.ok(!context.includes(id));
 });
 
-test("viewSlides sends requested slide images with their PINs in pixels and chat question numbers, skips image-only slides, refuses a changed deck", async () => {
+test("viewSlides sends requested slide images (PDF and image slides) with their PINs in pixels and chat question numbers, refuses a changed deck", async () => {
   const dir = await mkdtemp(join(tmpdir(), "view-slides-")), file = join(dir, "page-3.jpg");
   await writeFile(file, "jpeg");
   const metrics = { questions: 0, positioned: 0, unanswered: 0, answered: 0, resolved: 0, reactions: 0, answers: 0 };
@@ -48,13 +48,14 @@ test("viewSlides sends requested slide images with their PINs in pixels and chat
   const material = { slides: [{ id: "s1", pageIndex: 0, sourcePageIndex: 0 }, { id: "s2", pageIndex: 1, sourcePageIndex: null }, { id: "s3", pageIndex: 2, sourcePageIndex: 2 }],
     questions: [{ id: "b", slideId: "s3", anchor: { kind: "point", x: 0.5, y: 0.25 } }, { id: "late", slideId: "s3", anchor: { kind: "point", x: 0.1, y: 0.1 } }, { id: "a", slideId: "s3", anchor: null }] } as unknown as Parameters<typeof viewSlides>[0];
   const asked: number[][] = [];
-  const render = async (pages: number[]) => { asked.push(pages); return [{ page: 3, width: 1000, height: 500, file, text: "제목" }]; };
+  const render = async (pages: number[]) => { asked.push(pages); return [{ page: 3, width: 1000, height: 500, file, text: "제목" }, { page: 2, width: 800, height: 600, file, text: "" }]; };
   const result = await viewSlides(material, body, render, { pages: [3, 2, 3, 9, "1"] }) as { type: string; text?: string }[];
-  assert.deepEqual(asked, [[3]]);
-  assert.deepEqual(result.map((block) => block.type), ["text", "image", "text", "text"]);
+  assert.deepEqual(asked, [[3, 2]]);
+  assert.deepEqual(result.map((block) => block.type), ["text", "image", "text", "text", "image", "text"]);
   assert.equal(result[0].text, "슬라이드 3 (이미지 1000x500px):");
   assert.match(result[2].text!, /<slide_text page="3">\n제목\n<\/slide_text>[\s\S]*질문 2: PIN \(500, 125\)px$/);
-  assert.equal(result[3].text, "슬라이드 2는 PDF에 없는 이미지 슬라이드라 볼 수 없다.");
+  assert.equal(result[3].text, "슬라이드 2 (이미지 800x600px):");
+  assert.equal(result[5].text, "이 슬라이드에는 위치가 있는 PIN이 없다.");
   assert.match(String(await viewSlides(material, { ...body, slides: body.slides.slice(0, 2) }, render, { pages: [1] })), /바뀌어/);
   await rm(dir, { recursive: true });
 });
@@ -65,4 +66,18 @@ test("slidesMentioned attaches slides the instructor names, not question numbers
   assert.deepEqual(slidesMentioned("이 슬라이드에서 PIN이 어디 찍혔어?", 5, 15), [5]);
   assert.deepEqual(slidesMentioned("3번 질문은 무슨 뜻이야? 15%는?", 5, 15), []);
   assert.deepEqual(slidesMentioned("20페이지랑 1, 2, 3, 4번째 장", null, 15), [4]);
+});
+
+test("limiter never runs more than n tasks at once, keeps results in order, and a failure frees its slot", async () => {
+  const slot = limiter(2);
+  let running = 0, peak = 0;
+  const results = await Promise.allSettled([1, 2, 3, 4, 5].map((n) => slot(async () => {
+    running++; peak = Math.max(peak, running);
+    await new Promise((resolve) => setTimeout(resolve, 5));
+    running--;
+    if (n === 2) throw new Error("boom");
+    return n;
+  })));
+  assert.equal(peak, 2);
+  assert.deepEqual(results.map((r) => r.status === "fulfilled" ? r.value : "x"), [1, "x", 3, 4, 5]);
 });

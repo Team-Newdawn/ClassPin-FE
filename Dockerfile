@@ -50,6 +50,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 ENV NODE_ENV=production \
     NEXT_TELEMETRY_DISABLED=1 \
+    UV_THREADPOOL_SIZE=16 \
     PORT=3000 \
     HOSTNAME=0.0.0.0 \
     HOME=/tmp

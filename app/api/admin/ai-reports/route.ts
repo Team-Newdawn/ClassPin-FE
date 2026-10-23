@@ -1,14 +1,16 @@
-import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { after } from "next/server";
-import { boundedJson, insightOwner, readOwnedInsightSource, renderSlidePages, insightStorage, insightResponse, insightFailure, reportView, InsightRequestError } from "../../../_service/insight-request.ts";
+import { STALE_RUN_MS, runningAnalyses, oneRenderAtATime, boundedJson, insightOwner, readOwnedInsightSource, renderMaterialSlides, insightStorage, insightResponse, insightFailure, reportView, InsightRequestError } from "../../../_service/insight-request.ts";
 import { analyzeInsight } from "../../../_service/insight-claude.ts";
 
 export const runtime = "nodejs";
 export const maxDuration = 300;
 const uuid = /^[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i;
-const SOURCE_BYTES = 200 * 1024 ** 2;
+// ponytail: one flat quota until billing plans exist; two simultaneous starts can both pass the count (3 at most).
+// `next dev` (local and dev:remote) has no quota so analysis changes can be retried freely.
+const DAILY_ANALYSES = process.env.NODE_ENV === "development" ? Infinity : 2, KST_MS = 9 * 3_600_000, DAY_MS = 86_400_000;
 
 export async function GET(request: Request) {
   try {
@@ -29,27 +31,31 @@ export async function POST(request: Request) {
     if (!materialId) throw new InsightRequestError("INVALID_REQUEST", 400);
     const db = insightStorage();
     const running = await db.from("ai_insight_reports").select("id,material_id,status,error,created_at").eq("owner_id", ownerId).eq("material_id", materialId)
-      .eq("status", "running").gte("created_at", new Date(Date.now() - 10 * 60_000).toISOString()).limit(1).maybeSingle();
+      .eq("status", "running").gte("created_at", new Date(Date.now() - STALE_RUN_MS).toISOString()).limit(1).maybeSingle();
     if (running.data) return insightResponse(reportView(running.data), 202);
+    // Today's runs in Korean time; failed and interrupted runs are not the instructor's fault, so they don't count.
+    const today = new Date(Math.floor((Date.now() + KST_MS) / DAY_MS) * DAY_MS - KST_MS).toISOString();
+    const used = await db.from("ai_insight_reports").select("id", { count: "exact", head: true }).eq("owner_id", ownerId).gte("created_at", today)
+      .or(`status.in.(ready,confirmed),and(status.eq.running,created_at.gte."${new Date(Date.now() - STALE_RUN_MS).toISOString()}")`);
+    if (used.error) throw new InsightRequestError("REPORT_STORAGE_UNAVAILABLE", 503);
+    if ((used.count ?? 0) >= DAILY_ANALYSES) throw new InsightRequestError("DAILY_LIMIT", 429);
     const source = await readOwnedInsightSource(authorization, [materialId], request.signal);
     const material = source.materials[0];
     if (material.lectureStatus !== "ended") throw new InsightRequestError("LECTURE_NOT_ENDED", 409);
     const inserted = await db.from("ai_insight_reports").insert({ owner_id: ownerId, material_id: materialId }).select("id,material_id,status,error,created_at").single();
     if (inserted.error || !inserted.data) throw new InsightRequestError("REPORT_STORAGE_UNAVAILABLE", 503);
+    // A stop request aborts the Claude calls; finish() only writes while the row is still `running`, so a stopped run never turns ready.
+    const stop = new AbortController();
+    runningAnalyses.set(inserted.data.id, stop);
     after(async () => {
       const finish = (values: Record<string, unknown>) => db.from("ai_insight_reports").update(values).eq("id", inserted.data.id).eq("status", "running");
       try {
-        const file = await db.storage.from("course-materials").download(material.sourcePath);
-        if (file.error || !file.data) throw new Error("SOURCE_DOWNLOAD_FAILED");
-        if (file.data.size > SOURCE_BYTES) throw new Error("SOURCE_TOO_LARGE");
         const work = await mkdtemp(path.join(tmpdir(), "insight-"));
         try {
-          const pdf = path.join(work, "source.pdf");
-          await writeFile(pdf, new Uint8Array(await file.data.arrayBuffer()));
-          const pages = await renderSlidePages(pdf, work);
-          const body = await analyzeInsight(source, material, pages, source.purposes.get(material.folderId ?? "") ?? "", AbortSignal.timeout(280_000));
+          const pages = await oneRenderAtATime(() => { stop.signal.throwIfAborted(); return renderMaterialSlides(material, work); });
+          const body = await analyzeInsight(source, material, pages, source.purposes.get(material.folderId ?? "") ?? "", AbortSignal.any([stop.signal, AbortSignal.timeout(280_000)]));
           await finish({ status: "ready", body });
-        } finally { await rm(work, { recursive: true, force: true }); }
+        } finally { runningAnalyses.delete(inserted.data.id); await rm(work, { recursive: true, force: true }); }
       } catch (error) {
         // Only stable codes are stored; provider messages may echo prompt content.
         const code = error instanceof Error && /^[A-Z_]+$/.test(error.message) ? error.message : "ANALYSIS_FAILED";

@@ -2,7 +2,7 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { boundedJson, insightOwner, insightStorage, insightResponse, insightFailure, reportView, readOwnedInsightSource, renderMaterialSlides, runningAnalyses, InsightRequestError } from "../../../../_service/insight-request.ts";
-import { chatInsight, viewSlides } from "../../../../_service/insight-claude.ts";
+import { chatInsight, insightAi, viewSlides } from "../../../../_service/insight-ai.ts";
 import type { InsightMessage, InsightReportBody } from "../../../../_model/insight-report.ts";
 
 export const runtime = "nodejs";
@@ -51,7 +51,8 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
       const message = typeof body.message === "string" ? body.message.trim() : "";
       if (!message || message.length > 2000) throw new InsightRequestError("INVALID_REQUEST", 400);
       if (!["ready", "confirmed"].includes(row.status)) throw new InsightRequestError("REPORT_NOT_READY", 409);
-      if (!process.env.CLAUDE_API_KEY) throw new InsightRequestError("ANALYSIS_NOT_CONFIGURED", 503);
+      const ai = insightAi();
+      if (!ai) throw new InsightRequestError("ANALYSIS_NOT_CONFIGURED", 503);
       const history = (row.messages as InsightMessage[]) ?? [];
       // ponytail: flat 5 questions per report until billing plans exist; two tabs sending at once can each pass this check. `next dev` has no limit.
       if (process.env.NODE_ENV !== "development" && history.filter((item) => item.role === "user").length >= 5) throw new InsightRequestError("CHAT_LIMIT", 429);
@@ -66,7 +67,7 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
           return await viewSlides(owned, report, (pages) => renderMaterialSlides(owned, work, pages), input);
         } finally { await rm(work, { recursive: true, force: true }); }
       };
-      const answer = chatInsight(report, history.filter((item) => !item.cleared), message, slide, view, signal);
+      const answer = chatInsight(ai, report, history.filter((item) => !item.cleared), message, slide, view, signal);
       const encoder = new TextEncoder();
       // Text deltas stream as plain text; the turn is saved only once the full answer arrives, otherwise the stream errors.
       return new Response(new ReadableStream({

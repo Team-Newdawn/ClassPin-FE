@@ -39,12 +39,10 @@ for (const [name, value] of Object.entries(values)) {
 }
 if (values.REST_API_URL !== undefined) {
   const api = new URL(values.REST_API_URL);
+  // Loopback inside the container is the container itself; plain HTTP may only reach the BE over the `ohpin` docker network.
   if (api.pathname !== '/' || api.search || api.hash || api.username || api.password
-    || (api.protocol !== 'https:' && !(api.protocol === 'http:' && ['localhost', '127.0.0.1', '[::1]'].includes(api.hostname)))) {
-    fail('REST_API_URL must be an HTTPS origin or a local HTTP origin, without /api');
-  }
-  if (api.protocol === 'http:' && ['localhost', '127.0.0.1', '[::1]'].includes(api.hostname)) {
-    fail('REST_API_URL cannot use a local backend in production');
+    || (api.protocol !== 'https:' && !(api.protocol === 'http:' && api.hostname === 'ohpin-be'))) {
+    fail('REST_API_URL must be an HTTPS origin or http://ohpin-be:<port>, without /api');
   }
 }
 for (const name of ['RENDER_WORKERS', 'UPLOAD_CONCURRENCY', 'SLIDE_MAX_EDGE']) {

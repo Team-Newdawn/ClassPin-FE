@@ -3,7 +3,8 @@ import assert from "node:assert/strict";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { pickCategory, chatContext, viewSlides, slideImageEdge, readableText, slidesMentioned, limiter } from "./insight-claude.ts";
+import { pickCategory, chatContext, viewSlides, readableText, slidesMentioned, limiter, analyzeInsight, chatInsight, type InsightAi } from "./insight-ai.ts";
+import { slideImageEdge } from "./insight-providers/claude.ts";
 
 test("slideImageEdge keeps every page within Claude's 1568px / 1568-token image budget", () => {
   const tokens = (w: number, h: number) => Math.ceil(w / 28) * Math.ceil(h / 28);
@@ -80,4 +81,46 @@ test("limiter never runs more than n tasks at once, keeps results in order, and 
   })));
   assert.equal(peak, 2);
   assert.deepEqual(results.map((r) => r.status === "fulfilled" ? r.value : "x"), [1, "x", 3, 4, 5]);
+});
+
+test("analysis and chat drive any provider through the adapter contract: one failed chunk only empties its slides, chat gets attachments and the tool", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "insight-ai-"));
+  const images = await Promise.all(Array.from({ length: 21 }, async (_, i) => {
+    const file = join(dir, `page-${i + 1}.jpg`);
+    await writeFile(file, "jpeg");
+    return { page: i + 1, width: 100, height: 50, file, text: "" };
+  }));
+  const slides = images.map((_, i) => ({ id: `s${i + 1}`, pageIndex: i, sourcePageIndex: i }));
+  const questions = [{ id: "q1", slideId: "s21", text: "표 질문", answers: [], reactions: 0, status: "unanswered", anchor: { kind: "point", x: 0.5, y: 0.5 } }];
+  const material = { slides, questions } as unknown as Parameters<typeof analyzeInsight>[2];
+  const metrics = (questions: number) => ({ questions, positioned: questions, unanswered: questions, answered: 0, resolved: 0, reactions: 0, answers: 0 });
+  const source = { evidence: slides.map((slide) => ({ slideId: slide.id, metrics: metrics(slide.id === "s21" ? 1 : 0) })) } as unknown as Parameters<typeof analyzeInsight>[1];
+  const seen: { tool?: string; last?: unknown; toolResult?: unknown } = {};
+  const fake: InsightAi = {
+    name: "fake", model: () => "fake-1", configured: () => true, imageEdge: () => 100,
+    async json({ schema, content, onUsage }) {
+      onUsage({ input: 1, cacheRead: 0, cacheWrite: 0, output: 1, overTier: false });
+      if (!JSON.stringify(schema).includes("category")) return { overall: { summary: "요약", hotspots: [], suggestions: [] }, groups: [{ title: "표", summary: "", questions: [1] }] };
+      if (content.filter((part) => part.type === "image").length === 20) throw new Error("AI_TRUNCATED");
+      assert.match((content.at(-1) as { text: string }).text, /PIN \(50, 25\)px: 표 질문/);
+      return { category: "강의", slides: [{ page: 21, topic: "표", content: "", questionSummary: "표 질문 요약", suggestion: "" }] };
+    },
+    async* chat({ messages, tool, runTool }) {
+      seen.tool = tool.name; seen.last = messages.at(-1); seen.toolResult = await runTool({ pages: [21] });
+      yield "답";
+    },
+  };
+  const log = console.info;
+  console.info = () => {};
+  try {
+    const body = await analyzeInsight(fake, source, material, images, "", undefined);
+    assert.deepEqual([body.provider, body.model, body.failedPages?.length, body.slides[20].questionSummary, body.groups[0].questionIds], ["fake", "fake-1", 20, "표 질문 요약", ["q1"]]);
+    const view = async (input: unknown) => viewSlides(material, body, async (pages) => images.filter((image) => pages.includes(image.page)), input);
+    let answer = "";
+    for await (const delta of chatInsight(fake, body, [], "21번 슬라이드 봐줘", null, view)) answer += delta;
+    assert.equal(answer, "답");
+    assert.equal(seen.tool, "view_slides");
+    assert.deepEqual((seen.last as { content: { type: string }[] }).content.map((part) => part.type), ["text", "image", "text", "text"]);
+    assert.equal((seen.toolResult as { type: string }[])[1].type, "image");
+  } finally { console.info = log; await rm(dir, { recursive: true }); }
 });

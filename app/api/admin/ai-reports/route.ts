@@ -3,7 +3,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { after } from "next/server";
 import { STALE_RUN_MS, runningAnalyses, oneRenderAtATime, boundedJson, insightOwner, readOwnedInsightSource, renderMaterialSlides, insightStorage, insightResponse, insightFailure, reportView, InsightRequestError } from "../../../_service/insight-request.ts";
-import { analyzeInsight } from "../../../_service/insight-claude.ts";
+import { analyzeInsight, insightAi } from "../../../_service/insight-ai.ts";
 
 export const runtime = "nodejs";
 export const maxDuration = 300;
@@ -25,7 +25,8 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   try {
     const { ownerId, authorization } = await insightOwner(request);
-    if (!process.env.CLAUDE_API_KEY) throw new InsightRequestError("ANALYSIS_NOT_CONFIGURED", 503);
+    const ai = insightAi();
+    if (!ai) throw new InsightRequestError("ANALYSIS_NOT_CONFIGURED", 503);
     const input = await boundedJson(request.body, 4096) as { materialId?: unknown };
     const materialId = typeof input?.materialId === "string" && uuid.test(input.materialId) ? input.materialId.toLowerCase() : null;
     if (!materialId) throw new InsightRequestError("INVALID_REQUEST", 400);
@@ -53,7 +54,7 @@ export async function POST(request: Request) {
         const work = await mkdtemp(path.join(tmpdir(), "insight-"));
         try {
           const pages = await oneRenderAtATime(() => { stop.signal.throwIfAborted(); return renderMaterialSlides(material, work); });
-          const body = await analyzeInsight(source, material, pages, source.purposes.get(material.folderId ?? "") ?? "", AbortSignal.any([stop.signal, AbortSignal.timeout(280_000)]));
+          const body = await analyzeInsight(ai, source, material, pages, source.purposes.get(material.folderId ?? "") ?? "", AbortSignal.any([stop.signal, AbortSignal.timeout(280_000)]));
           await finish({ status: "ready", body });
         } finally { runningAnalyses.delete(inserted.data.id); await rm(work, { recursive: true, force: true }); }
       } catch (error) {

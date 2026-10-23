@@ -66,11 +66,15 @@ trap 'exit 143' TERM HUP
 # Load and validate before stopping any live container. No global image/system prune.
 gzip -dc "$release_dir/image.tar.gz" | docker load >/dev/null
 docker image inspect "$image" >/dev/null
+# Shared with the BE compose project so REST_API_URL can be http://ohpin-be:8080. Create-then-inspect tolerates a concurrent BE deploy.
+docker network create ohpin >/dev/null 2>&1 || docker network inspect ohpin >/dev/null
 remove_if_exists "$candidate"
 health_cmd="node -e \"fetch('http://127.0.0.1:3000/login',{signal:AbortSignal.timeout(3000)}).then(r=>process.exit(r.status===200?0:1)).catch(()=>process.exit(1))\""
 run_options=(
   --env-file "$release_dir/runtime.env"
   --env PORT=3000 --env HOSTNAME=0.0.0.0 --env NODE_ENV=production
+  # The cap also covers insight pdftoppm/sharp children. ponytail: unmeasured guess; size from docker stats during an insight run.
+  --network ohpin --memory 1g --env NODE_OPTIONS=--max-old-space-size=512
   --init --log-opt max-size=10m --log-opt max-file=3
   --health-cmd "$health_cmd" --health-interval 5s --health-timeout 5s
   --health-start-period 10s --health-retries 3
@@ -79,6 +83,9 @@ run_options=(
 docker run -d --name "$candidate" "${run_options[@]}" \
   -p 127.0.0.1::3000 "$image" >/dev/null
 wait_healthy "$candidate"
+# /login never touches the BE. With REST_API_URL set, prove the BE auth filter answers (401 without a token) before replacing the live container.
+docker exec "$candidate" node -e "const u=process.env.REST_API_URL;if(!u)process.exit(0);fetch(u+'/api/',{signal:AbortSignal.timeout(5000)}).then(r=>process.exit(r.status===401?0:1),()=>process.exit(1))" \
+  || { echo 'Candidate cannot reach the backend at REST_API_URL (is ohpin-be on the ohpin network?)' >&2; exit 1; }
 remove_if_exists "$candidate"
 
 # Keep exactly one previous container (with its original image and environment).

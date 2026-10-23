@@ -1,6 +1,8 @@
 export type InsightMetrics = { questions: number; positioned: number; unanswered: number; answered: number; resolved: number; reactions: number; answers: number };
 export type InsightReportBody = {
   schemaVersion: 2;
+  /** AI provider (`claude` | `openai` | `gemini`); absent on reports made before it was recorded, which were all Claude. */
+  provider?: string;
   model: string;
   /** AI-judged material kind (e.g. "투자 설명회"); absent on reports made before it existed. */
   category?: string;

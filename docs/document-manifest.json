@@ -201,7 +201,7 @@
       "id": "insights-ai-foundation",
       "path": "docs/insights-ai-foundation.md",
       "status": "approved",
-      "purpose": "Insight decisions and phased implementation; owner-only source readiness inspection and Groq model connection.",
+      "purpose": "Insight decisions and phased implementation; Claude analysis pipeline and the Claude/OpenAI/Gemini provider adapters (section 11).",
       "depends_on": [
         "ai-report-product",
         "ai-report-evidence",
@@ -215,9 +215,9 @@
         "insight-groq-connection"
       ],
       "approval": {
-        "approved_at": "2026-10-21T00:00:00+09:00",
-        "approved_by": "minchanpark (implementation decisions delegated; Groq Qwen and GPT-OSS setup approved in session)",
-        "content_sha256": "dabab3628dc6f0ce780bc15a5e472d66c1d7820dbe17152bae44a46a29c1d00d"
+        "approved_at": "2026-10-23T00:00:00+09:00",
+        "approved_by": "minchanpark (section 11 multi-provider Claude/OpenAI/Gemini adapters approved in session, 2026-10-23; production default stays claude until E1)",
+        "content_sha256": "0729d5ba730e34afb44556719651b5a7b185eaae197ba12fed90dd72a4a48683"
       }
     },
     {

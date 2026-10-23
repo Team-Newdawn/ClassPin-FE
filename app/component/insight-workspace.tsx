@@ -67,6 +67,8 @@ export function InsightWorkspace() {
     let stopped = false, timer: ReturnType<typeof setTimeout>;
     const controller = new AbortController();
     const poll = async () => {
+      // A hidden tab keeps its turn but skips the request; it catches up within 3 s of becoming visible.
+      if (document.visibilityState === "hidden") { timer = setTimeout(poll, 3000); return; }
       try {
         const value = await (await insightFetch(`/api/admin/ai-reports/${found.id}`, { signal: controller.signal })).json();
         if (stopped) return;

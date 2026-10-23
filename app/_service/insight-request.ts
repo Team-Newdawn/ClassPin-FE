@@ -8,7 +8,8 @@ import sharp from "sharp";
 import { cachedFile } from "../_infrastructure/pdf-cache.ts";
 import { resolveDocumentBinary } from "../_infrastructure/server/document-binaries.ts";
 import { renderPdfPages } from "../_infrastructure/server/pdf-render.ts";
-import { MAX_PAGES, limiter, readableText, slideImageEdge, type SlidePage } from "./insight-claude.ts";
+import { restOrigin } from "../_infrastructure/server/rest-origin.ts";
+import { MAX_PAGES, imageEdge, limiter, readableText, type SlidePage } from "./insight-ai.ts";
 import { inspectInsightSource } from "./insight-source.ts";
 import { classFolderPurposeLine, normalizeClassFolderPurpose, normalizeClassFolderPurposeLabel } from "../_model/types.ts";
 import type { InsightMessage, InsightReportBody, InsightReportView } from "../_model/insight-report.ts";
@@ -61,12 +62,9 @@ export async function boundedJson(body: ReadableStream<Uint8Array> | null, limit
 }
 
 export async function readOwnedInsightSource(authorization: string, selection: readonly string[], signal: AbortSignal) {
-  const origin = new URL(process.env.REST_API_URL || "https://ohpinbe.newdawn.co.kr");
-  if (origin.username || origin.password || origin.pathname !== "/" || origin.search || origin.hash ||
-    (origin.protocol !== "https:" && !(origin.protocol === "http:" && ["localhost", "127.0.0.1", "[::1]"].includes(origin.hostname)))) {
-    throw new InsightRequestError("SERVICE_UNAVAILABLE", 503);
-  }
-  const get = (path: string) => fetch(`${origin.origin}/api/instructor/${path}`, { headers: { Authorization: authorization },
+  const origin = restOrigin();
+  if (!origin) throw new InsightRequestError("SERVICE_UNAVAILABLE", 503);
+  const get = (path: string) => fetch(`${origin}/api/instructor/${path}`, { headers: { Authorization: authorization },
     cache: "no-store", redirect: "error", signal: AbortSignal.any([signal, AbortSignal.timeout(20_000)]) });
   // Folder purpose only steers the prompt, so a failed folder read analyzes without it.
   const [response, folders] = await Promise.all([get("courses"),
@@ -122,7 +120,7 @@ export async function renderSlidePages(file: string, dir: string, only?: readonl
     else if (item) [item.width, item.height] = value.split(" x ").map(parseFloat);
   }
   const shapes = sizes.map(({ width, height, rot }) => rot % 180 ? { width: height, height: width } : { width, height });
-  const edge = slideImageEdge(shapes);
+  const edge = imageEdge(shapes);
   const pages = only ? [...new Set(only)].filter((page) => page >= 1 && page <= total) : shapes.map((_, index) => index + 1);
   const args = ["-jpeg", "-scale-to", String(edge), "-jpegopt", "quality=90"], textOf = (from: number, to: number) =>
     run(poppler("pdftotext"), ["-layout", "-f", String(from), "-l", String(to), file, "-"], { timeout: 120_000, maxBuffer: 256 * 1024 ** 2 }).then(({ stdout }) => stdout.split("\f"));
@@ -174,7 +172,7 @@ export async function renderMaterialSlides(material: Material, dir: string, only
   const images = await Promise.all(fromImage.map((slide) => slot(async (): Promise<SlidePage> => {
     const file = await db.storage.from("lecture-slides").download(slide.imagePath!);
     if (file.error || !file.data) throw new Error("SOURCE_DOWNLOAD_FAILED");
-    const image = sharp(Buffer.from(await file.data.arrayBuffer())), { width = 1, height = 1 } = await image.metadata(), edge = slideImageEdge([{ width, height }]);
+    const image = sharp(Buffer.from(await file.data.arrayBuffer())), { width = 1, height = 1 } = await image.metadata(), edge = imageEdge([{ width, height }]);
     const out = path.join(dir, `slide-${slide.pageIndex + 1}.jpg`);
     const saved = await image.resize(edge, edge, { fit: "inside", withoutEnlargement: true }).jpeg({ quality: 90 }).toFile(out);
     return { page: slide.pageIndex + 1, width: saved.width, height: saved.height, file: out, text: "" };

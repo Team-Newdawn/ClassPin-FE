@@ -7,6 +7,7 @@ import { useSearchParams } from "next/navigation";
 import { useSessions } from "../_controller/session-store";
 import { getSupabaseClient } from "../_infrastructure/supabase/client";
 import { SlideCanvas } from "./slide-canvas";
+import { InsightExportDialog } from "./insight-export-dialog";
 import type { InsightReportView } from "../_model/insight-report";
 import styles from "./insight-workspace.module.css";
 
@@ -14,6 +15,7 @@ const tabs = ["전체 요약", "슬라이드별", "주제별 분석", "AI 대화
 /** AI answers may emphasize with **bold**; render only that, everything else stays plain text (an unclosed ** mid-stream shows as typed). */
 const emphasized = (text: string) => text.split(/\*\*([\s\S]+?)\*\*/g).map((part, index) => index % 2 ? <strong key={index}>{part}</strong> : part);
 const messages: Record<string, string> = {
+  EXPORT_PREVIEW_FAILED: "미리보기를 만들지 못했습니다. 잠시 후 다시 시도해 주세요.",
   ANALYSIS_NOT_CONFIGURED: "분석 서버에 Claude API 키가 설정되지 않았습니다.", REPORT_STORAGE_NOT_CONFIGURED: "분석 저장소 설정이 필요합니다.",
   LECTURE_NOT_ENDED: "강의를 종료한 뒤 분석할 수 있습니다.", SOURCE_NOT_FOUND: "자료가 삭제되었거나 접근 권한이 없습니다.",
   SOURCE_TOO_LARGE: "자료가 너무 커서 분석할 수 없습니다(600쪽, 200MB 이하).", ANALYSIS_INTERRUPTED: "분석이 중간에 멈췄습니다(서버 재시작 등). 다시 분석해 주세요.", ANALYSIS_CANCELLED: "분석을 중지했습니다.", SOURCE_DOWNLOAD_FAILED: "원본 자료를 읽지 못했습니다.",
@@ -44,6 +46,7 @@ export function InsightWorkspace() {
   const [reports, setReports] = useState<InsightReportView[]>([]), [report, setReport] = useState<InsightReportView | null>(null);
   const [tab, setTab] = useState(0), [slideIndex, setSlideIndex] = useState(0), [selectedPin, setSelectedPin] = useState<string | null>(null);
   const [relatedPins, setRelatedPins] = useState<string[] | null>(null);
+  const [exportReportId, setExportReportId] = useState<string | null>(null);
   const [error, setError] = useState(""), [busy, setBusy] = useState(false), [draft, setDraft] = useState("");
   const [pending, setPending] = useState<{ question: string; answer: string } | null>(null), chatEnd = useRef<HTMLDivElement>(null), composer = useRef<HTMLTextAreaElement>(null);
   const session = sessions.find((session) => session.materialId === material);
@@ -83,7 +86,7 @@ export function InsightWorkspace() {
   }, [material, reports, reportId]);
   useEffect(() => {
     const key = (event: KeyboardEvent) => {
-      if (!(event.target instanceof Element) || event.target.closest("input,textarea,select,[contenteditable=true],[role=tab]")) return;
+      if (!(event.target instanceof Element) || event.target.closest("input,textarea,select,[contenteditable=true],[role=tab],dialog")) return;
       if (event.key === "ArrowLeft" || event.key === "ArrowRight") {
         event.preventDefault(); setSelectedPin(null); setRelatedPins(null);
         setSlideIndex((index) => Math.max(0, Math.min(slides.length - 1, index + (event.key === "ArrowLeft" ? -1 : 1))));
@@ -134,15 +137,7 @@ export function InsightWorkspace() {
       <div className={styles.headerActions}>
         {report?.status === "ready" && <button className="btn primary" disabled={busy} onClick={() => void act(() => post({ action: "confirm" }))}>리포트 확정</button>}
         {body && <button className="btn secondary" disabled={busy} onClick={() => void start()}>다시 분석</button>}
-        <select aria-label="리포트 내보내기" value="" disabled={report?.status !== "confirmed" || busy} onChange={(event) => {
-          const format = event.target.value;
-          if (!format || !report) return;
-          void act(async () => {
-            const response = await insightFetch(`/api/admin/ai-reports/${report.id}/export?format=${format}`);
-            const url = URL.createObjectURL(await response.blob()), link = document.createElement("a");
-            link.href = url; link.download = `insight.${format}`; link.click(); setTimeout(() => URL.revokeObjectURL(url), 1000);
-          });
-        }}><option value="">내보내기</option>{["pdf", "pptx", "docx", "md"].map((format) => <option key={format}>{format}</option>)}</select>
+        <button type="button" className="btn secondary" disabled={report?.status !== "confirmed" || busy} onClick={() => setExportReportId(report!.id)}>내보내기</button>
       </div>
     </header>
     {error && <div role="alert" className={styles.error}>{error}</div>}
@@ -227,5 +222,7 @@ export function InsightWorkspace() {
         </div>
       </section>
     </div>
+    {report && report.id === exportReportId && report.status === "confirmed" && body && <InsightExportDialog key={report.id} reportId={report.id}
+      title={session?.title ?? "인사이트 리포트"} slideCount={body.slides.length} questionCount={body.questions.length} request={insightFetch} onClose={() => setExportReportId(null)} />}
   </main>;
 }

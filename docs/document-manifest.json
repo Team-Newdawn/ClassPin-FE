@@ -216,8 +216,8 @@
       ],
       "approval": {
         "approved_at": "2026-10-24T00:00:00+09:00",
-        "approved_by": "minchanpark (section 11 multi-provider Claude/OpenAI/Gemini adapters approved in session, 2026-10-23; production default stays claude until E1); section 12 insight titles and collapsible topic analysis requested by minchanpark in session, 2026-10-24; section 13 slide insights approved without unanswered follow-up by minchanpark in session, 2026-10-24; section 14 fixed slide and independently scrolling PIN list requested by minchanpark in session, 2026-10-24; section 15 duplicate slide key fix requested by minchanpark in session, 2026-10-24",
-        "content_sha256": "645cfa99090134f13aa434dffd66545ccaf3d343c1720095b697a95531d2cd11"
+        "approved_by": "minchanpark (section 11 multi-provider Claude/OpenAI/Gemini adapters approved in session, 2026-10-23; production default stays claude until E1); section 12 insight titles and collapsible topic analysis requested by minchanpark in session, 2026-10-24; section 13 slide insights approved without unanswered follow-up by minchanpark in session, 2026-10-24; section 14 fixed slide and independently scrolling PIN list requested by minchanpark in session, 2026-10-24; section 15 duplicate slide key fix requested by minchanpark in session, 2026-10-24; section 16 confirmed export settings and format-specific previews requested by minchanpark in session, 2026-10-24; section 16 Hangul preview font fix requested by minchanpark in session, 2026-10-24",
+        "content_sha256": "b5e1582e35ecd2969d2f42f52a95cc085c20ef2bc9713f289d561f0c5189e7ec"
       }
     },
     {

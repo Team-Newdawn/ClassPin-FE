@@ -83,6 +83,40 @@ test("limiter never runs more than n tasks at once, keeps results in order, and 
   assert.deepEqual(results.map((r) => r.status === "fulfilled" ? r.value : "x"), [1, "x", 3, 4, 5]);
 });
 
+test("slide issues keep same-slide evidence, reject invalid references, and never invent reactions for slides without questions", async () => {
+  const slides = [1, 2, 3].map((page) => ({ id: `s${page}`, pageIndex: page - 1 }));
+  const questions = [1, 2, 3].map((n) => ({ id: `q${n}`, slideId: n < 3 ? "s1" : "s2", text: `질문 본문 ${n}`, answers: [], reactions: 0, status: "unanswered", anchor: null }));
+  const material = { slides, questions } as unknown as Parameters<typeof analyzeInsight>[2];
+  const source = { evidence: slides.map((slide) => ({ slideId: slide.id, metrics: { questions: questions.filter((q) => q.slideId === slide.id).length } })) } as unknown as Parameters<typeof analyzeInsight>[1];
+  const issue = (title: string, refs: unknown) => ({ title, summary: "표의 비교 기준을 묻습니다.", questions: refs });
+  const fake: InsightAi = {
+    name: "fake", model: () => "fake", configured: () => true, imageEdge: () => 100,
+    async json({ schema, content }) {
+      if (!JSON.stringify(schema).includes("category")) return { overall: { hotspots: [{ page: 1, reason: "비교 기준" }, { page: 1, reason: "추가 설명" }] }, groups: [] };
+      const prompt = (content.at(-1) as { text: string }).text;
+      assert.match(prompt, /질문 1 - 질문 본문 1/);
+      assert.match(prompt, /질문 3 - 질문 본문 3/);
+      assert.match(prompt, /미답변·답변 유무를 문제·우선순위·추가 확인 과제의 근거로 쓰지 않는다/);
+      return { slides: [
+        { page: 1, questionSummary: "핵심과 청중 반응", suggestion: "비교표에 기준을 추가합니다.", issues: [
+          issue("비교 기준", [1, 1, 2]), issue("다른 슬라이드", [1, 3]), issue("없는 질문", [9]),
+          issue("문자열 번호", ["1"]), issue("빈 참조", []), issue("잘못된 참조", null), issue("", [1]), null,
+        ] },
+        { page: 2, issues: [1, 2, 3, 4].map((n) => issue(`쟁점 ${n}`, [3])) },
+        { page: 3, content: "자료 내용", questionSummary: "근거 없는 반응", suggestion: "근거 없는 제안", issues: [issue("근거 없는 쟁점", [1])] },
+      ] };
+    },
+    async* chat() { yield ""; },
+  };
+  const body = await analyzeInsight(fake, source, material, [], "");
+  assert.deepEqual(body.slides[0].issues, [{ title: "비교 기준", summary: "표의 비교 기준을 묻습니다.", questionIds: ["q1", "q2"] }]);
+  assert.equal(body.slides[0].questionSummary, "핵심과 청중 반응");
+  assert.deepEqual(body.overall.hotspots, [{ page: 1, reason: "비교 기준\n추가 설명" }]);
+  assert.equal(body.slides[1].issues?.length, 3);
+  assert.deepEqual([body.slides[2].content, body.slides[2].questionSummary, body.slides[2].suggestion, body.slides[2].issues], ["자료 내용", "", "", []]);
+  assert.match(chatContext(body), /쟁점 비교 기준: 표의 비교 기준을 묻습니다. \(질문 1, 2\)/);
+});
+
 test("analysis and chat drive any provider through the adapter contract: one failed chunk only empties its slides, chat gets attachments and the tool", async () => {
   const dir = await mkdtemp(join(tmpdir(), "insight-ai-"));
   const images = await Promise.all(Array.from({ length: 21 }, async (_, i) => {

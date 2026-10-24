@@ -4,7 +4,7 @@ import { PDFDocument, rgb, type PDFFont, type PDFPage } from "pdf-lib";
 import fontkit from "@pdf-lib/fontkit";
 import { BorderStyle, Document, ImageRun, Packer, Paragraph, ShadingType, Table, TableCell, TableLayoutType, TableRow, TextRun, WidthType } from "docx";
 import PptxGenJS from "pptxgenjs";
-import type { InsightReportBody } from "../_model/insight-report.ts";
+import { normalizeInsightReport, type InsightReportBody } from "../_model/insight-report.ts";
 
 /** Rendered slide JPEG (from renderMaterialSlides) keyed by 1-based slide number. */
 type SlideImage = { page: number; width: number; height: number; file: string };
@@ -48,6 +48,7 @@ export function insightExportSections(body: InsightReportBody) {
 }
 
 export async function exportInsight(body: InsightReportBody, format: string, context: InsightExportContext) {
+  body = normalizeInsightReport(body);
   if (format === "md") return { bytes: Buffer.from(`# ${context.title} 인사이트 리포트\n\n` + insightExportSections(body).map((section) => `## ${section.title}\n\n${section.lines.join("\n\n")}`).join("\n\n") +
     `\n\n${reportModel(body, context).footer}`), mime: "text/markdown; charset=utf-8" };
   const report = reportModel(body, context);

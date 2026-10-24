@@ -2,7 +2,7 @@ import { readFile } from "node:fs/promises";
 import type { inspectInsightSource } from "./insight-source.ts";
 import { redactInsightText } from "./insight-redaction.ts";
 import { claude } from "./insight-providers/claude.ts";
-import type { InsightMessage, InsightReportBody } from "../_model/insight-report.ts";
+import { normalizeInsightReport, type InsightMessage, type InsightReportBody } from "../_model/insight-report.ts";
 
 type Source = ReturnType<typeof inspectInsightSource>;
 type Material = Source["materials"][number];
@@ -83,15 +83,17 @@ export async function analyzeInsight(ai: InsightAi, source: Source, material: Ma
   const questions: Question[] = material.questions.map((q) => ({ id: q.id, page: pageOf.get(q.slideId)!, text: redactInsightText(q.text),
     answers: q.answers.map((answer) => redactInsightText(answer.body)), reactions: q.reactions, status: q.status,
     x: q.anchor?.kind === "point" || q.anchor?.kind === "box" ? q.anchor.x : null, y: q.anchor?.kind === "point" || q.anchor?.kind === "box" ? q.anchor.y : null }));
+  const numberOf = new Map(questions.map((question, index) => [question.id, index + 1]));
   const imageOf = new Map(images.map((image) => [image.page, image]));
   const chunks: { from: number; to: number }[] = [];
   for (let from = 1; from <= slides.length; from += PAGES_PER_CHUNK) chunks.push({ from, to: Math.min(slides.length, from + PAGES_PER_CHUNK - 1) });
-  type Item = { page: number; topic: string; content: string; questionSummary: string; suggestion: string };
-  const slideSchema = object({ category: text, slides: array(object({ page: { type: "integer" }, topic: text, content: text, questionSummary: text, suggestion: text })) });
+  type Item = { page: number; topic: string; content: string; questionSummary: string; suggestion: string; issues?: unknown };
+  const slideSchema = object({ category: text, slides: array(object({ page: { type: "integer" }, topic: text, content: text, questionSummary: text, suggestion: text,
+    issues: array(object({ title: text, summary: text, questions: array({ type: "integer" }) })) })) });
   const listing = (items: typeof slides) => items.map((slide) => {
     const own = questions.filter((q) => q.page === slide.page);
     const image = imageOf.get(slide.page);
-    return `슬라이드 ${slide.page}${image ? "" : " (이미지 없음)"}: ${own.length ? "\n" + own.map((q) => describeQuestion(q, image)).join("\n") : "질문 없음"}`;
+    return `슬라이드 ${slide.page}${image ? "" : " (이미지 없음)"}: ${own.length ? "\n" + own.map((q) => `질문 ${numberOf.get(q.id)} ${describeQuestion(q, image)}`).join("\n") : "질문 없음"}`;
   }).join("\n");
   // Each chunk in flight holds ~20MB of base64 images, so at most CHUNKS_IN_FLIGHT; decks up to 120 pages still go in one round.
   const chunkSlot = limiter(CHUNKS_IN_FLIGHT);
@@ -102,7 +104,7 @@ export async function analyzeInsight(ai: InsightAi, source: Source, material: Ma
       .map(async ({ slide, image }): Promise<AiPart[]> => [
         { type: "text", text: `슬라이드 ${slide.page} (이미지 ${image.width}x${image.height}px):` }, await jpeg(image.file),
         ...(image.text ? [{ type: "text" as const, text: `<slide_text page="${slide.page}">\n${image.text}\n</slide_text>` }] : [])]));
-    const prompt = `위 이미지는 슬라이드 원본이고, slide_text는 그 슬라이드에서 추출한 글자다(배치는 대략적이며 정확한 문구·숫자 확인용). 먼저 자료를 보고 이것이 어떤 자리의 자료인지(예: 대학 강의, 투자 설명회) 스스로 판단해 category에 짧은 이름으로 쓰고, 그 자리의 청중과 목적에 맞는 관점으로 아래 슬라이드마다 slides 항목을 하나씩 만들어라.${purpose ? ` ${purpose}` : ""} page는 슬라이드 번호다. topic은 슬라이드가 말하는 핵심 한 줄, questionSummary는 그 슬라이드의 질문들이 무엇을 묻는지 PIN이 가리키는 요소와 연결해 두세 문장, suggestion은 질문에 비춘 강의 개선 제안 한 문장이다. PIN 좌표는 그 슬라이드 이미지 기준 픽셀(원점 왼쪽 위)이다. 질문이 없는 슬라이드는 content에 슬라이드 내용을 두세 문장으로 단순하게 정리만 하고(평가·제안 없이), questionSummary와 suggestion은 빈 문자열. 질문이 있는 슬라이드는 content를 빈 문자열로 둔다.\n\n${listing(mine)}`;
+    const prompt = `위 이미지는 슬라이드 원본이고, slide_text는 그 슬라이드에서 추출한 글자다(배치는 대략적이며 정확한 문구·숫자 확인용). 먼저 자료를 보고 이것이 어떤 자리의 자료인지(예: 대학 강의, 투자 설명회) 스스로 판단해 category에 짧은 이름으로 쓰고, 그 자리의 청중과 목적에 맞는 관점으로 아래 슬라이드마다 slides 항목을 하나씩 만들어라.${purpose ? ` ${purpose}` : ""} page는 슬라이드 번호다. topic은 자료에서 읽히는 핵심 한 줄이다. questionSummary는 그 핵심과 실제 청중 질문의 초점을 연결한 AI 분석 두세 문장이다. 발표자의 실제 의도나 청중 전체의 이해도는 단정하지 않는다. issues는 이 슬라이드의 질문이 가리킨 주요 쟁점 최대 세 개다. 각 항목의 title은 쟁점 이름, summary는 표·그림·문구 등 구체적 요소와 질문을 연결한 설명 한두 문장, questions는 제공된 전체 자료 질문 번호 중 이 슬라이드에 속한 번호만 넣는다. 의미를 알 수 없는 질문에는 쟁점을 만들지 않고, 단일 질문을 반복 경향으로 부르지 않는다. suggestion은 어디에 무엇을 추가·수정하면 좋을지 구체적으로 제시하는 두세 문장이다. 답변 기능은 현재 숨김 상태이므로 미답변·답변 유무를 문제·우선순위·추가 확인 과제의 근거로 쓰지 않는다. PIN 좌표는 그 슬라이드 이미지 기준 픽셀(원점 왼쪽 위)이다. 질문이 없는 슬라이드는 content에 슬라이드 내용을 두세 문장으로 단순하게 정리만 하고(평가·제안 없이), questionSummary와 suggestion은 빈 문자열, issues는 빈 배열. 질문이 있는 슬라이드는 content를 빈 문자열로 둔다.\n\n${listing(mine)}`;
     return ask<{ category?: unknown; slides?: unknown }>(ai, { step: "slides", schema: slideSchema, text: prompt, slides: shown.flat(), signal })
       .then((value) => ({ category: value.category, slides: Array.isArray(value.slides) ? value.slides as Item[] : [], failed: [] as number[], error: null as unknown }),
         // One failed chunk leaves only its slides empty; the report still shows every other slide.
@@ -113,8 +115,16 @@ export async function analyzeInsight(ai: InsightAi, source: Source, material: Ma
   const category = pickCategory(parts.map((part) => part.category));
   const byPage = new Map(parts.flatMap((part) => part.slides).filter((item) => item && typeof item === "object").map((item) => [Number(item.page), item]));
   const bodySlides = slides.map((slide) => { const item = byPage.get(slide.page);
+    const issues = (slide.metrics.questions && Array.isArray(item?.issues) ? item.issues : []).flatMap((issue: unknown) => {
+      if (!issue || typeof issue !== "object") return [];
+      const value = issue as Record<string, unknown>, refs = value.questions;
+      if (!Array.isArray(refs) || !refs.length || refs.some((n) => !Number.isInteger(n) || questions[n - 1]?.page !== slide.page)) return [];
+      const title = clip(value.title, 120), summary = clip(value.summary, 600);
+      return title && summary ? [{ title, summary, questionIds: [...new Set(refs.map((n: number) => questions[n - 1].id))] }] : [];
+    }).slice(0, 3);
     // content only fills slides without questions; it stays out of the merge and chat context to keep those prompts small.
-    return { page: slide.page, topic: clip(item?.topic, 200), ...(slide.metrics.questions ? {} : { content: clip(item?.content) }), questionSummary: clip(item?.questionSummary), suggestion: clip(item?.suggestion, 300), metrics: slide.metrics }; });
+    return { page: slide.page, topic: clip(item?.topic, 200), ...(slide.metrics.questions ? {} : { content: clip(item?.content) }),
+      questionSummary: slide.metrics.questions ? clip(item?.questionSummary) : "", suggestion: slide.metrics.questions ? clip(item?.suggestion, 600) : "", issues, metrics: slide.metrics }; });
   const mergeSchema = object({ overall: object({ summary: text, hotspots: array(object({ page: { type: "integer" }, reason: text })), suggestions: array(text) }),
     groups: array(object({ title: text, summary: text, questions: array({ type: "integer" }) })) });
   const merged = await ask<{ overall?: { summary?: unknown; hotspots?: unknown; suggestions?: unknown }; groups?: unknown }>(ai, { step: "merge", schema: mergeSchema, signal,
@@ -129,22 +139,24 @@ export async function analyzeInsight(ai: InsightAi, source: Source, material: Ma
     .filter((group) => group.title && group.questionIds.length);
   const rest = questions.filter((_, i) => !used.has(i + 1)).map((q) => q.id);
   if (rest.length) groups.push({ title: "기타 질문", summary: "", questionIds: rest });
-  return { schemaVersion: 2, provider: ai.name, model: ai.model(), ...(category ? { category } : {}), ...(purpose ? { purpose } : {}), ...(failedPages.length ? { failedPages } : {}), slides: bodySlides,
+  return normalizeInsightReport({ schemaVersion: 2, provider: ai.name, model: ai.model(), ...(category ? { category } : {}), ...(purpose ? { purpose } : {}), ...(failedPages.length ? { failedPages } : {}), slides: bodySlides,
     questions: questions.map((q) => ({ id: q.id, page: q.page, text: q.text, answers: q.answers, reactions: q.reactions, status: q.status })),
     overall: { summary: clip(merged.overall?.summary, 2000),
-      hotspots: list(merged.overall?.hotspots).filter((item: Record<string, unknown>) => pages.has(Number(item?.page))).slice(0, 5)
+      hotspots: list(merged.overall?.hotspots).filter((item: Record<string, unknown>) => pages.has(Number(item?.page)))
         .map((item: Record<string, unknown>) => ({ page: Number(item.page), reason: clip(item.reason, 300) })),
       suggestions: list(merged.overall?.suggestions).map((item) => clip(item, 300)).filter(Boolean).slice(0, 3) },
-    groups };
+    groups });
 }
 
 /** Plain-text chat context: one line per item, questions by number instead of UUID, so 2,000 PINs stay under Haiku's 100K-token price tier. */
 export const chatContext = (body: InsightReportBody) => {
+  body = normalizeInsightReport(body);
   const number = new Map(body.questions.map((q, i) => [q.id, i + 1]));
   return [body.category && `자료 종류: ${body.category}`, body.purpose, `전체 요약: ${body.overall.summary}`,
     ...body.overall.hotspots.map((item) => `질문이 몰린 슬라이드 ${item.page}: ${item.reason}`),
     ...body.overall.suggestions.map((item) => `개선 제안: ${item}`),
-    ...body.slides.map((slide) => `슬라이드 ${slide.page}: ${slide.topic}${slide.questionSummary ? ` / 질문 요약: ${slide.questionSummary}` : ""}${slide.suggestion ? ` / 제안: ${slide.suggestion}` : ""}`),
+    ...body.slides.map((slide) => `슬라이드 ${slide.page}: ${slide.topic}${slide.questionSummary ? ` / 질문 요약: ${slide.questionSummary}` : ""}${slide.suggestion ? ` / 제안: ${slide.suggestion}` : ""}` +
+      (slide.issues ?? []).map((issue) => `\n  쟁점 ${issue.title}: ${issue.summary} (질문 ${issue.questionIds.map((id) => number.get(id)).filter(Boolean).join(", ")})`).join("")),
     ...body.groups.map((group) => `질문 묶음 ${group.title}: ${group.summary} (질문 ${group.questionIds.map((id) => number.get(id)).filter(Boolean).join(", ")})`),
     "질문 목록(번호. 본문 [공감 수, 상태], 표시가 없으면 공감 0·미답변):",
     ...body.slides.flatMap((slide) => { const own = body.questions.filter((q) => q.page === slide.page);

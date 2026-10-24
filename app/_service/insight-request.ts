@@ -12,7 +12,7 @@ import { restOrigin } from "../_infrastructure/server/rest-origin.ts";
 import { MAX_PAGES, imageEdge, limiter, readableText, type SlidePage } from "./insight-ai.ts";
 import { inspectInsightSource } from "./insight-source.ts";
 import { classFolderPurposeLine, normalizeClassFolderPurpose, normalizeClassFolderPurposeLabel } from "../_model/types.ts";
-import type { InsightMessage, InsightReportBody, InsightReportView } from "../_model/insight-report.ts";
+import { normalizeInsightReport, type InsightMessage, type InsightReportBody, type InsightReportView } from "../_model/insight-report.ts";
 
 export class InsightRequestError extends Error {
   status: number;
@@ -97,9 +97,10 @@ export const runningAnalyses: Map<string, AbortController> = ((globalThis as { i
 export const oneRenderAtATime: ReturnType<typeof limiter> = ((globalThis as { insightRender?: ReturnType<typeof limiter> }).insightRender ??= limiter(1));
 
 export function reportView(row: { id: string; material_id: string; status: InsightReportView["status"]; error: string | null; created_at: string; confirmed_at?: string | null; body?: unknown; messages?: unknown }): InsightReportView {
+  const body = (row.body as InsightReportBody | null) ?? null;
   const stale = row.status === "running" && Date.now() - Date.parse(row.created_at) > STALE_RUN_MS;
   return { id: row.id, materialIds: [row.material_id], status: stale ? "failed" : row.status, error: stale ? "ANALYSIS_INTERRUPTED" : row.error, createdAt: row.created_at, ...(row.confirmed_at ? { confirmedAt: row.confirmed_at } : {}),
-    body: (row.body as InsightReportBody | null) ?? null, ...(row.messages ? { messages: (row.messages as InsightMessage[]).filter((item) => !item.cleared) } : {}) };
+    body: body ? normalizeInsightReport(body) : null, ...(row.messages ? { messages: (row.messages as InsightMessage[]).filter((item) => !item.cleared) } : {}) };
 }
 
 const run = promisify(execFile);

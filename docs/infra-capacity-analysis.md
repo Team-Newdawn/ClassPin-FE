@@ -293,3 +293,22 @@ aws ec2 describe-instance-credit-specifications --instance-ids <instance-id>
 6. 되돌리기:
    - 4단계는 `ENV_FILE`에서 `REST_API_URL` 줄을 지우고 재배포하면 기본값(공개 HTTPS)으로 돌아간다.
    - 2단계는 BE 배포 스크립트의 이전 이미지 복원을 쓴다.
+
+## 8. 실측 (2026-10-23, EC2 `NewDawn_Server` i-0d2f388669fdbeca0)
+
+3장의 추정 중 일부를 실측으로 바꾼다.
+
+- **같은 박스에 다른 서비스도 있다.** OhPin(FE, BE, Prometheus·Loki·Grafana·Alloy·cAdvisor) 외에
+  `netdata`(234MiB)와 Taglow 정적 프런트 2개(`frontend-admin`, `frontend-participant`, 각 4MiB)가 함께 돈다.
+- **메모리:** 전체 1,913MiB, 사용 1,376MiB, 가용 379MiB, 스왑 없음.
+  - 컨테이너별: ohpin-fe 140MiB(상한 1GiB), ohpin-be 316MiB(상한 없음, 유휴 시), grafana 200MiB, netdata 234MiB,
+    prometheus 90MiB, loki 60MiB, alloy 45MiB, cadvisor 25MiB.
+  - 유휴 상태에서 이미 가용이 400MiB 아래라 변환 1건이면 넘친다는 3.1의 판단이 맞다.
+- **CPU:** 최근 7일 일평균 약 11%(기준 20% 아래), 5분 최대 37%. 크레딧은 `unlimited`이고 초과 과금 0. 지금 규모에서 CPU는 병목이 아니다.
+- **디스크:** gp3 30GB, 사용 18GB(60%). 3.x의 "8GB 기본 디스크" 추정은 틀렸다.
+  - 차지하는 것은 docker 이미지 11.7GB이고, 그중 6.4GB는 회수할 수 있다.
+  - 내역: 예전 `ohpin-be:<sha>` 9개(개당 약 800MB), 이전 `<none>` 794MB, Taglow `frontend-participant` 이미지 36개(약 2GB).
+  - 결론: EBS 확장은 지금 필요 없다. 이미지 정리로 충분하다.
+- **백업:** 루트 볼륨 스냅샷이 하나도 없다.
+- **접근:** 인스턴스 IAM 역할이 없어 SSM을 쓸 수 없다. SSH(22)는 `0.0.0.0/0`에 열려 있어 EC2 Instance Connect로 접속했다.
+- **보안 그룹:** 3306·3307·3001이 `0.0.0.0/0`에 열려 있다. 3306·3307은 듣는 프로세스가 없고, 3001은 `127.0.0.1`에만 바인드되어 있어 당장 노출은 없다. 그래도 닫는 것이 맞다.

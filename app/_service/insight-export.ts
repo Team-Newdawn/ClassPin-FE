@@ -1,4 +1,7 @@
-import { readFile } from "node:fs/promises";
+import { copyFile, mkdir, readFile, writeFile } from "node:fs/promises";
+import { execFile } from "node:child_process";
+import { promisify } from "node:util";
+import { pathToFileURL } from "node:url";
 import { join } from "node:path";
 import { PDFDocument, rgb, type PDFFont, type PDFPage } from "pdf-lib";
 import fontkit from "@pdf-lib/fontkit";
@@ -13,7 +16,8 @@ export type InsightExportContext = { title: string; fileName: string; date: stri
 // OhPin tokens (app/_design-system/tokens.css); exports can't read CSS variables.
 const C = { brand: "#0f62fe", brandSubtle: "#eef4ff", text: "#141f38", secondary: "#53627f", tertiary: "#7483a0", border: "#dde2ec", subtle: "#e9edf4",
   page: "#f4f6fa", success: "#0b7a4f", successBg: "#e9f8f1" };
-const FONT = "Pretendard";
+// The bundled PDF font; Docker installs it too, so Office previews render the same face.
+const FONT = "NanumGothic";
 const STATUS: Record<string, string> = { unanswered: "미답변", answered: "답변됨", resolved: "해결됨" };
 
 function reportModel(body: InsightReportBody, context: InsightExportContext) {
@@ -56,6 +60,30 @@ export async function exportInsight(body: InsightReportBody, format: string, con
   if (format === "docx") return { bytes: await docxReport(report), mime: "application/vnd.openxmlformats-officedocument.wordprocessingml.document" };
   if (format === "pptx") return { bytes: await pptxReport(report), mime: "application/vnd.openxmlformats-officedocument.presentationml.presentation" };
   throw new Error("INVALID_EXPORT_FORMAT");
+}
+
+/** Return the exact download file plus its format-specific rendered preview. */
+export async function previewInsightExport(result: Awaited<ReturnType<typeof exportInsight>>, format: string, work: string, signal?: AbortSignal) {
+  signal?.throwIfAborted();
+  const form = new FormData();
+  form.set("file", new Blob([new Uint8Array(result.bytes)], { type: result.mime }), `insight.${format}`);
+  if (format === "pptx" || format === "docx") {
+    const { resolveDocumentBinary } = await import("../_infrastructure/server/document-binaries.ts");
+    const binary = await resolveDocumentBinary("soffice");
+    const source = join(work, `insight.${format}`);
+    await writeFile(source, result.bytes);
+    // LibreOffice also loads fonts from its profile; without these, Hangul renders blank where Nanum isn't installed.
+    const fonts = join(work, "office-profile/user/fonts");
+    await mkdir(fonts, { recursive: true });
+    for (const weight of ["Regular", "Bold"]) await copyFile(join(process.cwd(), `public/assets/insights/NanumGothic-${weight}.ttf`), join(fonts, `NanumGothic-${weight}.ttf`));
+    await promisify(execFile)(binary, [
+      `-env:UserInstallation=${pathToFileURL(join(work, "office-profile")).href}`, "--headless",
+      "--convert-to", `pdf:${format === "pptx" ? "impress" : "writer"}_pdf_Export`, "--outdir", work, source,
+    ], { timeout: 60_000, maxBuffer: 1024 * 1024, signal });
+    signal?.throwIfAborted();
+    form.set("preview", new Blob([new Uint8Array(await readFile(join(work, "insight.pdf")))], { type: "application/pdf" }), "preview.pdf");
+  }
+  return form;
 }
 
 const hex = (value: string) => rgb(parseInt(value.slice(1, 3), 16) / 255, parseInt(value.slice(3, 5), 16) / 255, parseInt(value.slice(5, 7), 16) / 255);

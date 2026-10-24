@@ -2,7 +2,7 @@
 
 - Artifact: `class-frontend-architecture`
 - Status: `approved` (2026-09-28 사용자 위임에 따른 Codex 리뷰·승인)
-- Source: `doc/pin_class_prd.md`, `AGENTS.md`, `DESIGN.md`
+- Source: `docs/product/pin_class_prd.md`, `AGENTS.md`, `DESIGN.md`
 - Depends on: 없음
 - Decision boundary: Pin Class의 Model·View·Controller·Service 책임, 객체지향 적용 원칙, route/component CSS 소유권, 전역 상태의 점진 축소, 데이터 로딩·Realtime·성능 기준과 구조 리팩터링 검증
 
@@ -180,4 +180,4 @@ app/
 
 ## 12. Figma UI 개편 (2026-10-02 사용자 승인)
 
-`docs/ohpin-figma-ui-redesign.md`를 UI 개편의 기준으로 적용한다. 과거 명세의 강사 답변·해결 UI와 사이드바 인사이트 요구는 이번 사용자 결정으로 대체한다. 본인 질문 수정, 폴더 목적, 언어 전환, 기존 REST·Auth·Storage·Realtime 경계와 참가자 발표자 노트 비노출은 유지한다. 새 Figma 의미 색상 토큰과 네 가지 폴더 표시 팔레트를 사용하며 기존 저장 값은 보존한다. 회차 분리·시작 전 대기·5분 자동 종료·제출 질문 삭제는 이번 구현에서 제외한다. UI를 먼저 개편하고, 즉시 다중 업로드·PIN 묶음·자동 발표 토글·간단한 리포트 연결은 설계의 후속 구현 단위로 진행한다. 간단한 리포트는 승인형 상세 AI 리포트와 별개이며, 제공되지 않은 회차·시간·참여 인원을 생성하거나 AI 응답을 꾸며내지 않는다.
+`docs/design/ohpin-figma-ui-redesign.md`를 UI 개편의 기준으로 적용한다. 과거 명세의 강사 답변·해결 UI와 사이드바 인사이트 요구는 이번 사용자 결정으로 대체한다. 본인 질문 수정, 폴더 목적, 언어 전환, 기존 REST·Auth·Storage·Realtime 경계와 참가자 발표자 노트 비노출은 유지한다. 새 Figma 의미 색상 토큰과 네 가지 폴더 표시 팔레트를 사용하며 기존 저장 값은 보존한다. 회차 분리·시작 전 대기·5분 자동 종료·제출 질문 삭제는 이번 구현에서 제외한다. UI를 먼저 개편하고, 즉시 다중 업로드·PIN 묶음·자동 발표 토글·간단한 리포트 연결은 설계의 후속 구현 단위로 진행한다. 간단한 리포트는 승인형 상세 AI 리포트와 별개이며, 제공되지 않은 회차·시간·참여 인원을 생성하거나 AI 응답을 꾸며내지 않는다.

@@ -1,0 +1,10 @@
+import Anthropic from "/Users/minchanpark/Documents/orca/workspaces/ClassPin-FE/feature-dev-ai/node_modules/@anthropic-ai/sdk/index.mjs";
+import { readFileSync, readdirSync } from "node:fs";
+const client = new Anthropic({ apiKey: process.env.CLAUDE_API_KEY });
+const pins = JSON.parse(readFileSync("pins-hard.json", "utf8"))["2"];
+const all = readdirSync(".").filter((f) => f.startsWith("results-hard-")).flatMap((f) => JSON.parse(readFileSync(f, "utf8")));
+const bad = all.find((r: any) => r.m === "A" && r.page === 2 && r.r === 1 && r.correct < 20);
+const rows = pins.slice(0, 6).map((p: any) => `PIN ${p.n}\n정답: ${p.label}\n답: ${bad.answers.find((a: any) => a.n === p.n)?.target}`).join("\n\n");
+console.log(rows);
+const m = await client.messages.create({ model: "claude-sonnet-5-5", max_tokens: 2000, messages: [{ role: "user", content: `각 PIN의 답이 정답과 같은 슬라이드 요소를 가리키는지 채점하라. 표의 칸은 행과 열(회사)이 모두 맞아야 정답이다(기호 설명은 틀려도 행·열이 맞으면 정답). 차트·문구는 같은 요소를 가리키면 정답이고, 옆의 다른 요소면 오답이다. PIN마다 한 줄로 O/X와 이유.\n\n${rows}` }] });
+console.log((m.content.find((b) => b.type === "text") as any).text);

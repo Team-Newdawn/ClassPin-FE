@@ -2,11 +2,11 @@
 
 - Artifact: `lecture-roles-and-remote` — 기존 문서 ID와 경로는 리모컨 참조 호환을 위해 유지한다.
 - Status: `approved` — LRR-020~027의 owner 전용 발급·단일 기기 조작을 유지한다.
-- Source: `doc/pin_class_prd.md`, `AGENTS.md`
+- Source: `docs/product/pin_class_prd.md`, `AGENTS.md`
 - Depends on: `class-frontend-architecture`, `ohpin-figma-ui-redesign`, `account-structure-implementation`
 - Decision boundary: 로그인 없는 단일 기기 발표 리모컨의 발급·연결·표시 설정·질문 목록·해제·검증
 
-계정 역할·초대(LRR-001~009), 저장 종료 리포트, 이미지 비공개 전환과 FE/BE 인계는 [계정 구조 적용 지침](account-structure-implementation.md)으로 분리했다. 이 문서는 발표 리모컨만 소유한다. 리모컨 발급은 owner 고유 권한이며 editor/viewer에게 발급 권한을 주지 않는다.
+계정 역할·초대(LRR-001~009), 저장 종료 리포트, 이미지 비공개 전환과 FE/BE 인계는 [계정 구조 적용 지침](../architecture/account-structure-implementation.md)으로 분리했다. 이 문서는 발표 리모컨만 소유한다. 리모컨 발급은 owner 고유 권한이며 editor/viewer에게 발급 권한을 주지 않는다.
 
 ## 1. 발표 리모컨
 

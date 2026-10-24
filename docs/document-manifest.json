@@ -11,7 +11,7 @@
       "informed_by": [
         "prd"
       ],
-      "path": "docs/ai-instructor-report-product.md",
+      "path": "docs/insights/ai-instructor-report-product.md",
       "purpose": "Define instructor report selection, generation, review, AI-directed revision, confirmation, evidence presentation, and PDF delivery behavior.",
       "required_for": [
         "admin-report-selection-ui",
@@ -33,7 +33,7 @@
       "informed_by": [
         "prd"
       ],
-      "path": "docs/ai-instructor-report-evidence.md",
+      "path": "docs/insights/ai-instructor-report-evidence.md",
       "purpose": "Define the spatial evidence pack, structured AI output, provenance, evidence sufficiency, revision rules, and release-blocking evaluation criteria.",
       "required_for": [
         "spatial-evidence-preparation",
@@ -57,7 +57,7 @@
       "informed_by": [
         "prd"
       ],
-      "path": "docs/ai-instructor-report-system.md",
+      "path": "docs/insights/ai-instructor-report-system.md",
       "purpose": "Define report persistence, authorization, APIs, asynchronous execution, provider portability, privacy controls, retries, observability, and cost controls.",
       "required_for": [
         "report-database-and-rls",
@@ -79,7 +79,7 @@
       "informed_by": [
         "prd"
       ],
-      "path": "docs/class-frontend-architecture.md",
+      "path": "docs/architecture/class-frontend-architecture.md",
       "purpose": "Define the Pin Class frontend model-view-controller-service boundaries, object-oriented responsibility rules, route and component CSS ownership, and measurement-led data-loading performance strategy.",
       "required_for": [
         "class-frontend-layering",
@@ -101,7 +101,7 @@
       "informed_by": [
         "prd"
       ],
-      "path": "docs/pin-feedback-sunset.md",
+      "path": "docs/retired/pin-feedback-sunset.md",
       "purpose": "Define removal of the separate Pin Feedback runtime and source surface while relocating shared Pin Class behavior and preserving historical campaign database and Storage data.",
       "required_for": [
         "pin-feedback-runtime-removal",
@@ -122,7 +122,7 @@
       "informed_by": [
         "prd"
       ],
-      "path": "docs/pin-feedback-data-retirement.md",
+      "path": "docs/retired/pin-feedback-data-retirement.md",
       "purpose": "Define backup, access closure, forward-only schema retirement, Storage cleanup, and identity handling for the legacy Pin Feedback source layer while preserving imported Pin Class data and shared Class contracts.",
       "required_for": [
         "pin-feedback-schema-retirement",
@@ -132,7 +132,7 @@
     },
     {
       "id": "ohpin-figma-ui-redesign",
-      "path": "docs/ohpin-figma-ui-redesign.md",
+      "path": "docs/design/ohpin-figma-ui-redesign.md",
       "status": "approved",
       "purpose": "Figma UI redesign, preserved frontend behavior, implementation order, and deferred backend contracts.",
       "depends_on": [
@@ -145,14 +145,14 @@
         "ohpin-ui-redesign"
       ],
       "approval": {
-        "approved_at": "2026-10-20T00:00:00+09:00",
-        "approved_by": "user (live player Figma decisions and backend proposals, 2026-10-03; browser LIVE auto-end 9.4 approved in session, 2026-10-15; participant tablet and popup UI approved in session, 2026-10-17); /remote display mode persistence requested in session, 2026-10-17; owner-only persisted end reports with editor/viewer read-only access requested in session, 2026-10-18; folder menus, inline rename, delete choices, QR layout and four question display modes requested 2026-10-19; LIVE material join link confirmed 2026-10-19; lecture management question display and QR layout panel Figma 1237:1068 requested 2026-10-19; remote Bubble and complete QR options plus 64px layout fix requested 2026-10-20",
-        "content_sha256": "e6c9ee2744191062b2258cb3a88e796822fb57e04322f13c7852de36f5c30d65"
+        "approved_at": "2026-10-22T00:00:00+09:00",
+        "approved_by": "user (live player Figma decisions and backend proposals, 2026-10-03; browser LIVE auto-end 9.4 approved in session, 2026-10-15; participant tablet and popup UI approved in session, 2026-10-17); /remote display mode persistence requested in session, 2026-10-17; owner-only persisted end reports with editor/viewer read-only access requested in session, 2026-10-18; folder menus, inline rename, delete choices, QR layout and four question display modes requested 2026-10-19; LIVE material join link confirmed 2026-10-19; lecture management question display and QR layout panel Figma 1237:1068 requested 2026-10-19; remote Bubble and complete QR options plus 64px layout fix requested 2026-10-20; instructor and slideshow PIN sizing relative to rendered slide requested 2026-10-21; participant neutral comment wording and PIN tip anchoring requested 2026-10-22; participant list comment wording and lecture management live-comment and display-option labels requested 2026-10-22",
+        "content_sha256": "7d97aed0df315b36227b8d5e1411be585e3ad2735a30b18b93e54d695c91b2ca"
       }
     },
     {
       "id": "lecture-roles-and-remote",
-      "path": "docs/lecture-roles-and-remote.md",
+      "path": "docs/product/lecture-roles-and-remote.md",
       "status": "approved",
       "purpose": "Owner-issued, login-free single-device presentation remote: issuance, display controls, question sheet, revocation, responsive layout, and verification. Account roles are owned by account-structure-implementation.",
       "depends_on": [
@@ -174,7 +174,7 @@
     },
     {
       "id": "account-structure-implementation",
-      "path": "docs/account-structure-implementation.md",
+      "path": "docs/architecture/account-structure-implementation.md",
       "status": "approved",
       "purpose": "Separate account and resource roles, invitation authorization, owner-only persisted lecture end reports, private slide images, scoped editor uploads, and FE/BE/DB implementation and rollout guidance.",
       "depends_on": [
@@ -199,9 +199,9 @@
     },
     {
       "id": "insights-ai-foundation",
-      "path": "docs/insights-ai-foundation.md",
+      "path": "docs/insights/insights-ai-foundation.md",
       "status": "approved",
-      "purpose": "Insight decisions and phased implementation; owner-only source readiness inspection and Groq model connection.",
+      "purpose": "Insight decisions and phased implementation; Claude analysis pipeline and the Claude/OpenAI/Gemini provider adapters (section 11).",
       "depends_on": [
         "ai-report-product",
         "ai-report-evidence",
@@ -215,14 +215,14 @@
         "insight-groq-connection"
       ],
       "approval": {
-        "approved_at": "2026-10-21T00:00:00+09:00",
-        "approved_by": "minchanpark (implementation decisions delegated; Groq Qwen and GPT-OSS setup approved in session)",
-        "content_sha256": "dabab3628dc6f0ce780bc15a5e472d66c1d7820dbe17152bae44a46a29c1d00d"
+        "approved_at": "2026-10-24T00:00:00+09:00",
+        "approved_by": "minchanpark (section 11 multi-provider Claude/OpenAI/Gemini adapters approved in session, 2026-10-23; production default stays claude until E1); section 12 insight titles and collapsible topic analysis requested by minchanpark in session, 2026-10-24; section 13 slide insights approved without unanswered follow-up by minchanpark in session, 2026-10-24; section 14 fixed slide and independently scrolling PIN list requested by minchanpark in session, 2026-10-24; section 15 duplicate slide key fix requested by minchanpark in session, 2026-10-24; section 16 confirmed export settings and format-specific previews requested by minchanpark in session, 2026-10-24; section 16 Hangul preview font fix requested by minchanpark in session, 2026-10-24",
+        "content_sha256": "2411f8c5de52f062869049ae19762e112e5f32f9c7e62eb9dc12c5745be2d36f"
       }
     },
     {
       "id": "insights-rest-snapshot",
-      "path": "docs/insights-rest-snapshot.md",
+      "path": "docs/insights/insights-rest-snapshot.md",
       "status": "approved",
       "purpose": "Server-captured REST snapshots without backend changes.",
       "depends_on": [
@@ -240,6 +240,28 @@
         "approved_by": "minchanpark (backend-free workaround approved in session; implementation decisions delegated); platform integration and testing requested in session",
         "content_sha256": "0eecd2ed1b0a6aa94c8486a25b59dec95486a2cab3f0101e31732869bd1398f9"
       }
+    },
+    {
+      "id": "infra-capacity-analysis",
+      "path": "docs/operations/infra-capacity-analysis.md",
+      "status": "reference",
+      "purpose": "Preserve the feature-dev infrastructure capacity assessment with its measurement limits.",
+      "depends_on": [],
+      "informed_by": [
+        "class-frontend-architecture"
+      ],
+      "required_for": []
+    },
+    {
+      "id": "zoom-app-integration",
+      "path": "docs/product/zoom-app-integration.md",
+      "status": "reference",
+      "purpose": "Preserve the Zoom Apps trial record and reconstruction notes; no product implementation is approved by this record.",
+      "depends_on": [],
+      "informed_by": [
+        "prd"
+      ],
+      "required_for": []
     }
   ],
   "implementation_gate": {
@@ -248,6 +270,6 @@
   },
   "schema_version": "1.0",
   "source": {
-    "prd": "doc/pin_class_prd.md"
+    "prd": "docs/product/pin_class_prd.md"
   }
 }

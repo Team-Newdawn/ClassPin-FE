@@ -3,8 +3,8 @@
 - Artifact ID: `pin-feedback-data-retirement`
 - 상태: `approved`
 - 기준일: 2026-09-01
-- 근거 문서: `doc/pin_class_prd.md`
-- 선행 문서: `docs/pin-feedback-sunset.md`
+- 근거 문서: `docs/product/pin_class_prd.md`
+- 선행 문서: `docs/retired/pin-feedback-sunset.md`
 
 ## 1. 목적과 결정 경계
 

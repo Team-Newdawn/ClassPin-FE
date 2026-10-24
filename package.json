@@ -5,7 +5,7 @@
   "scripts": {
     "dev": "next dev",
     "dev:local": "supabase start && next dev",
-    "dev:remote": "node --env-file=.env.production.local node_modules/next/dist/bin/next dev",
+    "dev:remote": "node --env-file=.env.production.local -e \"process.exit(require('child_process').spawnSync('next', ['dev', ...process.argv.slice(1)], { stdio: 'inherit' }).status ?? 1)\" --",
     "build": "next build",
     "start": "next start",
     "lint": "eslint .",

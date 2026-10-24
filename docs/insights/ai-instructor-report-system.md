@@ -2,7 +2,7 @@
 
 - Artifact: `ai-report-system`
 - Status: `reviewed`
-- Source: `doc/pin_class_prd.md`
+- Source: `docs/product/pin_class_prd.md`
 - Depends on: `ai-report-product`, `ai-report-evidence`
 - Decision boundary: 리포트 영속성, 소유자 권한, API, 비동기 실행, AI 제공자 경계, 개인정보 보호, 재시도·멱등성, 관측 가능성, 비용 통제와 운영 배포
 

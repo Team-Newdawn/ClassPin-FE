@@ -1,0 +1,3704 @@
+[
+ {
+  "m": "PDF",
+  "set": "synth-p2",
+  "r": 0,
+  "graded": [
+   {
+    "id": "C24",
+    "want": "7.89%",
+    "got": "7.89%",
+    "ok": true
+   },
+   {
+    "id": "C25",
+    "want": "2.78%",
+    "got": "2.78%",
+    "ok": true
+   },
+   {
+    "id": "C26",
+    "want": "3.52%",
+    "got": "3.52%",
+    "ok": true
+   },
+   {
+    "id": "C27",
+    "want": "8.60%",
+    "got": "8.60%",
+    "ok": true
+   },
+   {
+    "id": "C28",
+    "want": "3.26%",
+    "got": "3.26%",
+    "ok": true
+   },
+   {
+    "id": "C29",
+    "want": "3.29%",
+    "got": "3.29%",
+    "ok": true
+   },
+   {
+    "id": "C30",
+    "want": "* 2024학년도 2학기 기준, 휴학생 제외",
+    "got": "* 2024학년도 2학기 기준, 휴학생 제외",
+    "ok": true
+   }
+  ],
+  "input": 4,
+  "output": 155,
+  "textUsed": false,
+  "readable": 1
+ },
+ {
+  "m": "PDF",
+  "set": "synth-p2",
+  "r": 1,
+  "graded": [
+   {
+    "id": "C24",
+    "want": "7.89%",
+    "got": "7.89%",
+    "ok": true
+   },
+   {
+    "id": "C25",
+    "want": "2.78%",
+    "got": "2.78%",
+    "ok": true
+   },
+   {
+    "id": "C26",
+    "want": "3.52%",
+    "got": "3.52%",
+    "ok": true
+   },
+   {
+    "id": "C27",
+    "want": "8.60%",
+    "got": "8.60%",
+    "ok": true
+   },
+   {
+    "id": "C28",
+    "want": "3.26%",
+    "got": "3.26%",
+    "ok": true
+   },
+   {
+    "id": "C29",
+    "want": "3.29%",
+    "got": "3.29%",
+    "ok": true
+   },
+   {
+    "id": "C30",
+    "want": "* 2024학년도 2학기 기준, 휴학생 제외",
+    "got": "* 2024학년도 2학기 기준, 휴학생 제외",
+    "ok": true
+   }
+  ],
+  "input": 4,
+  "output": 155,
+  "textUsed": false,
+  "readable": 1
+ },
+ {
+  "m": "PDF",
+  "set": "synth-p2",
+  "r": 2,
+  "graded": [
+   {
+    "id": "C24",
+    "want": "7.89%",
+    "got": "7.89%",
+    "ok": true
+   },
+   {
+    "id": "C25",
+    "want": "2.78%",
+    "got": "2.78%",
+    "ok": true
+   },
+   {
+    "id": "C26",
+    "want": "3.52%",
+    "got": "3.52%",
+    "ok": true
+   },
+   {
+    "id": "C27",
+    "want": "8.60%",
+    "got": "8.60%",
+    "ok": true
+   },
+   {
+    "id": "C28",
+    "want": "3.26%",
+    "got": "3.26%",
+    "ok": true
+   },
+   {
+    "id": "C29",
+    "want": "3.29%",
+    "got": "3.29%",
+    "ok": true
+   },
+   {
+    "id": "C30",
+    "want": "* 2024학년도 2학기 기준, 휴학생 제외",
+    "got": "* 2024학년도 2학기 기준, 휴학생 제외",
+    "ok": true
+   }
+  ],
+  "input": 4,
+  "output": 422,
+  "textUsed": false,
+  "readable": 1
+ },
+ {
+  "m": "PDF",
+  "set": "synth-p3",
+  "r": 0,
+  "graded": [
+   {
+    "id": "F31",
+    "want": "한국교육개발원 조사(2024.11.07), n=8,785, 신뢰수준 95% ±2.5%p",
+    "got": "한국교육개발원 조사(2024.11.07), n=8,785, 신뢰수준 95% ±2.5%p",
+    "ok": true
+   },
+   {
+    "id": "F32",
+    "want": "내부 LMS 로그 기준 집계 ID KEDI-42796-B",
+    "got": "내부 LMS 로그 기준 집계 ID KEDI-42796-B",
+    "ok": true
+   },
+   {
+    "id": "F33",
+    "want": "문항 Q33·Q88 결측 31건 제외",
+    "got": "문항 Q33·Q88 결측 31건 제외",
+    "ok": true
+   },
+   {
+    "id": "F34",
+    "want": "가중치: 학년 0.70, 성별 0.21, 계열 0.79",
+    "got": "가중치: 학년 0.70, 성별 0.21, 계열 0.79",
+    "ok": true
+   },
+   {
+    "id": "F35",
+    "want": "insight-team61@kedi.example.kr",
+    "got": "insight-team61@kedi.example.kr",
+    "ok": true
+   }
+  ],
+  "input": 4,
+  "output": 208,
+  "textUsed": false,
+  "readable": 0.9946524064171123
+ },
+ {
+  "m": "PDF",
+  "set": "synth-p3",
+  "r": 1,
+  "graded": [
+   {
+    "id": "F31",
+    "want": "한국교육개발원 조사(2024.11.07), n=8,785, 신뢰수준 95% ±2.5%p",
+    "got": "한국교육개발원 조사(2024.11.07), n=8,785, 신뢰수준 95% ±2.5%p",
+    "ok": true
+   },
+   {
+    "id": "F32",
+    "want": "내부 LMS 로그 기준 집계 ID KEDI-42796-B",
+    "got": "내부 LMS 로그 기준 집계 ID KEDI-42796-B",
+    "ok": true
+   },
+   {
+    "id": "F33",
+    "want": "문항 Q33·Q88 결측 31건 제외",
+    "got": "문항 Q33·Q88 결측 31건 제외",
+    "ok": true
+   },
+   {
+    "id": "F34",
+    "want": "가중치: 학년 0.70, 성별 0.21, 계열 0.79",
+    "got": "가중치: 학년 0.70, 성별 0.21, 계열 0.79",
+    "ok": true
+   },
+   {
+    "id": "F35",
+    "want": "insight-team61@kedi.example.kr",
+    "got": "insight-team61@kedi.example.kr",
+    "ok": true
+   }
+  ],
+  "input": 4,
+  "output": 208,
+  "textUsed": false,
+  "readable": 0.9946524064171123
+ },
+ {
+  "m": "PDF",
+  "set": "synth-p3",
+  "r": 2,
+  "graded": [
+   {
+    "id": "F31",
+    "want": "한국교육개발원 조사(2024.11.07), n=8,785, 신뢰수준 95% ±2.5%p",
+    "got": "한국교육개발원 조사(2024.11.07), n=8,785, 신뢰수준 95% ±2.5%p",
+    "ok": true
+   },
+   {
+    "id": "F32",
+    "want": "내부 LMS 로그 기준 집계 ID KEDI-42796-B",
+    "got": "내부 LMS 로그 기준 집계 ID KEDI-42796-B",
+    "ok": true
+   },
+   {
+    "id": "F33",
+    "want": "문항 Q33·Q88 결측 31건 제외",
+    "got": "문항 Q33·Q88 결측 31건 제외",
+    "ok": true
+   },
+   {
+    "id": "F34",
+    "want": "가중치: 학년 0.70, 성별 0.21, 계열 0.79",
+    "got": "가중치: 학년 0.70, 성별 0.21, 계열 0.79",
+    "ok": true
+   },
+   {
+    "id": "F35",
+    "want": "insight-team61@kedi.example.kr",
+    "got": "insight-team61@kedi.example.kr",
+    "ok": true
+   }
+  ],
+  "input": 4,
+  "output": 208,
+  "textUsed": false,
+  "readable": 0.9946524064171123
+ },
+ {
+  "m": "PDF",
+  "set": "synth-p1",
+  "r": 0,
+  "graded": [
+   {
+    "id": "T1",
+    "want": "8,574",
+    "got": "8,574",
+    "ok": true
+   },
+   {
+    "id": "T2",
+    "want": "3,424",
+    "got": "3,424",
+    "ok": true
+   },
+   {
+    "id": "T3",
+    "want": "1,646",
+    "got": "1,646",
+    "ok": true
+   },
+   {
+    "id": "T4",
+    "want": "4,740",
+    "got": "4,740",
+    "ok": true
+   },
+   {
+    "id": "T5",
+    "want": "3,109",
+    "got": "3,109",
+    "ok": true
+   },
+   {
+    "id": "T6",
+    "want": "5,113",
+    "got": "5,113",
+    "ok": true
+   },
+   {
+    "id": "T7",
+    "want": "9,555",
+    "got": "9,555",
+    "ok": true
+   },
+   {
+    "id": "T8",
+    "want": "3,315",
+    "got": "3,315",
+    "ok": true
+   },
+   {
+    "id": "T9",
+    "want": "2,530",
+    "got": "2,530",
+    "ok": true
+   },
+   {
+    "id": "T10",
+    "want": "4,078",
+    "got": "4,078",
+    "ok": true
+   },
+   {
+    "id": "T11",
+    "want": "8,362",
+    "got": "8,362",
+    "ok": true
+   },
+   {
+    "id": "T12",
+    "want": "8,865",
+    "got": "8,865",
+    "ok": true
+   },
+   {
+    "id": "T13",
+    "want": "1,488",
+    "got": "1,488",
+    "ok": true
+   },
+   {
+    "id": "T14",
+    "want": "8,799",
+    "got": "8,799",
+    "ok": true
+   },
+   {
+    "id": "T15",
+    "want": "6,979",
+    "got": "6,979",
+    "ok": true
+   },
+   {
+    "id": "T16",
+    "want": "2,510",
+    "got": "2,510",
+    "ok": true
+   },
+   {
+    "id": "T17",
+    "want": "2,570",
+    "got": "2,570",
+    "ok": true
+   },
+   {
+    "id": "T18",
+    "want": "4,683",
+    "got": "4,683",
+    "ok": true
+   },
+   {
+    "id": "T19",
+    "want": "1,404",
+    "got": "1,404",
+    "ok": true
+   },
+   {
+    "id": "T20",
+    "want": "9,637",
+    "got": "9,637",
+    "ok": true
+   },
+   {
+    "id": "T21",
+    "want": "8,398",
+    "got": "8,398",
+    "ok": true
+   },
+   {
+    "id": "T22",
+    "want": "6,555",
+    "got": "6,555",
+    "ok": true
+   },
+   {
+    "id": "T23",
+    "want": "3,263",
+    "got": "3,263",
+    "ok": true
+   }
+  ],
+  "input": 1901,
+  "output": 974,
+  "textUsed": false,
+  "readable": 1
+ },
+ {
+  "m": "PDF",
+  "set": "synth-p1",
+  "r": 2,
+  "graded": [
+   {
+    "id": "T1",
+    "want": "8,574",
+    "got": "8,574",
+    "ok": true
+   },
+   {
+    "id": "T2",
+    "want": "3,424",
+    "got": "3,424",
+    "ok": true
+   },
+   {
+    "id": "T3",
+    "want": "1,646",
+    "got": "1,646",
+    "ok": true
+   },
+   {
+    "id": "T4",
+    "want": "4,740",
+    "got": "4,740",
+    "ok": true
+   },
+   {
+    "id": "T5",
+    "want": "3,109",
+    "got": "3,109",
+    "ok": true
+   },
+   {
+    "id": "T6",
+    "want": "5,113",
+    "got": "5,113",
+    "ok": true
+   },
+   {
+    "id": "T7",
+    "want": "9,555",
+    "got": "9,555",
+    "ok": true
+   },
+   {
+    "id": "T8",
+    "want": "3,315",
+    "got": "3,315",
+    "ok": true
+   },
+   {
+    "id": "T9",
+    "want": "2,530",
+    "got": "2,530",
+    "ok": true
+   },
+   {
+    "id": "T10",
+    "want": "4,078",
+    "got": "4,078",
+    "ok": true
+   },
+   {
+    "id": "T11",
+    "want": "8,362",
+    "got": "8,362",
+    "ok": true
+   },
+   {
+    "id": "T12",
+    "want": "8,865",
+    "got": "8,865",
+    "ok": true
+   },
+   {
+    "id": "T13",
+    "want": "1,488",
+    "got": "1,488",
+    "ok": true
+   },
+   {
+    "id": "T14",
+    "want": "8,799",
+    "got": "8,799",
+    "ok": true
+   },
+   {
+    "id": "T15",
+    "want": "6,979",
+    "got": "6,979",
+    "ok": true
+   },
+   {
+    "id": "T16",
+    "want": "2,510",
+    "got": "2,510",
+    "ok": true
+   },
+   {
+    "id": "T17",
+    "want": "2,570",
+    "got": "2,570",
+    "ok": true
+   },
+   {
+    "id": "T18",
+    "want": "4,683",
+    "got": "4,683",
+    "ok": true
+   },
+   {
+    "id": "T19",
+    "want": "1,404",
+    "got": "1,404",
+    "ok": true
+   },
+   {
+    "id": "T20",
+    "want": "9,637",
+    "got": "9,637",
+    "ok": true
+   },
+   {
+    "id": "T21",
+    "want": "8,398",
+    "got": "8,398",
+    "ok": true
+   },
+   {
+    "id": "T22",
+    "want": "6,555",
+    "got": "6,555",
+    "ok": true
+   },
+   {
+    "id": "T23",
+    "want": "3,263",
+    "got": "3,263",
+    "ok": true
+   }
+  ],
+  "input": 1877,
+  "output": 1270,
+  "textUsed": false,
+  "readable": 1
+ },
+ {
+  "m": "PDF",
+  "set": "synth-p4",
+  "r": 0,
+  "graded": [
+   {
+    "id": "K36",
+    "want": "834명 중 20명",
+    "got": "834명 중 20명",
+    "ok": true
+   },
+   {
+    "id": "K37",
+    "want": "838명 중 88명",
+    "got": "838명 중 88명",
+    "ok": true
+   },
+   {
+    "id": "K38",
+    "want": "641명 중 40명",
+    "got": "641명 중 40명",
+    "ok": true
+   },
+   {
+    "id": "K39",
+    "want": "507명 중 21명",
+    "got": "507명 중 21명",
+    "ok": true
+   },
+   {
+    "id": "K40",
+    "want": "389명 중 27명",
+    "got": "389명 중 27명",
+    "ok": true
+   },
+   {
+    "id": "K41",
+    "want": "400명 중 66명",
+    "got": "400명 중 66명",
+    "ok": true
+   },
+   {
+    "id": "K42",
+    "want": "977명 중 54명",
+    "got": "977명 중 54명",
+    "ok": true
+   },
+   {
+    "id": "K43",
+    "want": "244명 중 14명",
+    "got": "244명 중 14명",
+    "ok": true
+   }
+  ],
+  "input": 4,
+  "output": 548,
+  "textUsed": false,
+  "readable": 1
+ },
+ {
+  "m": "PDF",
+  "set": "synth-p1",
+  "r": 1,
+  "graded": [
+   {
+    "id": "T1",
+    "want": "8,574",
+    "got": "8,574",
+    "ok": true
+   },
+   {
+    "id": "T2",
+    "want": "3,424",
+    "got": "3,424",
+    "ok": true
+   },
+   {
+    "id": "T3",
+    "want": "1,646",
+    "got": "1,646",
+    "ok": true
+   },
+   {
+    "id": "T4",
+    "want": "4,740",
+    "got": "4,740",
+    "ok": true
+   },
+   {
+    "id": "T5",
+    "want": "3,109",
+    "got": "3,109",
+    "ok": true
+   },
+   {
+    "id": "T6",
+    "want": "5,113",
+    "got": "5,113",
+    "ok": true
+   },
+   {
+    "id": "T7",
+    "want": "9,555",
+    "got": "9,555",
+    "ok": true
+   },
+   {
+    "id": "T8",
+    "want": "3,315",
+    "got": "3,315",
+    "ok": true
+   },
+   {
+    "id": "T9",
+    "want": "2,530",
+    "got": "2,530",
+    "ok": true
+   },
+   {
+    "id": "T10",
+    "want": "4,078",
+    "got": "4,078",
+    "ok": true
+   },
+   {
+    "id": "T11",
+    "want": "8,362",
+    "got": "8,362",
+    "ok": true
+   },
+   {
+    "id": "T12",
+    "want": "8,865",
+    "got": "8,865",
+    "ok": true
+   },
+   {
+    "id": "T13",
+    "want": "1,488",
+    "got": "1,488",
+    "ok": true
+   },
+   {
+    "id": "T14",
+    "want": "8,799",
+    "got": "8,799",
+    "ok": true
+   },
+   {
+    "id": "T15",
+    "want": "6,979",
+    "got": "6,979",
+    "ok": true
+   },
+   {
+    "id": "T16",
+    "want": "2,510",
+    "got": "2,510",
+    "ok": true
+   },
+   {
+    "id": "T17",
+    "want": "2,570",
+    "got": "2,570",
+    "ok": true
+   },
+   {
+    "id": "T18",
+    "want": "4,683",
+    "got": "4,683",
+    "ok": true
+   },
+   {
+    "id": "T19",
+    "want": "1,404",
+    "got": "1,404",
+    "ok": true
+   },
+   {
+    "id": "T20",
+    "want": "9,637",
+    "got": "9,637",
+    "ok": true
+   },
+   {
+    "id": "T21",
+    "want": "8,398",
+    "got": "8,398",
+    "ok": true
+   },
+   {
+    "id": "T22",
+    "want": "6,555",
+    "got": "6,555",
+    "ok": true
+   },
+   {
+    "id": "T23",
+    "want": "3,263",
+    "got": "3,263",
+    "ok": true
+   }
+  ],
+  "input": 1848,
+  "output": 2001,
+  "textUsed": false,
+  "readable": 1
+ },
+ {
+  "m": "PDF",
+  "set": "synth-p4",
+  "r": 1,
+  "graded": [
+   {
+    "id": "K36",
+    "want": "834명 중 20명",
+    "got": "834명 중 20명",
+    "ok": true
+   },
+   {
+    "id": "K37",
+    "want": "838명 중 88명",
+    "got": "838명 중 88명",
+    "ok": true
+   },
+   {
+    "id": "K38",
+    "want": "641명 중 40명",
+    "got": "641명 중 40명",
+    "ok": true
+   },
+   {
+    "id": "K39",
+    "want": "507명 중 21명",
+    "got": "507명 중 21명",
+    "ok": true
+   },
+   {
+    "id": "K40",
+    "want": "389명 중 27명",
+    "got": "389명 중 27명",
+    "ok": true
+   },
+   {
+    "id": "K41",
+    "want": "400명 중 66명",
+    "got": "400명 중 66명",
+    "ok": true
+   },
+   {
+    "id": "K42",
+    "want": "977명 중 54명",
+    "got": "977명 중 54명",
+    "ok": true
+   },
+   {
+    "id": "K43",
+    "want": "244명 중 14명",
+    "got": "244명 중 14명",
+    "ok": true
+   }
+  ],
+  "input": 4,
+  "output": 560,
+  "textUsed": false,
+  "readable": 1
+ },
+ {
+  "m": "PDF",
+  "set": "synth-p4",
+  "r": 2,
+  "graded": [
+   {
+    "id": "K36",
+    "want": "834명 중 20명",
+    "got": "834명 중 20명",
+    "ok": true
+   },
+   {
+    "id": "K37",
+    "want": "838명 중 88명",
+    "got": "838명 중 88명",
+    "ok": true
+   },
+   {
+    "id": "K38",
+    "want": "641명 중 40명",
+    "got": "641명 중 40명",
+    "ok": true
+   },
+   {
+    "id": "K39",
+    "want": "507명 중 21명",
+    "got": "507명 중 21명",
+    "ok": true
+   },
+   {
+    "id": "K40",
+    "want": "389명 중 27명",
+    "got": "389명 중 27명",
+    "ok": true
+   },
+   {
+    "id": "K41",
+    "want": "400명 중 66명",
+    "got": "400명 중 66명",
+    "ok": true
+   },
+   {
+    "id": "K42",
+    "want": "977명 중 54명",
+    "got": "977명 중 54명",
+    "ok": true
+   },
+   {
+    "id": "K43",
+    "want": "244명 중 14명",
+    "got": "244명 중 14명",
+    "ok": true
+   }
+  ],
+  "input": 4,
+  "output": 434,
+  "textUsed": false,
+  "readable": 1
+ },
+ {
+  "m": "PDF",
+  "set": "soi-p2",
+  "r": 1,
+  "graded": [
+   {
+    "id": "S1",
+    "want": "*Data Insights Market: 2025-2033 Strategic Insights.",
+    "got": "*Data Insights Market: 2025-2033 Strategic Insights.",
+    "ok": true
+   },
+   {
+    "id": "S2",
+    "want": "*Mordor Intelligence, Growth Trends & Forecasts 2025-2030",
+    "got": "*Mordor Intelligence, Growth Trends & Forecasts 2025-2030",
+    "ok": true
+   },
+   {
+    "id": "S3",
+    "want": "*Amra & Elma LLC, Top 20 Communication Platform Marketing Statistics 2025",
+    "got": "*Amra & Elma LLC, Top 20 Communication Platform Marketing Statistics 2025",
+    "ok": true
+   },
+   {
+    "id": "S4",
+    "want": "*전체 SNS 시장",
+    "got": "*전체 SNS 시장",
+    "ok": true
+   },
+   {
+    "id": "S5",
+    "want": "오픈형 SNS 및 기타",
+    "got": "오픈형 SNS 및 기타",
+    "ok": true
+   }
+  ],
+  "input": 4,
+  "output": 189,
+  "textUsed": false,
+  "readable": 0.7662337662337663
+ },
+ {
+  "m": "PDF",
+  "set": "soi-p2",
+  "r": 2,
+  "graded": [
+   {
+    "id": "S1",
+    "want": "*Data Insights Market: 2025-2033 Strategic Insights.",
+    "got": "*Data Insights Market: 2025-2033 Strategic Insights.",
+    "ok": true
+   },
+   {
+    "id": "S2",
+    "want": "*Mordor Intelligence, Growth Trends & Forecasts 2025-2030",
+    "got": "*Mordor Intelligence, Growth Trends & Forecasts 2025-2030",
+    "ok": true
+   },
+   {
+    "id": "S3",
+    "want": "*Amra & Elma LLC, Top 20 Communication Platform Marketing Statistics 2025",
+    "got": "*Amra & Elma LLC, Top 20 Communication Platform Marketing Statistics 2025",
+    "ok": true
+   },
+   {
+    "id": "S4",
+    "want": "*전체 SNS 시장",
+    "got": "*전체 SNS 시장",
+    "ok": true
+   },
+   {
+    "id": "S5",
+    "want": "오픈형 SNS 및 기타",
+    "got": "오픈형 SNS 및 기타",
+    "ok": true
+   }
+  ],
+  "input": 4,
+  "output": 189,
+  "textUsed": false,
+  "readable": 0.7662337662337663
+ },
+ {
+  "m": "PDF",
+  "set": "soi-p2",
+  "r": 0,
+  "graded": [
+   {
+    "id": "S1",
+    "want": "*Data Insights Market: 2025-2033 Strategic Insights.",
+    "got": "*Data Insights Market: 2025-2033 Strategic Insights.",
+    "ok": true
+   },
+   {
+    "id": "S2",
+    "want": "*Mordor Intelligence, Growth Trends & Forecasts 2025-2030",
+    "got": "*Mordor Intelligence, Growth Trends & Forecasts 2025-2030",
+    "ok": true
+   },
+   {
+    "id": "S3",
+    "want": "*Amra & Elma LLC, Top 20 Communication Platform Marketing Statistics 2025",
+    "got": "*Amra & Elma LLC, Top 20 Communication Platform Marketing Statistics 2025",
+    "ok": true
+   },
+   {
+    "id": "S4",
+    "want": "*전체 SNS 시장",
+    "got": "*전체 SNS 시장",
+    "ok": true
+   },
+   {
+    "id": "S5",
+    "want": "오픈형 SNS 및 기타",
+    "got": "오픈형 SNS 및 기타",
+    "ok": true
+   }
+  ],
+  "input": 4,
+  "output": 189,
+  "textUsed": false,
+  "readable": 0.7662337662337663
+ },
+ {
+  "m": "PDF",
+  "set": "soi-p12",
+  "r": 0,
+  "graded": [
+   {
+    "id": "S6",
+    "want": "현장 사용자 접점 확보",
+    "got": "현장 사용자 접점 확보",
+    "ok": true
+   },
+   {
+    "id": "S7",
+    "want": "총 80명 진행",
+    "got": "총 80명 진행",
+    "ok": true
+   },
+   {
+    "id": "S8",
+    "want": "2주간 진행",
+    "got": "2주간 진행",
+    "ok": true
+   },
+   {
+    "id": "S9",
+    "want": "베타 앱 기반 테스트",
+    "got": "베타 앱 기반 테스트",
+    "ok": true
+   },
+   {
+    "id": "S10",
+    "want": "EN, ES",
+    "got": "EN, ES",
+    "ok": true
+   }
+  ],
+  "input": 4,
+  "output": 239,
+  "textUsed": false,
+  "readable": 0.40076335877862596
+ },
+ {
+  "m": "PDF",
+  "set": "soi-p12",
+  "r": 1,
+  "graded": [
+   {
+    "id": "S6",
+    "want": "현장 사용자 접점 확보",
+    "got": "현장 사용자 접점 확보",
+    "ok": true
+   },
+   {
+    "id": "S7",
+    "want": "총 80명 진행",
+    "got": "총 80명 진행",
+    "ok": true
+   },
+   {
+    "id": "S8",
+    "want": "2주간 진행",
+    "got": "2주간 진행",
+    "ok": true
+   },
+   {
+    "id": "S9",
+    "want": "베타 앱 기반 테스트",
+    "got": "베타 앱 기반 테스트",
+    "ok": true
+   },
+   {
+    "id": "S10",
+    "want": "EN, ES",
+    "got": "EN, ES",
+    "ok": true
+   }
+  ],
+  "input": 4,
+  "output": 276,
+  "textUsed": false,
+  "readable": 0.40076335877862596
+ },
+ {
+  "m": "PDF",
+  "set": "soi-p12",
+  "r": 2,
+  "graded": [
+   {
+    "id": "S6",
+    "want": "현장 사용자 접점 확보",
+    "got": "현장 사용자 접점 확보",
+    "ok": true
+   },
+   {
+    "id": "S7",
+    "want": "총 80명 진행",
+    "got": "총 80명 진행",
+    "ok": true
+   },
+   {
+    "id": "S8",
+    "want": "2주간 진행",
+    "got": "2주간 진행",
+    "ok": true
+   },
+   {
+    "id": "S9",
+    "want": "베타 앱 기반 테스트",
+    "got": "베타 앱 기반 테스트",
+    "ok": true
+   },
+   {
+    "id": "S10",
+    "want": "EN, ES",
+    "got": "EN, ES",
+    "ok": true
+   }
+  ],
+  "input": 4,
+  "output": 244,
+  "textUsed": false,
+  "readable": 0.40076335877862596
+ },
+ {
+  "m": "IMG",
+  "set": "synth-p2",
+  "r": 0,
+  "graded": [
+   {
+    "id": "C24",
+    "want": "7.89%",
+    "got": "7.89%",
+    "ok": true
+   },
+   {
+    "id": "C25",
+    "want": "2.78%",
+    "got": "2.78%",
+    "ok": true
+   },
+   {
+    "id": "C26",
+    "want": "3.52%",
+    "got": "3.52%",
+    "ok": true
+   },
+   {
+    "id": "C27",
+    "want": "8.60%",
+    "got": "8.60%",
+    "ok": true
+   },
+   {
+    "id": "C28",
+    "want": "3.26%",
+    "got": "3.26%",
+    "ok": true
+   },
+   {
+    "id": "C29",
+    "want": "3.29%",
+    "got": "3.29%",
+    "ok": true
+   },
+   {
+    "id": "C30",
+    "want": "* 2024학년도 2학기 기준, 휴학생 제외",
+    "got": "* 2024학년도 2학기 기준, 휴학생 제외",
+    "ok": true
+   }
+  ],
+  "input": 4,
+  "output": 155,
+  "textUsed": false,
+  "readable": 1
+ },
+ {
+  "m": "IMG",
+  "set": "synth-p2",
+  "r": 2,
+  "graded": [
+   {
+    "id": "C24",
+    "want": "7.89%",
+    "got": "7.89%",
+    "ok": true
+   },
+   {
+    "id": "C25",
+    "want": "2.78%",
+    "got": "2.78%",
+    "ok": true
+   },
+   {
+    "id": "C26",
+    "want": "3.52%",
+    "got": "3.52%",
+    "ok": true
+   },
+   {
+    "id": "C27",
+    "want": "8.60%",
+    "got": "8.60%",
+    "ok": true
+   },
+   {
+    "id": "C28",
+    "want": "3.26%",
+    "got": "3.26%",
+    "ok": true
+   },
+   {
+    "id": "C29",
+    "want": "3.29%",
+    "got": "3.29%",
+    "ok": true
+   },
+   {
+    "id": "C30",
+    "want": "* 2024학년도 2학기 기준, 휴학생 제외",
+    "got": "* 2024학년도 2학기 기준, 휴학생 제외",
+    "ok": true
+   }
+  ],
+  "input": 4,
+  "output": 155,
+  "textUsed": false,
+  "readable": 1
+ },
+ {
+  "m": "IMG",
+  "set": "synth-p1",
+  "r": 0,
+  "graded": [
+   {
+    "id": "T1",
+    "want": "8,574",
+    "got": "8,574",
+    "ok": true
+   },
+   {
+    "id": "T2",
+    "want": "3,424",
+    "got": "3,424",
+    "ok": true
+   },
+   {
+    "id": "T3",
+    "want": "1,646",
+    "got": "1,646",
+    "ok": true
+   },
+   {
+    "id": "T4",
+    "want": "4,740",
+    "got": "4,740",
+    "ok": true
+   },
+   {
+    "id": "T5",
+    "want": "3,109",
+    "got": "3,109",
+    "ok": true
+   },
+   {
+    "id": "T6",
+    "want": "5,113",
+    "got": "5,113",
+    "ok": true
+   },
+   {
+    "id": "T7",
+    "want": "9,555",
+    "got": "9,555",
+    "ok": true
+   },
+   {
+    "id": "T8",
+    "want": "3,315",
+    "got": "3,315",
+    "ok": true
+   },
+   {
+    "id": "T9",
+    "want": "2,530",
+    "got": "2,530",
+    "ok": true
+   },
+   {
+    "id": "T10",
+    "want": "4,078",
+    "got": "4,078",
+    "ok": true
+   },
+   {
+    "id": "T11",
+    "want": "8,362",
+    "got": "8,362",
+    "ok": true
+   },
+   {
+    "id": "T12",
+    "want": "8,865",
+    "got": "8,865",
+    "ok": true
+   },
+   {
+    "id": "T13",
+    "want": "1,488",
+    "got": "1,488",
+    "ok": true
+   },
+   {
+    "id": "T14",
+    "want": "8,799",
+    "got": "8,799",
+    "ok": true
+   },
+   {
+    "id": "T15",
+    "want": "6,979",
+    "got": "6,979",
+    "ok": true
+   },
+   {
+    "id": "T16",
+    "want": "2,510",
+    "got": "2,510",
+    "ok": true
+   },
+   {
+    "id": "T17",
+    "want": "2,570",
+    "got": "2,570",
+    "ok": true
+   },
+   {
+    "id": "T18",
+    "want": "4,683",
+    "got": "4,683",
+    "ok": true
+   },
+   {
+    "id": "T19",
+    "want": "1,404",
+    "got": "1,404",
+    "ok": true
+   },
+   {
+    "id": "T20",
+    "want": "9,637",
+    "got": "9,637",
+    "ok": true
+   },
+   {
+    "id": "T21",
+    "want": "8,398",
+    "got": "8,398",
+    "ok": true
+   },
+   {
+    "id": "T22",
+    "want": "6,555",
+    "got": "6,555",
+    "ok": true
+   },
+   {
+    "id": "T23",
+    "want": "3,263",
+    "got": "3,263",
+    "ok": true
+   }
+  ],
+  "input": 1900,
+  "output": 1513,
+  "textUsed": false,
+  "readable": 1
+ },
+ {
+  "m": "IMG",
+  "set": "synth-p1",
+  "r": 2,
+  "graded": [
+   {
+    "id": "T1",
+    "want": "8,574",
+    "got": "8,574",
+    "ok": true
+   },
+   {
+    "id": "T2",
+    "want": "3,424",
+    "got": "3,424",
+    "ok": true
+   },
+   {
+    "id": "T3",
+    "want": "1,646",
+    "got": "1,646",
+    "ok": true
+   },
+   {
+    "id": "T4",
+    "want": "4,740",
+    "got": "4,740",
+    "ok": true
+   },
+   {
+    "id": "T5",
+    "want": "3,109",
+    "got": "3,109",
+    "ok": true
+   },
+   {
+    "id": "T6",
+    "want": "5,113",
+    "got": "5,113",
+    "ok": true
+   },
+   {
+    "id": "T7",
+    "want": "9,555",
+    "got": "9,555",
+    "ok": true
+   },
+   {
+    "id": "T8",
+    "want": "3,315",
+    "got": "3,315",
+    "ok": true
+   },
+   {
+    "id": "T9",
+    "want": "2,530",
+    "got": "2,530",
+    "ok": true
+   },
+   {
+    "id": "T10",
+    "want": "4,078",
+    "got": "1,505",
+    "ok": false
+   },
+   {
+    "id": "T11",
+    "want": "8,362",
+    "got": "8,362",
+    "ok": true
+   },
+   {
+    "id": "T12",
+    "want": "8,865",
+    "got": "8,865",
+    "ok": true
+   },
+   {
+    "id": "T13",
+    "want": "1,488",
+    "got": "1,488",
+    "ok": true
+   },
+   {
+    "id": "T14",
+    "want": "8,799",
+    "got": "8,799",
+    "ok": true
+   },
+   {
+    "id": "T15",
+    "want": "6,979",
+    "got": "6,979",
+    "ok": true
+   },
+   {
+    "id": "T16",
+    "want": "2,510",
+    "got": "2,510",
+    "ok": true
+   },
+   {
+    "id": "T17",
+    "want": "2,570",
+    "got": "2,570",
+    "ok": true
+   },
+   {
+    "id": "T18",
+    "want": "4,683",
+    "got": "4,683",
+    "ok": true
+   },
+   {
+    "id": "T19",
+    "want": "1,404",
+    "got": "1,404",
+    "ok": true
+   },
+   {
+    "id": "T20",
+    "want": "9,637",
+    "got": "9,637",
+    "ok": true
+   },
+   {
+    "id": "T21",
+    "want": "8,398",
+    "got": "7,606",
+    "ok": false
+   },
+   {
+    "id": "T22",
+    "want": "6,555",
+    "got": "6,555",
+    "ok": true
+   },
+   {
+    "id": "T23",
+    "want": "3,263",
+    "got": "3,263",
+    "ok": true
+   }
+  ],
+  "input": 1894,
+  "output": 833,
+  "textUsed": false,
+  "readable": 1
+ },
+ {
+  "m": "IMG",
+  "set": "synth-p2",
+  "r": 1,
+  "graded": [
+   {
+    "id": "C24",
+    "want": "7.89%",
+    "got": "7.89%",
+    "ok": true
+   },
+   {
+    "id": "C25",
+    "want": "2.78%",
+    "got": "2.78%",
+    "ok": true
+   },
+   {
+    "id": "C26",
+    "want": "3.52%",
+    "got": "3.52%",
+    "ok": true
+   },
+   {
+    "id": "C27",
+    "want": "8.60%",
+    "got": "8.60%",
+    "ok": true
+   },
+   {
+    "id": "C28",
+    "want": "3.26%",
+    "got": "3.26%",
+    "ok": true
+   },
+   {
+    "id": "C29",
+    "want": "3.29%",
+    "got": "3.29%",
+    "ok": true
+   },
+   {
+    "id": "C30",
+    "want": "* 2024학년도 2학기 기준, 휴학생 제외",
+    "got": "* 2024학년도 2학기 기준, 휴학생 제외",
+    "ok": true
+   }
+  ],
+  "input": 4,
+  "output": 155,
+  "textUsed": false,
+  "readable": 1
+ },
+ {
+  "m": "IMG",
+  "set": "synth-p3",
+  "r": 0,
+  "graded": [
+   {
+    "id": "F31",
+    "want": "한국교육개발원 조사(2024.11.07), n=8,785, 신뢰수준 95% ±2.5%p",
+    "got": "한국교육개발원 조사(2024.11.07), n=8,785, 신뢰수준 95% ±2.5%p",
+    "ok": true
+   },
+   {
+    "id": "F32",
+    "want": "내부 LMS 로그 기준 집계 ID KEDI-42796-B",
+    "got": "내부 LMS 로그 기준 집계 ID KEDI-42796-B",
+    "ok": true
+   },
+   {
+    "id": "F33",
+    "want": "문항 Q33·Q88 결측 31건 제외",
+    "got": "문항 Q33·Q88 결측 31건 제외",
+    "ok": true
+   },
+   {
+    "id": "F34",
+    "want": "가중치: 학년 0.70, 성별 0.21, 계열 0.79",
+    "got": "가중치: 학년 0.70, 성별 0.21, 계열 0.79",
+    "ok": true
+   },
+   {
+    "id": "F35",
+    "want": "insight-team61@kedi.example.kr",
+    "got": "insight-team61@kedi.example.kr",
+    "ok": true
+   }
+  ],
+  "input": 4,
+  "output": 208,
+  "textUsed": false,
+  "readable": 0.9946524064171123
+ },
+ {
+  "m": "IMG",
+  "set": "synth-p1",
+  "r": 1,
+  "graded": [
+   {
+    "id": "T1",
+    "want": "8,574",
+    "got": "8,574",
+    "ok": true
+   },
+   {
+    "id": "T2",
+    "want": "3,424",
+    "got": "3,424",
+    "ok": true
+   },
+   {
+    "id": "T3",
+    "want": "1,646",
+    "got": "1,646",
+    "ok": true
+   },
+   {
+    "id": "T4",
+    "want": "4,740",
+    "got": "4,740",
+    "ok": true
+   },
+   {
+    "id": "T5",
+    "want": "3,109",
+    "got": "3,109",
+    "ok": true
+   },
+   {
+    "id": "T6",
+    "want": "5,113",
+    "got": "5,113",
+    "ok": true
+   },
+   {
+    "id": "T7",
+    "want": "9,555",
+    "got": "9,555",
+    "ok": true
+   },
+   {
+    "id": "T8",
+    "want": "3,315",
+    "got": "3,315",
+    "ok": true
+   },
+   {
+    "id": "T9",
+    "want": "2,530",
+    "got": "2,530",
+    "ok": true
+   },
+   {
+    "id": "T10",
+    "want": "4,078",
+    "got": "4,078",
+    "ok": true
+   },
+   {
+    "id": "T11",
+    "want": "8,362",
+    "got": "8,362",
+    "ok": true
+   },
+   {
+    "id": "T12",
+    "want": "8,865",
+    "got": "8,865",
+    "ok": true
+   },
+   {
+    "id": "T13",
+    "want": "1,488",
+    "got": "1,488",
+    "ok": true
+   },
+   {
+    "id": "T14",
+    "want": "8,799",
+    "got": "8,799",
+    "ok": true
+   },
+   {
+    "id": "T15",
+    "want": "6,979",
+    "got": "6,979",
+    "ok": true
+   },
+   {
+    "id": "T16",
+    "want": "2,510",
+    "got": "2,510",
+    "ok": true
+   },
+   {
+    "id": "T17",
+    "want": "2,570",
+    "got": "2,570",
+    "ok": true
+   },
+   {
+    "id": "T18",
+    "want": "4,683",
+    "got": "4,683",
+    "ok": true
+   },
+   {
+    "id": "T19",
+    "want": "1,404",
+    "got": "1,404",
+    "ok": true
+   },
+   {
+    "id": "T20",
+    "want": "9,637",
+    "got": "9,637",
+    "ok": true
+   },
+   {
+    "id": "T21",
+    "want": "8,398",
+    "got": "8,398",
+    "ok": true
+   },
+   {
+    "id": "T22",
+    "want": "6,555",
+    "got": "6,555",
+    "ok": true
+   },
+   {
+    "id": "T23",
+    "want": "3,263",
+    "got": "3,263",
+    "ok": true
+   }
+  ],
+  "input": 1903,
+  "output": 1683,
+  "textUsed": false,
+  "readable": 1
+ },
+ {
+  "m": "IMG",
+  "set": "synth-p3",
+  "r": 1,
+  "graded": [
+   {
+    "id": "F31",
+    "want": "한국교육개발원 조사(2024.11.07), n=8,785, 신뢰수준 95% ±2.5%p",
+    "got": "한국교육개발원 조사(2024.11.07), n=8,785, 신뢰수준 95% ±2.5%p",
+    "ok": true
+   },
+   {
+    "id": "F32",
+    "want": "내부 LMS 로그 기준 집계 ID KEDI-42796-B",
+    "got": "내부 LMS 로그 기준 집계 ID KEDI-42796-B",
+    "ok": true
+   },
+   {
+    "id": "F33",
+    "want": "문항 Q33·Q88 결측 31건 제외",
+    "got": "문항 Q33·Q88 결측 31건 제외",
+    "ok": true
+   },
+   {
+    "id": "F34",
+    "want": "가중치: 학년 0.70, 성별 0.21, 계열 0.79",
+    "got": "가중치: 학년 0.70, 성별 0.21, 계열 0.79",
+    "ok": true
+   },
+   {
+    "id": "F35",
+    "want": "insight-team61@kedi.example.kr",
+    "got": "insight-team61@kedi.example.kr",
+    "ok": true
+   }
+  ],
+  "input": 4,
+  "output": 208,
+  "textUsed": false,
+  "readable": 0.9946524064171123
+ },
+ {
+  "m": "IMG",
+  "set": "synth-p4",
+  "r": 0,
+  "graded": [
+   {
+    "id": "K36",
+    "want": "834명 중 20명",
+    "got": "834명 중 20명",
+    "ok": true
+   },
+   {
+    "id": "K37",
+    "want": "838명 중 88명",
+    "got": "838명 중 88명",
+    "ok": true
+   },
+   {
+    "id": "K38",
+    "want": "641명 중 40명",
+    "got": "641명 중 40명",
+    "ok": true
+   },
+   {
+    "id": "K39",
+    "want": "507명 중 21명",
+    "got": "507명 중 21명",
+    "ok": true
+   },
+   {
+    "id": "K40",
+    "want": "389명 중 27명",
+    "got": "389명 중 27명",
+    "ok": true
+   },
+   {
+    "id": "K41",
+    "want": "400명 중 66명",
+    "got": "400명 중 66명",
+    "ok": true
+   },
+   {
+    "id": "K42",
+    "want": "977명 중 54명",
+    "got": "977명 중 54명",
+    "ok": true
+   },
+   {
+    "id": "K43",
+    "want": "244명 중 14명",
+    "got": "244명 중 14명",
+    "ok": true
+   }
+  ],
+  "input": 4,
+  "output": 501,
+  "textUsed": false,
+  "readable": 1
+ },
+ {
+  "m": "IMG",
+  "set": "synth-p4",
+  "r": 1,
+  "graded": [
+   {
+    "id": "K36",
+    "want": "834명 중 20명",
+    "got": "834명 중 20명",
+    "ok": true
+   },
+   {
+    "id": "K37",
+    "want": "838명 중 88명",
+    "got": "838명 중 88명",
+    "ok": true
+   },
+   {
+    "id": "K38",
+    "want": "641명 중 40명",
+    "got": "641명 중 40명",
+    "ok": true
+   },
+   {
+    "id": "K39",
+    "want": "507명 중 21명",
+    "got": "507명 중 21명",
+    "ok": true
+   },
+   {
+    "id": "K40",
+    "want": "389명 중 27명",
+    "got": "389명 중 27명",
+    "ok": true
+   },
+   {
+    "id": "K41",
+    "want": "400명 중 66명",
+    "got": "400명 중 66명",
+    "ok": true
+   },
+   {
+    "id": "K42",
+    "want": "977명 중 54명",
+    "got": "977명 중 54명",
+    "ok": true
+   },
+   {
+    "id": "K43",
+    "want": "244명 중 14명",
+    "got": "244명 중 14명",
+    "ok": true
+   }
+  ],
+  "input": 4,
+  "output": 464,
+  "textUsed": false,
+  "readable": 1
+ },
+ {
+  "m": "IMG",
+  "set": "synth-p3",
+  "r": 2,
+  "graded": [
+   {
+    "id": "F31",
+    "want": "한국교육개발원 조사(2024.11.07), n=8,785, 신뢰수준 95% ±2.5%p",
+    "got": "한국교육개발원 조사(2024.11.07), n=8,785, 신뢰수준 95% ±2.5%p",
+    "ok": true
+   },
+   {
+    "id": "F32",
+    "want": "내부 LMS 로그 기준 집계 ID KEDI-42796-B",
+    "got": "내부 LMS 로그 기준 접속 ID KEDI-42796-B",
+    "ok": false
+   },
+   {
+    "id": "F33",
+    "want": "문항 Q33·Q88 결측 31건 제외",
+    "got": "문항 Q33·Q88 결측 31건 제외",
+    "ok": true
+   },
+   {
+    "id": "F34",
+    "want": "가중치: 학년 0.70, 성별 0.21, 계열 0.79",
+    "got": "가중치: 학년 0.70, 성별 0.21, 계열 0.79",
+    "ok": true
+   },
+   {
+    "id": "F35",
+    "want": "insight-team61@kedi.example.kr",
+    "got": "insight-team61@kedi.example.kr",
+    "ok": true
+   }
+  ],
+  "input": 4,
+  "output": 528,
+  "textUsed": false,
+  "readable": 0.9946524064171123
+ },
+ {
+  "m": "IMG",
+  "set": "soi-p2",
+  "r": 0,
+  "graded": [
+   {
+    "id": "S1",
+    "want": "*Data Insights Market: 2025-2033 Strategic Insights.",
+    "got": "*Data Insights Market: 2025-2033 Strategic Insights.",
+    "ok": true
+   },
+   {
+    "id": "S2",
+    "want": "*Mordor Intelligence, Growth Trends & Forecasts 2025-2030",
+    "got": "*Mordor Intelligence, Growth Trends & Forecasts 2025-2030",
+    "ok": true
+   },
+   {
+    "id": "S3",
+    "want": "*Amra & Elma LLC, Top 20 Communication Platform Marketing Statistics 2025",
+    "got": "*Amra & Elma LLC, Top 20 Communication Platform Marketing Statistics 2025",
+    "ok": true
+   },
+   {
+    "id": "S4",
+    "want": "*전체 SNS 시장",
+    "got": "*전체 SNS 시장",
+    "ok": true
+   },
+   {
+    "id": "S5",
+    "want": "오픈형 SNS 및 기타",
+    "got": "오픈형 SNS 및 기타",
+    "ok": true
+   }
+  ],
+  "input": 4,
+  "output": 189,
+  "textUsed": false,
+  "readable": 0.7662337662337663
+ },
+ {
+  "m": "IMG",
+  "set": "soi-p2",
+  "r": 1,
+  "graded": [
+   {
+    "id": "S1",
+    "want": "*Data Insights Market: 2025-2033 Strategic Insights.",
+    "got": "*Data Insights Market: 2025-2033 Strategic Insights.",
+    "ok": true
+   },
+   {
+    "id": "S2",
+    "want": "*Mordor Intelligence, Growth Trends & Forecasts 2025-2030",
+    "got": "*Mordor Intelligence, Growth Trends & Forecasts 2025-2030",
+    "ok": true
+   },
+   {
+    "id": "S3",
+    "want": "*Amra & Elma LLC, Top 20 Communication Platform Marketing Statistics 2025",
+    "got": "*Amra & Elma LLC, Top 20 Communication Platform Marketing Statistics 2025",
+    "ok": true
+   },
+   {
+    "id": "S4",
+    "want": "*전체 SNS 시장",
+    "got": "*전체 SNS 시장",
+    "ok": true
+   },
+   {
+    "id": "S5",
+    "want": "오픈형 SNS 및 기타",
+    "got": "오픈형 SNS 및 기타",
+    "ok": true
+   }
+  ],
+  "input": 4,
+  "output": 189,
+  "textUsed": false,
+  "readable": 0.7662337662337663
+ },
+ {
+  "m": "IMG",
+  "set": "soi-p2",
+  "r": 2,
+  "graded": [
+   {
+    "id": "S1",
+    "want": "*Data Insights Market: 2025-2033 Strategic Insights.",
+    "got": "*Data Insights Market: 2025-2033 Strategic Insights.",
+    "ok": true
+   },
+   {
+    "id": "S2",
+    "want": "*Mordor Intelligence, Growth Trends & Forecasts 2025-2030",
+    "got": "*Mordor Intelligence, Growth Trends & Forecasts 2025-2030",
+    "ok": true
+   },
+   {
+    "id": "S3",
+    "want": "*Amra & Elma LLC, Top 20 Communication Platform Marketing Statistics 2025",
+    "got": "*Amra & Elma LLC, Top 20 Communication Platform Marketing Statistics 2025",
+    "ok": true
+   },
+   {
+    "id": "S4",
+    "want": "*전체 SNS 시장",
+    "got": "*전체 SNS 시장",
+    "ok": true
+   },
+   {
+    "id": "S5",
+    "want": "오픈형 SNS 및 기타",
+    "got": "오픈형 SNS 및 기타",
+    "ok": true
+   }
+  ],
+  "input": 4,
+  "output": 189,
+  "textUsed": false,
+  "readable": 0.7662337662337663
+ },
+ {
+  "m": "IMG",
+  "set": "soi-p12",
+  "r": 0,
+  "graded": [
+   {
+    "id": "S6",
+    "want": "현장 사용자 접점 확보",
+    "got": "현장 사용자 접점 확보",
+    "ok": true
+   },
+   {
+    "id": "S7",
+    "want": "총 80명 진행",
+    "got": "총 80명 진행",
+    "ok": true
+   },
+   {
+    "id": "S8",
+    "want": "2주간 진행",
+    "got": "2주간 진행",
+    "ok": true
+   },
+   {
+    "id": "S9",
+    "want": "베타 앱 기반 테스트",
+    "got": "베타 앱 기반 테스트",
+    "ok": true
+   },
+   {
+    "id": "S10",
+    "want": "EN, ES",
+    "got": "EN, ES",
+    "ok": true
+   }
+  ],
+  "input": 4,
+  "output": 122,
+  "textUsed": false,
+  "readable": 0.40076335877862596
+ },
+ {
+  "m": "IMG",
+  "set": "soi-p12",
+  "r": 1,
+  "graded": [
+   {
+    "id": "S6",
+    "want": "현장 사용자 접점 확보",
+    "got": "현장 사용자 접점 확보",
+    "ok": true
+   },
+   {
+    "id": "S7",
+    "want": "총 80명 진행",
+    "got": "총 80명 진행",
+    "ok": true
+   },
+   {
+    "id": "S8",
+    "want": "2주간 진행",
+    "got": "2주간 진행",
+    "ok": true
+   },
+   {
+    "id": "S9",
+    "want": "베타 앱 기반 테스트",
+    "got": "베타 앱 기반 테스트",
+    "ok": true
+   },
+   {
+    "id": "S10",
+    "want": "EN, ES",
+    "got": "EN, ES",
+    "ok": true
+   }
+  ],
+  "input": 4,
+  "output": 122,
+  "textUsed": false,
+  "readable": 0.40076335877862596
+ },
+ {
+  "m": "IMG",
+  "set": "soi-p12",
+  "r": 2,
+  "graded": [
+   {
+    "id": "S6",
+    "want": "현장 사용자 접점 확보",
+    "got": "현장 사용자 접점 확보",
+    "ok": true
+   },
+   {
+    "id": "S7",
+    "want": "총 80명 진행",
+    "got": "총 80명 진행",
+    "ok": true
+   },
+   {
+    "id": "S8",
+    "want": "2주간 진행",
+    "got": "2주간 진행",
+    "ok": true
+   },
+   {
+    "id": "S9",
+    "want": "베타 앱 기반 테스트",
+    "got": "베타 앱 기반 테스트",
+    "ok": true
+   },
+   {
+    "id": "S10",
+    "want": "EN, ES",
+    "got": "EN, ES",
+    "ok": true
+   }
+  ],
+  "input": 4,
+  "output": 122,
+  "textUsed": false,
+  "readable": 0.40076335877862596
+ },
+ {
+  "m": "IMG",
+  "set": "synth-p4",
+  "r": 2,
+  "graded": [
+   {
+    "id": "K36",
+    "want": "834명 중 20명",
+    "got": "834명 중 20명",
+    "ok": true
+   },
+   {
+    "id": "K37",
+    "want": "838명 중 88명",
+    "got": "838명 중 88명",
+    "ok": true
+   },
+   {
+    "id": "K38",
+    "want": "641명 중 40명",
+    "got": "641명 중 40명",
+    "ok": true
+   },
+   {
+    "id": "K39",
+    "want": "507명 중 21명",
+    "got": "507명 중 21명",
+    "ok": true
+   },
+   {
+    "id": "K40",
+    "want": "389명 중 27명",
+    "got": "389명 중 27명",
+    "ok": true
+   },
+   {
+    "id": "K41",
+    "want": "400명 중 66명",
+    "got": "400명 중 66명",
+    "ok": true
+   },
+   {
+    "id": "K42",
+    "want": "977명 중 54명",
+    "got": "977명 중 54명",
+    "ok": true
+   },
+   {
+    "id": "K43",
+    "want": "244명 중 14명",
+    "got": "244명 중 14명",
+    "ok": true
+   }
+  ],
+  "input": 4,
+  "output": 524,
+  "textUsed": false,
+  "readable": 1
+ },
+ {
+  "m": "IMG+TXT",
+  "set": "synth-p2",
+  "r": 0,
+  "graded": [
+   {
+    "id": "C24",
+    "want": "7.89%",
+    "got": "7.89%",
+    "ok": true
+   },
+   {
+    "id": "C25",
+    "want": "2.78%",
+    "got": "2.78%",
+    "ok": true
+   },
+   {
+    "id": "C26",
+    "want": "3.52%",
+    "got": "3.52%",
+    "ok": true
+   },
+   {
+    "id": "C27",
+    "want": "8.60%",
+    "got": "8.60%",
+    "ok": true
+   },
+   {
+    "id": "C28",
+    "want": "3.26%",
+    "got": "3.26%",
+    "ok": true
+   },
+   {
+    "id": "C29",
+    "want": "3.29%",
+    "got": "3.29%",
+    "ok": true
+   },
+   {
+    "id": "C30",
+    "want": "* 2024학년도 2학기 기준, 휴학생 제외",
+    "got": "* 2024학년도 2학기 기준, 휴학생 제외",
+    "ok": true
+   }
+  ],
+  "input": 4,
+  "output": 155,
+  "textUsed": true,
+  "readable": 1
+ },
+ {
+  "m": "IMG+TXT",
+  "set": "synth-p2",
+  "r": 1,
+  "graded": [
+   {
+    "id": "C24",
+    "want": "7.89%",
+    "got": "7.89%",
+    "ok": true
+   },
+   {
+    "id": "C25",
+    "want": "2.78%",
+    "got": "2.78%",
+    "ok": true
+   },
+   {
+    "id": "C26",
+    "want": "3.52%",
+    "got": "3.52%",
+    "ok": true
+   },
+   {
+    "id": "C27",
+    "want": "8.60%",
+    "got": "8.60%",
+    "ok": true
+   },
+   {
+    "id": "C28",
+    "want": "3.26%",
+    "got": "3.26%",
+    "ok": true
+   },
+   {
+    "id": "C29",
+    "want": "3.29%",
+    "got": "3.29%",
+    "ok": true
+   },
+   {
+    "id": "C30",
+    "want": "* 2024학년도 2학기 기준, 휴학생 제외",
+    "got": "* 2024학년도 2학기 기준, 휴학생 제외",
+    "ok": true
+   }
+  ],
+  "input": 4,
+  "output": 155,
+  "textUsed": true,
+  "readable": 1
+ },
+ {
+  "m": "IMG+TXT",
+  "set": "synth-p2",
+  "r": 2,
+  "graded": [
+   {
+    "id": "C24",
+    "want": "7.89%",
+    "got": "7.89%",
+    "ok": true
+   },
+   {
+    "id": "C25",
+    "want": "2.78%",
+    "got": "2.78%",
+    "ok": true
+   },
+   {
+    "id": "C26",
+    "want": "3.52%",
+    "got": "3.52%",
+    "ok": true
+   },
+   {
+    "id": "C27",
+    "want": "8.60%",
+    "got": "8.60%",
+    "ok": true
+   },
+   {
+    "id": "C28",
+    "want": "3.26%",
+    "got": "3.26%",
+    "ok": true
+   },
+   {
+    "id": "C29",
+    "want": "3.29%",
+    "got": "3.29%",
+    "ok": true
+   },
+   {
+    "id": "C30",
+    "want": "* 2024학년도 2학기 기준, 휴학생 제외",
+    "got": "* 2024학년도 2학기 기준, 휴학생 제외",
+    "ok": true
+   }
+  ],
+  "input": 4,
+  "output": 155,
+  "textUsed": true,
+  "readable": 1
+ },
+ {
+  "m": "IMG+TXT",
+  "set": "synth-p3",
+  "r": 0,
+  "graded": [
+   {
+    "id": "F31",
+    "want": "한국교육개발원 조사(2024.11.07), n=8,785, 신뢰수준 95% ±2.5%p",
+    "got": "한국교육개발원 조사(2024.11.07), n=8,785, 신뢰수준 95% ±2.5%p",
+    "ok": true
+   },
+   {
+    "id": "F32",
+    "want": "내부 LMS 로그 기준 집계 ID KEDI-42796-B",
+    "got": "내부 LMS 로그 기준 집계 ID KEDI-42796-B",
+    "ok": true
+   },
+   {
+    "id": "F33",
+    "want": "문항 Q33·Q88 결측 31건 제외",
+    "got": "문항 Q33·Q88 결측 31건 제외",
+    "ok": true
+   },
+   {
+    "id": "F34",
+    "want": "가중치: 학년 0.70, 성별 0.21, 계열 0.79",
+    "got": "가중치: 학년 0.70, 성별 0.21, 계열 0.79",
+    "ok": true
+   },
+   {
+    "id": "F35",
+    "want": "insight-team61@kedi.example.kr",
+    "got": "insight-team61@kedi.example.kr",
+    "ok": true
+   }
+  ],
+  "input": 4,
+  "output": 208,
+  "textUsed": true,
+  "readable": 0.9946524064171123
+ },
+ {
+  "m": "IMG+TXT",
+  "set": "synth-p3",
+  "r": 1,
+  "graded": [
+   {
+    "id": "F31",
+    "want": "한국교육개발원 조사(2024.11.07), n=8,785, 신뢰수준 95% ±2.5%p",
+    "got": "한국교육개발원 조사(2024.11.07), n=8,785, 신뢰수준 95% ±2.5%p",
+    "ok": true
+   },
+   {
+    "id": "F32",
+    "want": "내부 LMS 로그 기준 집계 ID KEDI-42796-B",
+    "got": "내부 LMS 로그 기준 집계 ID KEDI-42796-B",
+    "ok": true
+   },
+   {
+    "id": "F33",
+    "want": "문항 Q33·Q88 결측 31건 제외",
+    "got": "문항 Q33·Q88 결측 31건 제외",
+    "ok": true
+   },
+   {
+    "id": "F34",
+    "want": "가중치: 학년 0.70, 성별 0.21, 계열 0.79",
+    "got": "가중치: 학년 0.70, 성별 0.21, 계열 0.79",
+    "ok": true
+   },
+   {
+    "id": "F35",
+    "want": "insight-team61@kedi.example.kr",
+    "got": "insight-team61@kedi.example.kr",
+    "ok": true
+   }
+  ],
+  "input": 4,
+  "output": 208,
+  "textUsed": true,
+  "readable": 0.9946524064171123
+ },
+ {
+  "m": "IMG+TXT",
+  "set": "synth-p1",
+  "r": 0,
+  "graded": [
+   {
+    "id": "T1",
+    "want": "8,574",
+    "got": "8,574",
+    "ok": true
+   },
+   {
+    "id": "T2",
+    "want": "3,424",
+    "got": "3,424",
+    "ok": true
+   },
+   {
+    "id": "T3",
+    "want": "1,646",
+    "got": "1,646",
+    "ok": true
+   },
+   {
+    "id": "T4",
+    "want": "4,740",
+    "got": "4,740",
+    "ok": true
+   },
+   {
+    "id": "T5",
+    "want": "3,109",
+    "got": "3,109",
+    "ok": true
+   },
+   {
+    "id": "T6",
+    "want": "5,113",
+    "got": "5,113",
+    "ok": true
+   },
+   {
+    "id": "T7",
+    "want": "9,555",
+    "got": "9,555",
+    "ok": true
+   },
+   {
+    "id": "T8",
+    "want": "3,315",
+    "got": "3,315",
+    "ok": true
+   },
+   {
+    "id": "T9",
+    "want": "2,530",
+    "got": "2,530",
+    "ok": true
+   },
+   {
+    "id": "T10",
+    "want": "4,078",
+    "got": "4,078",
+    "ok": true
+   },
+   {
+    "id": "T11",
+    "want": "8,362",
+    "got": "8,362",
+    "ok": true
+   },
+   {
+    "id": "T12",
+    "want": "8,865",
+    "got": "8,865",
+    "ok": true
+   },
+   {
+    "id": "T13",
+    "want": "1,488",
+    "got": "1,488",
+    "ok": true
+   },
+   {
+    "id": "T14",
+    "want": "8,799",
+    "got": "8,799",
+    "ok": true
+   },
+   {
+    "id": "T15",
+    "want": "6,979",
+    "got": "6,979",
+    "ok": true
+   },
+   {
+    "id": "T16",
+    "want": "2,510",
+    "got": "2,510",
+    "ok": true
+   },
+   {
+    "id": "T17",
+    "want": "2,570",
+    "got": "2,570",
+    "ok": true
+   },
+   {
+    "id": "T18",
+    "want": "4,683",
+    "got": "4,683",
+    "ok": true
+   },
+   {
+    "id": "T19",
+    "want": "1,404",
+    "got": "1,404",
+    "ok": true
+   },
+   {
+    "id": "T20",
+    "want": "9,637",
+    "got": "9,637",
+    "ok": true
+   },
+   {
+    "id": "T21",
+    "want": "8,398",
+    "got": "8,398",
+    "ok": true
+   },
+   {
+    "id": "T22",
+    "want": "6,555",
+    "got": "6,555",
+    "ok": true
+   },
+   {
+    "id": "T23",
+    "want": "3,263",
+    "got": "3,263",
+    "ok": true
+   }
+  ],
+  "input": 1853,
+  "output": 783,
+  "textUsed": true,
+  "readable": 1
+ },
+ {
+  "m": "IMG+TXT",
+  "set": "synth-p3",
+  "r": 2,
+  "graded": [
+   {
+    "id": "F31",
+    "want": "한국교육개발원 조사(2024.11.07), n=8,785, 신뢰수준 95% ±2.5%p",
+    "got": "한국교육개발원 조사(2024.11.07), n=8,785, 신뢰수준 95% ±2.5%p",
+    "ok": true
+   },
+   {
+    "id": "F32",
+    "want": "내부 LMS 로그 기준 집계 ID KEDI-42796-B",
+    "got": "내부 LMS 로그 기준 집계 ID KEDI-42796-B",
+    "ok": true
+   },
+   {
+    "id": "F33",
+    "want": "문항 Q33·Q88 결측 31건 제외",
+    "got": "문항 Q33·Q88 결측 31건 제외",
+    "ok": true
+   },
+   {
+    "id": "F34",
+    "want": "가중치: 학년 0.70, 성별 0.21, 계열 0.79",
+    "got": "가중치: 학년 0.70, 성별 0.21, 계열 0.79",
+    "ok": true
+   },
+   {
+    "id": "F35",
+    "want": "insight-team61@kedi.example.kr",
+    "got": "insight-team61@kedi.example.kr",
+    "ok": true
+   }
+  ],
+  "input": 4,
+  "output": 208,
+  "textUsed": true,
+  "readable": 0.9946524064171123
+ },
+ {
+  "m": "IMG+TXT",
+  "set": "synth-p1",
+  "r": 2,
+  "graded": [
+   {
+    "id": "T1",
+    "want": "8,574",
+    "got": "8,574",
+    "ok": true
+   },
+   {
+    "id": "T2",
+    "want": "3,424",
+    "got": "3,424",
+    "ok": true
+   },
+   {
+    "id": "T3",
+    "want": "1,646",
+    "got": "1,646",
+    "ok": true
+   },
+   {
+    "id": "T4",
+    "want": "4,740",
+    "got": "4,740",
+    "ok": true
+   },
+   {
+    "id": "T5",
+    "want": "3,109",
+    "got": "3,109",
+    "ok": true
+   },
+   {
+    "id": "T6",
+    "want": "5,113",
+    "got": "5,113",
+    "ok": true
+   },
+   {
+    "id": "T7",
+    "want": "9,555",
+    "got": "9,555",
+    "ok": true
+   },
+   {
+    "id": "T8",
+    "want": "3,315",
+    "got": "3,315",
+    "ok": true
+   },
+   {
+    "id": "T9",
+    "want": "2,530",
+    "got": "2,530",
+    "ok": true
+   },
+   {
+    "id": "T10",
+    "want": "4,078",
+    "got": "4,078",
+    "ok": true
+   },
+   {
+    "id": "T11",
+    "want": "8,362",
+    "got": "8,362",
+    "ok": true
+   },
+   {
+    "id": "T12",
+    "want": "8,865",
+    "got": "8,865",
+    "ok": true
+   },
+   {
+    "id": "T13",
+    "want": "1,488",
+    "got": "1,488",
+    "ok": true
+   },
+   {
+    "id": "T14",
+    "want": "8,799",
+    "got": "8,799",
+    "ok": true
+   },
+   {
+    "id": "T15",
+    "want": "6,979",
+    "got": "6,979",
+    "ok": true
+   },
+   {
+    "id": "T16",
+    "want": "2,510",
+    "got": "2,510",
+    "ok": true
+   },
+   {
+    "id": "T17",
+    "want": "2,570",
+    "got": "2,570",
+    "ok": true
+   },
+   {
+    "id": "T18",
+    "want": "4,683",
+    "got": "4,683",
+    "ok": true
+   },
+   {
+    "id": "T19",
+    "want": "1,404",
+    "got": "1,404",
+    "ok": true
+   },
+   {
+    "id": "T20",
+    "want": "9,637",
+    "got": "9,637",
+    "ok": true
+   },
+   {
+    "id": "T21",
+    "want": "8,398",
+    "got": "8,398",
+    "ok": true
+   },
+   {
+    "id": "T22",
+    "want": "6,555",
+    "got": "6,555",
+    "ok": true
+   },
+   {
+    "id": "T23",
+    "want": "3,263",
+    "got": "3,263",
+    "ok": true
+   }
+  ],
+  "input": 1841,
+  "output": 778,
+  "textUsed": true,
+  "readable": 1
+ },
+ {
+  "m": "IMG+TXT",
+  "set": "synth-p1",
+  "r": 1,
+  "graded": [
+   {
+    "id": "T1",
+    "want": "8,574",
+    "got": "8,574",
+    "ok": true
+   },
+   {
+    "id": "T2",
+    "want": "3,424",
+    "got": "3,424",
+    "ok": true
+   },
+   {
+    "id": "T3",
+    "want": "1,646",
+    "got": "1,646",
+    "ok": true
+   },
+   {
+    "id": "T4",
+    "want": "4,740",
+    "got": "4,740",
+    "ok": true
+   },
+   {
+    "id": "T5",
+    "want": "3,109",
+    "got": "3,109",
+    "ok": true
+   },
+   {
+    "id": "T6",
+    "want": "5,113",
+    "got": "5,113",
+    "ok": true
+   },
+   {
+    "id": "T7",
+    "want": "9,555",
+    "got": "9,555",
+    "ok": true
+   },
+   {
+    "id": "T8",
+    "want": "3,315",
+    "got": "3,315",
+    "ok": true
+   },
+   {
+    "id": "T9",
+    "want": "2,530",
+    "got": "2,530",
+    "ok": true
+   },
+   {
+    "id": "T10",
+    "want": "4,078",
+    "got": "4,078",
+    "ok": true
+   },
+   {
+    "id": "T11",
+    "want": "8,362",
+    "got": "8,362",
+    "ok": true
+   },
+   {
+    "id": "T12",
+    "want": "8,865",
+    "got": "8,865",
+    "ok": true
+   },
+   {
+    "id": "T13",
+    "want": "1,488",
+    "got": "1,488",
+    "ok": true
+   },
+   {
+    "id": "T14",
+    "want": "8,799",
+    "got": "8,799",
+    "ok": true
+   },
+   {
+    "id": "T15",
+    "want": "6,979",
+    "got": "6,979",
+    "ok": true
+   },
+   {
+    "id": "T16",
+    "want": "2,510",
+    "got": "2,510",
+    "ok": true
+   },
+   {
+    "id": "T17",
+    "want": "2,570",
+    "got": "2,570",
+    "ok": true
+   },
+   {
+    "id": "T18",
+    "want": "4,683",
+    "got": "4,683",
+    "ok": true
+   },
+   {
+    "id": "T19",
+    "want": "1,404",
+    "got": "1,404",
+    "ok": true
+   },
+   {
+    "id": "T20",
+    "want": "9,637",
+    "got": "9,637",
+    "ok": true
+   },
+   {
+    "id": "T21",
+    "want": "8,398",
+    "got": "8,398",
+    "ok": true
+   },
+   {
+    "id": "T22",
+    "want": "6,555",
+    "got": "6,555",
+    "ok": true
+   },
+   {
+    "id": "T23",
+    "want": "3,263",
+    "got": "3,263",
+    "ok": true
+   }
+  ],
+  "input": 1950,
+  "output": 908,
+  "textUsed": true,
+  "readable": 1
+ },
+ {
+  "m": "IMG+TXT",
+  "set": "soi-p2",
+  "r": 1,
+  "graded": [
+   {
+    "id": "S1",
+    "want": "*Data Insights Market: 2025-2033 Strategic Insights.",
+    "got": "*Data Insights Market: 2025-2033 Strategic Insights.",
+    "ok": true
+   },
+   {
+    "id": "S2",
+    "want": "*Mordor Intelligence, Growth Trends & Forecasts 2025-2030",
+    "got": "*Mordor Intelligence, Growth Trends & Forecasts 2025-2030",
+    "ok": true
+   },
+   {
+    "id": "S3",
+    "want": "*Amra & Elma LLC, Top 20 Communication Platform Marketing Statistics 2025",
+    "got": "*Amra & Elma LLC, Top 20 Communication Platform Marketing Statistics 2025",
+    "ok": true
+   },
+   {
+    "id": "S4",
+    "want": "*전체 SNS 시장",
+    "got": "*전체 SNS 시장",
+    "ok": true
+   },
+   {
+    "id": "S5",
+    "want": "오픈형 SNS 및 기타",
+    "got": "오픈형 SNS 및 기타",
+    "ok": true
+   }
+  ],
+  "input": 4,
+  "output": 189,
+  "textUsed": false,
+  "readable": 0.7662337662337663
+ },
+ {
+  "m": "IMG+TXT",
+  "set": "soi-p2",
+  "r": 2,
+  "graded": [
+   {
+    "id": "S1",
+    "want": "*Data Insights Market: 2025-2033 Strategic Insights.",
+    "got": "*Data Insights Market: 2025-2033 Strategic Insights.",
+    "ok": true
+   },
+   {
+    "id": "S2",
+    "want": "*Mordor Intelligence, Growth Trends & Forecasts 2025-2030",
+    "got": "*Mordor Intelligence, Growth Trends & Forecasts 2025-2030",
+    "ok": true
+   },
+   {
+    "id": "S3",
+    "want": "*Amra & Elma LLC, Top 20 Communication Platform Marketing Statistics 2025",
+    "got": "*Amra & Elma LLC, Top 20 Communication Platform Marketing Statistics 2025",
+    "ok": true
+   },
+   {
+    "id": "S4",
+    "want": "*전체 SNS 시장",
+    "got": "*전체 SNS 시장",
+    "ok": true
+   },
+   {
+    "id": "S5",
+    "want": "오픈형 SNS 및 기타",
+    "got": "오픈형 SNS 및 기타",
+    "ok": true
+   }
+  ],
+  "input": 4,
+  "output": 189,
+  "textUsed": false,
+  "readable": 0.7662337662337663
+ },
+ {
+  "m": "IMG+TXT",
+  "set": "synth-p4",
+  "r": 0,
+  "graded": [
+   {
+    "id": "K36",
+    "want": "834명 중 20명",
+    "got": "834명 중 20명",
+    "ok": true
+   },
+   {
+    "id": "K37",
+    "want": "838명 중 88명",
+    "got": "838명 중 88명",
+    "ok": true
+   },
+   {
+    "id": "K38",
+    "want": "641명 중 40명",
+    "got": "641명 중 40명",
+    "ok": true
+   },
+   {
+    "id": "K39",
+    "want": "507명 중 21명",
+    "got": "507명 중 21명",
+    "ok": true
+   },
+   {
+    "id": "K40",
+    "want": "389명 중 27명",
+    "got": "389명 중 27명",
+    "ok": true
+   },
+   {
+    "id": "K41",
+    "want": "400명 중 66명",
+    "got": "400명 중 66명",
+    "ok": true
+   },
+   {
+    "id": "K42",
+    "want": "977명 중 54명",
+    "got": "977명 중 54명",
+    "ok": true
+   },
+   {
+    "id": "K43",
+    "want": "244명 중 14명",
+    "got": "244명 중 14명",
+    "ok": true
+   }
+  ],
+  "input": 4,
+  "output": 531,
+  "textUsed": true,
+  "readable": 1
+ },
+ {
+  "m": "IMG+TXT",
+  "set": "soi-p2",
+  "r": 0,
+  "graded": [
+   {
+    "id": "S1",
+    "want": "*Data Insights Market: 2025-2033 Strategic Insights.",
+    "got": "*Data Insights Market: 2025-2033 Strategic Insights.",
+    "ok": true
+   },
+   {
+    "id": "S2",
+    "want": "*Mordor Intelligence, Growth Trends & Forecasts 2025-2030",
+    "got": "*Mordor Intelligence, Growth Trends & Forecasts 2025-2030",
+    "ok": true
+   },
+   {
+    "id": "S3",
+    "want": "*Amra & Elma LLC, Top 20 Communication Platform Marketing Statistics 2025",
+    "got": "*Amra & Elma LLC, Top 20 Communication Platform Marketing Statistics 2025",
+    "ok": true
+   },
+   {
+    "id": "S4",
+    "want": "*전체 SNS 시장",
+    "got": "*전체 SNS 시장",
+    "ok": true
+   },
+   {
+    "id": "S5",
+    "want": "오픈형 SNS 및 기타",
+    "got": "오픈형 SNS 및 기타",
+    "ok": true
+   }
+  ],
+  "input": 4,
+  "output": 189,
+  "textUsed": false,
+  "readable": 0.7662337662337663
+ },
+ {
+  "m": "IMG+TXT",
+  "set": "synth-p4",
+  "r": 1,
+  "graded": [
+   {
+    "id": "K36",
+    "want": "834명 중 20명",
+    "got": "834명 중 20명",
+    "ok": true
+   },
+   {
+    "id": "K37",
+    "want": "838명 중 88명",
+    "got": "838명 중 88명",
+    "ok": true
+   },
+   {
+    "id": "K38",
+    "want": "641명 중 40명",
+    "got": "641명 중 40명",
+    "ok": true
+   },
+   {
+    "id": "K39",
+    "want": "507명 중 21명",
+    "got": "507명 중 21명",
+    "ok": true
+   },
+   {
+    "id": "K40",
+    "want": "389명 중 27명",
+    "got": "389명 중 27명",
+    "ok": true
+   },
+   {
+    "id": "K41",
+    "want": "400명 중 66명",
+    "got": "400명 중 66명",
+    "ok": true
+   },
+   {
+    "id": "K42",
+    "want": "977명 중 54명",
+    "got": "977명 중 54명",
+    "ok": true
+   },
+   {
+    "id": "K43",
+    "want": "244명 중 14명",
+    "got": "244명 중 14명",
+    "ok": true
+   }
+  ],
+  "input": 4,
+  "output": 494,
+  "textUsed": true,
+  "readable": 1
+ },
+ {
+  "m": "IMG+TXT",
+  "set": "synth-p4",
+  "r": 2,
+  "graded": [
+   {
+    "id": "K36",
+    "want": "834명 중 20명",
+    "got": "834명 중 20명",
+    "ok": true
+   },
+   {
+    "id": "K37",
+    "want": "838명 중 88명",
+    "got": "838명 중 88명",
+    "ok": true
+   },
+   {
+    "id": "K38",
+    "want": "641명 중 40명",
+    "got": "641명 중 40명",
+    "ok": true
+   },
+   {
+    "id": "K39",
+    "want": "507명 중 21명",
+    "got": "507명 중 21명",
+    "ok": true
+   },
+   {
+    "id": "K40",
+    "want": "389명 중 27명",
+    "got": "389명 중 27명",
+    "ok": true
+   },
+   {
+    "id": "K41",
+    "want": "400명 중 66명",
+    "got": "400명 중 66명",
+    "ok": true
+   },
+   {
+    "id": "K42",
+    "want": "977명 중 54명",
+    "got": "977명 중 54명",
+    "ok": true
+   },
+   {
+    "id": "K43",
+    "want": "244명 중 14명",
+    "got": "244명 중 14명",
+    "ok": true
+   }
+  ],
+  "input": 4,
+  "output": 454,
+  "textUsed": true,
+  "readable": 1
+ },
+ {
+  "m": "IMG+TXT",
+  "set": "soi-p12",
+  "r": 0,
+  "graded": [
+   {
+    "id": "S6",
+    "want": "현장 사용자 접점 확보",
+    "got": "현장 사용자 접점 확보",
+    "ok": true
+   },
+   {
+    "id": "S7",
+    "want": "총 80명 진행",
+    "got": "총 80명 진행",
+    "ok": true
+   },
+   {
+    "id": "S8",
+    "want": "2주간 진행",
+    "got": "2주간 진행",
+    "ok": true
+   },
+   {
+    "id": "S9",
+    "want": "베타 앱 기반 테스트",
+    "got": "베타 앱 기반 테스트",
+    "ok": true
+   },
+   {
+    "id": "S10",
+    "want": "EN, ES",
+    "got": "EN, ES",
+    "ok": true
+   }
+  ],
+  "input": 4,
+  "output": 122,
+  "textUsed": false,
+  "readable": 0.40076335877862596
+ },
+ {
+  "m": "IMG+TXT",
+  "set": "soi-p12",
+  "r": 1,
+  "graded": [
+   {
+    "id": "S6",
+    "want": "현장 사용자 접점 확보",
+    "got": "현장 사용자 접점 확보",
+    "ok": true
+   },
+   {
+    "id": "S7",
+    "want": "총 80명 진행",
+    "got": "총 80명 진행",
+    "ok": true
+   },
+   {
+    "id": "S8",
+    "want": "2주간 진행",
+    "got": "2주간 진행",
+    "ok": true
+   },
+   {
+    "id": "S9",
+    "want": "베타 앱 기반 테스트",
+    "got": "베타 앱 기반 테스트",
+    "ok": true
+   },
+   {
+    "id": "S10",
+    "want": "EN, ES",
+    "got": "EN, ES",
+    "ok": true
+   }
+  ],
+  "input": 4,
+  "output": 122,
+  "textUsed": false,
+  "readable": 0.40076335877862596
+ },
+ {
+  "m": "IMG+TXT",
+  "set": "soi-p12",
+  "r": 2,
+  "graded": [
+   {
+    "id": "S6",
+    "want": "현장 사용자 접점 확보",
+    "got": "현장 사용자 접점 확보",
+    "ok": true
+   },
+   {
+    "id": "S7",
+    "want": "총 80명 진행",
+    "got": "총 80명 진행",
+    "ok": true
+   },
+   {
+    "id": "S8",
+    "want": "2주간 진행",
+    "got": "2주간 진행",
+    "ok": true
+   },
+   {
+    "id": "S9",
+    "want": "베타 앱 기반 테스트",
+    "got": "베타 앱 기반 테스트",
+    "ok": true
+   },
+   {
+    "id": "S10",
+    "want": "EN, ES",
+    "got": "EN, ES",
+    "ok": true
+   }
+  ],
+  "input": 4,
+  "output": 122,
+  "textUsed": false,
+  "readable": 0.40076335877862596
+ },
+ {
+  "m": "IMG+TXT-raw",
+  "set": "soi-p2",
+  "r": 0,
+  "graded": [
+   {
+    "id": "S1",
+    "want": "*Data Insights Market: 2025-2033 Strategic Insights.",
+    "got": "*Data Insights Market: 2025-2033 Strategic Insights.",
+    "ok": true
+   },
+   {
+    "id": "S2",
+    "want": "*Mordor Intelligence, Growth Trends & Forecasts 2025-2030",
+    "got": "*Mordor Intelligence, Growth Trends & Forecasts 2025-2030",
+    "ok": true
+   },
+   {
+    "id": "S3",
+    "want": "*Amra & Elma LLC, Top 20 Communication Platform Marketing Statistics 2025",
+    "got": "*Amra & Elma LLC, Top 20 Communication Platform Marketing Statistics 2025",
+    "ok": true
+   },
+   {
+    "id": "S4",
+    "want": "*전체 SNS 시장",
+    "got": "*전체 SNS 시장",
+    "ok": true
+   },
+   {
+    "id": "S5",
+    "want": "오픈형 SNS 및 기타",
+    "got": "오픈형 SNS 및 기타",
+    "ok": true
+   }
+  ],
+  "input": 4,
+  "output": 394,
+  "textUsed": true,
+  "readable": 0.7662337662337663
+ },
+ {
+  "m": "IMG+TXT-raw",
+  "set": "soi-p2",
+  "r": 1,
+  "graded": [
+   {
+    "id": "S1",
+    "want": "*Data Insights Market: 2025-2033 Strategic Insights.",
+    "got": "*Data Insights Market: 2025-2033 Strategic Insights.",
+    "ok": true
+   },
+   {
+    "id": "S2",
+    "want": "*Mordor Intelligence, Growth Trends & Forecasts 2025-2030",
+    "got": "*Mordor Intelligence, Growth Trends & Forecasts 2025-2030",
+    "ok": true
+   },
+   {
+    "id": "S3",
+    "want": "*Amra & Elma LLC, Top 20 Communication Platform Marketing Statistics 2025",
+    "got": "*Amra & Elma LLC, Top 20 Communication Platform Marketing Statistics 2025",
+    "ok": true
+   },
+   {
+    "id": "S4",
+    "want": "*전체 SNS 시장",
+    "got": "*전체 SNS 시장",
+    "ok": true
+   },
+   {
+    "id": "S5",
+    "want": "오픈형 SNS 및 기타",
+    "got": "오픈형 SNS 및 기타",
+    "ok": true
+   }
+  ],
+  "input": 4,
+  "output": 394,
+  "textUsed": true,
+  "readable": 0.7662337662337663
+ },
+ {
+  "m": "IMG+TXT-raw",
+  "set": "soi-p2",
+  "r": 2,
+  "graded": [
+   {
+    "id": "S1",
+    "want": "*Data Insights Market: 2025-2033 Strategic Insights.",
+    "got": "*Data Insights Market: 2025-2033 Strategic Insights.",
+    "ok": true
+   },
+   {
+    "id": "S2",
+    "want": "*Mordor Intelligence, Growth Trends & Forecasts 2025-2030",
+    "got": "*Mordor Intelligence, Growth Trends & Forecasts 2025-2030",
+    "ok": true
+   },
+   {
+    "id": "S3",
+    "want": "*Amra & Elma LLC, Top 20 Communication Platform Marketing Statistics 2025",
+    "got": "*Amra & Elma LLC, Top 20 Communication Platform Marketing Statistics 2025",
+    "ok": true
+   },
+   {
+    "id": "S4",
+    "want": "*전체 SNS 시장",
+    "got": "*전체 SNS 시장",
+    "ok": true
+   },
+   {
+    "id": "S5",
+    "want": "오픈형 SNS 및 기타",
+    "got": "오픈형 SNS 및 기타",
+    "ok": true
+   }
+  ],
+  "input": 4,
+  "output": 394,
+  "textUsed": true,
+  "readable": 0.7662337662337663
+ },
+ {
+  "m": "IMG+TXT-raw",
+  "set": "soi-p12",
+  "r": 2,
+  "graded": [
+   {
+    "id": "S6",
+    "want": "현장 사용자 접점 확보",
+    "got": "현장 사용자 접점 확보",
+    "ok": true
+   },
+   {
+    "id": "S7",
+    "want": "총 80명 진행",
+    "got": "총 80명 진행",
+    "ok": true
+   },
+   {
+    "id": "S8",
+    "want": "2주간 진행",
+    "got": "2주간 진행",
+    "ok": true
+   },
+   {
+    "id": "S9",
+    "want": "베타 앱 기반 테스트",
+    "got": "베타 앱 기반 테스트",
+    "ok": true
+   },
+   {
+    "id": "S10",
+    "want": "EN, ES",
+    "got": "EN, ES",
+    "ok": true
+   }
+  ],
+  "input": 4,
+  "output": 266,
+  "textUsed": true,
+  "readable": 0.40076335877862596
+ },
+ {
+  "m": "IMG+TXT-raw",
+  "set": "soi-p12",
+  "r": 0,
+  "graded": [
+   {
+    "id": "S6",
+    "want": "현장 사용자 접점 확보",
+    "got": "현장 사용자 접점 확보",
+    "ok": true
+   },
+   {
+    "id": "S7",
+    "want": "총 80명 진행",
+    "got": "총 80명 진행",
+    "ok": true
+   },
+   {
+    "id": "S8",
+    "want": "2주간 진행",
+    "got": "2주간 진행",
+    "ok": true
+   },
+   {
+    "id": "S9",
+    "want": "베타 앱 기반 테스트",
+    "got": "베타 앱 기반 테스트",
+    "ok": true
+   },
+   {
+    "id": "S10",
+    "want": "EN, ES",
+    "got": "EN, ES",
+    "ok": true
+   }
+  ],
+  "input": 4,
+  "output": 302,
+  "textUsed": true,
+  "readable": 0.40076335877862596
+ },
+ {
+  "m": "IMG+TXT-raw",
+  "set": "soi-p12",
+  "r": 1,
+  "graded": [
+   {
+    "id": "S6",
+    "want": "현장 사용자 접점 확보",
+    "got": "현장 사용자 접점 확보",
+    "ok": true
+   },
+   {
+    "id": "S7",
+    "want": "총 80명 진행",
+    "got": "총 80명 진행",
+    "ok": true
+   },
+   {
+    "id": "S8",
+    "want": "2주간 진행",
+    "got": "2주간 진행",
+    "ok": true
+   },
+   {
+    "id": "S9",
+    "want": "베타 앱 기반 테스트",
+    "got": "베타 앱 기반 테스트",
+    "ok": true
+   },
+   {
+    "id": "S10",
+    "want": "EN, ES",
+    "got": "EN, ES",
+    "ok": true
+   }
+  ],
+  "input": 4,
+  "output": 285,
+  "textUsed": true,
+  "readable": 0.40076335877862596
+ }
+]

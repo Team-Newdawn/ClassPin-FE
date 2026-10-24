@@ -2,7 +2,7 @@
 
 - Artifact: `pin-feedback-sunset`
 - Status: `reviewed`
-- Source: `doc/pin_class_prd.md`, `AGENTS.md`, `DESIGN.md`
+- Source: `docs/product/pin_class_prd.md`, `AGENTS.md`, `DESIGN.md`
 - Depends on: `class-frontend-architecture`
 - Decision boundary: 별도 `/pin` 제품의 route·UI·service·API·전용 test 제거, Pin Class가 사용하는 공유 로직의 이전, legacy campaign DB·Storage 데이터 보존, 삭제 순서·롤백·검증
 

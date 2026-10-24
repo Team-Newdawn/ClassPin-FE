@@ -1,0 +1,188 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>OhPin 인사이트 AI 파이프라인</title>
+<style>
+  :root {
+    --bg: #f5f7fb; --surface: #fff; --text: #0f172a; --muted: #64748b; --line: #e2e8f0;
+    --brand: #2563eb; --brand-soft: #eaf1ff;
+    --server: #0f766e; --server-soft: #e6f6f4;
+    --ai: #7c3aed; --ai-soft: #f1eaff;
+    --code: #b45309; --code-soft: #fdf3e4;
+    --browser: #2563eb; --browser-soft: #eaf1ff;
+    --store: #475569; --store-soft: #eef2f6;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; font: 15px/1.6 "Pretendard", "Apple SD Gothic Neo", "Noto Sans KR", system-ui, sans-serif; color: var(--text); background: var(--bg); }
+  main { max-width: 1240px; margin: 0 auto; padding: 40px 24px 64px; }
+  h1 { margin: 0 0 4px; font-size: 26px; }
+  .lead { margin: 0 0 20px; color: var(--muted); }
+  .legend { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 28px; }
+  .tag { display: inline-flex; align-items: center; height: 22px; padding: 0 9px; border-radius: 999px; font-size: 12px; font-weight: 700; white-space: nowrap; }
+  .t-browser { background: var(--browser-soft); color: var(--browser); }
+  .t-server { background: var(--server-soft); color: var(--server); }
+  .t-ai { background: var(--ai-soft); color: var(--ai); }
+  .t-code { background: var(--code-soft); color: var(--code); }
+  .t-store { background: var(--store-soft); color: var(--store); }
+  .lanes { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; align-items: start; }
+  .lane { background: var(--surface); border: 1px solid var(--line); border-radius: 16px; padding: 24px; }
+  .lane > header { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 18px; }
+  .lane h2 { margin: 0; font-size: 19px; }
+  .lane header small { color: var(--muted); font-size: 13px; }
+  ol.flow { list-style: none; margin: 0; padding: 0; }
+  .step { position: relative; display: grid; grid-template-columns: 30px 1fr; gap: 12px; padding-bottom: 18px; }
+  .step:not(:last-child)::before { content: ""; position: absolute; left: 14px; top: 30px; bottom: 0; width: 2px; background: var(--line); }
+  .num { width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center; background: var(--text); color: #fff; font-size: 13px; font-weight: 700; }
+  .card { border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; background: var(--surface); }
+  .card h3 { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 0 0 6px; font-size: 15px; }
+  .card ul { margin: 0; padding-left: 18px; color: #334155; font-size: 13.5px; }
+  .card li + li { margin-top: 2px; }
+  .card.ai { border-color: #d9c8fb; background: #fcfaff; }
+  .io { display: grid; grid-template-columns: auto 1fr; gap: 2px 10px; margin-top: 6px; font-size: 13px; }
+  .io b { color: var(--muted); font-weight: 600; }
+  code { font: 12.5px ui-monospace, SFMono-Regular, Menlo, monospace; background: #f1f5f9; padding: 1px 5px; border-radius: 5px; }
+  .branch { margin-top: 10px; border: 1px dashed #c4b5fd; border-radius: 10px; padding: 10px 12px; background: #faf7ff; }
+  .branch strong { display: block; font-size: 13px; color: var(--ai); margin-bottom: 4px; }
+  .branch ol { margin: 0; padding-left: 18px; font-size: 13px; color: #334155; }
+  .fail { margin-top: 8px; font-size: 12.5px; color: #b91c1c; }
+  .shared { margin: 28px 0 0; background: var(--surface); border: 1px solid var(--line); border-radius: 16px; padding: 24px; }
+  .shared h2, .costs h2 { margin: 0 0 14px; font-size: 19px; }
+  .slide-format { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+  .slide-format div { border-radius: 12px; padding: 12px 14px; background: var(--bg); font-size: 13.5px; }
+  .slide-format b { display: block; margin-bottom: 4px; font-size: 14px; }
+  .costs { margin-top: 28px; background: var(--surface); border: 1px solid var(--line); border-radius: 16px; padding: 24px; }
+  .cost-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+  table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+  th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { color: var(--muted); font-weight: 600; font-size: 12.5px; }
+  td.n { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; font-weight: 700; }
+  .note { margin: 14px 0 0; color: var(--muted); font-size: 12.5px; }
+  @media (max-width: 900px) { .lanes, .cost-grid { grid-template-columns: 1fr; } .slide-format { grid-template-columns: 1fr 1fr; } }
+</style>
+</head>
+<body>
+<main>
+  <h1>OhPin 인사이트 AI 파이프라인</h1>
+  <p class="lead">모델 Claude Haiku 5.5 (생각 강도 low) · 2026-10-22 기준 · 비용은 1달러 = 1,400원</p>
+  <div class="legend" aria-label="범례">
+    <span class="tag t-browser">브라우저</span><span class="tag t-server">서버 (Next)</span><span class="tag t-ai">Claude 호출</span><span class="tag t-code">코드 처리</span><span class="tag t-store">저장소</span>
+  </div>
+
+  <div class="lanes">
+    <!-- 분석 -->
+    <section class="lane" aria-labelledby="a-title">
+      <header><h2 id="a-title">① 자료 분석</h2><small>POST /api/admin/ai-reports · 제한 280초</small></header>
+      <ol class="flow">
+        <li class="step"><span class="num">1</span><div class="card">
+          <h3><span class="tag t-browser">브라우저</span><span class="tag t-server">서버</span>분석 시작 · 요청 확인</h3>
+          <ul><li>관리자 로그인, 내 자료인지, 강의 종료 여부</li><li>10분 안에 같은 분석이 돌고 있으면 그 결과를 돌려줌</li><li>리포트를 <code>running</code>으로 만들고 즉시 응답 → 나머지는 <code>after()</code></li></ul>
+        </div></li>
+        <li class="step"><span class="num">2</span><div class="card">
+          <h3><span class="tag t-store">Storage</span><span class="tag t-server">poppler</span>원본 준비</h3>
+          <ul><li>원본 PDF 다운로드 (200MB 이하) → 임시 폴더</li><li><code>pdfinfo</code> 쪽 수(600쪽 이하)와 크기</li><li><code>pdftoppm</code> 쪽마다 JPEG 1455×818 · 코어 수만큼 병렬</li><li><code>pdftotext</code> 쪽마다 글자 · 깨진 글자층은 버림</li></ul>
+        </div></li>
+        <li class="step"><span class="num">3</span><div class="card">
+          <h3><span class="tag t-code">코드</span>질문 준비</h3>
+          <ul><li>이메일·전화 등 개인정보 가림</li><li>PIN 좌표 → 그 쪽 이미지 기준 픽셀</li></ul>
+        </div></li>
+        <li class="step"><span class="num">4</span><div class="card ai">
+          <h3><span class="tag t-ai">Claude × N (병렬)</span>20쪽씩 슬라이드 분석</h3>
+          <div class="io"><b>입력</b><span>[슬라이드 라벨 + 이미지 + 추출 글자] × 최대 20 · 폴더 목적 · 슬라이드별 질문 (PIN 픽셀 좌표)</span>
+          <b>출력</b><span>JSON: 자료 종류 · 슬라이드별 핵심 · 질문 요약 · 개선 제안</span></div>
+        </div></li>
+        <li class="step"><span class="num">5</span><div class="card">
+          <h3><span class="tag t-code">코드</span>자료 종류 다수결</h3>
+          <ul><li>조각별 판단 중 가장 많이 나온 이름 (동률이면 앞 조각)</li></ul>
+        </div></li>
+        <li class="step"><span class="num">6</span><div class="card ai">
+          <h3><span class="tag t-ai">Claude × 1</span>전체 정리</h3>
+          <div class="io"><b>입력</b><span>슬라이드별 결과 · 질문 목록 (UUID 대신 번호)</span>
+          <b>출력</b><span>전체 요약 · 질문이 몰린 슬라이드 · 개선 제안 · 질문 묶음(번호)</span></div>
+        </div></li>
+        <li class="step"><span class="num">7</span><div class="card">
+          <h3><span class="tag t-code">코드</span>검증</h3>
+          <ul><li>번호 → 질문 ID 복원, 없는 쪽·질문 참조 버림</li><li>글자 수 제한, 빠진 질문은 '기타 질문' 묶음</li><li>숫자 통계는 코드가 센 값만 사용</li></ul>
+        </div></li>
+        <li class="step"><span class="num">8</span><div class="card">
+          <h3><span class="tag t-store">DB</span>저장 · 정리</h3>
+          <ul><li><code>ai_insight_reports</code>에 <code>ready</code> + 결과 저장</li><li>임시 폴더 삭제 (성공·실패 모두)</li></ul>
+          <p class="fail">실패 시: 정해진 오류 코드만 <code>failed</code>로 저장 → 화면에 '다시 분석'</p>
+        </div></li>
+      </ol>
+    </section>
+
+    <!-- 대화 -->
+    <section class="lane" aria-labelledby="c-title">
+      <header><h2 id="c-title">② AI 대화</h2><small>POST /api/admin/ai-reports/{id} · 제한 90초</small></header>
+      <ol class="flow">
+        <li class="step"><span class="num">1</span><div class="card">
+          <h3><span class="tag t-browser">브라우저</span><span class="tag t-server">서버</span>질문 전송 · 요청 확인</h3>
+          <ul><li>보내는 값: 질문 + 지금 보는 슬라이드 번호</li><li>내 리포트인지, <code>ready/confirmed</code>인지, 2,000자 이하인지</li></ul>
+        </div></li>
+        <li class="step"><span class="num">2</span><div class="card">
+          <h3><span class="tag t-code">코드</span>맥락 구성</h3>
+          <ul><li>시스템: 지침 + 대화 자료 (분석 결과·질문 목록 평문, <b>1시간 캐시</b>)</li><li>최근 대화 20개 + "(지금 보는 슬라이드: N)" + 질문</li></ul>
+        </div></li>
+        <li class="step"><span class="num">3</span><div class="card">
+          <h3><span class="tag t-code">코드</span><span class="tag t-server">poppler</span>지목한 슬라이드 먼저 첨부</h3>
+          <ul><li>"2페이지", "3번 슬라이드", "슬라이드 4", "이 슬라이드"를 찾음 (최대 3장)</li><li>찾으면 그 쪽을 이미지·글자·PIN 위치로 만들어 질문 앞에 붙임</li><li>원본은 서버 디스크 캐시, 강사 권한으로 다시 확인</li></ul>
+        </div></li>
+        <li class="step"><span class="num">4</span><div class="card ai">
+          <h3><span class="tag t-ai">Claude 스트리밍</span>답변 작성</h3>
+          <ul><li>글자가 오는 대로 화면에 이어 씀</li><li>요약·경향·개선 제안 질문 → 분석 결과로 답함</li><li>위치·그림·표·수치 질문 → 반드시 슬라이드를 보고 답함</li></ul>
+          <div class="branch"><strong>슬라이드가 더 필요하면: view_slides 도구</strong>
+            <ol><li>Claude가 슬라이드 번호 요청 (최대 3장)</li><li>서버가 그 쪽만 이미지·글자·PIN 위치로 만들어 돌려줌</li><li>다시 호출해 이어서 답함 (한 답변에 최대 2번)</li></ol></div>
+        </div></li>
+        <li class="step"><span class="num">5</span><div class="card">
+          <h3><span class="tag t-browser">브라우저</span>표시</h3>
+          <ul><li>평문 말풍선 · <code>**굵게**</code>만 굵은 글씨로 렌더링</li><li>질문 번호·픽셀 좌표는 답에 쓰지 않고 요소 이름으로 말함</li></ul>
+        </div></li>
+        <li class="step"><span class="num">6</span><div class="card">
+          <h3><span class="tag t-store">DB</span>저장</h3>
+          <ul><li>답이 끝까지 온 경우에만 대화 기록 저장</li></ul>
+          <p class="fail">끊김·중단·거부: 저장하지 않고 입력창에 질문 복원</p>
+        </div></li>
+      </ol>
+    </section>
+  </div>
+
+  <section class="shared" aria-labelledby="s-title">
+    <h2 id="s-title">두 기능이 같이 쓰는 슬라이드 형식</h2>
+    <div class="slide-format">
+      <div><b>쪽 이미지</b>JPEG 1455×818 (Claude 이미지 한도 1,568px·1,568토큰 안) · 약 1,590토큰</div>
+      <div><b>추출 글자</b><code>&lt;slide_text&gt;</code> · 정확한 문구·숫자 확인용 · 깨진 글자층은 생략 · 최대 약 800토큰</div>
+      <div><b>PIN 위치</b>이미지 기준 픽셀 좌표 (원점 왼쪽 위) · 비율 좌표보다 빽빽한 표에서 최저 정확도 72% → 97%</div>
+      <div><b>도구</b>poppler (<code>pdftoppm</code>, <code>pdftotext</code>, <code>pdfinfo</code>) · 이미 배포 이미지에 있음 · 추가 패키지 없음</div>
+    </div>
+  </section>
+
+  <section class="costs" aria-labelledby="k-title">
+    <h2 id="k-title">비용 (Haiku 5.5: 입력 $0.10 · 출력 $0.50 / 1백만 토큰, 요청 입력 10만 토큰 초과 시 5배)</h2>
+    <div class="cost-grid">
+      <table>
+        <caption style="text-align:left;font-weight:700;padding-bottom:6px">분석 1회</caption>
+        <thead><tr><th>자료</th><th>입력 / 출력</th><th>비용</th></tr></thead>
+        <tbody>
+          <tr><td>15쪽 · 질문 17개 (실제)</td><td>약 2.9만 / 1.1만</td><td class="n">약 12원</td></tr>
+          <tr><td>100쪽 이미지 위주 · PIN 2,000개</td><td>약 33~41만 / 6.3만</td><td class="n">약 90~105원</td></tr>
+          <tr><td>PIN 약 2,500개 초과</td><td>정리 요청만 5배 단가</td><td class="n">약 140원</td></tr>
+        </tbody>
+      </table>
+      <table>
+        <caption style="text-align:left;font-weight:700;padding-bottom:6px">대화 질문 1개</caption>
+        <thead><tr><th>경우</th><th>15쪽 리포트</th><th>100쪽·2,000 PIN</th></tr></thead>
+        <tbody>
+          <tr><td>첫 질문 (캐시 저장)</td><td class="n">약 2원</td><td class="n">약 25원</td></tr>
+          <tr><td>1시간 안 다음 질문</td><td class="n">약 1원</td><td class="n">약 2.5원</td></tr>
+          <tr><td>슬라이드 첨부 (쪽당)</td><td class="n">+0.4원</td><td class="n">+0.4원</td></tr>
+          <tr><td>도구로 추가 확인 (요청 1회 더)</td><td class="n">+1원</td><td class="n">+1.5원</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="note">입력 토큰은 토큰 세기 API로 측정했고, 출력은 생각 과정을 포함한 추정치입니다. 실제 사용량(<code>usage</code>)은 아직 기록하지 않습니다. '다시 분석'은 분석 비용이 다시 듭니다. 예시: 15쪽 강의에서 분석 1회 + 대화 20개 ≈ 40원, 100쪽·PIN 2,000개 ≈ 170원.</p>
+  </section>
+</main>
+</body>
+</html>

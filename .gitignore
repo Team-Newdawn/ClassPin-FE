@@ -11,3 +11,6 @@ public/generated/*
 supabase/.temp/
 supabase/.branches/
 .claude/.headroom_wrap_*
+
+# Paper experiment binaries (slide decks, renders)
+docs/paper/experiments/**/data/

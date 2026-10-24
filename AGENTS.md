@@ -156,10 +156,12 @@ flow unless a task explicitly spans both products.
   questions, shown only when that slide has questions. `POST /api/question-summary`
   calls Groq with the server-only `GROQ_API_KEY` and returns 503 without it.
 - Instructor insights (`/admin/insights`, `app/api/admin/ai-reports/*`) analyze the stored
-  source PDF plus redacted questions with Claude (`CLAUDE_API_KEY`, server-only; model
-  `INSIGHT_CLAUDE_MODEL`, default `claude-haiku-5-5`) inside Next `after()`: poppler renders each page to a JPEG plus its text layer, one call per
+  source PDF plus redacted questions with one AI provider per server (`INSIGHT_AI_PROVIDER` claude|openai|gemini,
+  default claude; `INSIGHT_AI_MODEL`, default `claude-haiku-5-5`; server-only `CLAUDE_API_KEY`/`OPENAI_API_KEY`/`GEMINI_API_KEY`)
+  inside Next `after()`: poppler renders each page to a JPEG plus its text layer, one call per
   20-page chunk in parallel (PIN positions as image pixels), one merge call, code-only validation, no worker or critic.
-  Design and superseded rules: `docs/insights-ai-foundation.md` section 10.
+  Provider-neutral flow lives in `app/_service/insight-ai.ts`; each provider is one adapter in `app/_service/insight-providers/`.
+  Design and superseded rules: `docs/insights/insights-ai-foundation.md` sections 10-11.
 - The player header shows the LIVE elapsed time from the backend `started_at` (reset
   on every LIVE start) and the live audience count. The end-lecture dialog summarizes
   duration, participants, and questions; elapsed time freezes when that dialog opens
@@ -197,7 +199,7 @@ flow unless a task explicitly spans both products.
 - Question types are hidden everywhere (temporary): participants submit the
   lecture's first enabled category; BE/DB still require `category`.
 - The presentation remote (`/remote#token`, public, no login; spec
-  `docs/lecture-roles-and-remote.md`) is issued only by the owner from the lecture
+  `docs/product/lecture-roles-and-remote.md`) is issued only by the owner from the lecture
   management page. The first anonymous browser to open it holds it and others see
   "in use"; it moves `current_page` one step via `ohpin_remote_control` only while
   LIVE. Reissuing or leaving LIVE revokes it. Never show its link on the projected
@@ -245,6 +247,16 @@ approved behavior and preserve their security, data, accessibility, and
 verification constraints. If the code requires a decision those documents do
 not cover, update and approve the document before continuing. No generated
 context lock, hook, package lock, or document-driven harness is required.
+
+## Paper research work
+
+Applies only to paper or research tasks (experiment design or runs, literature
+review, analysis, writing); product work does not touch `docs/paper/`. Keep
+`docs/paper/` current in the same turn as the work: put each change in its
+category file (`research/`, `literature/`, `system/`, `experiments/`,
+`venues/`), record decisions and stage changes in `docs/paper/README.md`, and
+mark superseded claims instead of silently rewriting them. Experiment
+binaries stay in the git-ignored `experiments/**/data/`.
 
 <!-- BEGIN:nextjs-agent-rules -->
 

@@ -2,7 +2,7 @@
 
 - Artifact: `ai-report-product`
 - Status: `reviewed`
-- Source: `doc/pin_class_prd.md`
+- Source: `docs/product/pin_class_prd.md`
 - Decision boundary: 강사의 리포트 선택, 생성, 검토, AI 수정, 확정, 근거 표시, PDF 전달 경험
 
 ## 1. 목적과 제품 경계

@@ -4,7 +4,7 @@
 - Last verified: 2026-09-07
 - Scope: `/admin`, `/join/[code]`, `/api/convert`, Supabase Auth·Database·Storage·Realtime
 - Source of truth: 실행 코드와 로컬 Supabase 데이터베이스
-- Related documents: `doc/pin_class_prd.md`, `docs/class-frontend-architecture.md`, `doc/pin_class_database_schema.md`
+- Related documents: `docs/product/pin_class_prd.md`, `docs/architecture/class-frontend-architecture.md`, `docs/architecture/pin_class_database_schema.md`
 
 이 문서는 Pin Class에서 강사와 참여자의 입력이 어떤 계층을 지나 Supabase에 저장되고, 다시 화면으로 전달되는지 설명한다. 승인된 제품 계약을 새로 정의하지 않으며, 현재 코드의 동작을 이해하고 변경 영향을 추적하기 위한 참조 문서다.
 

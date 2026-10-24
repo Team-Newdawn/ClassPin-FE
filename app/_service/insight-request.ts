@@ -4,12 +4,15 @@ import { availableParallelism } from "node:os";
 import path from "node:path";
 import { promisify } from "node:util";
 import { createClient } from "@supabase/supabase-js";
+import sharp from "sharp";
+import { cachedFile } from "../_infrastructure/pdf-cache.ts";
 import { resolveDocumentBinary } from "../_infrastructure/server/document-binaries.ts";
 import { renderPdfPages } from "../_infrastructure/server/pdf-render.ts";
-import { MAX_PAGES, readableText, slideImageEdge, type SlidePage } from "./insight-claude.ts";
+import { restOrigin } from "../_infrastructure/server/rest-origin.ts";
+import { MAX_PAGES, imageEdge, limiter, readableText, type SlidePage } from "./insight-ai.ts";
 import { inspectInsightSource } from "./insight-source.ts";
 import { classFolderPurposeLine, normalizeClassFolderPurpose, normalizeClassFolderPurposeLabel } from "../_model/types.ts";
-import type { InsightReportBody, InsightReportView } from "../_model/insight-report.ts";
+import { normalizeInsightReport, type InsightMessage, type InsightReportBody, type InsightReportView } from "../_model/insight-report.ts";
 
 export class InsightRequestError extends Error {
   status: number;
@@ -59,12 +62,9 @@ export async function boundedJson(body: ReadableStream<Uint8Array> | null, limit
 }
 
 export async function readOwnedInsightSource(authorization: string, selection: readonly string[], signal: AbortSignal) {
-  const origin = new URL(process.env.REST_API_URL || "https://ohpinbe.newdawn.co.kr");
-  if (origin.username || origin.password || origin.pathname !== "/" || origin.search || origin.hash ||
-    (origin.protocol !== "https:" && !(origin.protocol === "http:" && ["localhost", "127.0.0.1", "[::1]"].includes(origin.hostname)))) {
-    throw new InsightRequestError("SERVICE_UNAVAILABLE", 503);
-  }
-  const get = (path: string) => fetch(`${origin.origin}/api/instructor/${path}`, { headers: { Authorization: authorization },
+  const origin = restOrigin();
+  if (!origin) throw new InsightRequestError("SERVICE_UNAVAILABLE", 503);
+  const get = (path: string) => fetch(`${origin}/api/instructor/${path}`, { headers: { Authorization: authorization },
     cache: "no-store", redirect: "error", signal: AbortSignal.any([signal, AbortSignal.timeout(20_000)]) });
   // Folder purpose only steers the prompt, so a failed folder read analyzes without it.
   const [response, folders] = await Promise.all([get("courses"),
@@ -88,9 +88,19 @@ export function insightStorage() {
     global: { fetch: (input, init) => fetch(input, { ...init, signal: AbortSignal.timeout(20_000), cache: "no-store" }) } });
 }
 
-export function reportView(row: { id: string; material_id: string; status: InsightReportView["status"]; error: string | null; created_at: string; body?: unknown; messages?: unknown }): InsightReportView {
-  return { id: row.id, materialIds: [row.material_id], status: row.status, error: row.error, createdAt: row.created_at,
-    body: (row.body as InsightReportBody | null) ?? null, ...(row.messages ? { messages: row.messages as InsightReportView["messages"] } : {}) };
+/** A run still `running` after this long was cut off (server restart/deploy); analysis itself finishes in under ~9 minutes. */
+export const STALE_RUN_MS = 15 * 60_000;
+/** Report id → abort for analyses running in this server process; on globalThis so every route bundle sees the same map.
+ * ponytail: per-process; with several servers a stop still marks the report failed but the other server's run finishes unseen. */
+export const runningAnalyses: Map<string, AbortController> = ((globalThis as { insightRuns?: Map<string, AbortController> }).insightRuns ??= new Map());
+/** One deck rasterizes at a time per server (CPU-bound, shares the box with live lectures), whether for analysis or export. */
+export const oneRenderAtATime: ReturnType<typeof limiter> = ((globalThis as { insightRender?: ReturnType<typeof limiter> }).insightRender ??= limiter(1));
+
+export function reportView(row: { id: string; material_id: string; status: InsightReportView["status"]; error: string | null; created_at: string; confirmed_at?: string | null; body?: unknown; messages?: unknown }): InsightReportView {
+  const body = (row.body as InsightReportBody | null) ?? null;
+  const stale = row.status === "running" && Date.now() - Date.parse(row.created_at) > STALE_RUN_MS;
+  return { id: row.id, materialIds: [row.material_id], status: stale ? "failed" : row.status, error: stale ? "ANALYSIS_INTERRUPTED" : row.error, createdAt: row.created_at, ...(row.confirmed_at ? { confirmedAt: row.confirmed_at } : {}),
+    body: body ? normalizeInsightReport(body) : null, ...(row.messages ? { messages: (row.messages as InsightMessage[]).filter((item) => !item.cleared) } : {}) };
 }
 
 const run = promisify(execFile);
@@ -111,7 +121,7 @@ export async function renderSlidePages(file: string, dir: string, only?: readonl
     else if (item) [item.width, item.height] = value.split(" x ").map(parseFloat);
   }
   const shapes = sizes.map(({ width, height, rot }) => rot % 180 ? { width: height, height: width } : { width, height });
-  const edge = slideImageEdge(shapes);
+  const edge = imageEdge(shapes);
   const pages = only ? [...new Set(only)].filter((page) => page >= 1 && page <= total) : shapes.map((_, index) => index + 1);
   const args = ["-jpeg", "-scale-to", String(edge), "-jpegopt", "quality=90"], textOf = (from: number, to: number) =>
     run(poppler("pdftotext"), ["-layout", "-f", String(from), "-l", String(to), file, "-"], { timeout: 120_000, maxBuffer: 256 * 1024 ** 2 }).then(({ stdout }) => stdout.split("\f"));
@@ -123,8 +133,8 @@ export async function renderSlidePages(file: string, dir: string, only?: readonl
     }));
   } else {
     const [all] = await Promise.all([textOf(1, total),
-      // Image-heavy decks take seconds per page to rasterize, so use the cores like slide conversion does.
-      renderPdfPages({ pdftoppm, pdf: file, outDir: dir, total, maxEdge: edge, quality: 90, maxWorkers: Math.min(8, Math.max(2, availableParallelism())), timeoutMs: 240_000 })]);
+      // Image-heavy decks take seconds per page; use half the cores so live lectures on the same server stay responsive.
+      renderPdfPages({ pdftoppm, pdf: file, outDir: dir, total, maxEdge: edge, quality: 90, maxWorkers: Math.min(8, Math.max(1, Math.floor(availableParallelism() / 2))), timeoutMs: 240_000 })]);
     all.forEach((text, index) => texts.set(index + 1, text));
   }
   const files = new Map((await readdir(dir)).flatMap((name) => { const page = /^page-0*(\d+)\.jpg$/.exec(name)?.[1]; return page ? [[Number(page), path.join(dir, name)] as const] : []; }));
@@ -134,4 +144,43 @@ export async function renderSlidePages(file: string, dir: string, only?: readonl
     const text = (texts.get(page) ?? "").replace(/[ \t]+$/gm, "").replace(/\n{3,}/g, "\n\n").trim().slice(0, 4000);
     return { page, width: Math.round(width * scale), height: Math.round(height * scale), file: image, text: readableText(text) ? text : "" };
   });
+}
+
+const SOURCE_BYTES = 200 * 1024 ** 2;
+type Material = ReturnType<typeof inspectInsightSource>["materials"][number];
+
+/** Every slide (or only these slide numbers) as a Claude-ready JPEG keyed by slide number. PDF-page slides render from the cached source;
+ * image slides (older PDF uploads, PPT/PPTX) use their stored JPEG, so an image-only deck never downloads its source. */
+export async function renderMaterialSlides(material: Material, dir: string, only?: readonly number[]): Promise<SlidePage[]> {
+  if (material.slides.length > MAX_PAGES) throw new Error("SOURCE_TOO_LARGE");
+  const db = insightStorage(), wanted = material.slides.filter((slide) => !only || only.includes(slide.pageIndex + 1));
+  const fromPdf = wanted.filter((slide) => slide.sourcePageIndex !== null), fromImage = wanted.filter((slide) => slide.sourcePageIndex === null);
+  let rendered = new Map<number, SlidePage>();
+  if (fromPdf.length) {
+    const bucket = db.storage.from("course-materials"), info = await bucket.info(material.sourcePath);
+    if (info.error || typeof info.data?.size !== "number") throw new Error("SOURCE_DOWNLOAD_FAILED");
+    if (info.data.size > SOURCE_BYTES) throw new Error("SOURCE_TOO_LARGE");
+    // Streams to the disk cache /api/pdf shares (same key), so the source never sits in memory.
+    const pdf = await cachedFile(material.sourcePath, async () => {
+      const file = await bucket.download(material.sourcePath).asStream();
+      if (file.error || !file.data) throw new Error("SOURCE_DOWNLOAD_FAILED");
+      return file.data;
+    });
+    rendered = new Map((await renderSlidePages(pdf, dir, only && fromPdf.map((slide) => slide.sourcePageIndex! + 1))).map((page) => [page.page, page]));
+  }
+  // sharp jobs hold libuv threads that /api/pdf disk reads and DNS lookups also need, so keep two images in flight.
+  const slot = limiter(2);
+  const images = await Promise.all(fromImage.map((slide) => slot(async (): Promise<SlidePage> => {
+    const file = await db.storage.from("lecture-slides").download(slide.imagePath!);
+    if (file.error || !file.data) throw new Error("SOURCE_DOWNLOAD_FAILED");
+    const image = sharp(Buffer.from(await file.data.arrayBuffer())), { width = 1, height = 1 } = await image.metadata(), edge = imageEdge([{ width, height }]);
+    const out = path.join(dir, `slide-${slide.pageIndex + 1}.jpg`);
+    const saved = await image.resize(edge, edge, { fit: "inside", withoutEnlargement: true }).jpeg({ quality: 90 }).toFile(out);
+    return { page: slide.pageIndex + 1, width: saved.width, height: saved.height, file: out, text: "" };
+  })));
+  return [...fromPdf.map((slide) => {
+    const page = rendered.get(slide.sourcePageIndex! + 1);
+    if (!page) throw new Error("SOURCE_RENDER_FAILED");
+    return { ...page, page: slide.pageIndex + 1 };
+  }), ...images];
 }

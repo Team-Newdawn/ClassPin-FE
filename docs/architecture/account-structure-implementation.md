@@ -2,10 +2,10 @@
 
 - Artifact: `account-structure-implementation`
 - Status: `approved` — 2026-10-18 사용자 요청으로 계정 구조 적용 지침을 분리하고, owner 전용 종료 리포트 생성·저장과 editor/viewer 조회, 이미지 비공개 전환 설계를 반영했다. 기능 구현·운영 전환 완료를 뜻하지 않는다.
-- Source: `doc/pin_class_prd.md`, 기존 `lecture-roles-and-remote`의 LRR-001~009, 2026-10-18 사용자 결정
+- Source: `docs/product/pin_class_prd.md`, 기존 `lecture-roles-and-remote`의 LRR-001~009, 2026-10-18 사용자 결정
 - Depends on: `class-frontend-architecture`, `ohpin-figma-ui-redesign`
 - 기준: FE `feature-dev@c9cf887`, BE `ClassPin-BE/origin/main@05eadd8`. BE 로컬 작업본은 이 기준에 포함하지 않는다.
-- 범위: 폴더·파일의 역할·초대, 간단한 종료 리포트 저장, 비공개 이미지 접근, FE/BE 작업 및 적용 순서. 발표 리모컨은 [별도 명세](lecture-roles-and-remote.md)를 따른다.
+- 범위: 폴더·파일의 역할·초대, 간단한 종료 리포트 저장, 비공개 이미지 접근, FE/BE 작업 및 적용 순서. 발표 리모컨은 [별도 명세](../product/lecture-roles-and-remote.md)를 따른다.
 
 이 문서는 적용할 목표 계약이다. 현재 코드에는 역할·초대·저장 종료 리포트와 비공개 이미지 경로가 아직 없다. 상세 AI 강의자 리포트의 A/B·수정·확정·Cloud Tasks 파이프라인은 별도 `ai-report-*` 문서의 범위이며 여기에 가져오지 않는다. 아래 API와 데이터 구성은 이 목표를 구현하기 위한 설계이고 현재 배포 API 목록이 아니다.
 
@@ -160,5 +160,5 @@ BE 저장소는 이 FE 작업에서 직접 수정하지 않는다. 이 지침을
 ## 9. 관련 문서와 근거
 
 - 기존 LRR-001~009의 역할·초대·소유권 결정은 이 문서 §1~3으로 옮겼다. 리포트 생성 권한은 ACI-003·030~039가 우선한다.
-- [발표 리모컨 명세](lecture-roles-and-remote.md), [간단한 종료 리포트 UI](ohpin-figma-ui-redesign.md#38-간단한-종료-리포트), [프런트엔드 경계](class-frontend-architecture.md).
+- [발표 리모컨 명세](../product/lecture-roles-and-remote.md), [간단한 종료 리포트 UI](../design/ohpin-figma-ui-redesign.md#38-간단한-종료-리포트), [프런트엔드 경계](class-frontend-architecture.md).
 - [Supabase private/public 버킷](https://supabase.com/docs/guides/storage/buckets/fundamentals), [JWT 다운로드와 서명 URL](https://supabase.com/docs/guides/storage/serving/downloads), [TUS 재개 업로드](https://supabase.com/docs/guides/storage/uploads/resumable-uploads), [Smart CDN·과거 캐시](https://supabase.com/docs/guides/storage/cdn/smart-cdn), [서버 전용 API key](https://supabase.com/docs/guides/getting-started/api-keys). 2026-10-18 확인. 서명 URL은 현재 권한 회수를 매 요청 반영하는 경로로 사용하지 않는다.

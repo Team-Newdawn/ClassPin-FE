@@ -4,7 +4,7 @@
 - Last verified: 2026-08-31
 - Database: Supabase CLI 로컬 PostgreSQL
 - Scope: `public` schema, `auth.users` 참조, Storage bucket, Realtime publication
-- Related documents: `doc/pin_class_prd.md`, `doc/pin_class_data_flow.md`
+- Related documents: `docs/product/pin_class_prd.md`, `docs/architecture/pin_class_data_flow.md`
 
 이 문서는 로컬 Supabase 데이터베이스를 직접 조회해 확인한 현재 스키마를 설명한다. 승인된 제품 계약을 새로 정의하지 않으며, migration과 실제 DB 구조를 이해하기 위한 참조 문서다.
 

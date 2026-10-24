@@ -2,7 +2,7 @@
 
 - Artifact: `ai-report-evidence`
 - Status: `reviewed`
-- Source: `doc/pin_class_prd.md`, `docs/ai-instructor-report-product.md`
+- Source: `docs/product/pin_class_prd.md`, `docs/insights/ai-instructor-report-product.md`
 - Decision boundary: 공간 근거 묶음, 구조화 AI 출력, 출처 추적, 근거 충분성, revision 제약, 출시 차단 평가 기준
 
 이 문서는 API, 데이터베이스, 작업 실행 인프라, AI 제공자 설정과 운영 정책을 정의하지 않는다.

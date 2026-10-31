@@ -10,7 +10,7 @@ import { LoadingScreen } from "@/app/component/loading-screen";
 import { PinLogo } from "@/app/component/pin-logo";
 import { SlideCanvas } from "@/app/component/slide-canvas";
 import { Eye, EyeOff } from "lucide-react";
-import { trapDialogFocus } from "@/app/_lib/dialog-focus";
+import { trapDialogFocus } from "@/app/component/dialog-focus";
 import { LECTURE_REACTION_EMOJIS } from "@/app/_model/lecture-reactions";
 import { questionMarkerEmoji } from "@/app/_model/types";
 import { useJoinSessionController } from "./controller";

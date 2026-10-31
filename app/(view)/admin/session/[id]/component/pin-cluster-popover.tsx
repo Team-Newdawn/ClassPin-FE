@@ -4,58 +4,16 @@ import Image from "next/image";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useLanguage } from "@/app/_controller/language-context";
 import type { Question } from "@/app/_model/types";
-import { summarizeQuestions, toSummaryItems, type SummaryPurpose } from "@/app/_service/question-summary-service";
+import { useQuestionSummary, type SummaryPurpose } from "./pin-cluster-controller";
 import styles from "./pin-cluster-popover.module.css";
 
-/** 강의 관리 플레이어와 발표 화면이 같은 방식으로 묶음을 펼치고 닫는다. 슬라이드가 바뀌면 자동으로 닫힌다. */
-export function usePinCluster(slideId: string | undefined, questions: readonly Question[]) {
-  const [cluster, setCluster] = useState<{ slideId: string; ids: string[]; highlightedId: string | null } | null>(null);
-  const expandedIds = cluster && cluster.slideId === slideId ? cluster.ids : undefined;
-  const questionsById = useMemo(() => new Map(questions.map((question) => [question.id, question])), [questions]);
-  const clusterQuestions = useMemo(() => expandedIds?.flatMap((id) => {
-    const question = questionsById.get(id);
-    return question ? [question] : [];
-  }) ?? [], [expandedIds, questionsById]);
-  return {
-    expandedIds,
-    // 팝오버 목록에서 고른 PIN. 펼친 PIN 중 이것만 커지고 맨 앞으로 나온다.
-    highlightedId: expandedIds ? cluster!.highlightedId : null,
-    highlightPin: (id: string) => setCluster((current) => current && { ...current, highlightedId: id }),
-    clusterQuestions,
-    openCluster: (ids: string[]) => { if (slideId) setCluster({ slideId, ids, highlightedId: null }); },
-    closeCluster: () => {
-      const first = expandedIds?.[0];
-      setCluster(null);
-      if (first) requestAnimationFrame(() => document.querySelector<HTMLElement>(`[data-cluster-ids~="${first}"]`)?.focus());
-    },
-  };
-}
-
 /** 질문 묶음 팝오버와 강의 관리 오른쪽 패널(현재 슬라이드 질문)이 함께 쓰는 AI 요약 상자. `text`가 있으면 AI를 부르지 않고 그 예시를 보여 준다. */
-export function QuestionSummary({ questions, folder, className = "", text }: { questions: readonly Question[]; folder: SummaryPurpose; className?: string; text?: string }) {
-  const { t, locale } = useLanguage();
-  const purpose = folder?.purpose ?? null;
-  const purposeLabel = folder?.purposeLabel ?? null;
-  const key = `${locale}:${JSON.stringify(toSummaryItems(questions.slice(0, 20)))}`;
-  const [summary, setSummary] = useState<{ key: string; text: string | null }>();
-
-  useEffect(() => {
-    if (text !== undefined) return;
-    let active = true;
-    summarizeQuestions(JSON.parse(key.slice(key.indexOf(":") + 1)), locale, purpose && { purpose, purposeLabel }).then(
-      (text) => { if (active) setSummary({ key, text }); },
-      (error) => {
-        console.error("Question summary failed", error);
-        if (active) setSummary({ key, text: null });
-      },
-    );
-    return () => { active = false; };
-  }, [key, locale, purpose, purposeLabel, text]);
-
-  const loading = text === undefined && summary?.key !== key;
+export function QuestionSummary({ questions, folder, className = "", text, refreshKey }: { questions: readonly Question[]; folder: SummaryPurpose; className?: string; text?: string; /** 있으면(슬라이드 ID) 그 슬라이드 요약을 5개 변화·30초 기준으로만 다시 만든다. */ refreshKey?: string }) {
+  const { t } = useLanguage();
+  const { loading, summary } = useQuestionSummary({ questions, folder, text, refreshKey });
   return <div className={`${styles.summary} ${className}`} aria-busy={loading}>
     <b><Image src="/assets/design/cluster-sparkle.svg" width={14} height={14} alt="" />{t("report.aiSummary")}</b>
-    <p role="status">{text ?? (loading ? t("session.clusterSummaryLoading") : summary?.text ?? t("session.clusterSummaryError"))}</p>
+    <p role="status">{text ?? (loading ? t("session.clusterSummaryLoading") : summary?.text ?? t(summary?.limited ? "session.summaryRateLimited" : "session.clusterSummaryError"))}</p>
   </div>;
 }
 

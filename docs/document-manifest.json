@@ -18,7 +18,8 @@
         "admin-report-review-ui",
         "admin-report-confirmation-and-pdf"
       ],
-      "status": "approved"
+      "status": "superseded",
+      "superseded_by": "instructor-report-authoring"
     },
     {
       "approval": {
@@ -41,7 +42,8 @@
         "ai-report-revision",
         "ai-report-evaluation"
       ],
-      "status": "approved"
+      "status": "superseded",
+      "superseded_by": "instructor-report-authoring"
     },
     {
       "approval": {
@@ -66,7 +68,8 @@
         "openrouter-provider-adapter",
         "report-operations-and-deployment"
       ],
-      "status": "approved"
+      "status": "superseded",
+      "superseded_by": "instructor-report-authoring"
     },
     {
       "approval": {
@@ -200,7 +203,7 @@
     {
       "id": "insights-ai-foundation",
       "path": "docs/insights-ai-foundation.md",
-      "status": "approved",
+      "status": "superseded",
       "purpose": "Insight decisions and phased implementation; Claude analysis pipeline and the Claude/OpenAI/Gemini provider adapters (section 11).",
       "depends_on": [
         "ai-report-product",
@@ -218,12 +221,13 @@
         "approved_at": "2026-10-24T00:00:00+09:00",
         "approved_by": "minchanpark (section 11 multi-provider Claude/OpenAI/Gemini adapters approved in session, 2026-10-23; production default stays claude until E1); section 12 insight titles and collapsible topic analysis requested by minchanpark in session, 2026-10-24; section 13 slide insights approved without unanswered follow-up by minchanpark in session, 2026-10-24; section 14 fixed slide and independently scrolling PIN list requested by minchanpark in session, 2026-10-24; section 15 duplicate slide key fix requested by minchanpark in session, 2026-10-24; section 16 confirmed export settings and format-specific previews requested by minchanpark in session, 2026-10-24; section 16 Hangul preview font fix requested by minchanpark in session, 2026-10-24",
         "content_sha256": "b5e1582e35ecd2969d2f42f52a95cc085c20ef2bc9713f289d561f0c5189e7ec"
-      }
+      },
+      "superseded_by": "instructor-report-authoring"
     },
     {
       "id": "insights-rest-snapshot",
       "path": "docs/insights-rest-snapshot.md",
-      "status": "approved",
+      "status": "superseded",
       "purpose": "Server-captured REST snapshots without backend changes.",
       "depends_on": [
         "insights-ai-foundation"
@@ -239,6 +243,56 @@
         "approved_at": "2026-10-21T00:00:00+09:00",
         "approved_by": "minchanpark (backend-free workaround approved in session; implementation decisions delegated); platform integration and testing requested in session",
         "content_sha256": "0eecd2ed1b0a6aa94c8486a25b59dec95486a2cab3f0101e31732869bd1398f9"
+      },
+      "superseded_by": "instructor-report-authoring"
+    },
+    {
+      "id": "instructor-report-authoring",
+      "path": "docs/instructor-report-authoring.md",
+      "status": "approved",
+      "purpose": "Single-material report authoring: AI-analysis draft, section editor, AI chat edits, format-specific export, stored lecture audience count.",
+      "depends_on": [
+        "class-frontend-architecture",
+        "ohpin-figma-ui-redesign"
+      ],
+      "informed_by": [
+        "prd"
+      ],
+      "required_for": [
+        "report-authoring-ui",
+        "report-draft-generation",
+        "report-ai-edit",
+        "report-export",
+        "lecture-audience-record"
+      ],
+      "approval": {
+        "approved_at": "2026-10-27T00:00:00+09:00",
+        "approved_by": "minchanpark (feature spec and §13 design/layout approved in session)",
+        "content_sha256": "fe7569624b08bae2f127d60f8bd858e170be9ab048e47cda625dd088a17d5747"
+      }
+    },
+    {
+      "id": "instructor-insight-dashboard",
+      "path": "docs/instructor-insight-dashboard.md",
+      "status": "approved",
+      "purpose": "Per-lecture insight dashboard: KPIs, PIN/audience time charts, per-slide dwell and PIN rate, PIN heatmap, topics, keywords, and the player-side lecture timeline record.",
+      "depends_on": [
+        "instructor-report-authoring",
+        "class-frontend-architecture",
+        "ohpin-figma-ui-redesign"
+      ],
+      "informed_by": [
+        "prd"
+      ],
+      "required_for": [
+        "lecture-timeline-record",
+        "insight-dashboard-api",
+        "insight-dashboard-ui"
+      ],
+      "approval": {
+        "approved_at": "2026-10-29T00:00:00+09:00",
+        "approved_by": "minchanpark (item list and implementation requested in session; unit/route/keyword defaults chosen by lead)",
+        "content_sha256": "c207177fe5634241d8860e5599a191731756c0b2f7610b2ce504b98cf933b588"
       }
     }
   ],

@@ -156,7 +156,7 @@ Node 22.18.0, macOS arm64. 40px 간격으로 분산한 합성 PIN을 x/y 기준 
 
 ### 재현 가능한 검증
 
-`node --experimental-strip-types --test app/_infrastructure/pdf-cache.test.ts app/_infrastructure/browser/pdf-document.test.mjs app/api/pdf/route.test.mjs`
+`node --experimental-strip-types --test app/_infrastructure/server/pdf-cache.test.ts app/_infrastructure/browser/pdf-document.test.mjs app/api/pdf/route.test.mjs`
 
 - 같은 토큰의 문서 재사용, 토큰 변경 후 새 문서/헤더, 참조 해제·재방문·30초 정리와 명시적 공유 worker 소유권을 검사한다.
 - 실제 Next `pipeToNodeResponse` 어댑터와 로컬 HTTP 서버를 통과시켜, 원본 다운로드를 의도적으로 완료하지 않은 상태에서도 HTTP 헤더와 Range 본문이 반환되는지, 같은 블록 요청이 합쳐지는지, 경계를 가로지르는 Range와 원본 캐시 재사용이 정확한지 검사한다.
@@ -164,3 +164,40 @@ Node 22.18.0, macOS arm64. 40px 간격으로 분산한 합성 PIN을 x/y 기준 
 - 실제 로컬 Storage에서 전체 캐시 없이 `bytes=0-99` 요청에 206·100B·`%PDF`·`no-store`를 확인했다. 임시 합성 PDF를 삭제한 뒤에는 블록 캐시가 남아 있어도 403을 확인했다. 임시 Storage 객체·바이트 캐시·벤치마크 페이지와 링크는 제거했다.
 
 운영 배포, 실제 운영 문서·회선·다중 사용자 부하, 1 GiB 실문서의 첫 렌더는 이번 로컬 검증에 포함하지 않았다. `fetchOwnedSessions`의 전체 소유 강의 그래프 조회는 기존 API 계약의 별도 병목으로 남으며 PDF 수정을 위해 임의로 데이터를 자르거나 BE 코드를 바꾸지 않았다.
+
+## 2026-10-31 PDF 슬라이드를 서버 페이지 이미지로 표시 (사용자 승인)
+
+### 원인(실측, 로컬 실제 자료)
+
+pdf.js가 Range 요청을 순차로 이어 가며 페이지를 해석한다. 요청마다 Storage RLS 확인이 붙는다.
+
+| 자료 | 첫 페이지까지 | 전체 페이지 |
+|---|---|---|
+| 49.3MB·15p 디자인 덱 | 28요청·4.4MB | 340요청·49.3MB·해석 CPU 9.7초 |
+| 17.9MB·9p | 13요청·8.5MB | 33요청 |
+| 1.4MB·6p | 8요청·0.5MB | 14요청 |
+| 0.2MB·10p | 3요청 | 3요청 |
+
+같은 페이지의 pdftoppm JPEG는 1920px 112~399KB, 480px 14~40KB였고 첫 변환은 30ms~1s였다.
+
+### 결정
+
+- `GET /api/pdf/page?path&page&w`: `w`는 640(썸네일)·1920(화면) 둘만 받는다. 요청마다 요청자 JWT로 Storage `info`를 읽어 RLS를 확인한 뒤, 원본은 `/api/pdf`와 같은 디스크 캐시 키로, 페이지 JPEG는 `path#p{page}@{w}` 키로 캐시한다. 응답은 `no-store`.
+- 변환은 서버당 동시 2개로 제한한다(라이브 강의와 CPU를 나눠 쓴다). 같은 키 요청은 합쳐진다.
+- 브라우저는 JWT 헤더로 이미지를 받아 blob URL로 보여 준다. 탭 메모리의 blob 캐시는 최근 60장으로 제한하고, 화면용이 오기 전에는 받아 둔 썸네일을 먼저 보여 준다. 화면 밖 썸네일은 보일 때 받는다.
+- pdf.js(`PdfPage`)는 업로드 직후·데모의 blob PDF와 리포트 내보내기 미리보기에만 남긴다. AI 분석·채팅의 슬라이드 렌더(`renderSlidePages`)는 바꾸지 않는다.
+- 한계: 서버에서 그 페이지를 처음 볼 때 0.5~1초 변환 대기, 배포 후 캐시가 비면 다시 변환. 업로드 시 선변환은 이 방식이 부족할 때 추가한다.
+
+### 측정 (2026-10-31, 로컬 Supabase·Next dev, 별도 headless Chrome, HTTP 캐시 끔)
+
+같은 브라우저·같은 서버 디스크 캐시(원본 PDF 캐시됨)에서 `SlideCanvas`만 이전 pdf.js 경로와 새 이미지 경로로 바꿔 비교했다. 시간은 페이지 이동부터 화면에 보이는 슬라이드가 모두 표시될 때까지(`performance.now()`), 앱 부팅과 REST 데이터 로드를 포함한다.
+
+| 화면 | 이전 pdf.js | 새 경로, 이미지 캐시 있음 | 새 경로, 그 서버에서 첫 조회 |
+|---|---|---|---|
+| 폴더(자료 2개 표지) | 38요청·5.0MB·1.9초 | 2요청·55KB·1.2초 | 2.6초 |
+| 플레이어, 49MB·15p 덱 | 197요청·26.3MB·5.5초 | 11요청·566KB·1.0초 | 5.5초 |
+| 발표 화면, 같은 덱 | 32요청·2.3MB·1.5초 | 1요청·168KB·0.5초 | 0.8초 |
+| 플레이어, 1.4MB·6p | 44요청·5.9MB·1.7초 | 8요청·352KB·0.8초 | 1.5초 |
+
+첫 조회는 페이지마다 pdftoppm이 원본을 다시 해석해 0.3~1초씩 걸리고, 서버당 2개씩만 변환한다. 큰 덱의 첫 조회가 이전과 비슷한 이유다. 이것이 문제가 되면 업로드 직후 선변환을 추가한다. Orca 임베디드 브라우저는 백그라운드에서 IntersectionObserver·rAF 통지를 미뤄 지연 로딩 측정에 쓰지 않았다.
+

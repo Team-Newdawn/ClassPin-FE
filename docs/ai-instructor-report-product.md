@@ -1,5 +1,7 @@
 # AI 강의자 리포트 제품 명세
 
+> 2026-10-27 대체됨: [강의 리포트 작성 명세](instructor-report-authoring.md)가 이 문서를 대체한다. `/admin/insights` 화면과 `/api/admin/ai-reports`는 삭제됐고, 분석 파이프라인과 REST 소유 자료 읽기만 리포트 초안에 재사용한다.
+
 - Artifact: `ai-report-product`
 - Status: `reviewed`
 - Source: `doc/pin_class_prd.md`

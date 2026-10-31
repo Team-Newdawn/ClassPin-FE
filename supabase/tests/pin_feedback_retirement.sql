@@ -123,12 +123,15 @@ values (
   'Preserved import (PinFeedback)'
 );
 
+-- Imported rows predate the owner-path trigger; recreate one as it exists in production.
+alter table public.material_versions disable trigger enforce_owned_source_path;
 insert into public.material_versions (id, material_id, source_path)
 values (
   '60000000-0000-0000-0000-000000000006',
   '50000000-0000-0000-0000-000000000005',
   'pin-feedback/70000000-0000-0000-0000-000000000007'
 );
+alter table public.material_versions enable trigger enforce_owned_source_path;
 
 insert into public.slides (id, material_version_id, page_index, image_path)
 values (

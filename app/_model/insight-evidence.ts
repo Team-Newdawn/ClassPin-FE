@@ -21,7 +21,7 @@ function unit(value: number): number {
   return value;
 }
 
-export function anchorBounds(anchor: InsightAnchor): Bounds | null {
+function anchorBounds(anchor: InsightAnchor): Bounds | null {
   if (anchor === null) return null;
   if (anchor.kind === "path") {
     if (!Array.isArray(anchor.points) || anchor.points.length < 2) throw new Error("Invalid insight path");

@@ -1,24 +1,16 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef } from "react";
 import Image from "next/image";
 import { X } from "lucide-react";
 import { useLanguage } from "@/app/_controller/language-context";
-import { useSessions } from "@/app/_controller/session-store";
-import { trapDialogFocus } from "@/app/_lib/dialog-focus";
-import { localizeUploadError } from "@/app/_model/i18n";
-import { convertToSlides } from "@/app/_service/convert";
+import { useMaterialUpload } from "@/app/_controller/use-material-upload";
+import { trapDialogFocus } from "@/app/component/dialog-focus";
 import styles from "./material-upload-dialog.module.css";
-
-type UploadItem = { id: string; file: File; phase: "waiting" | "uploading" | "processing" | "done" | "failed"; progress: number; error?: string; slideCount?: number };
 
 export function MaterialUploadDialog({ folderId = null, onClose }: { folderId?: string | null; onClose: () => void }) {
   const { t, locale } = useLanguage();
-  const { folders, createSession } = useSessions();
-  const [targetFolder, setTargetFolder] = useState(folderId);
-  const [items, setItems] = useState<UploadItem[]>([]);
-  const [busy, setBusy] = useState(false);
-  const active = useRef(false);
+  const { folders, targetFolder, setTargetFolder, items, hide, busy, upload } = useMaterialUpload(folderId);
   const input = useRef<HTMLInputElement>(null);
   const dialog = useRef<HTMLElement>(null);
   useEffect(() => {
@@ -28,30 +20,6 @@ export function MaterialUploadDialog({ folderId = null, onClose }: { folderId?: 
     dialog.current?.focus();
     return () => { document.body.style.overflow = previousOverflow; previousFocus?.focus(); };
   }, []);
-
-  const upload = async (files: File[], retryId?: string) => {
-    if (active.current || !files.length) return;
-    active.current = true;
-    setBusy(true);
-    const pending: UploadItem[] = files.map((file) => ({ id: crypto.randomUUID(), file, phase: "waiting", progress: 0 }));
-    setItems((previous) => [...previous.filter((item) => item.id !== retryId), ...pending]);
-    const update = (id: string, changes: Partial<UploadItem>) => setItems((previous) => previous.map((item) => item.id === id ? { ...item, ...changes } : item));
-    try {
-      for (const item of pending) {
-        update(item.id, { phase: "uploading" });
-        try {
-          const result = await convertToSlides(item.file, {
-            onUploadProgress: (fraction) => update(item.id, { progress: Math.round(fraction * 100), phase: fraction >= 1 ? "processing" : "uploading" }),
-            onMeta: () => update(item.id, { phase: "processing" }),
-          });
-          await createSession({ folderId: targetFolder, title: item.file.name.replace(/\.(pdf|pptx?)$/i, ""), fileName: item.file.name, slides: result.slides, sourcePath: result.sourcePath });
-          update(item.id, { phase: "done", progress: 100, slideCount: result.slides.length });
-        } catch (error) {
-          update(item.id, { phase: "failed", error: error instanceof Error ? localizeUploadError(locale, error.message) : t("upload.failed") });
-        }
-      }
-    } finally { active.current = false; setBusy(false); }
-  };
 
   const completed = items.filter((item) => item.phase === "done").length;
   return <div className={styles.backdrop} onMouseDown={(event) => { if (!busy && event.target === event.currentTarget) onClose(); }}>
@@ -68,7 +36,7 @@ export function MaterialUploadDialog({ folderId = null, onClose }: { folderId?: 
       {items.length > 0 && <ul className={styles.items} aria-live="polite">{items.map((item) => <li key={item.id} className={item.phase === "done" ? styles.complete : ""}>
         <span className={styles.fileIcon}><Image src={item.phase === "done" ? "/assets/design/check.svg" : "/assets/design/file.svg"} alt="" width={18} height={18} /></span>
         <div className={styles.file}><b title={item.file.name}>{item.file.name}</b><span>{new Intl.NumberFormat(locale, { maximumFractionDigits: 1 }).format(item.file.size / (item.file.size >= 1e6 ? 1e6 : 1e3))}{item.file.size >= 1e6 ? "MB" : "KB"} · {item.phase === "done" ? t("upload.readySlides", { count: item.slideCount ?? 0 }) : t(`upload.queue.${item.phase}`)}{item.phase === "uploading" ? ` ${item.progress}%` : ""}</span></div>
-        <button type="button" className={styles.remove} disabled={busy} onClick={() => setItems((previous) => previous.filter((row) => row.id !== item.id))} aria-label={t("upload.hideFile", { name: item.file.name })}><X /></button>
+        <button type="button" className={styles.remove} disabled={busy} onClick={() => hide(item.id)} aria-label={t("upload.hideFile", { name: item.file.name })}><X /></button>
         {(item.phase === "uploading" || item.phase === "processing") && <progress max={100} value={item.phase === "uploading" ? item.progress : undefined} aria-label={t("upload.fileProgress", { name: item.file.name })} />}
         {item.error && <div className={styles.error} role="alert">{item.error}<button type="button" disabled={busy} onClick={() => void upload([item.file], item.id)}>{t("common.retry")}</button></div>}
       </li>)}</ul>}

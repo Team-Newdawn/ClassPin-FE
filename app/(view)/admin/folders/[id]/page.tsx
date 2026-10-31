@@ -5,7 +5,6 @@ import Link from "next/link";
 import { ArrowLeft, Folder, Grid2X2, List, MessageCircleQuestion, Trash2, X } from "@/app/component/icons";
 import { AdminSearch } from "@/app/component/admin-search";
 
-import { useInsightReports } from "@/app/_controller/use-insight-reports";
 import { FolderMaterialCard } from "./component/folder-material-card";
 import { FolderTreeSidebar } from "@/app/component/folder-tree-sidebar";
 import { LoadingScreen } from "@/app/component/loading-screen";
@@ -17,7 +16,6 @@ import styles from "./page.module.css";
 import { MaterialUploadDialog } from "@/app/component/material-upload-dialog";
 
 export default function FolderPage() {
-  const insightReports = useInsightReports();
   const {
     t, folderId, folders, ready, uploadOpen, closeUpload, view, setView, sidebarOpen, toggleSidebar,
     query, setQuery,
@@ -25,7 +23,7 @@ export default function FolderPage() {
     folder, scopedSessions,
     visibleSessions, requestUpload, move, openDelete, closeDelete, confirmDelete
   } = useFolderController();
- const materialCards = visibleSessions.map((session) => <FolderMaterialCard key={session.id} session={session} reportId={insightReports.find((report) => report.materialIds.includes(session.materialId ?? "") && ["ready", "confirmed"].includes(report.status))?.id} folders={folders} view={view} moving={movingId === session.id} onMove={(nextFolderId) => void move(session.id, nextFolderId)} onDelete={() => openDelete(session)} />);
+ const materialCards = visibleSessions.map((session) => <FolderMaterialCard key={session.id} session={session} folders={folders} view={view} moving={movingId === session.id} onMove={(nextFolderId) => void move(session.id, nextFolderId)} onDelete={() => openDelete(session)} />);
 
   if (!ready) return <LoadingScreen />;
 

@@ -1,7 +1,6 @@
-export const DEFAULT_QUESTION_CATEGORY_KEYS = ["concept", "why", "example", "error", "important"] as const;
+const DEFAULT_QUESTION_CATEGORY_KEYS = ["concept", "why", "example", "error", "important"] as const;
 export const LEGACY_QUESTION_CATEGORY_KEYS = ["praise", "improve", "confusing", "bug", "idea"] as const;
 const BUILT_IN_QUESTION_CATEGORY_KEYS: readonly string[] = [...DEFAULT_QUESTION_CATEGORY_KEYS, ...LEGACY_QUESTION_CATEGORY_KEYS];
-export type DefaultQuestionCategory = typeof DEFAULT_QUESTION_CATEGORY_KEYS[number];
 export type QuestionCategory = string;
 export type QuestionStatus = "unanswered" | "answered" | "resolved";
 export type QuestionAnchorKind = "point" | "box" | "path";
@@ -9,8 +8,7 @@ export type PresentationQrPosition = "top-left" | "top-right" | "bottom-left" | 
 export const QUESTION_MARKERS = ["pin", "question", "smile", "idea"] as const;
 export type QuestionMarker = typeof QUESTION_MARKERS[number];
 
-export const QUESTION_CATEGORY_LABEL_MAX = 40;
-export const QUESTION_CATEGORY_MAX = 20;
+const QUESTION_CATEGORY_LABEL_MAX = 40;
 const QUESTION_CATEGORY_STORED_MAX = 50;
 const QUESTION_CATEGORY_KEY = /^[a-z0-9][a-z0-9-]{0,63}$/;
 
@@ -42,34 +40,8 @@ export function normalizeQuestionCategorySettings(value: unknown): QuestionCateg
   return settings;
 }
 
-export function isValidQuestionCategorySettings(value: unknown): value is QuestionCategorySettings {
-  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
-  const entries = Object.entries(value as Record<string, unknown>);
-  const active = entries.filter(([, item]) => {
-    const setting = item as Partial<QuestionCategorySetting> | null;
-    return setting?.enabled === true && setting.archived !== true;
-  });
-  return entries.length <= QUESTION_CATEGORY_STORED_MAX
-    && active.length >= 1
-    && entries.filter(([, item]) => (item as Partial<QuestionCategorySetting> | null)?.archived !== true).length <= QUESTION_CATEGORY_MAX
-    && entries.every(([key, item]) => {
-      if (!QUESTION_CATEGORY_KEY.test(key) || !item || typeof item !== "object" || Array.isArray(item)) return false;
-      const setting = item as Partial<QuestionCategorySetting>;
-      const builtIn = BUILT_IN_QUESTION_CATEGORY_KEYS.includes(key);
-      return typeof setting.label === "string"
-        && setting.label === setting.label.trim()
-        && [...setting.label].length <= QUESTION_CATEGORY_LABEL_MAX
-        && (builtIn || setting.label.length > 0)
-        && typeof setting.enabled === "boolean"
-        && typeof setting.archived === "boolean";
-    });
-}
-
 export const enabledQuestionCategories = (settings: QuestionCategorySettings) =>
   Object.keys(settings).filter((key) => settings[key].enabled && !settings[key].archived);
-
-export const configuredQuestionCategories = (settings: QuestionCategorySettings) =>
-  Object.keys(settings).filter((key) => !settings[key].archived);
 
 export const acceptsQuestionCategory = (settings: QuestionCategorySettings, category: QuestionCategory) =>
   enabledQuestionCategories(settings).includes(category);
@@ -79,12 +51,6 @@ export const questionCategoryLabel = (
   category: QuestionCategory,
   fallback: (category: QuestionCategory) => string
 ) => settings[category]?.label || fallback(category);
-
-export const questionCategoryClass = (settings: QuestionCategorySettings, category: QuestionCategory) => {
-  if (BUILT_IN_QUESTION_CATEGORY_KEYS.includes(category)) return category;
-  const custom = Object.keys(settings).filter((key) => !BUILT_IN_QUESTION_CATEGORY_KEYS.includes(key));
-  return `custom-${Math.max(0, custom.indexOf(category)) % 5}`;
-};
 
 export const isQuestionMarker = (value: unknown): value is QuestionMarker =>
   typeof value === "string" && (QUESTION_MARKERS as readonly string[]).includes(value);
@@ -109,7 +75,7 @@ export interface Profile {
 }
 
 export const CLASS_FOLDER_NAME_MAX = 80;
-export const CLASS_FOLDER_COLOR_COUNT = 6;
+const CLASS_FOLDER_COLOR_COUNT = 6;
 export const CLASS_FOLDER_DEFAULT_COLOR_INDEX = 2;
 export const CLASS_UNFILED_COLOR_INDEX = 0;
 export const CLASS_FOLDER_COLOR_OPTIONS = [2, 3, 1, 0] as const;

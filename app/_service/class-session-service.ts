@@ -387,6 +387,8 @@ export async function saveSlideInstructorNote(slideId: string, body: string) {
 
 /** 청중 입장 시 강의가 시작 전(204)이거나 종료(410)됐다. 없는 강의(404)와 구분한다. */
 export class LectureClosedError extends Error {}
+/** 한 참여자가 1분 10개·강의당 100개 질문 한도를 넘었다(DB 트리거 → 429). */
+export class QuestionRateLimitError extends Error {}
 
 async function fetchLiveSessionBy(column: "id" | "join_code", value: string): Promise<ClassSession | null> {
   const client = getAudienceSupabaseClient();
@@ -457,6 +459,8 @@ export async function submitQuestion(session: ClassSession, question: Question) 
   await restRequest(client, `/participant/lectures/${encodeURIComponent(session.id)}/questions`, "POST", {
     id: question.id, slideId: slide.id, x: question.x, y: question.y,
     category: question.category, marker: question.marker, text: question.text,
+  }).catch((error) => {
+    throw error instanceof RestError && error.status === 429 ? new QuestionRateLimitError(error.message) : error;
   });
 }
 

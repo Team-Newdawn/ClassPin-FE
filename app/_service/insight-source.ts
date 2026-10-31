@@ -99,7 +99,9 @@ export function inspectInsightSource(graph: unknown, materialIds: readonly strin
           reactions: count(question.reaction_count), createdAt: date(question.created_at), answers };
       }).sort((a, b) => a.id.localeCompare(b.id));
       materials.push({ id: materialId, folderId: course.folder_id == null ? null : id(course.folder_id), lectureId: id(lecture.id), lectureStatus: typeof lecture.status === "string" ? lecture.status : null, versionId, version: count(version.version_no), sourcePath: text(version.source_path),
-        title: text(lecture.title), fileName: text(material.file_name), slides, questions });
+        title: text(lecture.title), fileName: text(material.file_name), slides, questions,
+        // Optional in the REST graph; the report falls back to the player's audience record (RPT-071).
+        startedAt: typeof lecture.started_at === "string" ? lecture.started_at : null, endedAt: typeof lecture.ended_at === "string" ? lecture.ended_at : null });
     }
   }
   if (found.size !== selection.length) throw new Error("SOURCE_NOT_FOUND");

@@ -79,18 +79,19 @@ test("LIVE time resumes from the frozen value across repeated dialogs and resets
   assert.equal(render(), null);
 });
 
-test("audience departures count immediately, ignore late heartbeats, and rejoin after page restore", async () => {
+test("audience departures count immediately, ignore late heartbeats, rejoin after page restore, and keep total and peak", async () => {
   const cleanups: (() => void)[] = [];
   const timers = new Map<number, { callback: () => void; delay: number }>();
   const document = Object.assign(new EventTarget(), { visibilityState: "visible" });
   const window = new EventTarget();
   const messages: { payload: { id: string; left?: boolean }; keepalive: boolean }[] = [];
   let receive: (payload: unknown) => void = () => {};
-  let count = 0, time = 0, sequence = 0, timerId = 0, closed = false;
+  let audience = { count: 0, total: 0, peak: 0 }, time = 0, sequence = 0, timerId = 0, closed = false;
+  type Audience = typeof audience;
   const output = ts.transpileModule(readFileSync("app/_controller/use-live-audience.ts", "utf8"), {
     compilerOptions: { module: ts.ModuleKind.CommonJS },
   }).outputText;
-  const exports = {} as { useLiveAudienceCount: (id: string, live: boolean) => number; useAudienceHeartbeat: (id: string) => void };
+  const exports = {} as { useLiveAudienceCount: (id: string, live: boolean) => Audience; useAudienceHeartbeat: (id: string) => void };
   runInNewContext(output, {
     exports, document, window, console,
     Date: class extends Date { static now() { return time; } },
@@ -98,7 +99,7 @@ test("audience departures count immediately, ignore late heartbeats, and rejoin 
     setInterval: (callback: () => void, delay: number) => { timers.set(++timerId, { callback, delay }); return timerId; },
     clearInterval: (id: number) => timers.delete(id),
     require: (id: string) => id === "react" ? {
-      useState: () => [0, (value: number) => { count = value; }],
+      useState: (initial: Audience) => [initial, (update: (prev: Audience) => Audience) => { audience = update(audience); }],
       useEffect: (setup: () => () => void) => { cleanups.push(setup()); },
     } : id.endsWith("/lecture-reactions") ? {
       lectureAudienceTopic: (id: string) => `lecture-audience:${id}`, LECTURE_AUDIENCE_EVENT: "here",
@@ -114,33 +115,59 @@ test("audience departures count immediately, ignore late heartbeats, and rejoin 
   exports.useLiveAudienceCount("lecture", true);
   exports.useAudienceHeartbeat("lecture");
   await Promise.resolve();
-  assert.equal(count, 1);
+  assert.equal(audience.count, 1);
   const firstId = messages[0].payload.id;
   document.visibilityState = "hidden";
   document.dispatchEvent(new Event("visibilitychange"));
-  assert.equal(count, 1, "a background tab is still open");
+  assert.equal(audience.count, 1, "a background tab is still open");
   window.dispatchEvent(new Event("pagehide"));
-  assert.equal(count, 0);
+  assert.equal(audience.count, 0);
   assert.equal(messages.at(-1)?.keepalive, true);
   const sent = messages.length;
   window.dispatchEvent(new Event("pagehide"));
   assert.equal(messages.length, sent, "departure is sent once");
   receive({ id: firstId });
-  assert.equal(count, 0, "a late heartbeat must not revive a closed tab");
+  assert.equal(audience.count, 0, "a late heartbeat must not revive a closed tab");
   document.visibilityState = "visible";
   window.dispatchEvent(new Event("pageshow"));
-  assert.equal(count, 1);
+  assert.equal(audience.count, 1);
   assert.notEqual(messages.at(-1)?.payload.id, firstId);
   for (const payload of [null, { id: "" }, { id: "x".repeat(65) }, { id: 1 }]) receive(payload);
-  assert.equal(count, 1);
+  assert.equal(audience.count, 1);
   cleanups[1]();
-  assert.equal(count, 0, "route unmount also sends departure");
+  assert.equal(audience.count, 0, "route unmount also sends departure");
   receive({ id: "crashed-tab" });
-  assert.equal(count, 1);
+  receive({ id: "other-tab" });
+  receive({ id: "other-tab" });
+  assert.deepEqual({ ...audience }, { count: 2, total: 4, peak: 2 }, "total counts every tab id once, rejoins included");
   time += 151_000;
   for (const timer of timers.values()) if (timer.delay === 15_000) timer.callback();
-  assert.equal(count, 0, "missing departure signals still expire");
+  assert.deepEqual({ ...audience }, { count: 0, total: 4, peak: 2 }, "missing departure signals still expire; total and peak stay");
   cleanups[0]();
   assert.equal(closed, true);
   assert.equal(timers.size, 0);
+});
+
+test("timeline keeps one sample per tick up to 1440 and only real slide changes up to 5000", () => {
+  const output = ts.transpileModule(readFileSync("app/_controller/use-live-audience.ts", "utf8"), {
+    compilerOptions: { module: ts.ModuleKind.CommonJS },
+  }).outputText;
+  type Timeline = { samples: { at: string; audience: number; slide: number }[]; slideChanges: { at: string; slide: number }[] };
+  const exports = {} as {
+    addTimelineSample: (timeline: Timeline, sample: Timeline["samples"][number]) => Timeline;
+    addSlideChange: (timeline: Timeline, change: Timeline["slideChanges"][number]) => Timeline;
+  };
+  runInNewContext(output, { exports, require: () => ({}) });
+  const empty: Timeline = { samples: [], slideChanges: [] };
+  let timeline = exports.addSlideChange(empty, { at: "a", slide: 1 });
+  assert.deepEqual(empty, { samples: [], slideChanges: [] }, "pure");
+  timeline = exports.addSlideChange(timeline, { at: "b", slide: 1 });
+  timeline = exports.addSlideChange(timeline, { at: "c", slide: 2 });
+  timeline = exports.addSlideChange(timeline, { at: "d", slide: 1 });
+  assert.equal(timeline.slideChanges.map((change) => change.at).join(), "a,c,d");
+  timeline = exports.addTimelineSample(timeline, { at: "e", audience: 3, slide: 1 });
+  assert.deepEqual(JSON.parse(JSON.stringify(timeline.samples)), [{ at: "e", audience: 3, slide: 1 }]);
+  const full: Timeline = { samples: Array(1440).fill(timeline.samples[0]), slideChanges: Array.from({ length: 5000 }, (_, slide) => ({ at: "x", slide })) };
+  assert.equal(exports.addTimelineSample(full, { at: "f", audience: 1, slide: 1 }), full);
+  assert.equal(exports.addSlideChange(full, { at: "f", slide: 9999 }), full);
 });

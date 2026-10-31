@@ -9,7 +9,8 @@ import { LECTURE_REACTION_EMOJIS } from "@/app/_model/lecture-reactions";
 import { SlideCanvas } from "@/app/component/slide-canvas";
 import type { useSessionAdminController } from "../controller";
 import { QR_POSITIONS } from "@/app/_model/presentation-options";
-import { PinClusterPopover, usePinCluster } from "./pin-cluster-popover";
+import { PinClusterPopover } from "./pin-cluster-popover";
+import { usePinCluster } from "./pin-cluster-controller";
 import styles from "./lecture-preparation.module.css";
 
 // 질문 PIN 공개를 켰을 때 "이런 식으로 PIN이 찍힌다"를 보여 주는 예시. 저장되지 않는다. 가까운 PIN은 묶음으로 보인다.

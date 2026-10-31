@@ -3,14 +3,12 @@
 import { useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "@/app/_controller/auth-context";
+import { safeNextPath } from "@/app/_model/next-path";
 
 export function useLoginController(startError: string) {
   const router = useRouter();
   const params = useSearchParams();
-  const requestedNext = params.get("next");
-  const next = requestedNext?.startsWith("/") && !requestedNext.startsWith("//")
-    ? requestedNext
-    : "/admin/dashboard";
+  const next = safeNextPath(params.get("next"));
   const { configured, loading, isAdmin, signIn } = useAuth();
   const [error, setError] = useState<string | null>(null);
   const [redirecting, setRedirecting] = useState(false);

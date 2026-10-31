@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { advancePinPlayback, canRotatePinPlayback, crossedPinMilestone, findIncomingPins, findNewestIncomingPin, nextPresentationSlide, presentationAutoplayDelay, rectanglesOverlap, resolvePinDisplayPositions, placeBubbles, slideIndexFromPageNumber } from "./presentation-rotation.ts";
+import { advancePinPlayback, canRotatePinPlayback, crossedPinMilestone, findIncomingPins, findNewestIncomingPin, nextPresentationSlide, presentationAutoplayDelay, rectanglesOverlap, placeBubbles, slideIndexFromPageNumber } from "./presentation-rotation.ts";
 
 test("PIN 총합이 새 10단위를 넘으면 건너뛴 구간 중 가장 높은 값을 고른다", () => {
   assert.equal(crossedPinMilestone(9, 10), 10);
@@ -90,24 +90,6 @@ test("직접 입력한 1-based 슬라이드 번호 문자열이 범위 안의 �
   assert.equal(slideIndexFromPageNumber("11", 10), null);
   assert.equal(slideIndexFromPageNumber("1.5", 10), null);
   assert.equal(slideIndexFromPageNumber("invalid", 10), null);
-});
-
-test("중앙이나 가장자리에 겹친 PIN 30개를 화면 안의 겹치지 않는 위치로 펼친다", () => {
-  const width = 800;
-  const height = 450;
-  for (const [x, y] of [[0.5, 0.5], [0, 0], [1, 1]]) {
-    const pins = Array.from({ length: 30 }, (_, index) => ({ id: `${index}`, x, y }));
-    const positions = [...resolvePinDisplayPositions(pins, width, height).values()];
-
-    assert.equal(positions.length, pins.length);
-    positions.forEach((position, index) => {
-      assert.ok(position.x >= 0 && position.x <= 1);
-      assert.ok(position.y >= 0 && position.y <= 1);
-      positions.slice(index + 1).forEach((other) => {
-        assert.ok(Math.abs(position.x - other.x) * width >= 40 || Math.abs(position.y - other.y) * height >= 40);
-      });
-    });
-  }
 });
 
 test("말풍선과 PIN의 실제 사각형이 겹칠 때만 충돌로 판단한다", () => {

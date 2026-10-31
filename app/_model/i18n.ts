@@ -97,9 +97,6 @@ const ko = {
   "login.retry": "다시 로그인",
   "login.timeout": "로그인 처리가 지연되고 있어요. 다시 시도해 주세요.",
 
-  "nav.dashboard": "대시보드",
-  "nav.liveSession": "라이브 세션",
-  "nav.materials": "강의 자료",
   "nav.insights": "인사이트",
   "nav.myWorkspace": "내 워크스페이스",
   "nav.personalWorkspace": "개인 워크스페이스",
@@ -199,7 +196,6 @@ const ko = {
   "folders.moveError": "자료를 이동하지 못했습니다. 잠시 후 다시 시도해 주세요.",
 
   "dashboard.description": "지금 답해야 할 질문과 강의별 상태를 한 화면에서 확인하세요.",
-  "dashboard.openInsights": "인사이트 열기",
   "dashboard.startLecture": "새 강의 시작",
   "dashboard.totalLectures": "전체 강의",
   "dashboard.liveLectures": ({ count: value }) => `진행 중 ${value}개`,
@@ -224,14 +220,12 @@ const ko = {
   "dashboard.noAggregate": "집계할 질문이 없어요",
   "dashboard.noAggregateHint": "질문이 쌓이면 혼란 핫스팟을 자동으로 계산합니다.",
 
-  "materials.description": "업로드한 슬라이드와 회차별 질문 현황을 관리합니다.",
   "materials.converting": "변환 중…",
   "materials.upload": "자료 업로드",
   "materials.search": "자료 제목 파일명 검색",
   "materials.noMatch": "조건에 맞는 자료가 없어요",
   "materials.none": "아직 업로드한 자료가 없어요",
   "materials.changeSearch": "검색어나 필터를 바꿔보세요.",
-  "materials.emptyHint": "PDF·PPT를 올리면 슬라이드로 변환해 바로 질문을 받을 수 있어요.",
   "materials.deleteMaterial": ({ title }) => `${title} 강의 자료 삭제`,
   "materials.deleteTitle": "이 강의 자료를 삭제할까요?",
   "materials.deleteDescription": ({ title }) => `‘${title}’ 강의 자료를 삭제합니다.`,
@@ -241,29 +235,6 @@ const ko = {
   "materials.deleteConfirm": "강의 자료 삭제",
   "materials.deleting": "삭제 중…",
 
-  "insights.description": "질문이 몰린 위치와 유형을 집계해 다음 회차에 무엇을 바꿀지 찾습니다.",
-  "insights.aggregatedQuestions": "집계 질문",
-  "insights.fromSlides": ({ count: value }) => `슬라이드 ${value}곳에서 발생`,
-  "insights.pinRate": "핀 질문 비율",
-  "insights.pinRateHint": "좌표가 찍힌 질문",
-  "insights.hotspots": "혼란 핫스팟",
-  "insights.hotspotsHint": "질문 밀도가 높은 슬라이드 순",
-  "insights.low": "낮음",
-  "insights.mid": "중간",
-  "insights.high": "높음",
-  "insights.critical": "매우 높음",
-  "insights.noDensityHint": "질문이 쌓이면 슬라이드별 밀도를 계산합니다.",
-  "insights.improvementCandidates": "개선 후보",
-  "insights.improvementRule": "근거 질문 2건 이상인 슬라이드만 제안합니다",
-  "insights.traceable": "모든 제안은 원본 질문으로 역추적됩니다",
-  "insights.improvementText": ({ count: value }) => `이 슬라이드에서 질문 ${value}건이 발생했습니다. 설명 보강이나 예시 추가를 검토하세요.`,
-  "insights.viewEvidence": "근거 질문 보기",
-  "insights.noCandidates": "아직 제안할 개선 후보가 없어요",
-  "insights.noCandidatesHint": "같은 슬라이드에 질문이 2건 이상 쌓이면 후보로 올라옵니다.",
-  "insights.openQuestions": "미답변 질문",
-  "insights.waitingAnswers": ({ count: value }) => `${value}건이 답변을 기다리고 있어요`,
-  "insights.noOpenQuestions": "미답변 질문이 없어요",
-  "insights.allAnswered": "모든 질문에 답변이 등록됐습니다.",
 
   "session.notFound": "세션을 찾을 수 없어요",
   "session.backToFolder": "폴더로 돌아가기",
@@ -347,6 +318,7 @@ const ko = {
   "session.clusterTitle": ({ count }) => `이 자리의 핀 ${count}개`,
   "session.clusterSummaryLoading": "질문을 요약하는 중…",
   "session.clusterSummaryError": "AI 요약을 불러오지 못했어요. 아래 질문을 확인해 주세요.",
+  "session.summaryRateLimited": "AI 요약 요청이 많아 잠시 쉬고 있어요. 잠시 후 다시 시도해 주세요.",
   "session.joinQrTitle": "청중 참여 QR",
   "session.joinQrDescription": "QR을 찍거나 링크로 들어오면 바로 질문할 수 있어요",
   "session.copyLink": "링크 복사",
@@ -598,6 +570,7 @@ const ko = {
   "student.sendQuestion": "코멘트 보내기",
   "student.editError": "코멘트를 수정하지 못했어요. 잠시 후 다시 시도해 주세요.",
   "student.saveError": "코멘트를 저장하지 못했어요. 잠시 후 다시 시도해 주세요.",
+  "student.rateLimited": "코멘트를 너무 빠르게 남기고 있어요. 1분 뒤 다시 시도해 주세요. 한 강의에는 코멘트를 100개까지 남길 수 있어요.",
 
   "experience.complete": "완료",
   "experience.eyebrow": "참여 완료",
@@ -730,9 +703,6 @@ const en: Record<TranslationKey, Message> = {
   "login.retry": "Try signing in again",
   "login.timeout": "Sign-in is taking longer than expected. Please try again.",
 
-  "nav.dashboard": "Dashboard",
-  "nav.liveSession": "Live session",
-  "nav.materials": "Materials",
   "nav.insights": "Insights",
   "nav.myWorkspace": "My workspace",
   "nav.personalWorkspace": "Personal workspace",
@@ -832,7 +802,6 @@ const en: Record<TranslationKey, Message> = {
   "folders.moveError": "Could not move the material. Please try again in a moment.",
 
   "dashboard.description": "See the questions that need answers and every lecture's status at a glance.",
-  "dashboard.openInsights": "Open insights",
   "dashboard.startLecture": "Start new lecture",
   "dashboard.totalLectures": "Total lectures",
   "dashboard.liveLectures": (values) => `${count(values, "session")} live`,
@@ -857,14 +826,12 @@ const en: Record<TranslationKey, Message> = {
   "dashboard.noAggregate": "No questions to analyze",
   "dashboard.noAggregateHint": "Confusion hotspots will appear as questions come in.",
 
-  "materials.description": "Manage uploaded slides and question activity for each session.",
   "materials.converting": "Converting…",
   "materials.upload": "Upload materials",
   "materials.search": "Search title or file name",
   "materials.noMatch": "No materials match your filters",
   "materials.none": "No materials uploaded yet",
   "materials.changeSearch": "Try changing your search or filters.",
-  "materials.emptyHint": "Upload a PDF or PPT to turn it into slides and start collecting questions.",
   "materials.deleteMaterial": ({ title }) => `Delete ${title}`,
   "materials.deleteTitle": "Delete this lecture material?",
   "materials.deleteDescription": ({ title }) => `This will delete “${title}”.`,
@@ -874,29 +841,6 @@ const en: Record<TranslationKey, Message> = {
   "materials.deleteConfirm": "Delete material",
   "materials.deleting": "Deleting…",
 
-  "insights.description": "Analyze where and why questions cluster to improve your next session.",
-  "insights.aggregatedQuestions": "Questions analyzed",
-  "insights.fromSlides": (values) => `Across ${count(values, "slide")}`,
-  "insights.pinRate": "Pinned question rate",
-  "insights.pinRateHint": "Questions placed on a slide",
-  "insights.hotspots": "Confusion hotspots",
-  "insights.hotspotsHint": "Slides ranked by question density",
-  "insights.low": "Low",
-  "insights.mid": "Medium",
-  "insights.high": "High",
-  "insights.critical": "Very high",
-  "insights.noDensityHint": "Question density by slide will appear as questions come in.",
-  "insights.improvementCandidates": "Improvement opportunities",
-  "insights.improvementRule": "Only slides with at least 2 supporting questions are suggested",
-  "insights.traceable": "Every suggestion traces back to the original questions",
-  "insights.improvementText": (values) => `${count(values, "question")} came from this slide. Consider adding a clearer explanation or another example.`,
-  "insights.viewEvidence": "View supporting questions",
-  "insights.noCandidates": "No improvement opportunities yet",
-  "insights.noCandidatesHint": "A slide becomes a candidate after receiving at least 2 questions.",
-  "insights.openQuestions": "Unanswered questions",
-  "insights.waitingAnswers": (values) => `${count(values, "question")} waiting for an answer`,
-  "insights.noOpenQuestions": "No unanswered questions",
-  "insights.allAnswered": "Every question has an answer.",
 
   "session.notFound": "Session not found",
   "session.backToFolder": "Back to folder",
@@ -980,6 +924,7 @@ const en: Record<TranslationKey, Message> = {
   "session.clusterTitle": ({ count }) => `${count} pins here`,
   "session.clusterSummaryLoading": "Summarizing questions…",
   "session.clusterSummaryError": "Could not load the AI summary. Review the questions below.",
+  "session.summaryRateLimited": "Too many AI summary requests right now. Please try again in a moment.",
   "session.joinQrTitle": "Audience join QR",
   "session.joinQrDescription": "Scan the QR or open the link to ask questions right away",
   "session.copyLink": "Copy link",
@@ -1230,6 +1175,7 @@ const en: Record<TranslationKey, Message> = {
   "student.sendQuestion": "Send comment",
   "student.editError": "Could not update your comment. Please try again in a moment.",
   "student.saveError": "Could not save your comment. Please try again in a moment.",
+  "student.rateLimited": "You are posting comments too quickly. Try again in a minute. Each lecture accepts up to 100 comments from you.",
 
   "experience.complete": "Complete",
   "experience.eyebrow": "Participation complete",
@@ -1278,7 +1224,7 @@ export const translate = (locale: Locale, key: TranslationKey, values: Values = 
   return typeof message === "function" ? message(values) : message;
 };
 
-export const categoryKeys: QuestionCategory[] = ["concept", "why", "example", "error", "important"];
+const categoryKeys: QuestionCategory[] = ["concept", "why", "example", "error", "important"];
 
 export const categoryLabel = (locale: Locale, category: QuestionCategory) => {
   if ((categoryKeys as string[]).includes(category)) return translate(locale, `category.${category}` as TranslationKey);

@@ -10,7 +10,7 @@ import { useAudienceHeartbeat } from "@/app/_controller/use-live-audience";
 import { LECTURE_REACTION_EVENT, lectureReactionTopic, type LectureReactionEmoji } from "@/app/_model/lecture-reactions";
 import { questionsByEmpathy, questionsByNewest } from "@/app/_model/question-reactions";
 import { groupQuestionsBySlide } from "@/app/_model/stats";
-import { LectureClosedError } from "@/app/_service/class-session-service";
+import { LectureClosedError, QuestionRateLimitError } from "@/app/_service/class-session-service";
 import { publishRealtimeReaction } from "@/app/_service/realtime-reaction-service";
 import { acceptsQuestionCategory, enabledQuestionCategories, type Question, type QuestionCategory, type QuestionMarker } from "@/app/_model/types";
 
@@ -295,7 +295,7 @@ export function useJoinSessionController() {
     } catch (error) {
       const detail = error && typeof error === "object" && "message" in error ? String(error.message) : String(error);
       console.error(`Question save failed: ${detail}`, error);
-      setSubmitError(editingQuestionId ? t("student.editError") : t("student.saveError"));
+      setSubmitError(error instanceof QuestionRateLimitError ? t("student.rateLimited") : editingQuestionId ? t("student.editError") : t("student.saveError"));
     } finally {
       setSubmitting(false);
     }

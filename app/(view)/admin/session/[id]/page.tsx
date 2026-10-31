@@ -12,11 +12,12 @@ import { useLanguage } from "@/app/_controller/language-context";
 import { LoadingScreen } from "@/app/component/loading-screen";
 import { QuestionCard } from "./component/question-card";
 import { SlideCanvas } from "@/app/component/slide-canvas";
-import { StatusBadge } from "@/app/component/status-badge";
+import { StatusBadge } from "./component/status-badge";
 import { MAX_QUESTION_PANEL, MIN_QUESTION_PANEL, useSessionAdminController } from "./controller";
 import styles from "./page.module.css";
 import { LecturePreparation } from "./component/lecture-preparation";
-import { PinClusterPopover, QuestionSummary, usePinCluster } from "./component/pin-cluster-popover";
+import { PinClusterPopover, QuestionSummary } from "./component/pin-cluster-popover";
+import { usePinCluster } from "./component/pin-cluster-controller";
 import { slideIndexFromPageNumber } from "@/app/_model/class/presentation-rotation";
 
 function SessionToggle({ checked, label, onClick }: { checked: boolean; label: string; onClick: () => void }) {
@@ -33,7 +34,7 @@ function SessionToggle({ checked, label, onClick }: { checked: boolean; label: s
   </button>;
 }
 
-import { trapDialogFocus } from "@/app/_lib/dialog-focus";
+import { trapDialogFocus } from "@/app/component/dialog-focus";
 
 const NOTE_MIN_HEIGHT = 36; // 12px 글자 2줄
 
@@ -274,7 +275,7 @@ export default function SessionAdmin() {
                     <span aria-hidden="true">{questionSort === sort ? "✓" : ""}</span>{t(sort === "empathy" ? "student.sortByEmpathy" : "student.sortByNewest")}
                   </button>)}
                 </div>
-                <div className="question-stack">{slideQuestions.length > 0 && <QuestionSummary questions={slideQuestions} folder={controller.folder ?? null} className="slide-question-summary" />}{panelQuestions.length ? panelQuestions.map((q) => <QuestionCard key={q.id} question={q} selected={selected?.id === q.id} onClick={() => selectQuestionFromList(q.id, q.slideIndex)} />) : <div className={`no-questions ${live ? "live" : ""}`}><span><MessageCircleQuestion aria-hidden="true" /></span><b>{t(live ? "session.waitingQuestions" : "session.waitingFirstQuestion")}</b><small>{t(live ? "session.waitingQuestionsHint" : "session.waitingFirstQuestionHint")}</small></div>}</div></>
+                <div className="question-stack">{slideQuestions.length > 0 && <QuestionSummary questions={slideQuestions} folder={controller.folder ?? null} className="slide-question-summary" refreshKey={controller.slide?.id} />}{panelQuestions.length ? panelQuestions.map((q) => <QuestionCard key={q.id} question={q} selected={selected?.id === q.id} onClick={() => selectQuestionFromList(q.id, q.slideIndex)} />) : <div className={`no-questions ${live ? "live" : ""}`}><span><MessageCircleQuestion aria-hidden="true" /></span><b>{t(live ? "session.waitingQuestions" : "session.waitingFirstQuestion")}</b><small>{t(live ? "session.waitingQuestionsHint" : "session.waitingFirstQuestionHint")}</small></div>}</div></>
               <div className="live-question-reactions" aria-hidden="true">
                 {liveReactions.map((reaction) => <span key={reaction.id} style={{ left: `${reaction.left}%`, animationDelay: `${reaction.delay}ms` }}>{reaction.emoji}</span>)}
               </div>

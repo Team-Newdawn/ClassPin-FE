@@ -45,11 +45,6 @@ if (values.REST_API_URL !== undefined) {
     fail('REST_API_URL must be an HTTPS origin or http://ohpin-be:<port>, without /api');
   }
 }
-for (const name of ['RENDER_WORKERS', 'UPLOAD_CONCURRENCY', 'SLIDE_MAX_EDGE']) {
-  if (values[name] !== undefined && !/^[1-9][0-9]*$/.test(values[name])) {
-    fail(`${name} must be a positive integer`);
-  }
-}
 // Fixed deployment contract; reject accidental overrides rather than silently accepting them.
 for (const [name, value] of Object.entries({ PORT: '3000', HOSTNAME: '0.0.0.0', NODE_ENV: 'production' })) {
   if (values[name] !== undefined && values[name] !== value) fail(`${name} must be ${value}`);

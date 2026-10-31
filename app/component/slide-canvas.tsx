@@ -4,13 +4,10 @@
 import { Fragment, memo, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { clusterPins } from "@/app/_model/pin-clusters";
 import { placeBubbles } from "@/app/_model/class/presentation-rotation";
-
-
-
-
 import { useLanguage } from "@/app/_controller/language-context";
 import { questionMarkerEmoji, type Question, type Slide } from "@/app/_model/types";
 import { PdfPage } from "./pdf-page";
+import { PdfPageImage } from "./pdf-page-image";
 import styles from "./slide-canvas.module.css";
 
 // 본문 전체를 감싼 실제 높이로 배치한다. 좁은 폭 다음에는 넓은 폭도 시도한다.
@@ -117,13 +114,17 @@ export const SlideCanvas = memo(function SlideCanvas({ slide, questions = [], vi
     onCanvasClick(event.detail === 0 ? .5 : (event.clientX - box.left) / box.width, event.detail === 0 ? .5 : (event.clientY - box.top) / box.height);
   };
 
+  const pdfPage = slide.pdfUrl && slide.sourcePageIndex !== undefined
+    ? { url: slide.pdfUrl, pageNumber: slide.sourcePageIndex + 1, label: t("common.slideNumber", { number: slide.pageIndex + 1 }), eager: !compact } : null;
+
   return (
     <div ref={rootRef} data-live-effect={livePinEffect} className={`${styles.root} slide-canvas ${compact ? "compact" : ""} ${onSelectCluster ? "pin-manager" : ""} ${dimmed ? "focus-dim" : ""}`}>
       {/* Generated slide URLs are runtime assets and intentionally bypass Next image optimization. */}
       {slide.imageUrl
         ? <img src={slide.imageUrl} alt={t("common.slideNumber", { number: slide.pageIndex + 1 })} />
-        : slide.pdfUrl && slide.sourcePageIndex !== undefined
-          ? <><div className="slide-placeholder">{slide.pageIndex + 1}</div><PdfPage url={slide.pdfUrl} pageNumber={slide.sourcePageIndex + 1} label={t("common.slideNumber", { number: slide.pageIndex + 1 })} eager={!compact} /></>
+        : pdfPage
+          ? <><div className="slide-placeholder">{slide.pageIndex + 1}</div>{/* Uploaded sources render on the server; a fresh local blob PDF still renders in the browser. */}
+            {pdfPage.url.startsWith("/api/pdf?") ? <PdfPageImage {...pdfPage} /> : <PdfPage {...pdfPage} />}</>
         /* 변환된 슬라이드에는 항상 imageUrl 이 있다. 이미지가 아직/끝내 없을 때 흰 판만 남지 않게 한다. */
           : <div className="slide-placeholder">{slide.pageIndex + 1}</div>}
       {onCanvasClick && <button type="button" className="slide-placement-control" onClick={click} aria-label={t("student.pinTool")} />}

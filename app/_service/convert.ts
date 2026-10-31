@@ -10,7 +10,7 @@ import {
   type SourceFileExtension,
 } from "@/app/_model/upload";
 
-export type ConvertCallbacks = {
+type ConvertCallbacks = {
   /** 업로드 진행률(0~1). 브라우저가 서버로 바이트를 올리는 동안 호출된다. */
   onUploadProgress?: (fraction: number) => void;
   /** 전체 페이지 수를 확인했을 때 한 번 알려준다. */

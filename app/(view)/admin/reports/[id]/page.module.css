@@ -1,0 +1,95 @@
+.root{height:100dvh;display:flex;flex-direction:column;overflow:hidden;background:var(--color-bg-page);color:var(--color-text-primary)}
+.missing{min-height:100dvh;display:grid;place-content:center;justify-items:center;gap:16px;color:var(--color-text-secondary)}
+.header{height:64px;flex:none;display:flex;align-items:center;gap:12px;padding:0 24px;background:var(--color-bg-surface);border-bottom:1px solid var(--color-border)}
+.header h1{min-width:0;margin:0;font-size:16px;line-height:24px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.back{display:inline-flex;align-items:center;gap:4px;height:40px;padding:0 10px;border-radius:var(--radius-control);color:var(--color-text-secondary);font-size:14px;font-weight:600;text-decoration:none}.back:hover{background:var(--color-bg-subtle)}.back svg{width:16px}
+.iconButton{display:grid;place-items:center;flex:none;width:40px;height:40px;border:1px solid var(--color-border);border-radius:var(--radius-control);background:var(--color-bg-surface);color:var(--color-text-secondary);cursor:pointer}.iconButton svg{width:18px}.iconButton[aria-expanded=true]{background:var(--color-brand-subtle);color:var(--color-brand)}
+.saveState{flex:none;font-size:12px;line-height:18px;font-weight:500;color:var(--color-text-tertiary)}.saveState[data-state=failed],.saveState[data-state=conflict]{color:var(--color-error)}
+.actions{display:flex;gap:12px;margin-left:auto}
+.banner{flex:none;display:flex;flex-wrap:wrap;align-items:center;gap:12px;padding:12px 24px;background:var(--color-warning-bg);color:var(--color-warning);font-size:14px}.banner p{flex:1 1 320px;margin:0}
+.banner[data-tone=error]{background:var(--color-error-bg);color:var(--color-error)}
+
+.body{flex:1;min-height:0;display:grid;grid-template-columns:auto minmax(0,1fr) var(--chat-width)}
+.toc{width:240px;overflow-y:auto;padding:16px 12px;background:var(--color-bg-surface);border-right:1px solid var(--color-border)}
+.toc ol{display:grid;gap:2px;margin:0;padding:0;list-style:none}
+.toc button{display:flex;gap:8px;width:100%;min-height:40px;padding:9px 10px;border:0;border-radius:var(--radius-control);background:transparent;color:var(--color-text-secondary);font:inherit;font-size:13px;line-height:20px;text-align:left;cursor:pointer;overflow-wrap:anywhere}
+.toc button span{flex:none;font-weight:600;font-variant-numeric:tabular-nums}.toc button:hover{background:var(--color-bg-subtle)}
+.toc button[aria-current]{background:var(--color-brand-subtle);color:var(--color-brand);font-weight:600}
+
+/* RPT-100: reading-width document on the page background, border only. */
+.doc{min-width:0;overflow-y:auto;padding:32px 24px 64px}
+/* A4 page, the PDF export's layout at 794px (210 mm at 96 dpi = 595 pt x 1.334): what you edit is what exports (RPT-061). */
+.paper{max-width:794px;margin:0 auto;display:grid;align-content:start;padding:54px;background:var(--color-bg-surface);border:1px solid var(--color-border);border-radius:var(--radius-control);box-shadow:var(--shadow-xs)}
+.label{margin:0 0 12px;color:var(--color-brand);font-size:13px;line-height:18px;font-weight:700}
+.meta{margin:4px 0 0;padding:0 4px;color:var(--color-text-secondary);font-size:13px;line-height:20px}
+.metrics{display:grid;grid-template-columns:1fr 1fr;margin:20px 0 0;border:1px solid var(--color-border);border-radius:var(--radius-control);overflow:hidden}
+.metrics>div{display:flex;align-items:center;justify-content:space-between;gap:12px;height:32px;padding:0 16px;border-bottom:1px solid var(--color-border)}
+.metrics>div:nth-child(odd){border-right:1px solid var(--color-border)}
+.metrics>div:nth-last-child(-n+2):nth-child(odd),.metrics>div:last-child{border-bottom:0}
+.metrics dt{font-size:13px;color:var(--color-text-secondary)}.metrics .none{color:var(--color-text-tertiary)}.metrics dd{margin:0;font-size:13px;font-weight:700;color:var(--color-text-primary);font-variant-numeric:tabular-nums}
+.section{display:grid;margin-top:42px;scroll-margin-top:24px}
+.slideRef{margin:0 0 8px;padding:0 4px;color:var(--color-brand);font-size:12px;line-height:18px;font-weight:700}
+.slide{margin:0 0 16px}.slide :global(.slide-canvas){width:100%}
+.title,.sectionTitle{resize:none;field-sizing:content;overflow:hidden;overflow-wrap:anywhere}
+.title{width:100%;padding:0 4px;border:0;border-radius:8px;background:transparent;color:var(--color-text-primary);font:inherit;font-size:28px;line-height:38px;font-weight:700;letter-spacing:-.02em}
+.sectionTitle{width:100%;padding:0 4px;border:0;border-radius:8px;background:transparent;color:var(--color-text-primary);font:inherit;font-size:22px;line-height:32px;font-weight:700;letter-spacing:-.01em;margin-bottom:8px}
+/* ponytail: field-sizing grows the textarea natively; GrowingText measures only where it is unsupported. */
+.text{width:100%;min-height:52px;padding:4px;border-radius:8px;color:var(--color-text-primary);font-size:14px;line-height:22px;white-space:pre-wrap;overflow-wrap:anywhere}
+/* RPT-103 sizes; every size is explicit because the UA maps <font size> itself. */
+.text font[size="5"]{font-size:18px;line-height:28px}.text font[size="3"]{font-size:14px;line-height:22px}.text font[size="2"]{font-size:12px;line-height:18px}
+.text [data-table]{margin:8px 0;white-space:normal}
+.text table{width:100%;border-collapse:collapse;table-layout:fixed;font-size:13px;line-height:20px}
+.text :is(th,td){padding:6px 10px;border:1px solid var(--color-border);text-align:left;vertical-align:top}.text th{background:var(--color-bg-page);font-weight:700}
+.formatBar{position:sticky;top:-32px;z-index:2;max-width:794px;margin:-16px auto 16px;display:flex;gap:4px;padding:6px;border:1px solid var(--color-border);border-radius:var(--radius-control);background:var(--color-bg-surface);box-shadow:var(--shadow-xs)}
+.formatBar button{min-width:36px;height:32px;padding:0 10px;border:0;border-radius:8px;background:transparent;color:var(--color-text-secondary);font-size:13px;font-weight:600}
+.formatBar button:hover:not(:disabled){background:var(--pin-neutral-100);color:var(--color-text-primary)}
+.formatBar button[aria-pressed=true]{background:var(--color-brand-subtle);color:var(--color-brand)}
+.formatBar button:disabled{opacity:.45;cursor:default}.formatBar button:focus-visible{outline:none;box-shadow:var(--focus)}
+.add{justify-self:start;margin-top:42px}
+.paper :is(.title,.sectionTitle,.text):focus-visible{outline:none;box-shadow:var(--focus)}
+.paper :is(.title,.sectionTitle,.text,input)::placeholder{color:var(--color-text-tertiary)}
+.progress{margin:0;color:var(--color-text-secondary);font-size:14px;line-height:22px}.progressBar{width:100%;accent-color:var(--color-brand)}
+.paper>:global(.btn){justify-self:start}
+.paper>:is(.progress,.progressBar,.retry,.failed,:global(.btn)){margin-bottom:16px}
+.skeleton{display:grid;gap:12px;margin-top:24px}.skeleton span{height:16px;border-radius:8px;background:var(--color-bg-subtle)}.skeleton span:first-child{width:40%;height:28px}.skeleton span:last-child{width:70%}
+.retry{display:flex;flex-wrap:wrap;align-items:center;gap:12px;padding:12px 16px;border-radius:var(--radius-control);background:var(--color-warning-bg);color:var(--color-warning);font-size:14px}.retry p{flex:1 1 240px;margin:0}
+.failed{display:grid;gap:16px;color:var(--color-text-secondary)}.failed p{margin:0;font-size:16px;line-height:26px}.failed div{display:flex;flex-wrap:wrap;gap:12px}
+
+/* RPT-105: chat panel. */
+.chat{position:relative;min-height:0;display:flex;flex-direction:column;background:var(--color-bg-surface);border-left:1px solid var(--color-border)}
+.resizer{position:absolute;left:-5px;top:0;z-index:5;width:10px;height:100%;display:flex;align-items:center;justify-content:center;cursor:col-resize;touch-action:none;color:var(--color-text-tertiary)}.resizer svg{width:10px}.resizer:focus-visible{outline:2px solid var(--color-brand);background:var(--color-brand-subtle)}
+.chatHead{flex:none;display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:56px;padding:8px 16px 8px 24px;border-bottom:1px solid var(--color-border)}
+.chatHead h2{display:flex;align-items:center;gap:6px;margin:0;font-size:16px;line-height:24px;font-weight:600}.chatHead h2 svg,.sheetToggle svg{width:16px;color:var(--color-brand)}
+.chatHead :global(.btn){height:32px;padding:0 12px;font-size:13px}
+.sheetToggle{display:none}
+.chatBody{flex:1;min-height:0;display:flex;flex-direction:column}
+.log{flex:1;min-height:0;overflow-y:auto;display:flex;flex-direction:column;gap:16px;padding:20px 24px}
+.hint{margin:0;color:var(--color-text-tertiary);font-size:13px;line-height:20px}
+.user{align-self:flex-end;max-width:85%;margin:0;padding:10px 14px;border-radius:var(--radius-card);background:var(--color-bg-subtle);font-size:14px;line-height:22px;white-space:pre-wrap;overflow-wrap:anywhere}
+.answer{font-size:14px;line-height:22px;white-space:pre-wrap;overflow-wrap:anywhere}
+.streaming::after{content:"▍";margin-left:2px;color:var(--color-brand);animation:blink 1s steps(1) infinite}@keyframes blink{50%{opacity:0}}
+.proposal{display:grid;gap:8px;margin-top:12px;padding:16px;border:1px solid var(--color-border);border-radius:var(--radius-card);white-space:normal}
+.proposal b{font-size:13px;line-height:20px;font-weight:600}.proposal ul{margin:0;padding-left:18px;color:var(--color-text-secondary);font-size:13px;line-height:20px}
+.proposal>:global(.btn){justify-self:start}.proposal p{margin:0;display:flex;align-items:center;gap:4px;color:var(--color-success-text);font-size:13px;font-weight:600}.proposal p :global(.btn){height:32px;padding:0 8px}
+.composer{flex:none;display:grid;gap:8px;margin:0 16px 16px;padding:12px 14px;border:1px solid var(--color-border);border-radius:var(--radius-card);background:var(--color-bg-surface);box-shadow:var(--shadow-sm)}.composer:focus-within{box-shadow:var(--focus)}
+.composer textarea{width:100%;max-height:160px;padding:0;border:0;resize:none;field-sizing:content;background:transparent;color:var(--color-text-primary);font:inherit;font-size:14px;line-height:22px}.composer textarea:focus-visible{box-shadow:none}.composer textarea::placeholder{color:var(--color-text-tertiary)}
+.composerFoot{display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:12px;line-height:18px;color:var(--color-text-tertiary);font-variant-numeric:tabular-nums}
+.send{display:grid;place-items:center;width:40px;height:40px;border:0;border-radius:50%;background:var(--color-brand);color:var(--color-text-inverse);cursor:pointer}.send:hover:not(:disabled){background:var(--color-brand-hover)}.send svg{width:16px}
+@media(prefers-reduced-motion:reduce){.streaming::after{animation:none}}
+
+/* RPT-108: stacked under lg (TOC becomes a drawer), chat as a bottom sheet under md. */
+@media(max-width:1023px){
+  .root{height:auto;min-height:100dvh;overflow:visible}.header{position:sticky;top:0;z-index:10}
+  .body{display:flex;flex-direction:column}
+  .toc{position:fixed;top:64px;bottom:0;left:0;z-index:20;box-shadow:var(--shadow-md)}
+  .doc{overflow:visible;padding:24px 16px 32px}
+  .chat{height:min(640px,80dvh);border-left:0;border-top:1px solid var(--color-border)}.resizer{display:none}
+}
+@media(max-width:767px){
+  .header{flex-wrap:wrap;height:auto;min-height:64px;padding:8px 16px}.actions{gap:8px}
+  .paper{padding:24px 16px}.title{font-size:22px;line-height:32px}.metrics{grid-template-columns:1fr}.metrics>div:nth-child(odd){border-right:0}.metrics>div:nth-last-child(-n+2):nth-child(odd){border-bottom:1px solid var(--color-border)}
+  .doc{padding-bottom:88px}
+  .chat{position:fixed;left:0;right:0;bottom:0;z-index:30;height:auto;max-height:85dvh;border-radius:var(--radius-modal) var(--radius-modal) 0 0;box-shadow:var(--shadow-lg)}
+  .chat[data-open=true]{height:85dvh}.chat:not([data-open=true]) .chatBody,.chatHead h2{display:none}
+  .sheetToggle{display:flex;align-items:center;gap:6px;flex:1;min-height:44px;padding:0;border:0;background:transparent;color:var(--color-text-primary);font:inherit;font-size:14px;font-weight:600;text-align:left;cursor:pointer}
+}

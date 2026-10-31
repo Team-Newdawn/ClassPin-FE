@@ -44,13 +44,14 @@ export const claude: InsightAi = {
     try { return JSON.parse(block.text); } catch { throw new Error("AI_INVALID_OUTPUT"); }
   },
 
-  async* chat({ system, context, messages: history, tool, runTool, signal, onUsage }) {
+  async* chat({ system, context, messages: history, tools: list, runTool, signal, onUsage }) {
     const messages: Anthropic.MessageParam[] = history.map((item) => ({ role: item.role, content: blocks(item.content) }));
-    const tools: Anthropic.Tool[] = [{ name: tool.name, strict: true, description: tool.description, input_schema: tool.parameters as Anthropic.Tool.InputSchema }];
+    const tools: Anthropic.Tool[] = list.map((tool) => ({ name: tool.name, strict: true, description: tool.description, input_schema: tool.parameters as Anthropic.Tool.InputSchema }));
     let said = false;
     for (let round = 0; ; round++) {
       const stream = client().messages.stream({
-        model: model(), max_tokens: 2048, output_config: { effort: "low" }, tools, tool_choice: { type: round < 2 ? "auto" : "none" },
+        // A propose_document call may carry whole rewritten sections, so the cap is far above a chat answer.
+        model: model(), max_tokens: 16000, output_config: { effort: "low" }, tools, tool_choice: { type: round < 3 ? "auto" : "none" },
         // The report context is the same for every question on a report, so it is cached for an hour.
         system: [{ type: "text", text: system }, { type: "text", text: context, cache_control: { type: "ephemeral", ttl: "1h" } }],
         messages,
@@ -67,7 +68,7 @@ export const claude: InsightAi = {
       if (final.stop_reason === "refusal") throw new Error("AI_REFUSED");
       if (final.stop_reason !== "tool_use") return;
       messages.push({ role: "assistant", content: final.content }, { role: "user", content: await Promise.all(final.content.filter((block) => block.type === "tool_use")
-        .map(async (block) => ({ type: "tool_result" as const, tool_use_id: block.id, content: blocks(await runTool(block.input)) }))) });
+        .map(async (block) => ({ type: "tool_result" as const, tool_use_id: block.id, content: blocks(await runTool(block.name, block.input)) }))) });
     }
   },
 };

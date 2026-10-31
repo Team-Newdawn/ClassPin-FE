@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { buildSessionInsights, groupQuestionsBySlide, summarizeFolders, summarizeEndReport } from "./stats.ts";
+import { groupQuestionsBySlide, summarizeFolders, summarizeEndReport } from "./stats.ts";
 import type { ClassFolder, ClassSession, Question } from "./types.ts";
 
 test("종료 리포트는 동률과 삭제된 슬라이드의 질문을 보존하고 빈 자료를 구분한다", () => {
@@ -62,7 +62,7 @@ const sessions = [{
   }
 }] as ClassSession[];
 
-test("폴더·슬라이드·인사이트를 반환량에 선형인 단일 인덱스로 집계한다", () => {
+test("폴더·슬라이드를 반환량에 선형인 단일 인덱스로 집계한다", () => {
   const folders = [{ id: "folder-1", name: "프런트엔드", createdAt: "2026-08-01T00:00:00.000Z", colorIndex: 1, purpose: "qa" }] satisfies ClassFolder[];
   const unfiled = { id: "unfiled", name: "미분류", createdAt: "", colorIndex: 2, purpose: "qa" } satisfies ClassFolder;
 
@@ -82,15 +82,4 @@ test("폴더·슬라이드·인사이트를 반환량에 선형인 단일 인덱
     updatedAt: null
   }]);
 
-  const insights = buildSessionInsights(sessions, (category) => category);
-  assert.equal(insights.unanswered, 1);
-  assert.equal(insights.resolved, 1);
-  assert.equal(insights.pinRate, 50);
-  assert.equal(insights.resolveRate, 50);
-  assert.deepEqual(insights.hotspots.map(({ slideIndex, count }) => [slideIndex, count]), [[0, 1], [1, 1]]);
-  assert.deepEqual(insights.categories.map(({ key, label, count }) => [key, label, count]), [
-    ["concept", "개념", 1],
-    ["custom-speed", "속도", 1]
-  ]);
-  assert.deepEqual(insights.openQuestions.map(({ question: item }) => item.id), ["new"]);
 });

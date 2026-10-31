@@ -142,8 +142,11 @@ flow unless a task explicitly spans both products.
   uses resumable Storage upload and `/api/convert` receives only the owner-scoped
   source path; do not send large source bytes through Cloud Run request bodies.
 - Source PDFs are read through `GET /api/pdf?path=…` with the requester's JWT, never
-  through per-participant signed URLs. The route keeps the existing live-only RLS
-  gate and a server disk cache; do not add a service-role bypass or long browser cache.
+  through per-participant signed URLs. Slides show server-rendered page images from
+  `GET /api/pdf/page?path=…&page=…&w=640|1920` (pdftoppm on first view, then the disk
+  cache; decided 2026-10-31); pdf.js stays only for local blob PDFs and export
+  previews. Both routes keep the live-only RLS gate on every request; do not add a
+  service-role bypass or long browser cache.
 - Opening a material shows the live player. Its folder rail can collapse, its right
   question panel can resize, and speaker notes sit below the slide.
 - New materials start not live. The folder's start button only opens the player;
@@ -155,13 +158,15 @@ flow unless a task explicitly spans both products.
 - The right question panel starts with an AI summary of the current slide's
   questions, shown only when that slide has questions. `POST /api/question-summary`
   calls Groq with the server-only `GROQ_API_KEY` and returns 503 without it.
-- Instructor insights (`/admin/insights`, `app/api/admin/ai-reports/*`) analyze the stored
-  source PDF plus redacted questions with one AI provider per server (`INSIGHT_AI_PROVIDER` claude|openai|gemini,
-  default claude; `INSIGHT_AI_MODEL`, default `claude-haiku-5-5`; server-only `CLAUDE_API_KEY`/`OPENAI_API_KEY`/`GEMINI_API_KEY`)
-  inside Next `after()`: poppler renders each page to a JPEG plus its text layer, one call per
-  20-page chunk in parallel (PIN positions as image pixels), one merge call, code-only validation, no worker or critic.
-  Provider-neutral flow lives in `app/_service/insight-ai.ts`; each provider is one adapter in `app/_service/insight-providers/`.
-  Design and superseded rules: `docs/insights-ai-foundation.md` sections 10-11.
+- Instructor reports (`/admin/reports/[id]`, opened from the `/admin/insights` list, spec `docs/instructor-report-authoring.md`, approved
+  2026-10-27): one report per material, drafted once
+  by the existing AI analysis, then edited as sections with bold, three text sizes and AI-only tables (left) with AI chat that proposes
+  section changes (right; 5 questions per report, one-step undo). No confirmation step; PDF/DOCX
+  export the document as written (A4), PPTX/MD re-lay it out by code without AI. The analysis
+  runs one AI provider per server (`INSIGHT_AI_PROVIDER` claude|openai|gemini, default claude;
+  `INSIGHT_AI_MODEL`, default `claude-haiku-5-5`; server-only `CLAUDE_API_KEY`/`OPENAI_API_KEY`/`GEMINI_API_KEY`)
+  inside Next `after()`; flow in `app/_service/insight-ai.ts`, one adapter per provider in
+  `app/_service/insight-providers/`. Old `ai_insight_reports` rows stay untouched and hidden.
 - The player header shows the LIVE elapsed time from the backend `started_at` (reset
   on every LIVE start) and the live audience count. The end-lecture dialog summarizes
   duration, participants, and questions; elapsed time freezes when that dialog opens

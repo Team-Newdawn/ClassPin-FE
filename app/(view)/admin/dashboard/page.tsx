@@ -10,7 +10,6 @@ import { CLASS_FOLDER_COLOR_OPTIONS, CLASS_FOLDER_PURPOSE_LABEL_MAX, type ClassF
 import { FolderCard } from "./component/folder-card";
 import { FolderDeleteDialog } from "./component/folder-delete-dialog";
 import { UNFILED_ID, useDashboardController } from "./controller";
-import { useInsightReports } from "@/app/_controller/use-insight-reports";
 import styles from "./page.module.css";
 
 const folderColorOptions = CLASS_FOLDER_COLOR_OPTIONS.map((value) => ({
@@ -30,8 +29,6 @@ const folderPurposeOptions: Array<{ value: ClassFolderPurpose; label: Translatio
 import { MaterialUploadDialog } from "@/app/component/material-upload-dialog";
 
 export default function DashboardPage() {
-  // Loads the report list in the background so the folder page shows its report icons without popping in.
-  useInsightReports();
   const {
     t, displayName, view, setView, sort, setSort, folders, ready, uploadOpen, closeUpload, folderEditor, folderName, setFolderName, folderColorIndex,
     setFolderColorIndex, folderPurpose, setFolderPurpose, folderPurposeLabel, setFolderPurposeLabel, query, setQuery,

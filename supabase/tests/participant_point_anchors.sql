@@ -19,7 +19,7 @@ insert into public.materials (id, course_id, lecture_id, type, file_name)
 values ('62000000-0000-0000-0000-000000000006', '42000000-0000-0000-0000-000000000004', '52000000-0000-0000-0000-000000000005', 'pdf', 'fixture.pdf');
 
 insert into public.material_versions (id, material_id, source_path)
-values ('72000000-0000-0000-0000-000000000007', '62000000-0000-0000-0000-000000000006', 'fixture.pdf');
+values ('72000000-0000-0000-0000-000000000007', '62000000-0000-0000-0000-000000000006', '12000000-0000-0000-0000-000000000001/fixture.pdf');
 
 insert into public.slides (id, material_version_id, page_index, image_path)
 values ('82000000-0000-0000-0000-000000000008', '72000000-0000-0000-0000-000000000007', 0, 'fixture.jpg');

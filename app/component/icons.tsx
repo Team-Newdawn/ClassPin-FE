@@ -1,6 +1,6 @@
 "use client";
 
 export { ArrowLeft, ArrowRight, BarChart3, Check, ChevronLeft, ChevronRight,
-  Clock3, Copy, FileText, Folder, FolderOpen, FolderPlus, GripVertical, Grid2X2, LayoutDashboard, Link2, List, ListFilter, LogIn, LogOut, MessageCircleQuestion,
-  MapPin, Maximize2, Minimize2, MonitorUp, MoreHorizontal, PanelLeftClose, PanelLeftOpen, Pause, Pencil, Play, Plus, QrCode, Search, Send,
-  Share2, Smartphone, Smile, SmilePlus, Sparkles, Square, ThumbsUp, Trash2, Upload, Monitor, Users, ChevronDown, X } from "lucide-react";
+  Clock3, FileText, Folder, GripVertical, Grid2X2, List, ListFilter, LogOut, MessageCircleQuestion,
+  MapPin, Maximize2, Minimize2, MoreHorizontal, PanelLeftClose, PanelLeftOpen, Pencil, Play, Plus, QrCode, Search, Send,
+  Smartphone, SmilePlus, Sparkles, Square, ThumbsUp, Trash2, Monitor, ChevronDown, X } from "lucide-react";

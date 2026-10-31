@@ -115,9 +115,9 @@ POST는 새 생성 성공 201, 기존 ready 반환 200, 이미 생성 중 202, �
 | `_controller/session-store.tsx` | 공유 자료·초대 상태, 권한 변경 반영, 인증 실패 시 실패 캐시 복원 금지, 계정별 캐시 정리 |
 | `(view)/admin/dashboard`, `folders/[id]` | 공유/대기 카드·역할 배지·승인/거절, owner 공유 메뉴, 승인 전 표지 로딩 금지 |
 | `(view)/admin/session/[id]`, `present/controller.ts`, `_controller/use-live-auto-end.ts` | 역할별 UI·키보드/자동 저장 차단, 로컬 페이지 이동, owner만 발표/이탈 Web Lock·타이머 사용 |
-| `_service/convert.ts`, `_controller/use-slide-upload.ts`, `component/material-upload-dialog.tsx` | 업로드 범위 발급 후 TUS/변환/생성에 동일한 owner·upload ID 전달 |
+| `_service/convert.ts`, `_controller/use-material-upload.ts`, `component/material-upload-dialog.tsx` | 업로드 범위 발급 후 TUS/변환/생성에 동일한 owner·upload ID 전달 |
 | `component/slide-canvas.tsx` 및 이미지 썸네일, 신규 `/api/slide-image` | JWT fetch/Blob 표시·정리, 이미지 권한 재검사. 기존 `/api/pdf` 성능·RLS 유지 |
-| `component/session-end-report.tsx`, `_service/question-summary-service.ts`, `/api/question-summary` | mount 생성 제거, 저장본 GET, owner의 명시적 POST·실패 재시도, report 모드 우회 제거, 저장 지표/PDF 사용 |
+| `(view)/admin/session/[id]/report/component/session-end-report.tsx`, `_service/question-summary-service.ts`, `/api/question-summary` | mount 생성 제거, 저장본 GET, owner의 명시적 POST·실패 재시도, report 모드 우회 제거, 저장 지표/PDF 사용 |
 
 ### BE — ClassPin-BE/main
 

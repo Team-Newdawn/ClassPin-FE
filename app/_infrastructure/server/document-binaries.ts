@@ -8,7 +8,7 @@ import { promisify } from "node:util";
 const run = promisify(execFile);
 const PROBE_TIMEOUT_MS = 20_000;
 
-export type DocumentBinary = "pdftoppm" | "soffice";
+type DocumentBinary = "pdftoppm" | "soffice";
 
 /** 강의 자료와 피드백 PDF가 같은 배포·개발 런타임 바이너리를 사용하게 한다. */
 export async function resolveDocumentBinary(name: DocumentBinary) {

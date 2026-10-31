@@ -1,7 +1,7 @@
 import { createReadStream } from "node:fs";
 import { rm, stat } from "node:fs/promises";
 import { Readable } from "node:stream";
-import { cachedFile, findCachedFile } from "@/app/_infrastructure/pdf-cache";
+import { cachedFile, findCachedFile } from "@/app/_infrastructure/server/pdf-cache";
 import { getSupabaseClientForToken, supabaseServerConfigured } from "@/app/_infrastructure/supabase/server";
 
 const SOURCE_BUCKET = "course-materials";

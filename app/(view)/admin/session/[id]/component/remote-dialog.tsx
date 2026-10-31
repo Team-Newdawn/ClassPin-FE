@@ -4,7 +4,7 @@ import { QRCodeSVG } from "qrcode.react";
 import { Check } from "@/app/component/icons";
 import { useLanguage } from "@/app/_controller/language-context";
 import { useLectureRemoteIssuer } from "@/app/_controller/use-lecture-remote";
-import { trapDialogFocus } from "@/app/_lib/dialog-focus";
+import { trapDialogFocus } from "@/app/component/dialog-focus";
 
 /** owner 전용 발표 리모컨 발급. 링크는 발표 화면(프로젝터)에 띄우지 않는다. */
 export function RemoteDialog({ sessionId, onClose }: { sessionId: string; onClose: () => void }) {

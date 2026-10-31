@@ -11,7 +11,7 @@ import { advancePinPlayback, canRotatePinPlayback, crossedPinMilestone, findInco
 import { groupQuestionsBySlide } from "@/app/_model/stats";
 import type { Question } from "@/app/_model/types";
 import { classSessionPersistenceEnabled } from "@/app/_service/class-session-service";
-import { usePinCluster } from "../component/pin-cluster-popover";
+import { usePinCluster } from "../component/pin-cluster-controller";
 import { usePinLabelMode } from "@/app/_controller/use-pin-label-mode";
 import { usePresentationOptions } from "@/app/_controller/use-presentation-options";
 

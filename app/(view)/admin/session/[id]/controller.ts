@@ -9,15 +9,16 @@ import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { useHorizontalSlideWheel } from "@/app/_controller/use-horizontal-slide-wheel";
 import { useLanguage } from "@/app/_controller/language-context";
 import { useLectureReactions } from "@/app/_controller/use-lecture-reactions";
-import { useLiveAudienceCount, useLiveElapsed } from "@/app/_controller/use-live-audience";
+import { useLiveAudienceCount, useLiveElapsed, useLiveTimeline, type LiveTimeline } from "@/app/_controller/use-live-audience";
 import { useLiveAutoEnd } from "@/app/_controller/use-live-auto-end";
 import { useSessions } from "@/app/_controller/session-store";
+import { recordAudience } from "@/app/_service/report-api";
 import { findNewestIncomingPin, slideIndexFromPageNumber } from "@/app/_model/class/presentation-rotation";
 import { groupQuestionsBySlide } from "@/app/_model/stats";
 import { CLASS_UNFILED_COLOR_INDEX, type PresentationQrPosition, type QuestionStatus } from "@/app/_model/types";
 
 type Tab = "live" | "questions";
-export const PRESENTATION_QR_POSITIONS: readonly PresentationQrPosition[] = ["top-left", "top-right", "bottom-left", "bottom-right"];
+const PRESENTATION_QR_POSITIONS: readonly PresentationQrPosition[] = ["top-left", "top-right", "bottom-left", "bottom-right"];
 const MOBILE_REMOTE_MEDIA = "(max-width: 600px)";
 
 export const MIN_QUESTION_PANEL = 300;
@@ -31,6 +32,10 @@ const clampQuestionPanel = (width: number, workspaceWidth = MIN_STAGE_WIDTH + MA
 const errorDetail = (error: unknown) => error && typeof error === "object" && "message" in error
   ? String(error.message)
   : String(error);
+
+type AudienceRecord = LiveTimeline & { audience: number; peakAudience: number; startedAt: string | null; endedAt: string | null };
+const saveAudience = (lectureId: string, record: AudienceRecord) =>
+  recordAudience(lectureId, record).catch((error) => console.error(`Audience record failed: ${errorDetail(error)}`, error));
 
 export function useSessionAdminController() {
   const { t } = useLanguage();
@@ -86,7 +91,10 @@ export function useSessionAdminController() {
   // 경과 시간은 강의 종료를 누른 순간 멈추고, 계속 진행하면 다시 흐른다.
   const counting = session?.status === "live" || endConfirmOpen;
   const liveElapsed = useLiveElapsed(session?.startedAt, counting, endConfirmOpen);
-  const audienceCount = useLiveAudienceCount(session?.id ?? null, counting);
+  const audience = useLiveAudienceCount(session?.id ?? null, counting);
+  const timeline = useLiveTimeline(counting, session?.startedAt, (session?.currentSlide ?? 0) + 1, audience.count, (record) => {
+    if (session) void saveAudience(session.id, { audience: audience.total, peakAudience: audience.peak, startedAt: session.startedAt, endedAt: null, ...record });
+  }, endConfirmOpen);
   const [tab, setTab] = useState<Tab>(search.get("tab") === "questions" ? "questions" : "live");
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [filter, setFilter] = useState<QuestionStatus | "all">("all");
@@ -396,7 +404,7 @@ export function useSessionAdminController() {
     session,
     liveReactions,
     liveElapsed,
-    audienceCount,
+    audienceCount: audience.count,
     slide,
     folder,
     folderAccentIndex,
@@ -448,6 +456,8 @@ export function useSessionAdminController() {
     closeEndConfirm: () => setEndConfirmOpen(false),
     confirmEnd: () => session && runLectureAction(async () => {
       await setStatus(session.id, "ended");
+      // 종료를 누른 순간의 값(이 렌더의 클로저)을 보낸다. 기록 실패는 종료를 막거나 되돌리지 않는다.
+      void saveAudience(session.id, { audience: audience.total, peakAudience: audience.peak, startedAt: session.startedAt, endedAt: new Date().toISOString(), ...timeline.current });
       setEndConfirmOpen(false);
       router.push(`/admin/session/${session.id}/report`);
     }, t("session.saveLectureError")),

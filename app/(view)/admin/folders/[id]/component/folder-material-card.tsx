@@ -10,9 +10,8 @@ import styles from "./folder-material-card.module.css";
 import Link from "next/link";
 import Image from "next/image";
 
-export function FolderMaterialCard({ session, reportId, folders, view, moving, onMove, onDelete }: {
+export function FolderMaterialCard({ session, folders, view, moving, onMove, onDelete }: {
   session: ClassSession;
-  reportId?: string;
   folders: ClassFolder[];
   view: "grid" | "list";
   moving: boolean;
@@ -40,7 +39,6 @@ export function FolderMaterialCard({ session, reportId, folders, view, moving, o
       {view === "list" && <><td className={styles.metric}>{session.slides.length}</td><td className={styles.metric}>{session.questions.length}</td><td className={styles.lastLecture}><span aria-label={t("folders.lastLectureUnknown")}>—</span></td></>}
       <Cell className={styles.actions}><div className={styles.controls}><Link className={`btn primary ${styles.start}`} href={`/admin/session/${session.id}`}>{view === "list" && <Image src="/assets/design/play.svg" alt="" width={12} height={12} />}{t("folders.startLive")}</Link>
       <Link className={styles.actionIcon} href={`/admin/session/${session.id}?mode=prepare`} aria-label={t("folders.prepare")} title={t("folders.prepare")}><Image src="/assets/insights/manage.svg" alt="" width={24} height={24} /></Link>
-      {reportId && session.status === "ended" && <Link className={styles.actionIcon} href={`/admin/insights?material=${session.materialId}&report=${reportId}`} aria-label="인사이트 리포트 보기" title="인사이트 리포트 보기"><Image src="/assets/insights/report.svg" alt="" width={24} height={24} /></Link>}
 
       <details className={styles.menu} name="material-card-actions" onToggle={(event) => {
         if (view !== "list" || !event.currentTarget.open) return;
@@ -50,7 +48,6 @@ export function FolderMaterialCard({ session, reportId, folders, view, moving, o
       }} onBlur={(event) => { if (!event.currentTarget.contains(event.relatedTarget)) event.currentTarget.removeAttribute("open"); }} onKeyDown={(event) => { if (event.key === "Escape") { event.currentTarget.removeAttribute("open"); event.currentTarget.querySelector("summary")?.focus(); } }}>
         <summary className={`icon-btn ${styles.menuTrigger}`} aria-label={`${session.title}: ${t("folders.moveTo")}`} title={t("folders.moveTo")} aria-disabled={moving} onClick={(event) => { if (moving) event.preventDefault(); }}>{moving ? <span className="spinner dark" /> : <Image src="/assets/design/dots.svg" alt="" width={16} height={16} />}</summary>
         <div className={styles.popover}>
-          {session.status === "ended" && session.materialId && <Link href={`/admin/insights?material=${session.materialId}`}>인사이트 분석</Link>}
           <label>
             <span><Folder />{t("folders.moveTo")}</span>
             <select value={session.folderId ?? ""} aria-label={t("folders.moveMaterial", { title: session.title })} disabled={moving} onChange={(event) => onMove(event.target.value)}>

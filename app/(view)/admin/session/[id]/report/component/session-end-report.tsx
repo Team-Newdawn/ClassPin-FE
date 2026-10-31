@@ -3,43 +3,17 @@
 import Image from "next/image";
 import Link from "next/link";
 import { RotateCw } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
 import { useLanguage } from "@/app/_controller/language-context";
-import { CLASS_FOLDER_DEFAULT_PURPOSE, type ClassSession } from "@/app/_model/types";
+import type { ClassSession } from "@/app/_model/types";
+import { REPORT_SUMMARY_LIMIT, useSessionEndReport, type SummaryPurpose } from "../controller";
 import styles from "./session-end-report.module.css";
 
-import { summarizeEndReport } from "@/app/_model/stats";
-import { REPORT_SECTIONS, SummaryError, summarizeReport, toSummaryItems, type ReportSections, type SummaryPurpose } from "@/app/_service/question-summary-service";
-
-const REPORT_SUMMARY_LIMIT = 200;
 const CHART_HEIGHT = 300;
 
 export function SessionEndReport({ session, folder }: { session: ClassSession; folder: SummaryPurpose }) {
-  const { t, locale } = useLanguage();
-  const { counts, unmapped, maximum, topSlides, questionCount, reactionCount } = useMemo(() => summarizeEndReport(session.slides.length, session.questions), [session.slides.length, session.questions]);
-  // 공감이 많은 질문부터 최대 200개를 근거 페이지와 함께 보낸다.
-  const itemsKey = useMemo(() => JSON.stringify(toSummaryItems([...session.questions].sort((a, b) => b.reactionCount - a.reactionCount).slice(0, REPORT_SUMMARY_LIMIT))), [session.questions]);
-  const [attempt, setAttempt] = useState(0);
-  const [summary, setSummary] = useState<{ key: string; status: "done" | "error" | "unconfigured"; report?: ReportSections }>();
-  const purpose = folder?.purpose ?? null;
-  const purposeLabel = folder?.purposeLabel ?? null;
-  // 미분류 자료는 기본 목적(Q&A) 문구를 쓴다.
-  const tone = purpose ?? CLASS_FOLDER_DEFAULT_PURPOSE;
-  const items = t(`report.items.${tone}`);
-  const summaryKey = `${locale}:${attempt}:${purpose}:${purposeLabel}:${itemsKey}`;
-  useEffect(() => {
-    if (itemsKey === "[]") return;
-    let active = true;
-    summarizeReport(JSON.parse(itemsKey), locale, purpose && { purpose, purposeLabel }).then(
-      (report) => { if (active) setSummary({ key: summaryKey, status: "done", report }); },
-      (error) => {
-        console.error("End report summary failed", error);
-        if (active) setSummary({ key: summaryKey, status: error instanceof SummaryError && error.status === 503 ? "unconfigured" : "error" });
-      },
-    );
-    return () => { active = false; };
-  }, [itemsKey, locale, purpose, purposeLabel, summaryKey]);
-  const aiState = itemsKey === "[]" ? "empty" : summary?.key === summaryKey ? summary.status : "loading";
+  const { t } = useLanguage();
+  const { counts, unmapped, maximum, topSlides, questionCount, reactionCount, report, aiState, sections, tone, retry } = useSessionEndReport(session, folder);
+  const materialId = session.materialId, items = t(`report.items.${tone}`);
   const topPages = topSlides.map((page) => page ?? t("report.unmapped")).join(", ");
   const bars = [...counts.map((count, index) => ({ key: session.slides[index].id, label: String(index + 1), count })), ...(unmapped ? [{ key: "unmapped", label: "–", count: unmapped }] : [])];
 
@@ -51,7 +25,8 @@ export function SessionEndReport({ session, folder }: { session: ClassSession; f
     </header>
     <div className={styles.content}>
       <p className={styles.meta}>{t("report.scope")}</p>
-      {session.status === "ended" && session.materialId && <Link className="btn primary" href={`/admin/insights?material=${session.materialId}`}>슬라이드·PIN 인사이트 분석</Link>}
+      {session.status === "ended" && materialId && <button type="button" className="btn primary" disabled={report.busy} onClick={() => void report.open(materialId)}>{report.busy ? "리포트 여는 중…" : "리포트 작성"}</button>}
+      {report.error && <p className="login-error" role="alert">{report.error}</p>}
       <dl className={styles.metrics}>
         <div><dt>{t("report.questions")}</dt><dd><b>{questionCount}</b>{t("report.unitQuestions")}</dd></div>
         <div><dt>{t("report.empathy")}</dt><dd><b>{reactionCount}</b>{t("report.unitEmpathy")}</dd></div>
@@ -74,9 +49,9 @@ export function SessionEndReport({ session, folder }: { session: ClassSession; f
         <section className={styles.aiCard} aria-busy={aiState === "loading"} aria-labelledby="report-ai-title">
           <h2 id="report-ai-title"><Image src="/assets/design/report-sparkle.svg" width={16} height={16} alt="" />{t("report.aiSummary")}</h2>
           {aiState === "done"
-            ? <div className={styles.summaryBody} tabIndex={0} aria-label={t("report.aiSummary")}>{REPORT_SECTIONS.filter((section) => summary!.report![section].length).map((section) => <section key={section}><h3>{t(section === "summary" ? "report.ai.summary" : `report.ai.${section}.${tone}`)}</h3><ol>{summary!.report![section].map((line, index) => <li key={index}><span aria-hidden="true">{index + 1}</span>{line}</li>)}</ol></section>)}</div>
+            ? <div className={styles.summaryBody} tabIndex={0} aria-label={t("report.aiSummary")}>{sections.map(({ key: section, lines }) => <section key={section}><h3>{t(section === "summary" ? "report.ai.summary" : `report.ai.${section}.${tone}`)}</h3><ol>{lines.map((line, index) => <li key={index}><span aria-hidden="true">{index + 1}</span>{line}</li>)}</ol></section>)}</div>
             : <p className={styles.summary} role="status">{t(aiState === "empty" ? "report.aiEmpty" : aiState === "loading" ? "report.aiLoading" : aiState === "unconfigured" ? "report.aiUnavailable" : "report.aiError", { items })}</p>}
-          {aiState === "error" && <button type="button" className="btn secondary" onClick={() => setAttempt((value) => value + 1)}><RotateCw />{t("report.aiRetry")}</button>}
+          {aiState === "error" && <button type="button" className="btn secondary" onClick={retry}><RotateCw />{t("report.aiRetry")}</button>}
           {aiState === "done" && <small className={styles.summaryNote}>{t(session.questions.length > REPORT_SUMMARY_LIMIT ? "report.aiBasisTop" : "report.aiBasis", { count: Math.min(session.questions.length, REPORT_SUMMARY_LIMIT), items })}</small>}
         </section>
       </div>

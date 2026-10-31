@@ -5,14 +5,14 @@ import path from "node:path";
 import { promisify } from "node:util";
 import { createClient } from "@supabase/supabase-js";
 import sharp from "sharp";
-import { cachedFile } from "../_infrastructure/pdf-cache.ts";
+import { cachedFile } from "../_infrastructure/server/pdf-cache.ts";
 import { resolveDocumentBinary } from "../_infrastructure/server/document-binaries.ts";
 import { renderPdfPages } from "../_infrastructure/server/pdf-render.ts";
 import { restOrigin } from "../_infrastructure/server/rest-origin.ts";
-import { MAX_PAGES, imageEdge, limiter, readableText, type SlidePage } from "./insight-ai.ts";
+import { MAX_PAGES, imageEdge, readableText, type SlidePage } from "./insight-ai.ts";
+import { limiter } from "../_infrastructure/server/limiter.ts";
 import { inspectInsightSource } from "./insight-source.ts";
-import { classFolderPurposeLine, normalizeClassFolderPurpose, normalizeClassFolderPurposeLabel } from "../_model/types.ts";
-import { normalizeInsightReport, type InsightMessage, type InsightReportBody, type InsightReportView } from "../_model/insight-report.ts";
+import { CLASS_FOLDER_NAME_MAX, classFolderPurposeLine, normalizeClassFolderPurpose, normalizeClassFolderPurposeLabel } from "../_model/types.ts";
 
 export class InsightRequestError extends Error {
   status: number;
@@ -72,7 +72,9 @@ export async function readOwnedInsightSource(authorization: string, selection: r
   if (!response.ok) throw new InsightRequestError("SOURCE_UNAVAILABLE", 502);
   const purposes = new Map((Array.isArray(folders) ? folders : []).map((folder: Record<string, unknown>) => {
     const purpose = normalizeClassFolderPurpose(folder?.purpose);
-    return [String(folder?.id).toLowerCase(), classFolderPurposeLine(purpose, normalizeClassFolderPurposeLabel(purpose, folder?.purpose_label), "ko").trim()];
+    // RPT-035: the folder name hints at the material kind (e.g. "창업 캠프"); it is instructor text, so quoted as data.
+    const name = typeof folder?.name === "string" ? folder.name.replace(/\s+/g, " ").replaceAll("\"", "").trim().slice(0, CLASS_FOLDER_NAME_MAX) : "";
+    return [String(folder?.id).toLowerCase(), `${name ? `이 자료가 속한 폴더 이름: "${name}".` : ""}${classFolderPurposeLine(purpose, normalizeClassFolderPurposeLabel(purpose, folder?.purpose_label), "ko")}`.trim()];
   }));
   try { return { ...inspectInsightSource(await boundedJson(response.body, 32 * 1024 * 1024), selection), purposes }; }
   catch (error) {
@@ -95,13 +97,8 @@ export const STALE_RUN_MS = 15 * 60_000;
 export const runningAnalyses: Map<string, AbortController> = ((globalThis as { insightRuns?: Map<string, AbortController> }).insightRuns ??= new Map());
 /** One deck rasterizes at a time per server (CPU-bound, shares the box with live lectures), whether for analysis or export. */
 export const oneRenderAtATime: ReturnType<typeof limiter> = ((globalThis as { insightRender?: ReturnType<typeof limiter> }).insightRender ??= limiter(1));
-
-export function reportView(row: { id: string; material_id: string; status: InsightReportView["status"]; error: string | null; created_at: string; confirmed_at?: string | null; body?: unknown; messages?: unknown }): InsightReportView {
-  const body = (row.body as InsightReportBody | null) ?? null;
-  const stale = row.status === "running" && Date.now() - Date.parse(row.created_at) > STALE_RUN_MS;
-  return { id: row.id, materialIds: [row.material_id], status: stale ? "failed" : row.status, error: stale ? "ANALYSIS_INTERRUPTED" : row.error, createdAt: row.created_at, ...(row.confirmed_at ? { confirmedAt: row.confirmed_at } : {}),
-    body: body ? normalizeInsightReport(body) : null, ...(row.messages ? { messages: (row.messages as InsightMessage[]).filter((item) => !item.cleared) } : {}) };
-}
+/** Chat slide views get their own one-at-a-time queue: a few pages must not wait minutes behind a whole-deck analysis. */
+export const oneChatRenderAtATime: ReturnType<typeof limiter> = ((globalThis as { insightChatRender?: ReturnType<typeof limiter> }).insightChatRender ??= limiter(1));
 
 const run = promisify(execFile);
 /**
@@ -109,9 +106,10 @@ const run = promisify(execFile);
  * pixel coordinates line up, and extracts each page's text with poppler, which the runtime image already ships.
  * The size is computed from every page, so analysis and chat see the same image for a page.
  */
-export async function renderSlidePages(file: string, dir: string, only?: readonly number[]): Promise<SlidePage[]> {
+/** `signal` kills the poppler processes, so an export the instructor closed stops using the CPU. */
+export async function renderSlidePages(file: string, dir: string, only?: readonly number[], signal?: AbortSignal): Promise<SlidePage[]> {
   const pdftoppm = await resolveDocumentBinary("pdftoppm"), poppler = (name: string) => path.join(/* turbopackIgnore: true */ path.dirname(pdftoppm), name);
-  const { stdout: info } = await run(poppler("pdfinfo"), ["-f", "1", "-l", String(MAX_PAGES + 1), file], { timeout: 60_000, maxBuffer: 16 * 1024 ** 2 });
+  const { stdout: info } = await run(poppler("pdfinfo"), ["-f", "1", "-l", String(MAX_PAGES + 1), file], { timeout: 60_000, maxBuffer: 16 * 1024 ** 2, signal });
   const total = Number(/^Pages:\s+(\d+)/m.exec(info)?.[1] ?? 0);
   if (!total || total > MAX_PAGES) throw new Error("SOURCE_TOO_LARGE");
   const sizes = Array.from({ length: total }, () => ({ width: 1, height: 1, rot: 0 }));
@@ -124,17 +122,17 @@ export async function renderSlidePages(file: string, dir: string, only?: readonl
   const edge = imageEdge(shapes);
   const pages = only ? [...new Set(only)].filter((page) => page >= 1 && page <= total) : shapes.map((_, index) => index + 1);
   const args = ["-jpeg", "-scale-to", String(edge), "-jpegopt", "quality=90"], textOf = (from: number, to: number) =>
-    run(poppler("pdftotext"), ["-layout", "-f", String(from), "-l", String(to), file, "-"], { timeout: 120_000, maxBuffer: 256 * 1024 ** 2 }).then(({ stdout }) => stdout.split("\f"));
+    run(poppler("pdftotext"), ["-layout", "-f", String(from), "-l", String(to), file, "-"], { timeout: 120_000, maxBuffer: 256 * 1024 ** 2, signal }).then(({ stdout }) => stdout.split("\f"));
   const texts = new Map<number, string>();
   if (only) {
     await Promise.all(pages.map(async (page) => {
-      const [[text]] = await Promise.all([textOf(page, page), run(pdftoppm, [...args, "-f", String(page), "-l", String(page), file, path.join(dir, "page")], { timeout: 60_000 })]);
+      const [[text]] = await Promise.all([textOf(page, page), run(pdftoppm, [...args, "-f", String(page), "-l", String(page), file, path.join(dir, "page")], { timeout: 60_000, signal })]);
       texts.set(page, text);
     }));
   } else {
     const [all] = await Promise.all([textOf(1, total),
       // Image-heavy decks take seconds per page; use half the cores so live lectures on the same server stay responsive.
-      renderPdfPages({ pdftoppm, pdf: file, outDir: dir, total, maxEdge: edge, quality: 90, maxWorkers: Math.min(8, Math.max(1, Math.floor(availableParallelism() / 2))), timeoutMs: 240_000 })]);
+      renderPdfPages({ pdftoppm, pdf: file, outDir: dir, total, maxEdge: edge, quality: 90, maxWorkers: Math.min(8, Math.max(1, Math.floor(availableParallelism() / 2))), timeoutMs: 240_000, signal })]);
     all.forEach((text, index) => texts.set(index + 1, text));
   }
   const files = new Map((await readdir(dir)).flatMap((name) => { const page = /^page-0*(\d+)\.jpg$/.exec(name)?.[1]; return page ? [[Number(page), path.join(dir, name)] as const] : []; }));
@@ -151,7 +149,7 @@ type Material = ReturnType<typeof inspectInsightSource>["materials"][number];
 
 /** Every slide (or only these slide numbers) as a Claude-ready JPEG keyed by slide number. PDF-page slides render from the cached source;
  * image slides (older PDF uploads, PPT/PPTX) use their stored JPEG, so an image-only deck never downloads its source. */
-export async function renderMaterialSlides(material: Material, dir: string, only?: readonly number[]): Promise<SlidePage[]> {
+export async function renderMaterialSlides(material: Material, dir: string, only?: readonly number[], signal?: AbortSignal): Promise<SlidePage[]> {
   if (material.slides.length > MAX_PAGES) throw new Error("SOURCE_TOO_LARGE");
   const db = insightStorage(), wanted = material.slides.filter((slide) => !only || only.includes(slide.pageIndex + 1));
   const fromPdf = wanted.filter((slide) => slide.sourcePageIndex !== null), fromImage = wanted.filter((slide) => slide.sourcePageIndex === null);
@@ -166,11 +164,12 @@ export async function renderMaterialSlides(material: Material, dir: string, only
       if (file.error || !file.data) throw new Error("SOURCE_DOWNLOAD_FAILED");
       return file.data;
     });
-    rendered = new Map((await renderSlidePages(pdf, dir, only && fromPdf.map((slide) => slide.sourcePageIndex! + 1))).map((page) => [page.page, page]));
+    rendered = new Map((await renderSlidePages(pdf, dir, only && fromPdf.map((slide) => slide.sourcePageIndex! + 1), signal)).map((page) => [page.page, page]));
   }
   // sharp jobs hold libuv threads that /api/pdf disk reads and DNS lookups also need, so keep two images in flight.
   const slot = limiter(2);
   const images = await Promise.all(fromImage.map((slide) => slot(async (): Promise<SlidePage> => {
+    signal?.throwIfAborted();
     const file = await db.storage.from("lecture-slides").download(slide.imagePath!);
     if (file.error || !file.data) throw new Error("SOURCE_DOWNLOAD_FAILED");
     const image = sharp(Buffer.from(await file.data.arrayBuffer())), { width = 1, height = 1 } = await image.metadata(), edge = imageEdge([{ width, height }]);

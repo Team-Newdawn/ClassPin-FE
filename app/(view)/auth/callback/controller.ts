@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { safeNextPath } from "@/app/_model/next-path";
 import { authConfigured, observeAuthSession } from "@/app/_service/auth-service";
 
 export function useAuthCallbackController() {
@@ -12,8 +13,7 @@ export function useAuthCallbackController() {
 
   useEffect(() => {
     if (oauthError) return;
-    const requestedNext = params.get("next");
-    const next = requestedNext?.startsWith("/") && !requestedNext.startsWith("//") ? requestedNext : "/admin/dashboard";
+    const next = safeNextPath(params.get("next"));
     if (!authConfigured) { router.replace("/admin/dashboard"); return; }
     let done = false;
     const finish = () => {

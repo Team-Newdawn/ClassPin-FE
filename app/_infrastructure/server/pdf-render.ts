@@ -23,12 +23,13 @@ export function renderPdfPages(input: {
   quality: number;
   maxWorkers: number;
   timeoutMs: number;
+  signal?: AbortSignal;
 }) {
   const args = ["-jpeg", "-scale-to", String(input.maxEdge), "-jpegopt", `quality=${input.quality}`];
   const prefix = path.join(input.outDir, "page");
   const workers = Math.min(input.maxWorkers, Math.ceil(input.total / 2));
   if (!input.total || workers <= 1) {
-    return run(input.pdftoppm, [...args, input.pdf, prefix], { timeout: input.timeoutMs }).then(() => undefined);
+    return run(input.pdftoppm, [...args, input.pdf, prefix], { timeout: input.timeoutMs, signal: input.signal }).then(() => undefined);
   }
 
   const size = Math.ceil(input.total / workers);
@@ -37,6 +38,6 @@ export function renderPdfPages(input: {
     ranges.push([start, Math.min(start + size - 1, input.total)]);
   }
   return Promise.all(ranges.map(([first, last]) =>
-    run(input.pdftoppm, [...args, "-f", String(first), "-l", String(last), input.pdf, prefix], { timeout: input.timeoutMs })
+    run(input.pdftoppm, [...args, "-f", String(first), "-l", String(last), input.pdf, prefix], { timeout: input.timeoutMs, signal: input.signal })
   )).then(() => undefined);
 }

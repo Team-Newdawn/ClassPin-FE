@@ -39,3 +39,17 @@ test("summary requests share in-flight work, isolate tokens, retry failures and 
     assert.equal(calls, before + 1, "old summaries must be evicted instead of growing forever");
   } finally { globalThis.fetch = original; }
 });
+
+test("summary refresh counts new, edited and deleted questions but not reactions", () => {
+  const exports: Record<string, unknown> = {};
+  const code = ts.transpileModule(readFileSync("app/_service/question-summary-service.ts", "utf8"), {
+    compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 }
+  }).outputText;
+  new Function("require", "exports", code)(() => ({}), exports);
+  const count = exports.countSummaryChanges as (a: { id: string; text: string }[], b: { id: string; text: string }[]) => number;
+  const base = [{ id: "a", text: "A" }, { id: "b", text: "B" }, { id: "c", text: "C" }];
+  assert.equal(count(base, base.map((q) => ({ ...q, reactionCount: 9 }))), 0);
+  assert.equal(count(base, [...base, { id: "d", text: "D" }, { id: "e", text: "E" }]), 2);
+  assert.equal(count(base, [{ id: "a", text: "A edited" }, { id: "b", text: "B" }]), 2);
+  assert.equal(count([], base), 3);
+});

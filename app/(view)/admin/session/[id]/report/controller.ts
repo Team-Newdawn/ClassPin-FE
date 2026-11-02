@@ -4,7 +4,6 @@ import { useEffect, useMemo, useState } from "react";
 import { useParams } from "next/navigation";
 import { useSessions } from "@/app/_controller/session-store";
 import { useLanguage } from "@/app/_controller/language-context";
-import { useOpenReport } from "@/app/_controller/use-report";
 import { summarizeEndReport } from "@/app/_model/stats";
 import { CLASS_FOLDER_DEFAULT_PURPOSE, type ClassSession } from "@/app/_model/types";
 import { REPORT_SECTIONS, SummaryError, summarizeReport, toSummaryItems, type ReportSections, type SummaryPurpose } from "@/app/_service/question-summary-service";
@@ -24,7 +23,6 @@ export function useEndReportPage() {
 
 export function useSessionEndReport(session: ClassSession, folder: SummaryPurpose) {
   const { locale } = useLanguage();
-  const report = useOpenReport();
   const stats = useMemo(() => summarizeEndReport(session.slides.length, session.questions), [session.slides.length, session.questions]);
   // 공감이 많은 질문부터 최대 200개를 근거 페이지와 함께 보낸다.
   const itemsKey = useMemo(() => JSON.stringify(toSummaryItems([...session.questions].sort((a, b) => b.reactionCount - a.reactionCount).slice(0, REPORT_SUMMARY_LIMIT))), [session.questions]);
@@ -46,7 +44,7 @@ export function useSessionEndReport(session: ClassSession, folder: SummaryPurpos
     return () => { active = false; };
   }, [itemsKey, locale, purpose, purposeLabel, summaryKey]);
   const aiState = itemsKey === "[]" ? "empty" : summary?.key === summaryKey ? summary.status : "loading";
-  return { ...stats, report, aiState, sections: aiState === "done" ? REPORT_SECTIONS.flatMap((key) => summary!.report![key].length ? [{ key, lines: summary!.report![key] }] : []) : [],
+  return { ...stats, aiState, sections: aiState === "done" ? REPORT_SECTIONS.flatMap((key) => summary!.report![key].length ? [{ key, lines: summary!.report![key] }] : []) : [],
     // 미분류 자료는 기본 목적(Q&A) 문구를 쓴다.
     tone: purpose ?? CLASS_FOLDER_DEFAULT_PURPOSE, retry: () => setAttempt((value) => value + 1) };
 }

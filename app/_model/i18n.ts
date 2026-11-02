@@ -97,7 +97,8 @@ const ko = {
   "login.retry": "다시 로그인",
   "login.timeout": "로그인 처리가 지연되고 있어요. 다시 시도해 주세요.",
 
-  "nav.insights": "인사이트",
+  "nav.insights": "분석",
+  "nav.reports": "리포트",
   "nav.myWorkspace": "내 워크스페이스",
   "nav.personalWorkspace": "개인 워크스페이스",
 
@@ -703,7 +704,8 @@ const en: Record<TranslationKey, Message> = {
   "login.retry": "Try signing in again",
   "login.timeout": "Sign-in is taking longer than expected. Please try again.",
 
-  "nav.insights": "Insights",
+  "nav.insights": "Analysis",
+  "nav.reports": "Reports",
   "nav.myWorkspace": "My workspace",
   "nav.personalWorkspace": "Personal workspace",
 

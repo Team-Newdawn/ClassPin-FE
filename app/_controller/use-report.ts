@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { reportApi, type ReportApiError } from "../_service/report-api";
-import { staleTargets, type ReportDocument, type ReportView } from "../_model/report";
+import { staleTargets, type ReportDocument, type ReportTemplate, type ReportView } from "../_model/report";
 
 const SAVE_DELAY_MS = 1000, RETRY_MS = 5000, POLL_MS = 3000;
 // RPT-092: next step for the user, never internal or AI-provider detail.
@@ -16,9 +16,10 @@ const messages: Record<string, string> = {
   AI_REFUSED: "AI가 이 자료의 초안 작성을 거부했습니다. 수치만으로 시작할 수 있어요.", AI_TRUNCATED: "AI 응답이 잘렸습니다. 다시 시도해 주세요.",
   AI_INVALID_OUTPUT: "AI 응답 형식이 올바르지 않습니다. 다시 시도해 주세요.", AI_UNAVAILABLE: "AI 서비스에 연결하지 못했습니다. 잠시 후 다시 시도해 주세요.",
   REPORT_NOT_READY: "초안이 완성된 뒤 사용할 수 있습니다.", CHAT_LIMIT: "이 리포트의 AI 질문 5회를 모두 사용했습니다.",
-  CHAT_BUSY: "이 리포트의 다른 질문에 답하는 중이에요. 답변이 끝난 뒤 다시 보내 주세요.", NOTHING_TO_UNDO: "되돌릴 이전 문서가 없습니다.", REDRAFT_LIMIT: "이 리포트의 초안 다시 만들기 2회를 모두 사용했습니다.",
+  CHAT_BUSY: "이 리포트의 다른 질문에 답하는 중이에요. 답변이 끝난 뒤 다시 보내 주세요.", NOTHING_TO_UNDO: "되돌릴 이전 문서가 없습니다.",
   INVALID_DOCUMENT: "문서가 너무 길거나 형식이 올바르지 않아 저장하지 못했습니다. 내용을 줄인 뒤 다시 시도해 주세요.",
   REPORT_CONFLICT: "다른 곳에서 수정되었습니다.", REPORT_DRAFTING: "초안을 만드는 중에는 할 수 없습니다. 끝난 뒤 다시 시도해 주세요.",
+  INVALID_FILE: "PDF, PNG·JPG 이미지, 텍스트(TXT·MD·CSV) 파일만 첨부할 수 있어요.", FILE_TOO_LARGE: "첨부 파일은 10MB(이미지는 5MB) 이하만 보낼 수 있어요.",
   INVALID_PROPOSAL: "변경안이 지금 문서와 맞지 않습니다. AI에게 다시 요청해 주세요.", EXPORT_PREVIEW_FAILED: "미리보기를 만들지 못했습니다. 잠시 후 다시 시도해 주세요.",
 };
 export const reportMessage = (code: string | null) => messages[code ?? ""] ?? messages.ANALYSIS_FAILED;
@@ -33,12 +34,13 @@ export const reportRequest = (path: string, init?: RequestInit) => reportApi(pat
 });
 const json = async (response: Promise<Response>) => (await (await response).json()) as ReportView;
 
-/** RPT-012: opens the material's report, creating it (and its draft) first when none exists. */
+/** RPT-012: creates a report for the material (and starts its draft), then opens it. */
 export function useOpenReport() {
   const router = useRouter();
   const [busy, setBusy] = useState(false), [error, setError] = useState("");
-  const open = async (materialId: string) => {
-    const create = (metricsOnly?: boolean) => json(reportRequest("/api/admin/reports", { method: "POST", body: JSON.stringify({ materialId, ...(metricsOnly ? { metricsOnly } : {}) }) }));
+  /** RPT-036: `form` is the template and extra request picked on /admin/reports. */
+  const open = async (materialId: string, form: { template?: ReportTemplate; request?: string } = {}) => {
+    const create = (metricsOnly?: boolean) => json(reportRequest("/api/admin/reports", { method: "POST", body: JSON.stringify({ materialId, ...form, ...(metricsOnly ? { metricsOnly } : {}) }) }));
     setBusy(true); setError("");
     try {
       const view = await create().catch((failure: RequestError) => {
@@ -158,17 +160,34 @@ export function useReport(id: string) {
     if (!message?.proposal) return;
     const stale = staleTargets(message.proposal, editedAt.current, arrived.current.get(message.createdAt) ?? 0);
     if (stale.length && !confirm(`변경안이 나온 뒤 직접 고친 섹션 ${stale.length}개를 덮어씁니다. 적용할까요?`)) return;
-    void documentAction({ action: "apply", messageIndex });
+    const before = live.current.doc;
+    void documentAction({ action: "apply", messageIndex }).then(() => {
+      const after = live.current.doc;
+      if (after === before || !after) return;
+      // RPT-109: the sections this apply changed stay marked until the next whole-document change or reload.
+      setEdited(new Set(after.sections.filter((section) => {
+        const old = before?.sections.find((item) => item.id === section.id);
+        return !old || old.title !== section.title || old.text !== section.text;
+      }).map((section) => section.id)));
+      setUndone(false);
+    });
+  };
+  // RPT-043: the server keeps one previous document and undo swaps it in, so undoing again is redo. `undone` is per page load.
+  const [edited, setEdited] = useState<ReadonlySet<string>>(new Set()), [undone, setUndone] = useState(false);
+  const swap = () => {
+    const before = live.current.doc;
+    void documentAction({ action: "undo" }).then(() => { if (live.current.doc !== before) { setUndone((value) => !value); setEdited(new Set()); } });
   };
 
   /** Streams one answer; resolves false when it was stopped or failed so the caller can restore the question. */
-  const send = async (question: string, slide?: number) => {
+  /** RPT-057/058: `file` is base64 for this question only; `withData: false` leaves the source slides and questions out. */
+  const send = async (question: string, slide: number | undefined, extra: { withData: boolean; file: { name: string; data: string } | null }) => {
     setError(""); setAnswerStatus(""); setPending({ question, answer: "" });
     const stop = chatStop.current = new AbortController();
     let streaming = false;
     try {
       await flush().catch(() => {}); // the AI reads the saved document
-      const response = await reportRequest(path, { method: "POST", signal: stop.signal, body: JSON.stringify({ action: "chat", message: question, ...(slide ? { slide } : {}) }) });
+      const response = await reportRequest(path, { method: "POST", signal: stop.signal, body: JSON.stringify({ action: "chat", message: question, ...(slide ? { slide } : {}), withData: extra.withData, ...(extra.file ? { file: extra.file } : {}) }) });
       const reader = response.body!.pipeThrough(new TextDecoderStream()).getReader();
       let answer = "";
       streaming = true;
@@ -188,14 +207,11 @@ export function useReport(id: string) {
   };
 
   return {
-    report, doc, saveState, conflict, error, loadError, busy, pending, answerStatus, edit, flush, apply, send,
+    report, doc, saveState, conflict, error, loadError, busy, pending, answerStatus, edit, flush, apply, send, edited, undone,
     stopChat: () => chatStop.current?.abort(),
-    undo: () => documentAction({ action: "undo" }),
-    redraft: (metricsOnly = false) => {
-      // RPT-034: replacing a document needs consent; undo can bring it back.
-      if (live.current.doc && !confirm("초안을 다시 만들면 지금 문서를 대체하고 되돌릴 수 없습니다. 계속할까요?")) return;
-      void documentAction({ action: "redraft", metricsOnly });
-    },
+    undo: swap,
+    /** RPT-033: runs a failed first draft again, or starts from the numbers only. */
+    retry: (metricsOnly = false) => void documentAction({ action: "retry", metricsOnly }),
     cancel: () => run(() => post({ action: "cancel" }), true),
     reset: () => { if (confirm("지금까지의 대화를 지울까요? 남은 질문 수는 그대로입니다.")) void run(() => post({ action: "reset" })); },
     keepMine: () => {

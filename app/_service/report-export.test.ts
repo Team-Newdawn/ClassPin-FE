@@ -6,6 +6,7 @@ import { join } from "node:path";
 import { execFileSync } from "node:child_process";
 import sharp from "sharp";
 import JSZip from "jszip";
+import { PDFDocument } from "pdf-lib";
 import { exportReport, previewReportExport, slidePages } from "./report-export.ts";
 import type { ReportDocument } from "../_model/report.ts";
 
@@ -158,4 +159,19 @@ test("formatted text and AI tables reach every format; pptx tables split between
   // A long styled line is cut inside but keeps each piece's style.
   const [first, second] = slidePages(`<big>**${"가".repeat(30)}**</big>`, 10, 2);
   assert.match(first, /^<big>\*\*가+\*\*<\/big>$/); assert.match(second, /^<big>\*\*가+\*\*<\/big>$/);
+});
+
+test("italic, underline and links reach every format as real styles and hyperlinks (RPT-024)", async () => {
+  const styled: ReportDocument = { ...document, sections: [{ id: "s", title: "서식", text: "<i>기울임</i> <u>밑줄</u> [**자료 링크**](https://ohpin.kr/r?a=1&b=2)" }] };
+  const md = (await exportReport(styled, "md", context)).bytes.toString();
+  assert.ok(md.includes("*기울임* 밑줄 [**자료 링크**](https://ohpin.kr/r?a=1&b=2)"), "italic becomes *, underline tags go, the link stays");
+  const docx = await (await JSZip.loadAsync((await exportReport(styled, "docx", context)).bytes)).file("word/document.xml")!.async("string");
+  assert.match(docx, /<w:i\/>/); assert.match(docx, /<w:u w:val="single"\/>/); assert.match(docx, /<w:hyperlink /);
+  const pptx = await JSZip.loadAsync((await exportReport(styled, "pptx", context)).bytes);
+  const slideXml = (await Promise.all(Object.keys(pptx.files).filter((name) => /^ppt\/slides\/slide\d+\.xml$/.test(name)).map((name) => pptx.file(name)!.async("string")))).join("");
+  assert.match(slideXml, / i="1"/); assert.match(slideXml, / u="sng"/); assert.match(slideXml, /<a:hlinkClick /);
+  const pdf = await PDFDocument.load((await exportReport(styled, "pdf", context)).bytes);
+  const annots = pdf.getPages().flatMap((page) => page.node.Annots()?.asArray() ?? []).map((ref) => String(pdf.context.lookup(ref)));
+  assert.ok(annots.some((annot) => annot.includes("/URI (https://ohpin.kr/r?a=1&b=2)")), "pdf carries a clickable link annotation");
+  for (const text of [md, docx, slideXml]) assert.doesNotMatch(text, /&lt;i&gt;|&lt;u&gt;|<i>|<u>/, "no raw markup");
 });

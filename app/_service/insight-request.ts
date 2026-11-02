@@ -12,7 +12,9 @@ import { restOrigin } from "../_infrastructure/server/rest-origin.ts";
 import { MAX_PAGES, imageEdge, readableText, type SlidePage } from "./insight-ai.ts";
 import { limiter } from "../_infrastructure/server/limiter.ts";
 import { inspectInsightSource } from "./insight-source.ts";
-import { CLASS_FOLDER_NAME_MAX, classFolderPurposeLine, normalizeClassFolderPurpose, normalizeClassFolderPurposeLabel } from "../_model/types.ts";
+import { CLASS_FOLDER_NAME_MAX, classFolderPurposeLine, normalizeClassFolderPurpose, normalizeClassFolderPurposeLabel, type ClassFolderPurpose } from "../_model/types.ts";
+// The folder screen's Korean purpose names (app/_model/i18n.ts folders.purpose*).
+const PURPOSE_NAMES: Record<ClassFolderPurpose, string> = { qa: "Q&A", feedback: "피드백", education: "교육", brainstorming: "브레인스토밍", other: "기타" };
 
 export class InsightRequestError extends Error {
   status: number;
@@ -76,7 +78,13 @@ export async function readOwnedInsightSource(authorization: string, selection: r
     const name = typeof folder?.name === "string" ? folder.name.replace(/\s+/g, " ").replaceAll("\"", "").trim().slice(0, CLASS_FOLDER_NAME_MAX) : "";
     return [String(folder?.id).toLowerCase(), `${name ? `이 자료가 속한 폴더 이름: "${name}".` : ""}${classFolderPurposeLine(purpose, normalizeClassFolderPurposeLabel(purpose, folder?.purpose_label), "ko")}`.trim()];
   }));
-  try { return { ...inspectInsightSource(await boundedJson(response.body, 32 * 1024 * 1024), selection), purposes }; }
+  // RPT-036 보고용 개요: "폴더 이름 · 사용 목적" as plain display text.
+  const folderLabels = new Map((Array.isArray(folders) ? folders : []).map((folder: Record<string, unknown>) => {
+    const purpose = normalizeClassFolderPurpose(folder?.purpose), name = typeof folder?.name === "string" ? folder.name.trim().slice(0, CLASS_FOLDER_NAME_MAX) : "";
+    const label = purpose === "other" ? normalizeClassFolderPurposeLabel(purpose, folder?.purpose_label) ?? PURPOSE_NAMES.other : PURPOSE_NAMES[purpose];
+    return [String(folder?.id).toLowerCase(), [name, label].filter(Boolean).join(" · ")];
+  }));
+  try { return { ...inspectInsightSource(await boundedJson(response.body, 32 * 1024 * 1024), selection), purposes, folderLabels }; }
   catch (error) {
     const missing = error instanceof Error && error.message === "SOURCE_NOT_FOUND";
     throw new InsightRequestError(missing ? "SOURCE_NOT_FOUND" : "INVALID_SOURCE", missing ? 404 : 422);

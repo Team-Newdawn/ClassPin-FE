@@ -12,8 +12,9 @@ const usage = (value: Anthropic.Usage): AiUsage => {
   const cacheRead = value.cache_read_input_tokens ?? 0, cacheWrite = value.cache_creation_input_tokens ?? 0;
   return { input: value.input_tokens, cacheRead, cacheWrite, output: value.output_tokens, overTier: value.input_tokens + cacheRead + cacheWrite > 100_000 };
 };
-const blocks = (content: AiContent): string | (Anthropic.TextBlockParam | Anthropic.ImageBlockParam)[] => typeof content === "string" ? content
-  : content.map((part) => part.type === "text" ? part : { type: "image", source: { type: "base64", media_type: "image/jpeg", data: part.data } });
+const blocks = (content: AiContent): string | (Anthropic.TextBlockParam | Anthropic.ImageBlockParam | Anthropic.DocumentBlockParam)[] => typeof content === "string" ? content
+  : content.map((part) => part.type === "text" ? part : part.type === "pdf" ? { type: "document", source: { type: "base64", media_type: "application/pdf", data: part.data } }
+    : { type: "image", source: { type: "base64", media_type: part.png ? "image/png" : "image/jpeg", data: part.data } });
 
 /**
  * Long edge (px) for rendering every page so that no image exceeds Claude's 1568px / 1568-token budget;

@@ -1,0 +1,21 @@
+/* RPT-110, Figma ClassPin 2227:2667. */
+.root{position:relative;min-width:0}
+.root h1{margin:0;min-width:0}
+.toggle{display:flex;align-items:center;gap:6px;max-width:100%;padding:4px 6px;border:0;border-radius:8px;background:transparent;color:var(--color-text-primary);font:inherit;font-size:16px;line-height:24px;font-weight:700;cursor:pointer}
+.toggle>span:first-child{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.toggle img{flex:none}
+.toggle:hover,.toggle[aria-expanded=true]{background:var(--color-bg-subtle)}
+.panel{position:absolute;top:calc(100% + 8px);left:0;z-index:20;width:min(400px,calc(100vw - 32px));max-height:min(560px,calc(100dvh - 96px));overflow-y:auto;display:grid;gap:2px;padding:8px;border:1px solid var(--color-border);border-radius:14px;background:var(--color-bg-surface);box-shadow:var(--shadow-lg)}
+.panel ul{display:grid;gap:2px;margin:0;padding:0;list-style:none}
+.panel hr{width:100%;height:1px;margin:4px 0;border:0;background:var(--color-border)}
+.group{margin:0;padding:8px 10px;color:var(--color-text-tertiary);font-size:12px;font-weight:700}
+.option{display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:10px;color:var(--color-text-primary);text-decoration:none}
+.option:hover{background:var(--color-bg-subtle)}.option img{flex:none}
+.option>span{min-width:0;flex:1;display:grid;gap:1px}
+.option b{overflow:hidden;font-size:14px;font-weight:500;text-overflow:ellipsis;white-space:nowrap}
+.option small{overflow:hidden;color:var(--color-text-tertiary);font-size:12px;text-overflow:ellipsis;white-space:nowrap}
+.option[aria-current=page]{background:var(--color-brand-subtle)}.option[aria-current=page] b{color:var(--color-brand);font-weight:700}
+.create{padding:10px;color:var(--color-brand);font-size:14px;font-weight:700}
+.search{width:100%;height:36px;padding:0 12px;border:0;border-radius:10px;background:var(--color-bg-subtle);color:var(--color-text-primary);font-size:13px}
+.search::placeholder{color:var(--color-text-tertiary)}
+.materials{max-height:220px;overflow-y:auto}
+.empty,.error{margin:0;padding:9px 10px;color:var(--color-text-tertiary);font-size:13px}.error{color:var(--color-error)}

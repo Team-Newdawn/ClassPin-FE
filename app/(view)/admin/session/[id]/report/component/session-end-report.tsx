@@ -12,7 +12,7 @@ const CHART_HEIGHT = 300;
 
 export function SessionEndReport({ session, folder }: { session: ClassSession; folder: SummaryPurpose }) {
   const { t } = useLanguage();
-  const { counts, unmapped, maximum, topSlides, questionCount, reactionCount, report, aiState, sections, tone, retry } = useSessionEndReport(session, folder);
+  const { counts, unmapped, maximum, topSlides, questionCount, reactionCount, aiState, sections, tone, retry } = useSessionEndReport(session, folder);
   const materialId = session.materialId, items = t(`report.items.${tone}`);
   const topPages = topSlides.map((page) => page ?? t("report.unmapped")).join(", ");
   const bars = [...counts.map((count, index) => ({ key: session.slides[index].id, label: String(index + 1), count })), ...(unmapped ? [{ key: "unmapped", label: "–", count: unmapped }] : [])];
@@ -25,8 +25,8 @@ export function SessionEndReport({ session, folder }: { session: ClassSession; f
     </header>
     <div className={styles.content}>
       <p className={styles.meta}>{t("report.scope")}</p>
-      {session.status === "ended" && materialId && <button type="button" className="btn primary" disabled={report.busy} onClick={() => void report.open(materialId)}>{report.busy ? "리포트 여는 중…" : "리포트 작성"}</button>}
-      {report.error && <p className="login-error" role="alert">{report.error}</p>}
+      {/* RPT-012: the report home, with this material preselected. */}
+      {session.status === "ended" && materialId && <Link className="btn primary" href={`/admin/reports?material=${materialId}`}>리포트 작성</Link>}
       <dl className={styles.metrics}>
         <div><dt>{t("report.questions")}</dt><dd><b>{questionCount}</b>{t("report.unitQuestions")}</dd></div>
         <div><dt>{t("report.empathy")}</dt><dd><b>{reactionCount}</b>{t("report.unitEmpathy")}</dd></div>

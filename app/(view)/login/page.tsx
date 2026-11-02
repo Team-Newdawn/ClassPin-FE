@@ -2,15 +2,12 @@
 
 import { Suspense, useState } from "react";
 import Link from "next/link";
-import { Noto_Sans_KR } from "next/font/google";
 import { PinLogo } from "@/app/component/pin-logo";
 import { useLanguage } from "@/app/_controller/language-context";
 import { LanguageSwitcher } from "@/app/component/language-switcher";
 import { LoadingScreen } from "@/app/component/loading-screen";
 import { useLoginController } from "./controller";
 import styles from "./page.module.css";
-
-const authFont = Noto_Sans_KR({ subsets: ["latin"], weight: ["400", "500", "700"], display: "swap" });
 
 function GoogleIcon() {
   // eslint-disable-next-line @next/next/no-img-element
@@ -25,7 +22,7 @@ function LoginContent() {
   return (
     <main className={styles.root}>
       <header className={styles.nav}><PinLogo /><LanguageSwitcher /></header>
-      <section className={`${styles.card} ${authFont.className}`} aria-labelledby="auth-title">
+      <section className={styles.card} aria-labelledby="auth-title">
         <div className={styles.heading}>
           <h1 id="auth-title">{t(signup ? "login.signupTitle" : "login.title")}</h1>
           <p>{t(signup ? "login.signupDescription" : "login.description1")}</p>

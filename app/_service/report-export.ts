@@ -3,9 +3,9 @@ import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { pathToFileURL } from "node:url";
 import { join } from "node:path";
-import { PDFDocument, rgb, type PDFFont, type PDFPage } from "pdf-lib";
+import { degrees, PDFDocument, PDFString, rgb, type PDFFont, type PDFPage } from "pdf-lib";
 import fontkit from "@pdf-lib/fontkit";
-import { BorderStyle, Document, ImageRun, Packer, Paragraph, ShadingType, Table, TableCell, TableLayoutType, TableRow, TextRun, WidthType } from "docx";
+import { BorderStyle, Document, ExternalHyperlink, ImageRun, Packer, Paragraph, ShadingType, Table, TableCell, TableLayoutType, TableRow, TextRun, WidthType } from "docx";
 import PptxGenJS from "pptxgenjs";
 import { formatReportLine, METRIC_NONE as NONE, metricRows, parseReportText, reportDate, type ReportDocument, type TextRun as StyledRun } from "../_model/report.ts";
 
@@ -75,11 +75,14 @@ function reportModel(document: ReportDocument, context: ReportExportContext) {
 type Report = ReturnType<typeof reportModel>;
 const oneLine = (value: string) => value.replace(/\s*\n\s*/g, " ");
 
-/** RPT-063: bold and tables stay Markdown, size tags go (Markdown has no sizes); a single newline between text lines becomes a hard break. */
+/**
+ * RPT-063: bold, links and tables stay Markdown, `<i>` becomes `*`, size and underline tags go (Markdown has neither);
+ * a single newline between text lines becomes a hard break.
+ */
 function markdownBody(text: string) {
   const blocks = parseReportText(text);
   return blocks.map((block, index) => {
-    const source = block.source.replace(/<\/?(big|small)>/g, ""), next = blocks[index + 1];
+    const source = block.source.replace(/<\/?(big|small|u)>/g, "").replace(/<\/?i>/g, "*"), next = blocks[index + 1];
     if (!next) return source;
     if (block.kind === "table" || next.kind === "table") return `${source}\n\n`;
     return source && next.source ? `${source}  \n` : `${source}\n`;
@@ -130,7 +133,8 @@ export async function previewReportExport(result: Awaited<ReturnType<typeof expo
 const hex = (value: string) => rgb(parseInt(value.slice(1, 3), 16) / 255, parseInt(value.slice(3, 5), 16) / 255, parseInt(value.slice(5, 7), 16) / 255);
 const roundRect = (w: number, h: number, r: number) => `M ${r} 0 H ${w - r} A ${r} ${r} 0 0 1 ${w} ${r} V ${h - r} A ${r} ${r} 0 0 1 ${w - r} ${h} H ${r} A ${r} ${r} 0 0 1 0 ${h - r} V ${r} A ${r} ${r} 0 0 1 ${r} 0 Z`;
 /** One laid-out text line: styled pieces on one baseline, as tall as its largest piece. */
-type Line = { segs: { text: string; size: number; font: PDFFont; color: string }[]; size: number; h: number };
+type Seg = { text: string; size: number; font: PDFFont; color: string; italic?: true; underline?: true; link?: string };
+type Line = { segs: Seg[]; size: number; h: number };
 // RPT-061 body sizes in points.
 const PDF_SIZE = { big: 14, small: 8.5 } as const;
 
@@ -153,7 +157,9 @@ async function pdfReport(report: Report) {
   const wrap = (runs: readonly StyledRun[], width: number, { size = 10.5, font = regular, color = C.text }: Style = {}): Line[] => {
     const chars = runs.flatMap((run) => Array.from(run.text.replace(/\t/g, " "), (text) => {
       const charSize = run.size ? PDF_SIZE[run.size] : size, charFont = run.bold ? bold : font;
-      return { text, size: charSize, font: charFont, color, w: charFont.widthOfTextAtSize(text, charSize) };
+      // A link reads as one: brand color and underlined (RPT-061).
+      return { text, size: charSize, font: charFont, color: run.link ? C.brand : color, w: charFont.widthOfTextAtSize(text, charSize),
+        ...run.italic && { italic: true as const }, ...(run.underline || run.link) && { underline: true as const }, ...run.link && { link: run.link } };
     }));
     type Char = (typeof chars)[number];
     const lines: Line[] = [];
@@ -161,8 +167,9 @@ async function pdfReport(report: Report) {
       const segs: Line["segs"] = [], max = Math.max(size, ...part.map((char) => char.size));
       for (const char of part) {
         const last = segs.at(-1);
-        if (last && last.font === char.font && last.size === char.size) last.text += char.text;
-        else segs.push({ text: char.text, size: char.size, font: char.font, color: char.color });
+        if (last && last.font === char.font && last.size === char.size && last.color === char.color && last.italic === char.italic
+          && last.underline === char.underline && last.link === char.link) last.text += char.text;
+        else segs.push({ text: char.text, size: char.size, font: char.font, color: char.color, italic: char.italic, underline: char.underline, link: char.link });
       }
       lines.push({ segs, size: max, h: max * 1.6 });
     };
@@ -186,7 +193,15 @@ async function pdfReport(report: Report) {
   const draw = (line: Line, x: number, top: number) => {
     // One baseline for the line, set by its largest piece; each piece keeps its own size.
     const baseline = H - top - line.size * .8 - line.size * .35;
-    for (const seg of line.segs) { page.drawText(seg.text, { x, y: baseline, size: seg.size, font: seg.font, color: hex(seg.color) }); x += seg.font.widthOfTextAtSize(seg.text, seg.size); }
+    for (const seg of line.segs) {
+      const w = seg.font.widthOfTextAtSize(seg.text, seg.size);
+      // NanumGothic has no italic face, so italic is the regular face slanted 12 degrees.
+      page.drawText(seg.text, { x, y: baseline, size: seg.size, font: seg.font, color: hex(seg.color), ...seg.italic && { xSkew: degrees(12) } });
+      if (seg.underline) page.drawLine({ start: { x, y: baseline - seg.size * .15 }, end: { x: x + w, y: baseline - seg.size * .15 }, thickness: seg.size / 16, color: hex(seg.color) });
+      if (seg.link) page.node.addAnnot(pdf.context.register(pdf.context.obj({ Type: "Annot", Subtype: "Link", Border: [0, 0, 0],
+        Rect: [x, baseline - seg.size * .3, x + w, baseline + seg.size], A: { Type: "Action", S: "URI", URI: PDFString.of(seg.link) } })));
+      x += w;
+    }
   };
   /** Flows lines down the page, continuing on a new page when they don't fit. */
   const flow = (lines: Line[]) => {
@@ -268,11 +283,16 @@ async function pdfReport(report: Report) {
 }
 
 async function docxReport(report: Report) {
-  const run = (text: string, options: { size?: number; bold?: boolean; color?: string } = {}) =>
-    new TextRun({ text, font: FONT, size: Math.round((options.size ?? 10.5) * 2), bold: options.bold, color: (options.color ?? C.text).slice(1) });
-  // RPT-061 body sizes: small 8.5, normal 10.5, big 14.
-  const runs = (items: readonly StyledRun[], bold?: boolean) => items.map((item) => run(item.text, { size: item.size === "big" ? 14 : item.size === "small" ? 8.5 : 10.5, bold: bold || item.bold }));
-  const p = (children: TextRun | TextRun[], options: { after?: number; keepNext?: boolean } = {}) =>
+  const run = (text: string, options: { size?: number; bold?: boolean; italic?: boolean; underline?: boolean; color?: string } = {}) =>
+    new TextRun({ text, font: FONT, size: Math.round((options.size ?? 10.5) * 2), bold: options.bold, italics: options.italic, ...options.underline && { underline: {} },
+      color: (options.color ?? C.text).slice(1) });
+  // RPT-061 body sizes: small 8.5, normal 10.5, big 14. A link is a real hyperlink, brand color and underlined.
+  const runs = (items: readonly StyledRun[], bold?: boolean) => items.map((item) => {
+    const piece = run(item.text, { size: item.size === "big" ? 14 : item.size === "small" ? 8.5 : 10.5, bold: bold || item.bold, italic: item.italic,
+      underline: item.underline || Boolean(item.link), ...item.link && { color: C.brand } });
+    return item.link ? new ExternalHyperlink({ link: item.link, children: [piece] }) : piece;
+  });
+  const p = (children: TextRun | ExternalHyperlink | (TextRun | ExternalHyperlink)[], options: { after?: number; keepNext?: boolean } = {}) =>
     new Paragraph({ children: [children].flat(), spacing: { after: options.after ?? 120, line: 300 }, keepNext: options.keepNext });
   const line = { style: BorderStyle.SINGLE, size: 6, color: C.border.slice(1) };
   // A4 content width in twips; explicit widths and table-level borders (docx defaults to black) render the same in Word, Pages and Quick Look.
@@ -320,6 +340,10 @@ const ROWS = Math.floor(BODY.h * 72 / BODY.line);
 /** Characters (em) per line for a box `w` inches wide, with 10% slack for word wrap. */
 const perLine = (w: number) => Math.floor(w * 72 / BODY.size * .9);
 
+/** RPT-062: a styled run's PowerPoint text options; a link is a hyperlink in the brand color. */
+const pptxStyle = (part: StyledRun): PptxGenJS.TextPropsOptions => ({ bold: part.bold, italic: part.italic,
+  ...(part.underline || part.link) && { underline: { style: "sng" } }, ...part.link && { hyperlink: { url: part.link }, color: C.brand.slice(1) } });
+
 async function pptxReport(report: Report) {
   const pptx = new PptxGenJS(); pptx.layout = "LAYOUT_WIDE"; pptx.author = "OhPin"; pptx.title = report.title;
   const c = (value: string) => value.slice(1);
@@ -360,7 +384,7 @@ async function pptxReport(report: Report) {
         if (!lines.length) return;
         const h = lines.reduce((sum, item) => sum + lineRows(item, perLine(w)), 0) * BODY.line / 72;
         slide.addText(lines.flatMap((item, index) => (item.length ? item : [{ text: "" }]).map((part, at, all) => ({ text: part.text,
-          options: { bold: part.bold, fontSize: part.size ? PPTX_SIZE[part.size] : BODY.size, breakLine: at === all.length - 1 && index < lines.length - 1 } }))),
+          options: { ...pptxStyle(part), fontSize: part.size ? PPTX_SIZE[part.size] : BODY.size, breakLine: at === all.length - 1 && index < lines.length - 1 } }))),
         { x, y: top, w, h, fontFace: FONT, color: c(C.text), margin: 0, valign: "top", lineSpacing: BODY.line });
         top += h; lines = [];
       };
@@ -368,7 +392,7 @@ async function pptxReport(report: Report) {
         if (block.kind === "line") { lines.push(block.runs); continue; }
         flush();
         const rowH = BODY.line / 72;
-        slide.addTable(block.rows.map((row, index) => row.map((item) => ({ text: item.map((part) => ({ text: part.text, options: { bold: !index || part.bold, fontSize: part.size ? PPTX_SIZE[part.size] - 2 : 12 } })),
+        slide.addTable(block.rows.map((row, index) => row.map((item) => ({ text: item.map((part) => ({ text: part.text, options: { ...pptxStyle(part), bold: !index || part.bold, fontSize: part.size ? PPTX_SIZE[part.size] - 2 : 12 } })),
           options: index ? {} : { fill: { color: c(C.page) } } }))),
         { x, y: top, w, colW: block.rows[0].map(() => w / block.rows[0].length), rowH, fontFace: FONT, fontSize: 12, color: c(C.text), valign: "middle",
           margin: [0, .08, 0, .08], border: { type: "solid", pt: .75, color: c(C.border) } });

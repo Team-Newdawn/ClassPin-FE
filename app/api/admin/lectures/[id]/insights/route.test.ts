@@ -11,7 +11,8 @@ const { GET } = await import("./route.ts");
 
 const id = "5a000000-0000-4000-8000-000000000001", reportId = "3f2b8c1e-0d4a-4e6b-9a7c-1b2c3d4e5f60";
 const env = { NEXT_PUBLIC_SUPABASE_URL: "http://supabase.test", NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: "p", SUPABASE_SERVICE_ROLE_KEY: "s", REST_API_URL: "http://localhost:9" };
-const stored = { started_at: "2026-10-29T01:00:00+00:00", ended_at: null, audience: 3, peak_audience: 5, samples: [{ at: "2026-10-29T01:01:00.000Z", audience: 3, slide: 1 }], slide_changes: [] };
+const stored = { started_at: "2026-10-29T01:00:00+00:00", ended_at: null, audience: 3, peak_audience: 5 };
+const slide = { page: 2, topic: "t", questionSummary: "슬라이드 요약", suggestion: "", metrics: {} };
 const group = { title: "주제", summary: "요약", questionIds: ["q1"], extra: "dropped" };
 
 // Supabase is faked at fetch level: each table returns its row only when the request filters by the caller's owner_id.
@@ -40,7 +41,7 @@ test("no record and no report read as nulls; a bad id is 404", async () => {
     const response = await call();
     assert.equal(response.status, 200);
     assert.equal(response.headers.get("cache-control"), "no-store");
-    assert.deepEqual(await response.json(), { record: null, topics: null, reportId: null });
+    assert.deepEqual(await response.json(), { record: null, topics: null, slides: null, reportId: null });
     assert.equal((await call("not-a-uuid")).status, 404);
   } finally { globalThis.fetch = realFetch; }
 });
@@ -49,10 +50,10 @@ test("the record and topics come from the caller's rows only", async () => {
   const realFetch = globalThis.fetch;
   Object.assign(process.env, env);
   try {
-    const urls = fake(stored, { groups: [group] });
+    const urls = fake(stored, { groups: [group], slides: [slide] });
     assert.deepEqual(await (await call()).json(), {
-      record: { startedAt: stored.started_at, endedAt: null, audience: 3, peakAudience: 5, samples: stored.samples, slideChanges: [] },
-      topics: [{ title: "주제", summary: "요약", questionIds: ["q1"] }], reportId });
+      record: { startedAt: stored.started_at, endedAt: null, audience: 3, peakAudience: 5 },
+      topics: [{ title: "주제", summary: "요약", questionIds: ["q1"] }], slides: [{ page: 2, summary: "슬라이드 요약" }], reportId });
     assert.equal(urls.length, 2);
     for (const url of urls) assert.ok(url.includes("owner_id=eq.owner") && url.includes(`lecture_id=eq.${id}`), url);
     fake(stored, null);

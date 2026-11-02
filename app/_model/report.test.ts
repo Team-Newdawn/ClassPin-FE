@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import type { InsightReportBody } from "./insight-report.ts";
-import { applyReportProposal, draftReport, parseReportDocument, parseReportProposal, reportMetrics, staleTargets } from "./report.ts";
+import { applyReportProposal, draftReport, parseExportDocument, parseReportDocument, parseReportProposal, reportMetrics, staleTargets } from "./report.ts";
 
 const metrics = reportMetrics(
   { slides: [1, 2, 3], questions: [
@@ -30,6 +30,36 @@ test("draft follows the approved section order and caps quoted questions", () =>
   assert.match(slide2.text, /^- 질문11 \(공감 11 · 미답변\)/m);
   assert.match(slide2.text, /외 2개$/);
   assert.equal(draft.sections[4].text, "내용");
+});
+
+test("templates choose which code-built sections follow the AI's, and blank keeps only the overview (RPT-036)", async () => {
+  const { REPORT_TEMPLATES, reportAge } = await import("./report.ts");
+  const empty = { questions: 0, positioned: 0, unanswered: 0, answered: 0, resolved: 0, reactions: 0, answers: 0 };
+  const analysis: InsightReportBody = { schemaVersion: 2, model: "m",
+    slides: [{ page: 1, topic: "도입", content: "내용", questionSummary: "", suggestion: "", metrics: empty },
+      { page: 2, topic: "본론", questionSummary: "요약", suggestion: "", metrics: { ...empty, questions: 1 } }],
+    questions: [{ id: "q", page: 2, text: "왜?", answers: [], reactions: 0, status: "unanswered" }],
+    sections: [{ title: "결론", text: "본문" }], groups: [{ title: "용어", summary: "묶음", questionIds: ["q"] }] };
+  const titles = (template: keyof typeof REPORT_TEMPLATES) => draftReport({ title: "t", metrics, analysis, questions: [], template }).sections.map((s) => s.title);
+  // 보고용: five fixed sections; the AI's sections fill participation, conclusion and follow-ups by position.
+  const report = draftReport({ title: "t", metrics: { ...metrics, audience: 4 }, questions: [], template: "executive",
+    analysis: { ...analysis, slides: [analysis.slides[0], { ...analysis.slides[1], metrics: { ...analysis.slides[1].metrics, positioned: 1 } }],
+      sections: [{ title: "x", text: "참여 활발함" }, { title: "y", text: "용어 설명 보완 필요함" }] },
+    lecture: { title: "1강", startedAt: "2026-11-02T05:00:00Z", folder: "테스트 · 교육" } }).sections;
+  assert.deepEqual(report.map((s) => s.title), ["개요", "참여 결과", "청중 관심사 Top 3", "결론", "후속 조치 제안"]);
+  assert.match(report[0].text, /- 강의명: 1강\n- 일시: 2026년 11월 2일 오후 2:00\n/);
+  assert.match(report[0].text, /- 대상·목적: 테스트 · 교육$/);
+  assert.match(report[1].text, /- 질문: \d+건\(1인당 [\d.]+건\)\n- 핀이 찍힌 슬라이드: 1\/\d+장/);
+  assert.match(report[1].text, /참여 활발함$/);
+  assert.equal(report[2].text, '1. **용어** (질문 1건)\n   - 묶음\n   - 대표 질문: "왜?"');
+  assert.deepEqual([report[3].text, report[4].text], ["용어 설명 보완 필요함", ""]);
+  assert.deepEqual(titles("improvement"), ["개요", "결론", "주제: 용어", "슬라이드 2 · 본론"]);
+  assert.deepEqual(titles("summary"), ["개요", "결론"]);
+  const questions = [{ page: 2, text: "왜?", reactions: 0, status: "unanswered", answers: [] }];
+  assert.deepEqual(draftReport({ title: "t", metrics, analysis: null, questions, template: "blank" }).sections.map((s) => s.title), ["개요"]);
+  const now = Date.parse("2026-11-01T12:00:00Z");
+  assert.deepEqual(["2026-11-01T11:59:30Z", "2026-11-01T11:20:00Z", "2026-11-01T02:00:00Z", "2026-10-31T10:00:00Z", "2026-10-24T03:00:00Z"].map((iso) => reportAge(iso, now)),
+    ["방금 수정됨", "40분 전", "10시간 전", "어제", "10월 24일"]);
 });
 
 test("metrics-only draft keeps raw questions per slide that has them", () => {
@@ -76,6 +106,12 @@ test("report text: inline bold and sizes nest inside one line, tables parse, mal
   assert.equal(line.kind === "line" && formatReportLine(line.runs), line.source, "format is the inverse of parse");
   assert.equal(formatReportLine([{ text: "가", size: "big", bold: true }, { text: "나", size: "big" }, { text: "다", size: "big" }]), "<big>**가**나다</big>");
   assert.deepEqual(parseReportText("**열림 <big>닫힘 없음").map((block) => block.kind === "line" && block.runs), [[{ text: "**열림 <big>닫힘 없음" }]]);
+  // RPT-024 (2026-11-02): italic, underline and http(s) links nest with the rest and round-trip.
+  const [styled] = parseReportText("<i>기울임</i> <u>밑줄</u> [**자료**](https://ohpin.kr/a?b=1) [위험](javascript:alert(1))");
+  assert.deepEqual(styled.kind === "line" && styled.runs, [{ text: "기울임", italic: true }, { text: " " }, { text: "밑줄", underline: true }, { text: " " },
+    { text: "자료", link: "https://ohpin.kr/a?b=1", bold: true }, { text: " [위험](javascript:alert(1))" }]);
+  assert.equal(styled.kind === "line" && formatReportLine(styled.runs), styled.source);
+  assert.equal(formatReportLine([{ text: "가", link: "https://a.kr", italic: true, underline: true }, { text: "나", link: "https://a.kr" }]), "[<i><u>가</u></i>나](https://a.kr)");
 
   const blocks = parseReportText("앞\n| 항목 | 값 |\n| --- | :---: |\n| **질문** | 4 |\n| 공감 |\n뒤");
   assert.deepEqual(blocks.map((block) => block.kind), ["line", "table", "line"]);
@@ -86,4 +122,13 @@ test("report text: inline bold and sizes nest inside one line, tables parse, mal
   // No rule line, a column-count mismatch, or more than 8 columns: plain lines.
   for (const text of ["| a | b |\n| c | d |", "| a | b |\n| --- |", `|${" x |".repeat(9)}\n|${" --- |".repeat(9)}`])
     assert.ok(parseReportText(text).every((block) => block.kind === "line"), text);
+});
+
+test("analysis export document: caller metrics are checked for shape, sections for size", () => {
+  const metrics = { at: "2026-11-01T00:00:00.000Z", slides: 3, questions: 2, pins: 1, reactions: 0, durationMinutes: null, audience: 4, peakAudience: null };
+  const document = { title: "분석", metrics, sections: [{ id: "summary-0", title: "분석 요약", text: "질문 2건" }] };
+  assert.deepEqual(parseExportDocument(document), document);
+  for (const bad of [null, { ...document, metrics: { ...metrics, at: "x" } }, { ...document, metrics: { ...metrics, pins: -1 } },
+    { ...document, metrics: { ...metrics, audience: "4" } }, { ...document, sections: [{ id: "a", title: "t", text: "x".repeat(20_001) }] }])
+    assert.throws(() => parseExportDocument(bad), /INVALID_DOCUMENT/);
 });

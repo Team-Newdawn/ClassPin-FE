@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { pickCategory, reportChatContext, viewSlides, readableText, slidesMentioned, analyzeInsight, chatReport, CHAT_FULL_DOCUMENT_CHARS, type InsightAi } from "./insight-ai.ts";
+import { chatFile, pickCategory, reportChatContext, viewSlides, readableText, slidesMentioned, analyzeInsight, chatReport, CHAT_FULL_DOCUMENT_CHARS, type InsightAi } from "./insight-ai.ts";
 import { limiter } from "../_infrastructure/server/limiter.ts";
 import type { ReportDocument, ReportProposal } from "../_model/report.ts";
 import { slideImageEdge } from "./insight-providers/claude.ts";
@@ -116,7 +116,10 @@ test("slide issues keep same-slide evidence, reject invalid references, and neve
     },
     async* chat() { yield ""; },
   };
-  const body = await analyzeInsight(fake, source, material, [], "");
+  // RPT-032: chunk progress, then the slide analysis without sections before the body call.
+  const seen: unknown[] = [];
+  const body = await analyzeInsight(fake, source, material, [], "", undefined, (progress) => seen.push(progress.step === "body" ? { step: "body", sections: progress.partial.sections.length, slides: progress.partial.slides.length } : progress));
+  assert.deepEqual(seen, [{ step: "slides", done: 3, total: 3 }, { step: "body", sections: 0, slides: 3 }]);
   assert.deepEqual(body.slides[0].issues, [{ title: "비교 기준", summary: "표의 비교 기준을 묻습니다.", questionIds: ["q1", "q2"] }]);
   assert.equal(body.slides[0].questionSummary, "핵심과 청중 반응");
   // RPT-035: the AI-chosen sections pass through; a section without a title is dropped.
@@ -162,14 +165,39 @@ test("analysis and chat drive any provider through the adapter contract: one fai
     const view = async (input: unknown) => viewSlides(material, 21, async (pages) => images.filter((image) => pages.includes(image.page)), input);
     const document: ReportDocument = { title: "리포트", metrics: metricsOf(21), sections: [{ id: "sec-a", title: "강의 개요", text: "본문" }] };
     let answer = "", proposal: ReportProposal | undefined;
-    for await (const delta of chatReport(fake, { document, material, history: [], message: "21번 슬라이드 봐줘", currentPage: null, view, onProposal: (value) => { proposal = value; } })) answer += delta;
+    for await (const delta of chatReport(fake, { document, material, history: [], message: "21번 슬라이드 봐줘", currentPage: null, view, onProposal: (value) => { proposal = value; }, withData: true, file: null })) answer += delta;
     assert.equal(answer, "답");
     assert.deepEqual(seen.tools, ["view_slides", "propose_document"]);
     assert.match(String(seen.retry), /올바르지 않다/);
     assert.deepEqual(proposal, { replace: [{ id: "sec-a", title: "개요", text: "새 본문" }], insert: [{ after: null, title: "머리말", text: "안녕" }], remove: [] });
     assert.deepEqual((seen.last as { content: { type: string }[] }).content.map((part) => part.type), ["text", "image", "text", "text"]);
     assert.equal((seen.toolResult as { type: string }[])[1].type, "image");
+    // RPT-057/058: without source data no slide is attached or viewable, and the attachment rides along this question only.
+    const file = chatFile({ name: "메모.md", data: Buffer.from("핵심 메모").toString("base64") });
+    for await (const delta of chatReport(fake, { document, material, history: [{ role: "user", text: "이전", createdAt: "t", file: "예전.pdf" }], message: "21번 슬라이드 봐줘",
+      currentPage: null, view, onProposal: () => {}, withData: false, file })) void delta;
+    assert.deepEqual(seen.tools, ["propose_document"]);
+    assert.equal(seen.toolResult, "알 수 없는 도구다.");
+    const last = (seen.last as { content: { type: string; text?: string }[] }).content;
+    assert.deepEqual(last.map((part) => part.type), ["text", "text", "text"]);
+    assert.match(String(last[1].text), /<attached_file name="메모.md">\n핵심 메모/);
   } finally { console.info = log; await rm(dir, { recursive: true }); }
+});
+
+test("chatFile types an attachment by its bytes and refuses anything else", () => {
+  const b64 = (bytes: number[] | string) => (typeof bytes === "string" ? Buffer.from(bytes) : Buffer.from(bytes)).toString("base64");
+  assert.equal(chatFile(undefined), null);
+  assert.equal(chatFile({ name: "a.pdf", data: b64("%PDF-1.7") })!.parts[1].type, "pdf");
+  assert.deepEqual(chatFile({ name: "a.png", data: b64([0x89, 0x50, 0x4e, 0x47, 1]) })!.parts[1], { type: "image", data: b64([0x89, 0x50, 0x4e, 0x47, 1]), png: true });
+  assert.equal(chatFile({ name: "a.jpg", data: b64([0xff, 0xd8, 0xff, 0]) })!.parts[1].type, "image");
+  // A renamed binary is not text, whatever its name says.
+  assert.throws(() => chatFile({ name: "a.txt", data: b64([0xc3, 0x28]) }), /INVALID_FILE/);
+  assert.throws(() => chatFile({ name: "", data: b64("x") }), /INVALID_FILE/);
+  assert.throws(() => chatFile({ name: "big.txt", data: Buffer.alloc(10 * 1024 * 1024 + 1, 97).toString("base64") }), /FILE_TOO_LARGE/);
+  assert.throws(() => chatFile({ name: "big.png", data: Buffer.concat([Buffer.from([0x89, 0x50, 0x4e, 0x47]), Buffer.alloc(5 * 1024 * 1024)]).toString("base64") }), /FILE_TOO_LARGE/);
+  const long = chatFile({ name: "<a>.txt", data: b64("가".repeat(50_001)) })!;
+  assert.equal(long.name, "a.txt");
+  assert.match(String((long.parts[1] as { text: string }).text), /앞 50000자만/);
 });
 
 test("one chat answer views at most 6 slides, even when tool calls run in parallel", async () => {

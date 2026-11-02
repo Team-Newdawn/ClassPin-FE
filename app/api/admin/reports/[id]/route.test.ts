@@ -20,8 +20,8 @@ type Turn = { role: string; text: string; cleared?: boolean; pending?: boolean; 
 const updatedAt = "2026-10-27T00:00:00.000000+00:00";
 
 // Supabase and the REST backend are faked at fetch level: the stored row (null = not the caller's) and every PATCH of it.
-function fake(messages: Turn[] | null, redrafts = 0) {
-  const row = messages && { redrafts, id, owner_id: "owner", material_id: materialId, lecture_id: lectureId, title: "강의", file_name: "a.pdf", status: "ready", error: null,
+function fake(messages: Turn[] | null) {
+  const row = messages && { id, owner_id: "owner", material_id: materialId, lecture_id: lectureId, title: "강의", file_name: "a.pdf", status: "ready", error: null,
     document, previous_document: null, messages, created_at: updatedAt, updated_at: updatedAt, drafted_at: null };
   const writes: Record<string, unknown>[] = [];
   globalThis.fetch = (async (url: string | URL | Request, init?: RequestInit) => {
@@ -130,15 +130,4 @@ test("a chat question is reserved first, refunded on failure, kept when stopped,
     globalThis.fetch = realFetch;
     claude.chat = realChat;
   }
-});
-
-test("an AI redraft over a document stops at 2 per report and refuses before any AI or storage work", async () => {
-  const realFetch = globalThis.fetch;
-  Object.assign(process.env, env);
-  try {
-    const writes = fake([], 2), limited = await call("POST", { action: "redraft" });
-    assert.equal(limited.status, 429);
-    assert.equal((await limited.json()).error, "REDRAFT_LIMIT");
-    assert.deepEqual(writes, []);
-  } finally { globalThis.fetch = realFetch; }
 });

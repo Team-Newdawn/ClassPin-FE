@@ -2,9 +2,9 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { boundedJson, insightFailure, insightResponse, InsightRequestError, oneChatRenderAtATime, readOwnedInsightSource, renderMaterialSlides, runningAnalyses } from "../../../../_service/insight-request.ts";
-import { checkDailyDrafts, draftBasis, drafting, ownedReport, reportView, startDraft, type ReportRow } from "../../../../_service/report-request.ts";
-import { CHAT_SLIDES_PER_ANSWER, chatReport, insightAi, viewSlides } from "../../../../_service/insight-ai.ts";
-import { applyReportProposal, CHAT_QUESTIONS_PER_REPORT, draftReport, REDRAFTS_PER_REPORT, parseReportDocument, type ReportDocument, type ReportMessage, type ReportProposal } from "../../../../_model/report.ts";
+import { checkDailyDrafts, draftBasis, draftProgress, drafting, ownedReport, reportView, startDraft, type ReportRow } from "../../../../_service/report-request.ts";
+import { CHAT_SLIDES_PER_ANSWER, chatFile, chatReport, insightAi, viewSlides, type ChatFile } from "../../../../_service/insight-ai.ts";
+import { applyReportProposal, CHAT_QUESTIONS_PER_REPORT, draftReport, parseReportDocument, type ReportDocument, type ReportMessage, type ReportProposal } from "../../../../_model/report.ts";
 
 export const runtime = "nodejs";
 export const maxDuration = 300;
@@ -17,7 +17,10 @@ const conflict = (row: ReportRow) => insightResponse({ error: "REPORT_CONFLICT",
 const editable = (row: ReportRow): row is ReportRow & { document: ReportDocument } => Boolean(row.document) && !drafting(row);
 
 export async function GET(request: Request, context: Context) {
-  try { return insightResponse(reportView((await ownedReport(request, (await context.params).id)).row)); }
+  try {
+    const { row } = await ownedReport(request, (await context.params).id);
+    return insightResponse({ ...reportView(row), progress: drafting(row) ? draftProgress.get(row.id) ?? null : null });
+  }
   catch (error) { return insightFailure(error); }
 }
 
@@ -57,22 +60,21 @@ export async function DELETE(request: Request, context: Context) {
 export async function POST(request: Request, context: Context) {
   try {
     const { id } = await context.params, { db, row, ownerId, authorization } = await ownedReport(request, id);
-    const body = await boundedJson(request.body, 8192) as { action?: unknown; metricsOnly?: unknown; messageIndex?: unknown; updatedAt?: unknown; message?: unknown; slide?: unknown };
+    // A chat question may carry one base64 file of up to 10MB (RPT-057).
+    const body = await boundedJson(request.body, 14 * 1024 * 1024) as { action?: unknown; metricsOnly?: unknown; messageIndex?: unknown; updatedAt?: unknown; message?: unknown; slide?: unknown; withData?: unknown; file?: unknown };
     const messages = row.messages ?? [];
-    if (body?.action === "redraft") {
+    // RPT-033: only a draft that never produced a document can run again; a document is never redrafted (RPT-034, removed 2026-11-02).
+    if (body?.action === "retry") {
       if (drafting(row)) throw new InsightRequestError("REPORT_DRAFTING", 409);
+      if (row.document) throw new InsightRequestError("INVALID_REQUEST", 400);
       const ai = body.metricsOnly === true ? null : insightAi();
       if (body.metricsOnly !== true && !ai) throw new InsightRequestError("ANALYSIS_NOT_CONFIGURED", 503);
-      // RPT-034: an AI redraft over a document is limited per report; retrying a draft that never produced one is not a redraft.
-      const redrafts = ai && row.document ? (row.redrafts ?? 0) + 1 : undefined;
-      if (redrafts && redrafts > REDRAFTS_PER_REPORT && process.env.NODE_ENV !== "development") throw new InsightRequestError("REDRAFT_LIMIT", 429);
       if (ai) await checkDailyDrafts(db, ownerId);
       const source = await readOwnedInsightSource(authorization, [row.material_id], request.signal);
-      const basis = await draftBasis(db, ownerId, source.materials[0]), previous = row.document ?? row.previous_document ?? null;
-      // RPT-034/043: the replaced document becomes the undo target.
-      if (!ai) return await save(db, row, { status: "ready", error: null, document: draftReport({ ...basis, analysis: null }), analysis: null, previous_document: previous }, 202);
+      const basis = await draftBasis(db, ownerId, source.materials[0], { ...row, folder: source.folderLabels.get(source.materials[0].folderId ?? "") });
+      if (!ai) return await save(db, row, { status: "ready", error: null, document: draftReport({ ...basis, analysis: null }), analysis: null }, 202);
       const draftedAt = now(), response = await save(db, row, { status: "drafting", error: null, drafted_at: draftedAt }, 202);
-      if (response.status === 202) startDraft(db, id, draftedAt, ai, source, basis, previous, redrafts);
+      if (response.status === 202) startDraft(db, id, draftedAt, ai, source, basis);
       return response;
     }
     if (body?.action === "cancel") {
@@ -118,9 +120,12 @@ export async function POST(request: Request, context: Context) {
   } catch (error) { return insightFailure(error); }
 }
 
-async function chat(request: Request, db: Awaited<ReturnType<typeof ownedReport>>["db"], row: ReportRow, authorization: string, body: { message?: unknown; slide?: unknown }) {
+async function chat(request: Request, db: Awaited<ReturnType<typeof ownedReport>>["db"], row: ReportRow, authorization: string, body: { message?: unknown; slide?: unknown; withData?: unknown; file?: unknown }) {
   const id = row.id, message = typeof body.message === "string" ? body.message.trim() : "";
   if (!message || message.length > 2000) throw new InsightRequestError("INVALID_REQUEST", 400);
+  let file: ChatFile | null;
+  try { file = chatFile(body.file); } catch (error) { throw new InsightRequestError((error as Error).message, (error as Error).message === "FILE_TOO_LARGE" ? 413 : 400); }
+  const withData = body.withData !== false;
   if (!editable(row)) throw new InsightRequestError("REPORT_NOT_READY", 409);
   const document = row.document, ai = insightAi();
   if (!ai) throw new InsightRequestError("ANALYSIS_NOT_CONFIGURED", 503);
@@ -150,7 +155,7 @@ async function chat(request: Request, db: Awaited<ReturnType<typeof ownedReport>
   };
   let proposal: ReportProposal | undefined;
   const answer = chatReport(ai, { document, material, history: history.filter((item) => !item.cleared), message, currentPage: slide, view,
-    onProposal: (value) => { proposal = value; }, signal });
+    onProposal: (value) => { proposal = value; }, signal, withData, file });
   const encoder = new TextEncoder();
   // Text deltas stream as plain text; the turn is saved only once the full answer arrives, otherwise the stream errors.
   return new Response(new ReadableStream({
@@ -159,7 +164,7 @@ async function chat(request: Request, db: Awaited<ReturnType<typeof ownedReport>
         let text = "";
         for await (const delta of answer) { text += delta; controller.enqueue(encoder.encode(delta)); }
         const at = now();
-        const saved: ReportMessage[] = [...history, { role: "user", text: message, createdAt: at }, { role: "assistant", text: text.trim(), createdAt: at, ...proposal ? { proposal } : {} }];
+        const saved: ReportMessage[] = [...history, { role: "user", text: message, createdAt: at, ...file ? { file: file.name } : {} }, { role: "assistant", text: text.trim(), createdAt: at, ...proposal ? { proposal } : {} }];
         const result = await db.from("instructor_reports").update({ messages: saved }).eq("id", id);
         if (result.error) throw new Error("REPORT_STORAGE_UNAVAILABLE");
         controller.close();

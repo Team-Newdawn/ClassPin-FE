@@ -1,65 +1,60 @@
-.root{height:100dvh;display:flex;flex-direction:column;overflow:hidden;background:var(--color-bg-page);color:var(--color-text-primary)}
+/* RPT-100/105 (Figma ClassPin 2224:2222): folder sidebar | document canvas box | AI chat box, the boxes radius 16 on the page tint. */
+.root{height:100dvh;display:grid;grid-template-columns:248px minmax(0,1fr);overflow:hidden;background:var(--color-bg-page);color:var(--color-text-primary)}.collapsed{grid-template-columns:72px minmax(0,1fr)}
+.workspace{min-width:0;min-height:0;display:grid;grid-template-columns:minmax(0,1fr);gap:16px;padding:16px}.workspace[data-chat]{grid-template-columns:minmax(0,1fr) 420px}
+.canvas{min-width:0;min-height:0;display:flex;flex-direction:column;overflow:hidden;border:1px solid var(--color-border);border-radius:16px;background:var(--color-bg-surface)}
 .missing{min-height:100dvh;display:grid;place-content:center;justify-items:center;gap:16px;color:var(--color-text-secondary)}
-.header{height:64px;flex:none;display:flex;align-items:center;gap:12px;padding:0 24px;background:var(--color-bg-surface);border-bottom:1px solid var(--color-border)}
+.header{height:56px;flex:none;display:flex;align-items:center;gap:8px;padding:0 12px 0 16px;border-bottom:1px solid var(--color-border)}
 .header h1{min-width:0;margin:0;font-size:16px;line-height:24px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.back{display:inline-flex;align-items:center;gap:4px;height:40px;padding:0 10px;border-radius:var(--radius-control);color:var(--color-text-secondary);font-size:14px;font-weight:600;text-decoration:none}.back:hover{background:var(--color-bg-subtle)}.back svg{width:16px}
-.iconButton{display:grid;place-items:center;flex:none;width:40px;height:40px;border:1px solid var(--color-border);border-radius:var(--radius-control);background:var(--color-bg-surface);color:var(--color-text-secondary);cursor:pointer}.iconButton svg{width:18px}.iconButton[aria-expanded=true]{background:var(--color-brand-subtle);color:var(--color-brand)}
-.saveState{flex:none;font-size:12px;line-height:18px;font-weight:500;color:var(--color-text-tertiary)}.saveState[data-state=failed],.saveState[data-state=conflict]{color:var(--color-error)}
-.actions{display:flex;gap:12px;margin-left:auto}
+.iconButton{display:grid;place-items:center;flex:none;width:32px;height:32px;border:0;border-radius:8px;background:transparent;color:var(--color-text-secondary);cursor:pointer}.iconButton:hover:not(:disabled){background:var(--color-bg-subtle)}.iconButton svg{width:18px}.iconButton[aria-expanded=true]{background:var(--color-brand-subtle);color:var(--color-brand)}
+.saveState{flex:none;padding:4px 10px;border-radius:999px;background:var(--color-brand-subtle);color:var(--color-brand);font-size:12px;line-height:16px;font-weight:500;white-space:nowrap}.saveState[data-state=saving]{background:var(--color-bg-subtle);color:var(--color-text-tertiary)}.saveState[data-state=failed],.saveState[data-state=conflict]{background:var(--color-error-bg);color:var(--color-error)}
+.actions{display:flex;align-items:center;gap:8px;margin-left:auto}.actions :global(.btn){height:36px;padding:0 14px}
 .banner{flex:none;display:flex;flex-wrap:wrap;align-items:center;gap:12px;padding:12px 24px;background:var(--color-warning-bg);color:var(--color-warning);font-size:14px}.banner p{flex:1 1 320px;margin:0}
 .banner[data-tone=error]{background:var(--color-error-bg);color:var(--color-error)}
-
-.body{flex:1;min-height:0;display:grid;grid-template-columns:auto minmax(0,1fr) var(--chat-width)}
-.toc{width:240px;overflow-y:auto;padding:16px 12px;background:var(--color-bg-surface);border-right:1px solid var(--color-border)}
+.canvasBody{flex:1;min-height:0;display:flex}.canvasBody>.doc{flex:1}
+.toc{flex:none;width:220px;overflow-y:auto;padding:16px 12px;border-right:1px solid var(--color-border)}
 .toc ol{display:grid;gap:2px;margin:0;padding:0;list-style:none}
 .toc button{display:flex;gap:8px;width:100%;min-height:40px;padding:9px 10px;border:0;border-radius:var(--radius-control);background:transparent;color:var(--color-text-secondary);font:inherit;font-size:13px;line-height:20px;text-align:left;cursor:pointer;overflow-wrap:anywhere}
 .toc button span{flex:none;font-weight:600;font-variant-numeric:tabular-nums}.toc button:hover{background:var(--color-bg-subtle)}
 .toc button[aria-current]{background:var(--color-brand-subtle);color:var(--color-brand);font-weight:600}
-
 /* RPT-100: reading-width document on the page background, border only. */
-.doc{min-width:0;overflow-y:auto;padding:32px 24px 64px}
+/* RPT-100/102, Figma ClassPin 2224:2391: a 700px paper on the page-tinted canvas. */
+.doc{min-width:0;overflow-y:auto;padding:0 32px 48px;background:var(--color-bg-page)}
 /* A4 page, the PDF export's layout at 794px (210 mm at 96 dpi = 595 pt x 1.334): what you edit is what exports (RPT-061). */
-.paper{max-width:794px;margin:0 auto;display:grid;align-content:start;padding:54px;background:var(--color-bg-surface);border:1px solid var(--color-border);border-radius:var(--radius-control);box-shadow:var(--shadow-xs)}
-.label{margin:0 0 12px;color:var(--color-brand);font-size:13px;line-height:18px;font-weight:700}
-.meta{margin:4px 0 0;padding:0 4px;color:var(--color-text-secondary);font-size:13px;line-height:20px}
-.metrics{display:grid;grid-template-columns:1fr 1fr;margin:20px 0 0;border:1px solid var(--color-border);border-radius:var(--radius-control);overflow:hidden}
-.metrics>div{display:flex;align-items:center;justify-content:space-between;gap:12px;height:32px;padding:0 16px;border-bottom:1px solid var(--color-border)}
-.metrics>div:nth-child(odd){border-right:1px solid var(--color-border)}
-.metrics>div:nth-last-child(-n+2):nth-child(odd),.metrics>div:last-child{border-bottom:0}
-.metrics dt{font-size:13px;color:var(--color-text-secondary)}.metrics .none{color:var(--color-text-tertiary)}.metrics dd{margin:0;font-size:13px;font-weight:700;color:var(--color-text-primary);font-variant-numeric:tabular-nums}
-.section{display:grid;margin-top:42px;scroll-margin-top:24px}
+.paper{max-width:700px;margin:28px auto 0;display:grid;align-content:start;gap:16px;padding:40px 48px;background:var(--color-bg-surface);border:1px solid var(--color-border);border-radius:12px}
+.label{justify-self:start;display:flex;align-items:center;gap:5px;margin:0;padding:3px 8px;border-radius:999px;background:var(--color-brand-subtle);color:var(--color-brand);font-size:12px;line-height:18px;font-weight:700}
+.meta{margin:0;padding:0 4px;color:var(--color-text-secondary);font-size:13px;line-height:20px;font-weight:500}
+.section{display:grid;scroll-margin-top:60px}
 .slideRef{margin:0 0 8px;padding:0 4px;color:var(--color-brand);font-size:12px;line-height:18px;font-weight:700}
 .slide{margin:0 0 16px}.slide :global(.slide-canvas){width:100%}
 .title,.sectionTitle{resize:none;field-sizing:content;overflow:hidden;overflow-wrap:anywhere}
 .title{width:100%;padding:0 4px;border:0;border-radius:8px;background:transparent;color:var(--color-text-primary);font:inherit;font-size:28px;line-height:38px;font-weight:700;letter-spacing:-.02em}
-.sectionTitle{width:100%;padding:0 4px;border:0;border-radius:8px;background:transparent;color:var(--color-text-primary);font:inherit;font-size:22px;line-height:32px;font-weight:700;letter-spacing:-.01em;margin-bottom:8px}
+.sectionTitle{flex:1;min-width:0;padding:2px 6px;border:0;border-radius:8px;background:transparent;color:var(--color-text-primary);font:inherit;font-size:17px;line-height:26px;font-weight:700}
 /* ponytail: field-sizing grows the textarea natively; GrowingText measures only where it is unsupported. */
-.text{width:100%;min-height:52px;padding:4px;border-radius:8px;color:var(--color-text-primary);font-size:14px;line-height:22px;white-space:pre-wrap;overflow-wrap:anywhere}
+.text{width:100%;min-height:48px;padding:4px;border-radius:8px;color:var(--color-text-secondary);font-size:15px;line-height:24px;white-space:pre-wrap;overflow-wrap:anywhere}
 /* RPT-103 sizes; every size is explicit because the UA maps <font size> itself. */
-.text font[size="5"]{font-size:18px;line-height:28px}.text font[size="3"]{font-size:14px;line-height:22px}.text font[size="2"]{font-size:12px;line-height:18px}
+.text font[size="5"]{font-size:18px;line-height:28px}.text font[size="3"]{font-size:15px;line-height:24px}.text font[size="2"]{font-size:12px;line-height:18px}
 .text [data-table]{margin:8px 0;white-space:normal}
 .text table{width:100%;border-collapse:collapse;table-layout:fixed;font-size:13px;line-height:20px}
 .text :is(th,td){padding:6px 10px;border:1px solid var(--color-border);text-align:left;vertical-align:top}.text th{background:var(--color-bg-page);font-weight:700}
-.formatBar{position:sticky;top:-32px;z-index:2;max-width:794px;margin:-16px auto 16px;display:flex;gap:4px;padding:6px;border:1px solid var(--color-border);border-radius:var(--radius-control);background:var(--color-bg-surface);box-shadow:var(--shadow-xs)}
-.formatBar button{min-width:36px;height:32px;padding:0 10px;border:0;border-radius:8px;background:transparent;color:var(--color-text-secondary);font-size:13px;font-weight:600}
+/* RPT-111, Figma ClassPin 2224:2357. */
+.formatBar{flex:none;height:44px;display:flex;align-items:center;gap:4px;padding:0 16px;border-bottom:1px solid var(--color-border);background:var(--color-bg-surface)}
+.formatBar button{display:grid;place-items:center;min-width:30px;height:30px;padding:0;border:0;border-radius:8px;background:transparent;color:var(--color-text-secondary);font-size:14px}
 .formatBar button:hover:not(:disabled){background:var(--pin-neutral-100);color:var(--color-text-primary)}
 .formatBar button[aria-pressed=true]{background:var(--color-brand-subtle);color:var(--color-brand)}
 .formatBar button:disabled{opacity:.45;cursor:default}.formatBar button:focus-visible{outline:none;box-shadow:var(--focus)}
-.add{justify-self:start;margin-top:42px}
+.add{justify-self:start;margin-top:16px}
 .paper :is(.title,.sectionTitle,.text):focus-visible{outline:none;box-shadow:var(--focus)}
 .paper :is(.title,.sectionTitle,.text,input)::placeholder{color:var(--color-text-tertiary)}
 .progress{margin:0;color:var(--color-text-secondary);font-size:14px;line-height:22px}.progressBar{width:100%;accent-color:var(--color-brand)}
 .paper>:global(.btn){justify-self:start}
-.paper>:is(.progress,.progressBar,.retry,.failed,:global(.btn)){margin-bottom:16px}
+.paper>:is(.progress,.progressBar,.failed,:global(.btn)){margin-bottom:16px}
 .skeleton{display:grid;gap:12px;margin-top:24px}.skeleton span{height:16px;border-radius:8px;background:var(--color-bg-subtle)}.skeleton span:first-child{width:40%;height:28px}.skeleton span:last-child{width:70%}
-.retry{display:flex;flex-wrap:wrap;align-items:center;gap:12px;padding:12px 16px;border-radius:var(--radius-control);background:var(--color-warning-bg);color:var(--color-warning);font-size:14px}.retry p{flex:1 1 240px;margin:0}
 .failed{display:grid;gap:16px;color:var(--color-text-secondary)}.failed p{margin:0;font-size:16px;line-height:26px}.failed div{display:flex;flex-wrap:wrap;gap:12px}
-
 /* RPT-105: chat panel. */
-.chat{position:relative;min-height:0;display:flex;flex-direction:column;background:var(--color-bg-surface);border-left:1px solid var(--color-border)}
-.resizer{position:absolute;left:-5px;top:0;z-index:5;width:10px;height:100%;display:flex;align-items:center;justify-content:center;cursor:col-resize;touch-action:none;color:var(--color-text-tertiary)}.resizer svg{width:10px}.resizer:focus-visible{outline:2px solid var(--color-brand);background:var(--color-brand-subtle)}
-.chatHead{flex:none;display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:56px;padding:8px 16px 8px 24px;border-bottom:1px solid var(--color-border)}
-.chatHead h2{display:flex;align-items:center;gap:6px;margin:0;font-size:16px;line-height:24px;font-weight:600}.chatHead h2 svg,.sheetToggle svg{width:16px;color:var(--color-brand)}
+.chat{min-width:0;min-height:0;display:flex;flex-direction:column;overflow:hidden;border:1px solid var(--color-border);border-radius:16px;background:var(--color-bg-surface)}
+.chatHead{flex:none;display:flex;align-items:center;gap:8px;height:56px;padding:0 12px 0 20px;border-bottom:1px solid var(--color-border)}
+.chatHead h2{display:flex;flex:1;align-items:center;gap:8px;min-width:0;margin:0;font-size:15px;line-height:22px;font-weight:700}.sheetToggle svg{width:16px;color:var(--color-brand)}
+.avatar{flex:none;display:grid;place-items:center;width:28px;height:28px;border-radius:8px;background:var(--color-brand-subtle)}
 .chatHead :global(.btn){height:32px;padding:0 12px;font-size:13px}
 .sheetToggle{display:none}
 .chatBody{flex:1;min-height:0;display:flex;flex-direction:column}
@@ -73,23 +68,85 @@
 .proposal>:global(.btn){justify-self:start}.proposal p{margin:0;display:flex;align-items:center;gap:4px;color:var(--color-success-text);font-size:13px;font-weight:600}.proposal p :global(.btn){height:32px;padding:0 8px}
 .composer{flex:none;display:grid;gap:8px;margin:0 16px 16px;padding:12px 14px;border:1px solid var(--color-border);border-radius:var(--radius-card);background:var(--color-bg-surface);box-shadow:var(--shadow-sm)}.composer:focus-within{box-shadow:var(--focus)}
 .composer textarea{width:100%;max-height:160px;padding:0;border:0;resize:none;field-sizing:content;background:transparent;color:var(--color-text-primary);font:inherit;font-size:14px;line-height:22px}.composer textarea:focus-visible{box-shadow:none}.composer textarea::placeholder{color:var(--color-text-tertiary)}
-.composerFoot{display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:12px;line-height:18px;color:var(--color-text-tertiary);font-variant-numeric:tabular-nums}
-.send{display:grid;place-items:center;width:40px;height:40px;border:0;border-radius:50%;background:var(--color-brand);color:var(--color-text-inverse);cursor:pointer}.send:hover:not(:disabled){background:var(--color-brand-hover)}.send svg{width:16px}
+.composerFoot{display:flex;align-items:center;gap:8px;font-size:12px;line-height:18px;color:var(--color-text-tertiary);font-variant-numeric:tabular-nums}
+.send{flex:none;display:grid;place-items:center;width:32px;height:32px;border:0;border-radius:50%;background:var(--color-brand);color:var(--color-text-inverse);cursor:pointer}.send:hover:not(:disabled){background:var(--color-brand-hover)}.send svg{width:16px}
 @media(prefers-reduced-motion:reduce){.streaming::after{animation:none}}
-
-/* RPT-108: stacked under lg (TOC becomes a drawer), chat as a bottom sheet under md. */
+/* RPT-108: under lg the chat box stacks under the canvas (TOC becomes a drawer); under md the chat is a bottom sheet. */
+@media(min-width:768px){.chat:not([data-open=true]){display:none}}
 @media(max-width:1023px){
-  .root{height:auto;min-height:100dvh;overflow:visible}.header{position:sticky;top:0;z-index:10}
-  .body{display:flex;flex-direction:column}
-  .toc{position:fixed;top:64px;bottom:0;left:0;z-index:20;box-shadow:var(--shadow-md)}
-  .doc{overflow:visible;padding:24px 16px 32px}
-  .chat{height:min(640px,80dvh);border-left:0;border-top:1px solid var(--color-border)}.resizer{display:none}
+  .root{height:auto;min-height:100dvh;overflow:visible}
+  .workspace,.workspace[data-chat]{grid-template-columns:minmax(0,1fr);padding:12px}
+  .canvas{overflow:visible}.header{position:sticky;top:0;z-index:10;border-radius:16px 16px 0 0;background:var(--color-bg-surface)}
+  .canvasBody{display:block}
+  .toc{position:fixed;top:0;bottom:0;left:0;z-index:20;background:var(--color-bg-surface);box-shadow:var(--shadow-md)}
+  .doc{overflow:visible;padding:0 12px 24px}
+  .chat{height:min(640px,80dvh)}
 }
 @media(max-width:767px){
-  .header{flex-wrap:wrap;height:auto;min-height:64px;padding:8px 16px}.actions{gap:8px}
-  .paper{padding:24px 16px}.title{font-size:22px;line-height:32px}.metrics{grid-template-columns:1fr}.metrics>div:nth-child(odd){border-right:0}.metrics>div:nth-last-child(-n+2):nth-child(odd){border-bottom:1px solid var(--color-border)}
+  .root,.collapsed{grid-template-columns:64px minmax(0,1fr)}
+  .header{flex-wrap:wrap;height:auto;min-height:56px;padding:8px 12px}.actions{gap:6px}.openChat{display:none}
+  .paper{padding:24px 16px}.title{font-size:22px;line-height:32px}
   .doc{padding-bottom:88px}
   .chat{position:fixed;left:0;right:0;bottom:0;z-index:30;height:auto;max-height:85dvh;border-radius:var(--radius-modal) var(--radius-modal) 0 0;box-shadow:var(--shadow-lg)}
-  .chat[data-open=true]{height:85dvh}.chat:not([data-open=true]) .chatBody,.chatHead h2{display:none}
+  .chat[data-open=true]{height:85dvh}.chat:not([data-open=true]) .chatBody,.chatHead h2,.closeChat{display:none}
   .sheetToggle{display:flex;align-items:center;gap:6px;flex:1;min-height:44px;padding:0;border:0;background:transparent;color:var(--color-text-primary);font:inherit;font-size:14px;font-weight:600;text-align:left;cursor:pointer}
 }
+/* Report export dialog option (shared ExportDialog in app/component). */
+.exportDesign{padding-top:24px}.exportDesign h3{margin:0;font-size:16px;font-weight:700}.exportDesign>div{margin-top:16px;padding:16px;border:1px solid var(--color-border);border-radius:10px;background:var(--color-bg-subtle)}.exportDesign b{font-size:14px}.exportDesign p{margin:8px 0 0;font-size:13px;line-height:1.6;color:var(--color-text-secondary)}
+/* RPT-057..059, Figma ClassPin 2224:2305 and 2224:2313. */
+.suggestions{flex:none;display:flex;flex-wrap:wrap;gap:8px;margin:0 16px 10px}
+.suggestions button{padding:6px 12px;border:1px solid var(--color-border);border-radius:999px;background:var(--color-bg-surface);color:var(--color-text-secondary);font:inherit;font-size:13px;font-weight:500;cursor:pointer}
+.suggestions button:hover{border-color:var(--color-border-strong)}.suggestions button:focus-visible{outline:0;box-shadow:var(--focus)}
+.fileChip{justify-self:start;max-width:100%;display:flex;align-items:center;gap:6px;padding:5px 10px;border-radius:8px;background:var(--color-brand-subtle);color:var(--color-brand);font-size:12px;font-weight:500}
+.fileChip span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.fileChip button{flex:none;display:grid;place-items:center;padding:0;border:0;border-radius:4px;background:transparent;cursor:pointer}.fileChip button:focus-visible{outline:0;box-shadow:var(--focus)}
+.fileError{margin:0;color:var(--color-error);font-size:12px}
+.attach{flex:none;display:grid;place-items:center;width:30px;height:30px;border-radius:8px;cursor:pointer}.attach:hover{background:var(--color-bg-subtle)}
+.attach:has(input:focus-visible){box-shadow:var(--focus)}.attach:has(input:disabled){opacity:.5;cursor:default}
+.dataChip{position:relative;flex:0 1 auto;display:flex;align-items:center;min-width:0;border-radius:999px;background:var(--color-bg-subtle)}.dataChip:focus-within{box-shadow:var(--focus)}
+.dataChip select{width:100%;min-width:0;padding:6px 26px 6px 10px;overflow:hidden;white-space:nowrap;border:0;border-radius:999px;appearance:none;background:transparent;color:var(--color-text-secondary);font:inherit;font-size:12px;font-weight:500;cursor:pointer;outline:0;text-overflow:ellipsis}
+.dataChip img{position:absolute;right:10px;pointer-events:none}
+/* The chip gives way first, so attach, the count and send always stay inside a narrow panel. */
+.left{flex:none;margin-left:auto;white-space:nowrap}
+.sentFile{display:flex;align-items:center;gap:4px;margin-bottom:4px;color:var(--color-brand);font-size:12px;font-weight:500;overflow-wrap:anywhere}
+.formatBar>i{width:1px;height:18px;margin:0 4px;background:var(--color-border)}
+.styleSelect{position:relative;display:flex;align-items:center;border-radius:8px;background:var(--color-bg-subtle)}.styleSelect:focus-within{box-shadow:var(--focus)}
+.styleSelect select{height:30px;padding:0 26px 0 10px;border:0;appearance:none;background:transparent;color:var(--color-text-secondary);font:inherit;font-size:13px;font-weight:500;cursor:pointer;outline:0}
+.styleSelect select:disabled{opacity:.45;cursor:default}.styleSelect img{position:absolute;right:10px;pointer-events:none}
+.formatHint{margin-left:auto;overflow:hidden;color:var(--color-text-tertiary);font-size:12px;text-overflow:ellipsis;white-space:nowrap}
+/* Figma ClassPin 2224:2401 (KPI) and 2224:2417 (bars). */
+.kpis{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin:0}
+.kpis>div{min-width:0;display:flex;flex-direction:column;gap:2px;padding:12px 14px;border-radius:10px;background:var(--color-bg-page)}
+.kpis dd{margin:0;font-size:20px;line-height:28px;font-weight:700;font-variant-numeric:tabular-nums}.kpis dd.none{font-size:14px;color:var(--color-text-tertiary)}
+.kpis dt{color:var(--color-text-tertiary);font-size:12px;line-height:16px}
+.bars{display:grid;gap:8px;margin:0;padding:14px 16px;border:1px solid var(--color-border);border-radius:10px}
+.bars figcaption{color:var(--color-text-tertiary);font-size:12px;font-weight:700}
+.bars ol{display:grid;gap:8px;margin:0;padding:0;list-style:none}
+.bars li{display:grid;grid-template-columns:auto 130px minmax(0,1fr) auto;align-items:center;gap:10px;font-size:13px}
+.page{padding:2px 6px;border-radius:6px;background:var(--color-brand-subtle);color:var(--color-brand);font-size:11px;font-weight:700}
+.barTitle{overflow:hidden;color:var(--color-text-secondary);font-weight:500;text-overflow:ellipsis;white-space:nowrap}
+.track{height:8px;border-radius:4px;background:var(--color-bg-subtle);overflow:hidden}.track span{display:block;height:100%;border-radius:4px;background:var(--pin-blue-400)}.track span[data-top]{background:var(--color-brand)}
+.bars b{font-variant-numeric:tabular-nums}
+/* Number, title and delete button share one centered row; the gap keeps the title's focus ring off the number. */
+.sectionHead{display:flex;align-items:center;gap:6px;margin-bottom:4px}.sectionHead>span{flex:none;font-size:17px;line-height:26px;font-weight:700}
+/* RPT-109, Figma ClassPin 2224:2439: sections the last AI apply changed. */
+.section[data-edited]{padding:12px 14px 12px 17px;border-radius:8px;background:var(--color-brand-subtle);box-shadow:inset 3px 0 var(--color-brand)}
+.editedTag{display:flex;align-items:center;gap:5px;margin:0 0 6px;color:var(--color-brand);font-size:11px;font-weight:700}
+.redo img{transform:scaleX(-1)}.iconButton:disabled{opacity:.4;cursor:default}
+.share{gap:6px;font-weight:700}
+@media(max-width:767px){.kpis{grid-template-columns:repeat(2,minmax(0,1fr))}.bars li{grid-template-columns:auto minmax(0,1fr) auto}.barTitle{display:none}.formatHint{display:none}.paper{padding:28px 20px}}
+h2.sectionTitle{margin:0}
+.text a{color:var(--color-brand);text-decoration:underline}
+.linkForm{position:relative;display:flex;align-items:center;gap:4px;margin-left:8px;min-width:0;flex:1}
+.linkForm input{min-width:0;flex:1;max-width:320px;height:30px;padding:0 10px;border:1px solid var(--color-border-strong);border-radius:8px;font-size:13px}
+.linkForm input:focus{outline:0;border-color:var(--color-brand);box-shadow:var(--focus)}.linkForm input[aria-invalid]{border-color:var(--color-error)}
+.formatBar .linkForm button{min-width:0;padding:0 10px;font-size:13px;font-weight:600}.formatBar .linkForm button[type=submit]{color:var(--color-brand)}
+.linkForm span{position:absolute;top:calc(100% + 8px);left:0;z-index:3;padding:6px 10px;border-radius:8px;background:var(--color-error-bg);color:var(--color-error);font-size:12px;white-space:nowrap}
+/* RPT-021: per-section delete, shown on hover or keyboard focus; the note below the last section restores it. */
+.removeSection{flex:none;display:grid;place-items:center;width:30px;height:30px;padding:0;border:0;border-radius:8px;background:transparent;color:var(--color-text-tertiary);opacity:0;cursor:pointer}
+.section:is(:hover,:focus-within) .removeSection,.removeSection:focus-visible{opacity:1}
+.removeSection:hover{background:var(--color-error-bg);color:var(--color-error)}.removeSection svg{width:16px;height:16px}
+@media(hover:none){.removeSection{opacity:1}}
+.removedNote{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:16px 0 0;padding:8px 8px 8px 14px;border-radius:10px;background:var(--color-bg-subtle);color:var(--color-text-secondary);font-size:13px;overflow-wrap:anywhere}
+.removedNote :global(.btn){height:32px;margin-left:auto}
+.openChat{background:var(--color-brand-subtle)}

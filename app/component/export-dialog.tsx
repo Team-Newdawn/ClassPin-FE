@@ -1,20 +1,22 @@
 "use client";
 
-import { useEffect, useEffectEvent, useRef, useState, type CSSProperties } from "react";
+import { useCallback, useEffect, useEffectEvent, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { acquirePdfDocument } from "@/app/_infrastructure/browser/pdf-document";
 import { PdfPage } from "@/app/component/pdf-page";
-import styles from "./report-export-dialog.module.css";
+import { ArrowRight, X } from "@/app/component/icons";
+import styles from "./export-dialog.module.css";
 
+/** Figma ClassPin 2236:2842. */
 const formats = [
-  { value: "pdf", label: "PDF", description: "공유·인쇄용", preview: "문서 미리보기" },
-  { value: "pptx", label: "PPTX", description: "슬라이드 편집용", preview: "16:9 슬라이드 미리보기" },
-  { value: "docx", label: "DOCX", description: "문서 편집용", preview: "문서 미리보기" },
-  { value: "md", label: "MD", description: "텍스트 원문", preview: "Markdown 미리보기" },
+  { value: "pdf", label: "PDF", badge: "PDF", description: "보기 좋은 문서", preview: "A4 세로" },
+  { value: "pptx", label: "PPT", badge: "PPT", description: "발표 자료로 활용", preview: "16:9 슬라이드" },
+  { value: "docx", label: "DOCX", badge: "DOC", description: "Word에서 편집", preview: "A4 문서" },
+  { value: "md", label: "MD", badge: "MD", description: "노트에 붙여넣기", preview: "Markdown" },
 ] as const;
-type Format = typeof formats[number]["value"];
+export type ExportFormat = typeof formats[number]["value"];
 type Preview = { fileUrl: string; documentUrl?: string; text?: string };
 
-function PdfPreview({ url, onReady, onError }: { url: string; onReady: (ready: boolean) => void; onError: (message: string) => void }) {
+function PdfPreview({ url, onReady, onError }: { url: string; onReady: () => void; onError: (message: string) => void }) {
   const [info, setInfo] = useState({ pages: 0, ratio: 210 / 297 });
   const [page, setPage] = useState(1);
   const activeThumbnail = useRef<HTMLButtonElement>(null);
@@ -23,7 +25,7 @@ function PdfPreview({ url, onReady, onError }: { url: string; onReady: (ready: b
     let stopped = false;
     void document.promise.then(async (pdf) => {
       const first = await pdf.getPage(1), bounds = first.getViewport({ scale: 1 });
-      if (!stopped) { setInfo({ pages: pdf.numPages, ratio: bounds.width / bounds.height }); onReady(true); }
+      if (!stopped) { setInfo({ pages: pdf.numPages, ratio: bounds.width / bounds.height }); onReady(); }
     }).catch(() => { if (!stopped) onError("페이지 미리보기를 표시하지 못했습니다. 다시 시도해 주세요."); });
     return () => { stopped = true; document.release(); };
   }, [url, onReady, onError]);
@@ -32,13 +34,13 @@ function PdfPreview({ url, onReady, onError }: { url: string; onReady: (ready: b
   if (!info.pages) return <div className={styles.state} role="status">페이지를 불러오는 중입니다…</div>;
   return <div className={styles.document} style={{ "--page-ratio": info.ratio } as CSSProperties}>
     <div className={styles.documentBody}>
-      <nav className={styles.thumbnails} aria-label="리포트 페이지">
+      <nav className={styles.thumbnails} aria-label="미리보기 페이지">
         {Array.from({ length: info.pages }, (_, index) => <button type="button" key={index} ref={page === index + 1 ? activeThumbnail : undefined}
           aria-label={`${index + 1}페이지 보기`} aria-current={page === index + 1 ? "page" : undefined} onClick={() => setPage(index + 1)}>
           <span className={styles.thumbnailPage}><PdfPage url={url} pageNumber={index + 1} label={`${index + 1}페이지 썸네일`} /></span><span>{index + 1}</span>
         </button>)}
       </nav>
-      <div className={styles.paperStage}><div className={styles.paper}><PdfPage url={url} pageNumber={page} label={`리포트 ${page}페이지`} eager /></div></div>
+      <div className={styles.paperStage}><div className={styles.paper}><PdfPage url={url} pageNumber={page} label={`${page}페이지`} eager /></div></div>
     </div>
     <nav className={styles.pagination} aria-label="미리보기 페이지 탐색">
       <button type="button" aria-label="이전 페이지" disabled={page === 1} onClick={() => setPage(page - 1)}>‹</button>
@@ -48,19 +50,27 @@ function PdfPreview({ url, onReady, onError }: { url: string; onReady: (ready: b
   </div>;
 }
 
-export function ReportExportDialog({ reportId, title, request, beforeExport, onClose }: {
-  reportId: string; title: string; request: (path: string, init?: RequestInit) => Promise<Response>;
-  /** Saves unsaved edits first, so the export is the document on screen (RPT-060). Throw to stop with that message. */
-  beforeExport?: () => Promise<void>; onClose: () => void;
+/**
+ * Shared by the report editor (RPT-060..064) and the analysis dashboard (DSH-042). `load` returns the server's
+ * `preview=1` response (file + rendered preview); a new `reloadKey` asks for a fresh preview.
+ */
+export function ExportDialog({ title, subtitle, load, reloadKey = "", options, note, actions, onClose }: {
+  title: string; subtitle?: string; load: (format: ExportFormat, signal: AbortSignal) => Promise<Response>; reloadKey?: string;
+  /** Settings below the format choice. */ options?: ReactNode; note?: ReactNode; actions?: ReactNode; onClose: () => void;
 }) {
   const dialog = useRef<HTMLDialogElement>(null);
-  const [format, setFormat] = useState<Format>("pdf");
-  const [preview, setPreview] = useState<Preview | null>(null);
-  const [error, setError] = useState("");
-  const [ready, setReady] = useState(false);
+  const [format, setFormat] = useState<ExportFormat>("pdf");
   const [attempt, setAttempt] = useState(0);
+  // Results are tagged with the request they answer, so a format, item or retry change shows "loading" without resetting state.
+  const request = `${format}|${attempt}|${reloadKey}`;
+  const [result, setResult] = useState<{ request: string; preview?: Preview; error?: string }>({ request: "" });
+  const [readyFor, setReadyFor] = useState("");
+  const preview = result.request === request ? result.preview ?? null : null, error = result.request === request ? result.error ?? "" : "";
+  const ready = readyFor === request;
+  const setReady = useCallback(() => setReadyFor(request), [request]);
+  const setError = useCallback((message: string) => setResult({ request, error: message }), [request]);
   const selected = formats.find((item) => item.value === format)!;
-  const save = useEffectEvent(async () => { await beforeExport?.(); });
+  const fetchPreview = useEffectEvent(load);
   useEffect(() => {
     const node = dialog.current!, previous = document.activeElement as HTMLElement | null;
     node.showModal(); node.querySelector<HTMLButtonElement>("[data-close]")?.focus();
@@ -70,36 +80,33 @@ export function ReportExportDialog({ reportId, title, request, beforeExport, onC
     const controller = new AbortController(), urls: string[] = [];
     const objectUrl = (file: Blob) => { const url = URL.createObjectURL(file); urls.push(url); return url; };
     void (async () => {
-      await save();
-      if (controller.signal.aborted) return;
-      const response = await request(`/api/admin/reports/${reportId}/export?format=${format}&preview=1`, { signal: controller.signal });
+      const response = await fetchPreview(format, controller.signal);
       const files = await response.formData(), file = files.get("file"), rendered = files.get("preview");
       if (!(file instanceof Blob) || !file.size) throw new Error("내보낼 파일을 만들지 못했습니다.");
       if ((format === "pptx" || format === "docx") && (!(rendered instanceof Blob) || rendered.type !== "application/pdf" || !rendered.size)) throw new Error("미리보기를 만들지 못했습니다.");
       const text = format === "md" ? await file.text() : undefined;
       if (controller.signal.aborted) return;
       const fileUrl = objectUrl(file);
-      setPreview({ fileUrl, text, documentUrl: format === "pdf" ? fileUrl : rendered instanceof Blob ? objectUrl(rendered) : undefined });
-      if (format === "md") setReady(true);
-    })().catch((failure: unknown) => { if (!controller.signal.aborted) setError(failure instanceof Error ? failure.message : "미리보기를 불러오지 못했습니다."); });
+      setResult({ request, preview: { fileUrl, text, documentUrl: format === "pdf" ? fileUrl : rendered instanceof Blob ? objectUrl(rendered) : undefined } });
+      if (format === "md") setReadyFor(request);
+    })().catch((failure: unknown) => { if (!controller.signal.aborted) setResult({ request, error: failure instanceof Error ? failure.message : "미리보기를 불러오지 못했습니다." }); });
     return () => { controller.abort(); urls.forEach((url) => URL.revokeObjectURL(url)); };
-  }, [format, attempt, reportId, request]);
-  const reset = () => { setPreview(null); setError(""); setReady(false); };
+  }, [format, request]);
 
-  return <dialog ref={dialog} className={styles.root} aria-labelledby="report-export-title" aria-describedby="report-export-description"
+  return <dialog ref={dialog} className={styles.root} aria-labelledby="export-title" aria-describedby={subtitle ? "export-description" : undefined}
     onCancel={(event) => { event.preventDefault(); onClose(); }} onClick={(event) => {
       if (event.target !== event.currentTarget) return;
       const box = event.currentTarget.getBoundingClientRect();
       if (event.clientX < box.left || event.clientX > box.right || event.clientY < box.top || event.clientY > box.bottom) onClose();
     }}>
-    <header className={styles.header}><div><h2 id="report-export-title">리포트 내보내기</h2>
-      <p id="report-export-description">{title}</p></div>
-      <button data-close type="button" className={styles.close} aria-label="내보내기 닫기" onClick={onClose}>×</button>
+    <header className={styles.header}><div><h2 id="export-title">{title}</h2>
+      {subtitle && <p id="export-description">{subtitle}</p>}</div>
+      <button data-close type="button" className={styles.close} aria-label="내보내기 닫기" onClick={onClose}><X aria-hidden="true" /></button>
     </header>
     <div className={styles.body}>
-      <section className={styles.preview} aria-label={`${selected.label} 리포트 미리보기`} aria-busy={!ready && !error}>
-        <div className={styles.previewHeader}><h3>리포트 미리보기</h3><span>{selected.label} · {selected.preview}</span></div>
-        {error ? <div className={styles.state}><p role="alert">{error}</p><button type="button" className="btn secondary" onClick={() => { reset(); setAttempt((value) => value + 1); }}>다시 시도</button></div>
+      <section className={styles.preview} aria-label={`${selected.label} 미리보기`} aria-busy={!ready && !error}>
+        <div className={styles.previewHeader}><h3>미리보기</h3><span>{selected.label} · {selected.preview}</span></div>
+        {error ? <div className={styles.state}><p role="alert">{error}</p><button type="button" className="btn secondary" onClick={() => setAttempt((value) => value + 1)}>다시 시도</button></div>
           : !preview ? <div className={styles.state} role="status">{selected.label} 미리보기를 만드는 중입니다…</div>
             : format === "md" ? <article className={styles.markdown} tabIndex={0} aria-label="내보낼 Markdown 미리보기">
               {/* exportReport's Markdown only uses #, ##, one table and blank-line paragraphs. */}
@@ -109,15 +116,20 @@ export function ReportExportDialog({ reportId, title, request, beforeExport, onC
       </section>
       <aside className={styles.settings}>
         <fieldset className={styles.formats}><legend>내보내기 형식</legend><div>
-          {formats.map((item) => <label key={item.value} data-selected={format === item.value}><input type="radio" name="report-export-format" value={item.value}
-            checked={format === item.value} onChange={() => { reset(); setFormat(item.value); }} /><span><b>{item.label}</b><small>{item.description}</small></span></label>)}
+          {formats.map((item) => <label key={item.value} data-selected={format === item.value}><input type="radio" name="export-format" value={item.value}
+            checked={format === item.value} onChange={() => setFormat(item.value)} />
+            <i data-format={item.value} aria-hidden="true">{item.badge}</i><span><b>{item.label}</b><small>{item.description}</small></span></label>)}
         </div></fieldset>
-        <section className={styles.design}><h3>리포트 디자인</h3><div><b>기본 디자인</b><p>현재 리포트 디자인을 그대로 사용합니다.</p></div></section>
+        {options}
       </aside>
     </div>
-    <footer className={styles.footer}><button type="button" className="btn primary" disabled={!preview || !ready || Boolean(error)} onClick={() => {
-      if (!preview || !ready || error) return;
-      const link = document.createElement("a"); link.href = preview.fileUrl; link.download = `report.${format}`; link.click();
-    }}>리포트 내보내기 →</button></footer>
+    <footer className={styles.footer}>
+      <p>{note}</p>
+      {actions}
+      <button type="button" className="btn primary" disabled={!preview || !ready || Boolean(error)} onClick={() => {
+        if (!preview || !ready || error) return;
+        const link = document.createElement("a"); link.href = preview.fileUrl; link.download = `report.${format}`; link.click();
+      }}>내보내기 <ArrowRight aria-hidden="true" /></button>
+    </footer>
   </dialog>;
 }

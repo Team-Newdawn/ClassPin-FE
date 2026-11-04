@@ -4,68 +4,85 @@ import { useEffect, useEffectEvent, useState } from "react";
 import { useParams } from "next/navigation";
 import { reportRequest } from "@/app/_controller/use-report";
 import { useSessions } from "@/app/_controller/session-store";
+import { useLanguage } from "@/app/_controller/language-context";
+import type { TranslationKey } from "@/app/_model/i18n";
+import type { ClassSession } from "@/app/_model/types";
 import { useBrowserPreferences } from "@/app/_controller/use-browser-preferences";
-import { exportSections, lectureSpan, questionFlow, rememberView } from "@/app/_model/insight-dashboard";
+import { exportSections, lectureSpan, rememberView } from "@/app/_model/insight-dashboard";
 import { REPORT_LIMITS, reportMetrics, type ReportDocument } from "@/app/_model/report";
 import { lectureDate, RECENT_ANALYSES, type RecentAnalyses } from "../controller";
 
 /** docs/instructor-insight-dashboard.md DSH-021. */
-type Insights = {
-  record: { startedAt: string | null; endedAt: string | null; audience: number; peakAudience: number } | null;
-  topics: { title: string; summary: string; questionIds: string[] }[] | null;
-  slides: { page: number; summary: string }[] | null;
-  reportId: string | null;
-};
+type Insights = { record: { startedAt: string | null; endedAt: string | null; audience: number; peakAudience: number } | null };
+/** DSH-033/034: the dashboard\'s own AI result, independent of reports. */
+type Grouped = { groups: { title: string; summary: string; questionIds: string[]; en?: { title: string; summary: string } }[]; slides: { slideId: string; summary: string; en?: string }[] };
 export type Section = "overview" | "flow" | "slides" | "questions";
-/** DSH-042: export items in document order; `summary` is the top banner. */
-export const EXPORT_PARTS = ["summary", "overview", "flow", "slides", "questions"] as const;
+/** DSH-042: export items in document order. */
+export const EXPORT_PARTS = ["overview", "flow", "slides", "questions"] as const;
 export type ExportPart = typeof EXPORT_PARTS[number];
-export const EXPORT_LABELS: Record<ExportPart, string> = { summary: "분석 요약", overview: "개요", flow: "시간대별 질문 흐름", slides: "슬라이드별 핀 분석", questions: "질문 분석" };
-const PAGE_SIZE = 10;
+export const EXPORT_LABELS = { overview: "insight.part.overview", flow: "insight.part.flow", slides: "insight.part.slides", questions: "insight.part.questions" } as const satisfies Record<ExportPart, TranslationKey>;
 const isPin = (question: { x: number | null; y: number | null }) => question.x !== null && question.y !== null;
 const percent = (part: number, whole: number) => whole ? Math.round((part / whole) * 100) : 0;
-/** DSH-031: people ÷ tabs can pass 100% (reloads, several runs); the donut stops at 100. */
-const ratio = (part: number, whole: number) => Math.min(100, percent(part, whole));
-const oneDecimal = (value: number) => Math.round(value * 10) / 10;
-const fold = (text: string) => text.normalize("NFC").toLowerCase();
 const clip = (text: string) => text.length > 40 ? `${text.slice(0, 40)}…` : text;
 
-export function useInsightsController() {
-  const { id } = useParams<{ id: string }>();
-  const { sessions, folders, ready } = useSessions();
-  const [data, setData] = useState<Insights | null>(null), [error, setError] = useState("");
-  const [sidebarOpen, setSidebarOpen] = useState(true), [selected, setSelected] = useState<number | null>(null);
-  const [query, setQuery] = useState(""), [slideFilter, setSlideFilter] = useState("all"), [sort, setSort] = useState<"reactions" | "recent">("reactions"), [page, setPage] = useState(0);
-  const [exporting, setExporting] = useState<{ all: boolean; parts: ExportPart[] } | null>(null);
-  const [people, setPeople] = useState<{ questionAuthors: number; engaged: number; reactorsOrPinAuthors: number } | null>(null);
-  const [grouped, setGrouped] = useState<{ groups: NonNullable<Insights["topics"]> } | { error: string } | null>(null);
+type Translate = ReturnType<typeof useLanguage>["t"];
+type LectureRecord = NonNullable<Insights["record"]>;
+
+/** DSH-021: the lecture record (end time, audience); a 404 is reported as missing. */
+export function useLectureRecord(id: string) {
+  const [data, setData] = useState<Insights | null>(null), [loadFailure, setLoadFailure] = useState<{ missing: true } | { text: string } | null>(null);
   useEffect(() => {
     const controller = new AbortController();
     reportRequest(`/api/admin/lectures/${encodeURIComponent(id)}/insights`, { signal: controller.signal }).then((response) => response.json())
       .then(setData, (failure: Error & { status?: number }) => {
-        if (!controller.signal.aborted) setError(failure.status === 404 ? "이 강의의 기록을 찾을 수 없습니다." : failure.message);
+        if (!controller.signal.aborted) setLoadFailure(failure.status === 404 ? { missing: true } : { text: failure.message });
       });
     return () => controller.abort();
   }, [id]);
+  return { data, loadFailure };
+}
+
+/** DSH-030/031: PIN questions per slide, the scoreboard and the lecture length, shared with the end report. `topTopic` is the largest AI question type. */
+export function lectureOverview(session: ClassSession, record: LectureRecord | null, t: Translate, topTopic: { title: string; count: number } | null) {
+  const questions = session.questions, slideCount = session.slides.length;
+  const perSlide = session.slides.map((_, index) => {
+    const on = questions.filter((question) => question.slideIndex === index);
+    return { questions: on.length, pins: on.filter(isPin).length };
+  });
+  const pins = questions.filter(isPin).length, reactions = questions.reduce((sum, question) => sum + question.reactionCount, 0);
+  const pinnedSlides = perSlide.filter((row) => row.pins > 0).length;
+  const ranked = perSlide.map((row, index) => ({ ...row, index })).filter((row) => row.questions > 0).sort((a, b) => b.questions - a.questions);
+  const byReactions = [...questions].sort((a, b) => b.reactionCount - a.reactionCount);
+  const topQuestion = byReactions[0], cases = (count: number) => t("common.cases", { count });
+  const board: [string, string, string][] = [
+    [t("insight.board.questions"), t("insight.boardTotal", { count: questions.length }), t("insight.empathy", { count: reactions })],
+    [t("insight.board.topSlide"), ranked[0] ? `P.${ranked[0].index + 1}` : t("insight.none"), ranked[0] ? cases(ranked[0].questions) : ""],
+    [t("insight.board.pinnedSlides"), `${pinnedSlides} / ${slideCount}`, t("insight.pins", { count: pins })],
+    topTopic ? [t("insight.board.topTopic"), topTopic.title, cases(topTopic.count)]
+      : topQuestion ? [t("insight.board.topQuestion"), clip(topQuestion.text), t("insight.empathy", { count: topQuestion.reactionCount })] : [t("insight.board.topTopic"), t("insight.none"), ""],
+  ];
+  const span = lectureSpan(session.startedAt, record?.endedAt ?? null, questions);
+  return { perSlide, ranked, byReactions, board, date: lectureDate(session), minutes: span && record?.endedAt ? Math.round((span.end - span.start) / 60_000) : null };
+}
+
+export function useInsightsController() {
+  const { id } = useParams<{ id: string }>();
+  const { sessions, folders, ready } = useSessions();
+  const { t, locale } = useLanguage();
+  const { data, loadFailure } = useLectureRecord(id);
+  const [sidebarOpen, setSidebarOpen] = useState(true), [selected, setSelected] = useState<number | null>(null);
+  const [picked, setPicked] = useState<string | null>(null);
+  const [exporting, setExporting] = useState<{ all: boolean; parts: ExportPart[] } | null>(null);
+  const [grouped, setGrouped] = useState<Grouped | { error: "config" | "failed" } | null>(null);
   const live = sessions.find((item) => item.id === id)?.questions, questionCount = live?.length ?? 0;
-  // A report analysis made from questions that were since deleted says nothing about the current ones (topics, slide summaries).
-  const analysis = data?.topics?.some((topic) => topic.questionIds.some((qid) => live?.some((question) => question.id === qid))) ? data : null;
-  // DSH-023: who asked or reacted; a failure only blanks those numbers.
-  useEffect(() => {
-    const controller = new AbortController();
-    // DSH-023 step 2: switch to `/api/rest/instructor/lectures/{id}/participation` once ClassPin-BE#10 B is deployed.
-    reportRequest(`/api/admin/lectures/${encodeURIComponent(id)}/participation`, { signal: controller.signal }).then((response) => response.json())
-      .then(setPeople, () => undefined);
-    return () => controller.abort();
-  }, [id, questionCount]);
-  // DSH-034: without a report's topic groups, the server groups the questions once (and again only when they change).
-  const needGroups = data !== null && !analysis && questionCount > 0;
+  // DSH-033/034: the server groups the questions once (and again only when they change).
+  const needGroups = questionCount > 0;
   useEffect(() => {
     if (!needGroups) return;
     const controller = new AbortController();
     reportRequest(`/api/admin/lectures/${encodeURIComponent(id)}/question-groups`, { method: "POST", signal: controller.signal }).then((response) => response.json())
-      .then((body: { groups: NonNullable<Insights["topics"]> }) => setGrouped({ groups: body.groups }), (failure: Error & { code?: string }) => {
-        if (!controller.signal.aborted) setGrouped({ error: failure.code === "ANALYSIS_NOT_CONFIGURED" ? "AI 설정이 없어 질문 유형을 만들 수 없습니다." : "질문 유형을 만들지 못했습니다. 잠시 후 다시 열어 주세요." });
+      .then((body: Grouped) => setGrouped(body), (failure: Error & { code?: string }) => {
+        if (!controller.signal.aborted) setGrouped({ error: failure.code === "ANALYSIS_NOT_CONFIGURED" ? "config" : "failed" });
       });
     return () => controller.abort();
   }, [id, needGroups, questionCount]);
@@ -76,6 +93,7 @@ export function useInsightsController() {
   const remember = useEffectEvent(() => saveRecent({ viewed: rememberView(recent.viewed ?? {}, id, new Date().toISOString()) }));
   const found = Boolean(session);
   useEffect(() => { if (found) remember(); }, [id, found]);
+  const error = !loadFailure ? "" : "missing" in loadFailure ? t("insight.lectureMissing") : loadFailure.text;
   const shared = { ready, error, loading: !data && !error, folders, sidebarOpen, toggleSidebar: () => setSidebarOpen((open) => !open),
     /** DSH-042: a section's button starts with that item, "전체 내보내기" with all of them; the instructor can change both. */
     exporting, openExport: (part?: Section) => setExporting({ all: !part, parts: part ? [part] : [...EXPORT_PARTS] }), closeExport: () => setExporting(null),
@@ -84,98 +102,75 @@ export function useInsightsController() {
   if (!session) return { ...shared, session: null } as const;
 
   const questions = session.questions, slideCount = session.slides.length, record = data?.record ?? null;
-  const span = lectureSpan(session.startedAt, record?.endedAt ?? null, questions);
-  const flow = span ? questionFlow(questions, span) : null;
-  const perSlide = session.slides.map((_, index) => {
-    const on = questions.filter((question) => question.slideIndex === index);
-    return { questions: on.length, pins: on.filter(isPin).length, reactions: on.reduce((sum, question) => sum + question.reactionCount, 0) };
-  });
-  const total = questions.length, pins = questions.filter(isPin).length, reactions = questions.reduce((sum, question) => sum + question.reactionCount, 0);
-  const pinnedSlides = perSlide.filter((row) => row.pins > 0).length, audience = record?.audience ?? null;
-  const ranked = perSlide.map((row, index) => ({ ...row, index })).filter((row) => row.questions > 0).sort((a, b) => b.questions - a.questions);
-  const index = Math.min(selected ?? ranked[0]?.index ?? 0, Math.max(0, slideCount - 1));
-
+  const total = questions.length;
   // DSH-034: topic groups stand in for question types; counts keep only questions that still exist.
   const known = new Set(questions.map((question) => question.id));
-  const topics = analysis?.topics ?? (grouped && "groups" in grouped ? grouped.groups : null);
-  const types = topics?.map((topic) => ({ title: topic.title, count: topic.questionIds.filter((questionId) => known.has(questionId)).length }))
-    .filter((type) => type.count).sort((a, b) => b.count - a.count).map((type) => ({ ...type, percent: percent(type.count, total) })) ?? null;
-  const typesNote = !total ? "질문이 없어 질문 유형이 없습니다." : error ? "질문 유형을 불러오지 못했습니다."
-    : grouped && "error" in grouped ? grouped.error : "질문을 주제별로 묶는 중이에요…";
-  const byReactions = [...questions].sort((a, b) => b.reactionCount - a.reactionCount);
-  const needle = fold(query.trim());
-  // DSH-040: the list filter (Figma 2242:2144) sorts by reactions or newest first.
-  const ordered = sort === "recent" ? [...questions].sort((a, b) => b.createdAt.localeCompare(a.createdAt)) : byReactions;
-  const filtered = ordered.filter((question) => (slideFilter === "all" || question.slideIndex === Number(slideFilter)) && (!needle || fold(question.text).includes(needle)));
-  const pageCount = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE)), current = Math.min(page, pageCount - 1);
+  const result = grouped && "groups" in grouped ? grouped : null, topics = result?.groups ?? null;
+  const types = topics?.map((topic) => ({ key: topic.title, ...locale === "en" && topic.en ? topic.en : topic, questionIds: topic.questionIds.filter((questionId) => known.has(questionId)) }))
+    .map((topic) => ({ ...topic, count: topic.questionIds.length })).filter((type) => type.count).sort((a, b) => b.count - a.count).map((type) => ({ ...type, percent: percent(type.count, total) })) ?? null;
+  const failed = grouped && "error" in grouped ? grouped.error : null;
+  const typesNote = t(!total ? "insight.typesNone" : error ? "insight.typesLoadFailed" : failed === "config" ? "insight.typesNoConfig" : failed ? "insight.typesFailed" : "insight.analyzing");
+  const { perSlide, ranked, byReactions, board, date, minutes } = lectureOverview(session, record, t, types?.[0] ?? null);
+  // DSH-030: the first slide with the most PIN questions; null while no slide has one.
+  const peakPins = perSlide.reduce<typeof perSlide[number] | null>((best, row) => row.pins > (best?.pins ?? 0) ? row : best, null);
+  const index = Math.min(selected ?? ranked[0]?.index ?? 0, Math.max(0, slideCount - 1));
+  // DSH-035: one type in detail (the largest until another is picked): its AI summary, the slides it spans, all its questions.
+  const typeDetail = (type: NonNullable<typeof types>[number]) => {
+    const own = byReactions.filter((question) => type.questionIds.includes(question.id));
+    const slides = [...new Set(own.map((question) => question.slideIndex))].sort((a, b) => a - b)
+      .map((slide) => `P.${slide + 1} (${own.filter((question) => question.slideIndex === slide).length})`).join(" · ");
+    return { ...type, slides, questions: own };
+  };
+  const picks = types?.map(typeDetail) ?? [], detail = picks.find((type) => type.key === picked) ?? picks[0] ?? null;
 
   // DSH-032: summaries are written from the numbers, not by AI.
-  const peak = flow?.buckets.reduce((best, bucket) => bucket.count > best.count ? bucket : best);
-  const top = ranked.slice(0, 2);
-  const slideNames = top.map((row) => `P.${row.index + 1}`).join(" · ");
   const summaries = {
-    banner: total ? `질문 ${total}건과 공감 ${reactions}개가 모였어요. ${`P.${ranked[0].index + 1}`} 슬라이드에서 질문이 가장 많았어요.` : "아직 이 강의에 들어온 질문이 없어요.",
-    overview: audience && people ? `참여율 ${ratio(people.engaged, audience)}%예요. 질문한 참여자는 ${ratio(people.questionAuthors, audience)}%, 핀·공감에 참여한 참여자는 ${ratio(people.reactorsOrPinAuthors, audience)}%예요.`
-      : total ? `질문 ${total}건 중 ${percent(pins, total)}%가 슬라이드 위 핀이에요. ${slideCount}장 중 ${pinnedSlides}장에 핀이 찍혔어요.` : "아직 질문과 핀이 없어요.",
-    flow: !flow ? "LIVE 기록이 없어 시간대별 흐름을 낼 수 없어요."
-      : peak?.count && flow.buckets.length > 1 && flow.buckets.every((bucket) => bucket.count === peak.count) ? `강의 내내 ${flow.size}분마다 질문이 ${peak.count}건씩 고르게 들어왔어요.`
-      : peak?.count ? `${peak.start}–${peak.end}분에 질문이 ${peak.count}건으로 가장 많았어요.` : "강의 시간 동안 들어온 질문이 없어요.",
-    slides: top.length ? `${slideNames} 슬라이드에 질문의 ${percent(top.reduce((sum, row) => sum + row.questions, 0), total)}%가 몰렸어요.` : "아직 슬라이드에 달린 질문이 없어요.",
-    questions: types?.[0]?.count ? `질문의 ${types[0].percent}%가 ‘${types[0].title}’ 유형이에요.`
-      : byReactions[0] ? `공감이 가장 많은 질문은 ‘${clip(byReactions[0].text)}’(공감 ${byReactions[0].reactionCount})이에요.` : "아직 질문이 없어요.",
+    flow: peakPins ? t("insight.flowSummary", { slide: perSlide.indexOf(peakPins) + 1, count: peakPins.pins }) : t("insight.flowNone"),
+    questions: types?.[0]?.count ? t("insight.topTypeSummary", { percent: types[0].percent, title: types[0].title })
+      : byReactions[0] ? t("insight.topQuestionSummary", { text: clip(byReactions[0].text), count: byReactions[0].reactionCount }) : t("insight.noQuestions"),
   };
 
-  const pinsPerSlide = slideCount ? oneDecimal(pins / slideCount) : 0, none = "기록 없음";
-  const person = (value: number | undefined) => value === undefined ? none : `${value}명`;
-  const rows = {
-    people: [["총 참여자", person(audience ?? undefined)], ["질문한 참여자", person(people?.questionAuthors)], ["공감·핀 참여자", person(people?.reactorsOrPinAuthors)]],
-    questions: [["전체 질문", `${total}건`], ["1인당 평균 질문", !people ? none : people.questionAuthors ? `${oneDecimal(total / people.questionAuthors)}건` : "0건"],
-      ["핀이 있는 질문", `${percent(pins, total)}%`]],
-    reactions: [["공감 수", `${reactions}`], ["핀이 찍힌 슬라이드", `${pinnedSlides} / ${slideCount}`], ["슬라이드당 평균 핀", `${pinsPerSlide}개`]],
-  } satisfies Record<string, [string, string][]>;
-  const slideSummary = (slide: number) => analysis?.slides?.find((row) => row.page === slide + 1)?.summary || null;
+  const cases = (count: number) => t("common.cases", { count });
+  const slideSummary = (slide: number) => { const row = result?.slides.find((item) => item.slideId === session.slides[slide].id); return (locale === "en" && row?.en) || row?.summary || null; };
+  // DSH-046: the one AI call for types and slide analysis is still running (up to ~45 s for 100 questions); the page shows skeletons.
+  const analyzing = Boolean(total) && !error && !grouped;
+  const slideNote = t(failed === "config" ? "insight.analysisNoConfig" : failed ? "insight.analysisFailed" : "insight.analysisNone");
 
   /** DSH-042: the chosen items as a report document; the server lays it out without AI. */
   const exportDocument = (parts: readonly ExportPart[]): ReportDocument => {
-    const table = (head: string, items: [string, string][]) => [`| ${head} | 값 |`, "| --- | --- |", ...items.map(([label, value]) => `| ${label} | ${value} |`)];
+    const table = (head: string, items: [string, string][]) => [`| ${head} | ${t("insight.table.value")} |`, "| --- | --- |", ...items.map(([label, value]) => `| ${label} | ${value} |`)];
+    const pinned = perSlide.flatMap((row, slide) => !row.pins ? [] : ["",
+      `**P.${slide + 1} ${session.slides[slide].title || t("common.slideNumber", { number: slide + 1 })}**`, ...slideSummary(slide) ? [`${t("insight.aiSummary")}: ${slideSummary(slide)}`] : [],
+      ...byReactions.filter((question) => question.slideIndex === slide && isPin(question)).map((question) => `- ${question.text} (${t("insight.empathy", { count: question.reactionCount })})`)]).slice(1);
     const lines: Record<ExportPart, string[]> = {
-      summary: [summaries.banner],
-      overview: [summaries.overview, "", ...table("참여 현황", rows.people), "", ...table("질문 현황", rows.questions), "", ...table("반응 현황", rows.reactions)],
-      flow: [summaries.flow, ...flow ? ["", "| 구간 | 질문 수 |", "| --- | --- |", ...flow.buckets.map((bucket) => `| ${bucket.start}–${bucket.end}분 | ${bucket.count}건 |`)] : []],
-      slides: [summaries.slides, ...perSlide.flatMap((row, slide) => !row.questions ? [] : ["",
-        `**P.${slide + 1} ${session.slides[slide].title || `슬라이드 ${slide + 1}`}** · 핀 ${row.pins}개 · 질문 ${row.questions}건 · 공감 ${row.reactions}`,
-        ...byReactions.filter((question) => question.slideIndex === slide).slice(0, 3).map((question) => `- ${question.text} (공감 ${question.reactionCount})`),
-        ...slideSummary(slide) ? [`AI 요약: ${slideSummary(slide)}`] : []])],
-      questions: [summaries.questions, "",
-        ...types?.length ? ["| 질문 유형 | 질문 수 | 비율 |", "| --- | --- | --- |", ...types.map((type) => `| ${type.title} | ${type.count}건 | ${type.percent}% |`)] : [`질문 유형: ${typesNote}`],
-        "", `**전체 질문 ${total}건** (공감순)`, ...byReactions.map((question) => `- P.${question.slideIndex + 1} · ${question.text} (공감 ${question.reactionCount})`)],
+      overview: table(t("insight.table.item"), board.map(([label, value, note]) => [label, [value, note].filter(Boolean).join(" · ")])),
+      // RPT-037: the graph parts carry no sentence in the file.
+      flow: [],
+      // Each slide block starts with a blank line; the first one is dropped.
+      slides: pinned.length ? pinned : [t("insight.pinsNone")],
+      questions: [...types?.length ? [] : [t("insight.typesLine", { note: typesNote })],
+        ...picks.flatMap((type) => ["", `**${type.title}** · ${cases(type.count)}`, ...type.summary ? [`${t("insight.aiSummary")}: ${type.summary}`] : [], t("insight.typeSlides", { slides: type.slides }),
+          ...type.questions.slice(0, 3).map((question) => `- ${question.text} (${t("insight.empathy", { count: question.reactionCount })})`)])],
     };
     return {
-      title: `${session.title} 분석`.slice(0, REPORT_LIMITS.title),
+      title: t("insight.documentTitle", { title: session.title }).slice(0, REPORT_LIMITS.title),
       metrics: reportMetrics({ slides: session.slides, questions: questions.map((question) => ({ anchor: isPin(question) ? question : null, reactions: question.reactionCount })) },
-        { startedAt: session.startedAt, endedAt: record?.endedAt ?? null }, record, lectureDate(session)),
-      sections: parts.flatMap((part) => exportSections(EXPORT_LABELS[part], lines[part], REPORT_LIMITS.sectionText).map((section, index) => ({ id: `${part}-${index}`, ...section }))),
+        { startedAt: session.startedAt, endedAt: record?.endedAt ?? null }, record, date),
+      // RPT-037: the first chunk of the flow and question parts carries their graph (no table).
+      sections: parts.flatMap((part) => exportSections(t(EXPORT_LABELS[part]), lines[part], REPORT_LIMITS.sectionText).map((section, index) => ({ id: `${part}-${index}`, ...section,
+        ...!index && part === "flow" ? { chart: { kind: "line" as const, points: perSlide.map((row, slide) => ({ label: `P.${slide + 1}`, value: row.pins })) } }
+          : !index && part === "questions" && types?.length ? { chart: { kind: "bar" as const, points: types.map((type) => ({ label: type.title, value: type.count })) } } : {} }))),
     };
   };
 
   return {
-    ...shared, session, slideCount, summaries, exportDocument, flow, perSlide, index, slide: session.slides[index],
+    ...shared, session, slideCount, summaries, exportDocument, perSlide, index, slide: session.slides[index],
     folderName: folders.find((folder) => folder.id === session.folderId)?.name ?? null,
     siblings: sessions.filter((item) => (item.folderId ?? "") === (session.folderId ?? "")).sort((a, b) => lectureDate(b).localeCompare(lectureDate(a))),
-    date: lectureDate(session), minutes: span && record?.endedAt ? Math.round((span.end - span.start) / 60_000) : null, audience,
-    /** DSH-031: title, donut label, one-line note, donut percent (null = no denominator), rows. */
-    overview: [
-      { title: "참여 현황", label: "참여율", value: audience && people ? ratio(people.engaged, audience) : null, rows: rows.people,
-        note: audience && people ? `참여자 ${audience}명 중 ${Math.min(people.engaged, audience)}명이 질문하거나 반응했어요.` : "참여자 기록이 없어 참여율을 낼 수 없어요." },
-      { title: "질문 현황", label: "질문한 참여자", value: audience && people ? ratio(people.questionAuthors, audience) : null, rows: rows.questions,
-        note: audience && people ? `참여자 ${audience}명 중 ${Math.min(people.questionAuthors, audience)}명이 질문했어요.` : `질문 ${total}건 중 ${pins}건에 핀이 있어요.` },
-      { title: "반응 현황", label: "핀이 찍힌 슬라이드", value: percent(pinnedSlides, slideCount), rows: rows.reactions, note: `${slideCount}장 중 ${pinnedSlides}장에 핀이 찍혔어요.` },
-    ],
-    slideQuestions: byReactions.filter((question) => question.slideIndex === index),
-    slideSummary: slideSummary(index),
+    date, minutes, board,
+    slidePins: byReactions.filter((question) => question.slideIndex === index && isPin(question)),
+    slideSummary: slideSummary(index), slideNote, analyzing,
     select: setSelected, types, typesNote, total,
-    list: { query, slideFilter, sort, page: current, slides: perSlide.flatMap((row, slide) => row.questions ? [slide] : []), pageCount, size: PAGE_SIZE, count: filtered.length, rows: filtered,
-      setQuery: (value: string) => { setQuery(value); setPage(0); }, setSlideFilter: (value: string) => { setSlideFilter(value); setPage(0); },
-      setSort: (value: "reactions" | "recent") => { setSort(value); setPage(0); }, setPage },
+    detail, pick: setPicked,
   };
 }

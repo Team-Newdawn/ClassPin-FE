@@ -1,7 +1,6 @@
 import { getUploadSession } from "@/app/_infrastructure/supabase/client";
 import type { ClassFolder, Question } from "@/app/_model/types";
 
-type SummaryMode = "cluster" | "report";
 export class SummaryError extends Error {
   constructor(readonly status: number) { super(`Question summary ${status}`); }
 }
@@ -23,14 +22,11 @@ export function countSummaryChanges(summarized: readonly Pick<Question, "id" | "
     + [...before.keys()].filter((id) => !now.has(id)).length;
 }
 
-export const REPORT_SECTIONS = ["summary", "pages", "questions", "improvements"] as const;
-export type ReportSections = Record<(typeof REPORT_SECTIONS)[number], string[]>;
-
 /** 요약 관점을 정하는 폴더 사용 목적. 미분류 자료는 null. */
 export type SummaryPurpose = Pick<ClassFolder, "purpose" | "purposeLabel"> | null | undefined;
 const purposeBody = (folder: SummaryPurpose) => folder ? { purpose: folder.purpose, purposeLabel: folder.purposeLabel ?? null } : {};
 
-async function requestSummary<T>(mode: SummaryMode, items: readonly SummaryItem[], locale: string, folder: SummaryPurpose, pick: (payload: Record<string, unknown> | null) => T | undefined) {
+async function requestSummary<T>(mode: "cluster", items: readonly SummaryItem[], locale: string, folder: SummaryPurpose, pick: (payload: Record<string, unknown> | null) => T | undefined) {
   const auth = await getUploadSession();
   const key = JSON.stringify([auth?.accessToken, mode, locale, purposeBody(folder), items]);
   let request = cache.get(key) as Promise<T> | undefined;
@@ -54,9 +50,3 @@ async function requestSummary<T>(mode: SummaryMode, items: readonly SummaryItem[
 
 export const summarizeQuestions = (items: readonly SummaryItem[], locale: string, folder: SummaryPurpose) =>
   requestSummary("cluster", items, locale, folder, (payload) => typeof payload?.summary === "string" ? payload.summary : undefined);
-
-export const summarizeReport = (items: readonly SummaryItem[], locale: string, folder: SummaryPurpose) =>
-  requestSummary("report", items, locale, folder, (payload) => {
-    const report = payload?.report as ReportSections | undefined;
-    return report && REPORT_SECTIONS.every((section) => Array.isArray(report[section])) ? report : undefined;
-  });

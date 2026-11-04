@@ -6,6 +6,7 @@ import { promisify } from "node:util";
 import { createClient } from "@supabase/supabase-js";
 import sharp from "sharp";
 import { cachedFile } from "../_infrastructure/server/pdf-cache.ts";
+import { pdfPageImage } from "../_infrastructure/server/pdf-page.ts";
 import { resolveDocumentBinary } from "../_infrastructure/server/document-binaries.ts";
 import { renderPdfPages } from "../_infrastructure/server/pdf-render.ts";
 import { restOrigin } from "../_infrastructure/server/rest-origin.ts";
@@ -154,6 +155,35 @@ export async function renderSlidePages(file: string, dir: string, only?: readonl
 
 const SOURCE_BYTES = 200 * 1024 ** 2;
 type Material = ReturnType<typeof inspectInsightSource>["materials"][number];
+
+/**
+ * RPT-060: slide images for a report export, from the page images `/api/pdf/page` keeps on disk (1920px, the stage size),
+ * so a slide already seen, or a second format of the same export, is not rendered again. Image slides and anything the
+ * cache cannot serve go through renderMaterialSlides. No slide text is extracted; exports do not use it.
+ * The caller has already checked the report owner's access to the material.
+ */
+// One export renders at a time (oneRenderAtATime); within it, half the cores like the draft render, not the viewers' two slots.
+const exportSlot: ReturnType<typeof limiter> = ((globalThis as { exportPageRender?: ReturnType<typeof limiter> }).exportPageRender ??= limiter(Math.min(8, Math.max(1, Math.floor(availableParallelism() / 2)))));
+export async function exportSlideImages(material: Material, dir: string, pages: readonly number[], signal?: AbortSignal) {
+  const wanted = material.slides.filter((slide) => pages.includes(slide.pageIndex + 1)), bucket = insightStorage().storage.from("course-materials");
+  const fromPdf = wanted.filter((slide) => slide.sourcePageIndex !== null);
+  const cached = await Promise.all(fromPdf.map(async (slide) => {
+    signal?.throwIfAborted();
+    const file = await pdfPageImage(material.sourcePath, slide.sourcePageIndex! + 1, 1920, async () => {
+      // Same size gate as renderMaterialSlides before the source reaches the disk cache.
+      const info = await bucket.info(material.sourcePath);
+      if (info.error || typeof info.data?.size !== "number") throw new Error("SOURCE_DOWNLOAD_FAILED");
+      if (info.data.size > SOURCE_BYTES) throw new Error("SOURCE_TOO_LARGE");
+      const download = await bucket.download(material.sourcePath).asStream();
+      if (download.error || !download.data) throw new Error("SOURCE_DOWNLOAD_FAILED");
+      return download.data;
+    }, exportSlot);
+    const { width = 1, height = 1 } = await sharp(file).metadata();
+    return { page: slide.pageIndex + 1, width, height, file, text: "" };
+  }));
+  const rest = wanted.filter((slide) => slide.sourcePageIndex === null).map((slide) => slide.pageIndex + 1);
+  return [...cached, ...rest.length ? await renderMaterialSlides(material, dir, rest, signal) : []];
+}
 
 /** Every slide (or only these slide numbers) as a Claude-ready JPEG keyed by slide number. PDF-page slides render from the cached source;
  * image slides (older PDF uploads, PPT/PPTX) use their stored JPEG, so an image-only deck never downloads its source. */

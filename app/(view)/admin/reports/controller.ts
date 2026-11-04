@@ -4,9 +4,9 @@ import { useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { reportRequest, useOpenReport } from "@/app/_controller/use-report";
 import { useSessions } from "@/app/_controller/session-store";
-import type { ReportTemplate, ReportView } from "@/app/_model/report";
+import type { ReportView } from "@/app/_model/report";
 
-export type ReportSummary = Pick<ReportView, "id" | "materialId" | "template" | "title" | "status" | "updatedAt">;
+export type ReportSummary = Pick<ReportView, "id" | "materialId" | "title" | "status" | "updatedAt">;
 
 /** docs/instructor-report-authoring.md RPT-011/036: create a report (one per material) and list the instructor's reports. */
 export function useReportHomeController() {
@@ -32,7 +32,7 @@ export function useReportHomeController() {
   // `?material=` (from the analysis dashboard) preselects that material and its folder.
   const preset = sessions.find((session) => session.materialId === params.get("material"));
   const [picked, setPicked] = useState<{ folderId?: string; materialId?: string }>({});
-  const [template, setTemplate] = useState<ReportTemplate>("executive"), [request, setRequest] = useState("");
+  const [request, setRequest] = useState("");
   useEffect(() => {
     const controller = new AbortController();
     reportRequest("/api/admin/reports", { signal: controller.signal }).then((response) => response.json())
@@ -49,10 +49,10 @@ export function useReportHomeController() {
   const folderName = new Map(folders.map((folder) => [folder.id, folder.name]));
 
   return {
-    ready, folders, inFolder, folderId, materialId, template, request, report,
+    ready, folders, inFolder, folderId, materialId, request, report,
     reports, listError, deleteTarget, deleting, deleteError, askDelete, confirmDelete, sidebarOpen, toggleSidebar: () => setSidebarOpen((open) => !open),
     folderOf: (row: ReportSummary) => folderName.get(sessions.find((session) => session.materialId === row.materialId)?.folderId ?? "") ?? "미분류",
-    setFolder: (id: string) => setPicked({ folderId: id }), setMaterial: (id: string) => setPicked({ folderId, materialId: id }), setTemplate, setRequest,
-    create: () => void report.open(materialId, { template, ...(request.trim() ? { request: request.trim() } : {}) }),
+    setFolder: (id: string) => setPicked({ folderId: id }), setMaterial: (id: string) => setPicked({ folderId, materialId: id }), setRequest,
+    create: () => void report.open(materialId, request.trim() ? { request: request.trim() } : {}),
   };
 }

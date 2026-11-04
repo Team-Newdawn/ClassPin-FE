@@ -6,7 +6,6 @@
 .header{height:56px;flex:none;display:flex;align-items:center;gap:8px;padding:0 12px 0 16px;border-bottom:1px solid var(--color-border)}
 .header h1{min-width:0;margin:0;font-size:16px;line-height:24px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .iconButton{display:grid;place-items:center;flex:none;width:32px;height:32px;border:0;border-radius:8px;background:transparent;color:var(--color-text-secondary);cursor:pointer}.iconButton:hover:not(:disabled){background:var(--color-bg-subtle)}.iconButton svg{width:18px}.iconButton[aria-expanded=true]{background:var(--color-brand-subtle);color:var(--color-brand)}
-.saveState{flex:none;padding:4px 10px;border-radius:999px;background:var(--color-brand-subtle);color:var(--color-brand);font-size:12px;line-height:16px;font-weight:500;white-space:nowrap}.saveState[data-state=saving]{background:var(--color-bg-subtle);color:var(--color-text-tertiary)}.saveState[data-state=failed],.saveState[data-state=conflict]{background:var(--color-error-bg);color:var(--color-error)}
 .actions{display:flex;align-items:center;gap:8px;margin-left:auto}.actions :global(.btn){height:36px;padding:0 14px}
 .banner{flex:none;display:flex;flex-wrap:wrap;align-items:center;gap:12px;padding:12px 24px;background:var(--color-warning-bg);color:var(--color-warning);font-size:14px}.banner p{flex:1 1 320px;margin:0}
 .banner[data-tone=error]{background:var(--color-error-bg);color:var(--color-error)}
@@ -26,25 +25,17 @@
 .section{display:grid;scroll-margin-top:60px}
 .slideRef{margin:0 0 8px;padding:0 4px;color:var(--color-brand);font-size:12px;line-height:18px;font-weight:700}
 .slide{margin:0 0 16px}.slide :global(.slide-canvas){width:100%}
-.title,.sectionTitle{resize:none;field-sizing:content;overflow:hidden;overflow-wrap:anywhere}
-.title{width:100%;padding:0 4px;border:0;border-radius:8px;background:transparent;color:var(--color-text-primary);font:inherit;font-size:28px;line-height:38px;font-weight:700;letter-spacing:-.02em}
-.sectionTitle{flex:1;min-width:0;padding:2px 6px;border:0;border-radius:8px;background:transparent;color:var(--color-text-primary);font:inherit;font-size:17px;line-height:26px;font-weight:700}
-/* ponytail: field-sizing grows the textarea natively; GrowingText measures only where it is unsupported. */
+.title,.sectionTitle{margin:0;overflow-wrap:anywhere}
+.title{padding:0 4px;color:var(--color-text-primary);font:inherit;font-size:28px;line-height:38px;font-weight:700;letter-spacing:-.02em}
+.sectionTitle{flex:1;min-width:0;padding:2px 6px;color:var(--color-text-primary);font:inherit;font-size:17px;line-height:26px;font-weight:700}
 .text{width:100%;min-height:48px;padding:4px;border-radius:8px;color:var(--color-text-secondary);font-size:15px;line-height:24px;white-space:pre-wrap;overflow-wrap:anywhere}
 /* RPT-103 sizes; every size is explicit because the UA maps <font size> itself. */
 .text font[size="5"]{font-size:18px;line-height:28px}.text font[size="3"]{font-size:15px;line-height:24px}.text font[size="2"]{font-size:12px;line-height:18px}
-.text [data-table]{margin:8px 0;white-space:normal}
+.text > div{margin:8px 0;white-space:normal}
 .text table{width:100%;border-collapse:collapse;table-layout:fixed;font-size:13px;line-height:20px}
 .text :is(th,td){padding:6px 10px;border:1px solid var(--color-border);text-align:left;vertical-align:top}.text th{background:var(--color-bg-page);font-weight:700}
 /* RPT-111, Figma ClassPin 2224:2357. */
-.formatBar{flex:none;height:44px;display:flex;align-items:center;gap:4px;padding:0 16px;border-bottom:1px solid var(--color-border);background:var(--color-bg-surface)}
-.formatBar button{display:grid;place-items:center;min-width:30px;height:30px;padding:0;border:0;border-radius:8px;background:transparent;color:var(--color-text-secondary);font-size:14px}
-.formatBar button:hover:not(:disabled){background:var(--pin-neutral-100);color:var(--color-text-primary)}
-.formatBar button[aria-pressed=true]{background:var(--color-brand-subtle);color:var(--color-brand)}
-.formatBar button:disabled{opacity:.45;cursor:default}.formatBar button:focus-visible{outline:none;box-shadow:var(--focus)}
-.add{justify-self:start;margin-top:16px}
-.paper :is(.title,.sectionTitle,.text):focus-visible{outline:none;box-shadow:var(--focus)}
-.paper :is(.title,.sectionTitle,.text,input)::placeholder{color:var(--color-text-tertiary)}
+.paper .section:focus-visible{outline:none;box-shadow:var(--focus)}
 .progress{margin:0;color:var(--color-text-secondary);font-size:14px;line-height:22px}.progressBar{width:100%;accent-color:var(--color-brand)}
 .paper>:global(.btn){justify-self:start}
 .paper>:is(.progress,.progressBar,.failed,:global(.btn)){margin-bottom:16px}
@@ -63,9 +54,6 @@
 .user{align-self:flex-end;max-width:85%;margin:0;padding:10px 14px;border-radius:var(--radius-card);background:var(--color-bg-subtle);font-size:14px;line-height:22px;white-space:pre-wrap;overflow-wrap:anywhere}
 .answer{font-size:14px;line-height:22px;white-space:pre-wrap;overflow-wrap:anywhere}
 .streaming::after{content:"▍";margin-left:2px;color:var(--color-brand);animation:blink 1s steps(1) infinite}@keyframes blink{50%{opacity:0}}
-.proposal{display:grid;gap:8px;margin-top:12px;padding:16px;border:1px solid var(--color-border);border-radius:var(--radius-card);white-space:normal}
-.proposal b{font-size:13px;line-height:20px;font-weight:600}.proposal ul{margin:0;padding-left:18px;color:var(--color-text-secondary);font-size:13px;line-height:20px}
-.proposal>:global(.btn){justify-self:start}.proposal p{margin:0;display:flex;align-items:center;gap:4px;color:var(--color-success-text);font-size:13px;font-weight:600}.proposal p :global(.btn){height:32px;padding:0 8px}
 .composer{flex:none;display:grid;gap:8px;margin:0 16px 16px;padding:12px 14px;border:1px solid var(--color-border);border-radius:var(--radius-card);background:var(--color-bg-surface);box-shadow:var(--shadow-sm)}.composer:focus-within{box-shadow:var(--focus)}
 .composer textarea{width:100%;max-height:160px;padding:0;border:0;resize:none;field-sizing:content;background:transparent;color:var(--color-text-primary);font:inherit;font-size:14px;line-height:22px}.composer textarea:focus-visible{box-shadow:none}.composer textarea::placeholder{color:var(--color-text-tertiary)}
 .composerFoot{display:flex;align-items:center;gap:8px;font-size:12px;line-height:18px;color:var(--color-text-tertiary);font-variant-numeric:tabular-nums}
@@ -103,17 +91,18 @@
 .fileError{margin:0;color:var(--color-error);font-size:12px}
 .attach{flex:none;display:grid;place-items:center;width:30px;height:30px;border-radius:8px;cursor:pointer}.attach:hover{background:var(--color-bg-subtle)}
 .attach:has(input:focus-visible){box-shadow:var(--focus)}.attach:has(input:disabled){opacity:.5;cursor:default}
-.dataChip{position:relative;flex:0 1 auto;display:flex;align-items:center;min-width:0;border-radius:999px;background:var(--color-bg-subtle)}.dataChip:focus-within{box-shadow:var(--focus)}
-.dataChip select{width:100%;min-width:0;padding:6px 26px 6px 10px;overflow:hidden;white-space:nowrap;border:0;border-radius:999px;appearance:none;background:transparent;color:var(--color-text-secondary);font:inherit;font-size:12px;font-weight:500;cursor:pointer;outline:0;text-overflow:ellipsis}
-.dataChip img{position:absolute;right:10px;pointer-events:none}
+.dataChip{flex:0 1 auto;display:flex;align-items:center;gap:6px;min-width:0;padding:6px 10px;border:0;border-radius:999px;background:var(--color-bg-subtle);color:var(--color-text-secondary);font:inherit;font-size:12px;font-weight:500;cursor:pointer}
+.dataChip>span{min-width:0;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}.dataChip img{flex:none}.dataChip:focus-visible{outline:0;box-shadow:var(--focus)}.dataChip:disabled{opacity:.5;cursor:default}
+/* Same look as the player's question-sort menu; positioned on open (fixed, above the composer). */
+.dataMenu{position:fixed;inset:auto;margin:0;width:260px;padding:5px;border:1px solid var(--color-border);border-radius:11px;background:var(--color-bg-surface);box-shadow:var(--shadow-md)}
+.dataMenu:popover-open{display:grid;gap:4px}
+.dataMenu button{display:flex;align-items:flex-start;gap:6px;width:100%;padding:8px 10px;border:0;border-radius:7px;background:var(--color-bg-surface);color:var(--color-text-primary);font:inherit;text-align:left;cursor:pointer}
+.dataMenu button>span:first-child{flex:0 0 16px;color:var(--color-brand);font-weight:700}.dataMenu button>span:last-child{display:grid;gap:2px}
+.dataMenu b{font-size:13px;font-weight:600}.dataMenu small{color:var(--color-text-tertiary);font-size:12px;line-height:16px}
+.dataMenu button:hover,.dataMenu button[aria-checked=true]{background:var(--color-brand-subtle)}.dataMenu button:focus-visible{outline:0;box-shadow:var(--focus)}
 /* The chip gives way first, so attach, the count and send always stay inside a narrow panel. */
 .left{flex:none;margin-left:auto;white-space:nowrap}
 .sentFile{display:flex;align-items:center;gap:4px;margin-bottom:4px;color:var(--color-brand);font-size:12px;font-weight:500;overflow-wrap:anywhere}
-.formatBar>i{width:1px;height:18px;margin:0 4px;background:var(--color-border)}
-.styleSelect{position:relative;display:flex;align-items:center;border-radius:8px;background:var(--color-bg-subtle)}.styleSelect:focus-within{box-shadow:var(--focus)}
-.styleSelect select{height:30px;padding:0 26px 0 10px;border:0;appearance:none;background:transparent;color:var(--color-text-secondary);font:inherit;font-size:13px;font-weight:500;cursor:pointer;outline:0}
-.styleSelect select:disabled{opacity:.45;cursor:default}.styleSelect img{position:absolute;right:10px;pointer-events:none}
-.formatHint{margin-left:auto;overflow:hidden;color:var(--color-text-tertiary);font-size:12px;text-overflow:ellipsis;white-space:nowrap}
 /* Figma ClassPin 2224:2401 (KPI) and 2224:2417 (bars). */
 .kpis{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin:0}
 .kpis>div{min-width:0;display:flex;flex-direction:column;gap:2px;padding:12px 14px;border-radius:10px;background:var(--color-bg-page)}
@@ -131,22 +120,9 @@
 .sectionHead{display:flex;align-items:center;gap:6px;margin-bottom:4px}.sectionHead>span{flex:none;font-size:17px;line-height:26px;font-weight:700}
 /* RPT-109, Figma ClassPin 2224:2439: sections the last AI apply changed. */
 .section[data-edited]{padding:12px 14px 12px 17px;border-radius:8px;background:var(--color-brand-subtle);box-shadow:inset 3px 0 var(--color-brand)}
-.editedTag{display:flex;align-items:center;gap:5px;margin:0 0 6px;color:var(--color-brand);font-size:11px;font-weight:700}
-.redo img{transform:scaleX(-1)}.iconButton:disabled{opacity:.4;cursor:default}
+.iconButton:disabled{opacity:.4;cursor:default}
 .share{gap:6px;font-weight:700}
-@media(max-width:767px){.kpis{grid-template-columns:repeat(2,minmax(0,1fr))}.bars li{grid-template-columns:auto minmax(0,1fr) auto}.barTitle{display:none}.formatHint{display:none}.paper{padding:28px 20px}}
-h2.sectionTitle{margin:0}
+@media(max-width:767px){.kpis{grid-template-columns:repeat(2,minmax(0,1fr))}.bars li{grid-template-columns:auto minmax(0,1fr) auto}.barTitle{display:none}.paper{padding:28px 20px}}
 .text a{color:var(--color-brand);text-decoration:underline}
-.linkForm{position:relative;display:flex;align-items:center;gap:4px;margin-left:8px;min-width:0;flex:1}
-.linkForm input{min-width:0;flex:1;max-width:320px;height:30px;padding:0 10px;border:1px solid var(--color-border-strong);border-radius:8px;font-size:13px}
-.linkForm input:focus{outline:0;border-color:var(--color-brand);box-shadow:var(--focus)}.linkForm input[aria-invalid]{border-color:var(--color-error)}
-.formatBar .linkForm button{min-width:0;padding:0 10px;font-size:13px;font-weight:600}.formatBar .linkForm button[type=submit]{color:var(--color-brand)}
-.linkForm span{position:absolute;top:calc(100% + 8px);left:0;z-index:3;padding:6px 10px;border-radius:8px;background:var(--color-error-bg);color:var(--color-error);font-size:12px;white-space:nowrap}
-/* RPT-021: per-section delete, shown on hover or keyboard focus; the note below the last section restores it. */
-.removeSection{flex:none;display:grid;place-items:center;width:30px;height:30px;padding:0;border:0;border-radius:8px;background:transparent;color:var(--color-text-tertiary);opacity:0;cursor:pointer}
-.section:is(:hover,:focus-within) .removeSection,.removeSection:focus-visible{opacity:1}
-.removeSection:hover{background:var(--color-error-bg);color:var(--color-error)}.removeSection svg{width:16px;height:16px}
-@media(hover:none){.removeSection{opacity:1}}
-.removedNote{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:16px 0 0;padding:8px 8px 8px 14px;border-radius:10px;background:var(--color-bg-subtle);color:var(--color-text-secondary);font-size:13px;overflow-wrap:anywhere}
-.removedNote :global(.btn){height:32px;margin-left:auto}
 .openChat{background:var(--color-brand-subtle)}
+.chart{margin:0 0 12px}.chart svg{display:block;width:100%;height:auto}

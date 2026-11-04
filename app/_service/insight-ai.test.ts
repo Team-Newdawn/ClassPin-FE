@@ -5,7 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { chatFile, pickCategory, reportChatContext, viewSlides, readableText, slidesMentioned, analyzeInsight, chatReport, CHAT_FULL_DOCUMENT_CHARS, type InsightAi } from "./insight-ai.ts";
 import { limiter } from "../_infrastructure/server/limiter.ts";
-import type { ReportDocument, ReportProposal } from "../_model/report.ts";
+import type { ReportDocument } from "../_model/report.ts";
 import { slideImageEdge } from "./insight-providers/claude.ts";
 
 test("slideImageEdge keeps every page within Claude's 1568px / 1568-token image budget", () => {
@@ -33,36 +33,43 @@ test("pickCategory takes the most-voted AI-named kind, earlier chunk on ties, em
 });
 
 const metricsOf = (slides: number) => ({ at: "", slides, questions: 0, pins: 0, reactions: 0, durationMinutes: null, audience: null, peakAudience: null });
-test("reportChatContext lists sections with ids and source questions by number; a long document keeps only titles and the named bodies", () => {
+test("reportChatContext lists sections and only the source questions the document does not quote; a long document keeps only titles and the named bodies", () => {
   const id = "3f2b8c1e-0d4a-4e6b-9a7c-1b2c3d4e5f60";
   const material = { slides: [{ id: "s1", pageIndex: 0 }, { id: "s2", pageIndex: 1 }],
     questions: [{ id, slideId: "s2", text: "둘째 질문", answers: [{ body: "답" }], reactions: 3, status: "answered" }, { id: "a", slideId: "s1", text: "첫 질문 a@b.co", answers: [], reactions: 0, status: "unanswered" }] } as unknown as Parameters<typeof reportChatContext>[1];
   const document: ReportDocument = { title: "리포트", metrics: metricsOf(2), sections: [{ id: "sec-a", title: "강의 개요", text: "개요 본문" }, { id: "sec-b", title: "슬라이드 2", text: "슬라이드 본문", slide: 2 }] };
   const context = reportChatContext(document, material, "요약해 줘", null);
-  assert.match(context, /섹션 1 \[id=sec-a\]: 강의 개요\n개요 본문/);
-  assert.match(context, /섹션 2 \[id=sec-b\] \(슬라이드 2\): 슬라이드 2\n슬라이드 본문/);
-  assert.match(context, /슬라이드 1 질문:\n1\. \[REDACTED\]\n슬라이드 2 질문:\n2\. 둘째 질문 \[공감 3, answered\]\n  답변: 답/);
+  assert.match(context, /섹션 1: 강의 개요\n개요 본문/);
+  assert.match(context, /섹션 2 \(슬라이드 2\): 슬라이드 2\n슬라이드 본문/);
+  assert.match(context, /슬라이드 1 질문:\n- \[REDACTED\]\n슬라이드 2 질문:\n- 둘째 질문 \[공감 3, answered\]\n  답변: 답/);
   assert.ok(!context.includes(id));
+  // A question the document already quotes as a whole line is not sent again; a mere substring ("둘째") does not count.
+  const quoting: ReportDocument = { ...document, sections: [{ id: "sec-b", title: "슬라이드 2", text: "질문 1건 (공감순)\n- 둘째 질문 (공감 3)\n  답변: 답\n- 둘째", slide: 2 }] };
+  const deduped = reportChatContext(quoting, material, "요약해 줘", null);
+  assert.ok(!deduped.includes("슬라이드 2 질문:"));
+  assert.match(deduped, /리포트 문서에 없는 원본 질문[^\n]*\n슬라이드 1 질문:\n- \[REDACTED\]$/);
+  const all = { ...material, questions: material.questions.slice(0, 1) } as typeof material;
+  assert.match(reportChatContext(quoting, all, "요약해 줘", null), /원본 질문은 모두 리포트 문서에 있다\.$/);
   const long: ReportDocument = { ...document, sections: [...document.sections, { id: "sec-c", title: "부록", text: "x".repeat(CHAT_FULL_DOCUMENT_CHARS) }] };
   const trimmed = reportChatContext(long, material, "2번 슬라이드 섹션을 다듬어 줘", null);
-  assert.match(trimmed, /섹션 1 \[id=sec-a\]: 강의 개요\n섹션 2/);
+  assert.match(trimmed, /섹션 1: 강의 개요\n섹션 2/);
   assert.match(trimmed, /슬라이드 2\n슬라이드 본문/);
-  assert.match(trimmed, /섹션 3 \[id=sec-c\]: 부록\n원본 질문/);
+  assert.match(trimmed, /섹션 3: 부록\n자료는 슬라이드 2장이다\. 리포트 문서에 없는 원본 질문/);
   assert.match(reportChatContext(long, material, "섹션 3 줄여 줘", null), /부록\nxxx/);
 });
 
-test("viewSlides sends requested slide images (PDF and image slides) with their PINs in pixels and chat question numbers, refuses a changed deck", async () => {
+test("viewSlides sends requested slide images (PDF and image slides) with each PIN's pixel position and question text, refuses a changed deck", async () => {
   const dir = await mkdtemp(join(tmpdir(), "view-slides-")), file = join(dir, "page-3.jpg");
   await writeFile(file, "jpeg");
   const material = { slides: [{ id: "s1", pageIndex: 0, sourcePageIndex: 0 }, { id: "s2", pageIndex: 1, sourcePageIndex: null }, { id: "s3", pageIndex: 2, sourcePageIndex: 2 }],
-    questions: [{ id: "b", slideId: "s3", anchor: { kind: "point", x: 0.5, y: 0.25 } }, { id: "late", slideId: "s3", anchor: { kind: "point", x: 0.1, y: 0.1 } }, { id: "a", slideId: "s3", anchor: null }] } as unknown as Parameters<typeof viewSlides>[0];
+    questions: [{ id: "b", slideId: "s3", text: "이 숫자는?", anchor: { kind: "point", x: 0.5, y: 0.25 } }, { id: "late", slideId: "s3", text: "메일 a@b.co", anchor: { kind: "point", x: 0.1, y: 0.1 } }, { id: "a", slideId: "s3", text: "위치 없음", anchor: null }] } as unknown as Parameters<typeof viewSlides>[0];
   const asked: number[][] = [];
   const render = async (pages: number[]) => { asked.push(pages); return [{ page: 3, width: 1000, height: 500, file, text: "제목" }, { page: 2, width: 800, height: 600, file, text: "" }]; };
   const result = await viewSlides(material, 3, render, { pages: [3, 2, 3, 9, "1"] }) as { type: string; text?: string }[];
   assert.deepEqual(asked, [[3, 2]]);
   assert.deepEqual(result.map((block) => block.type), ["text", "image", "text", "text", "image", "text"]);
   assert.equal(result[0].text, "슬라이드 3 (이미지 1000x500px):");
-  assert.match(result[2].text!, /<slide_text page="3">\n제목\n<\/slide_text>[\s\S]*질문 1: PIN \(500, 125\)px\n질문 2: PIN \(100, 50\)px$/);
+  assert.match(result[2].text!, /<slide_text page="3">\n제목\n<\/slide_text>[\s\S]*- PIN \(500, 125\)px: 이 숫자는\?\n- PIN \(100, 50\)px: \[REDACTED\]$/);
   assert.equal(result[3].text, "슬라이드 2 (이미지 800x600px):");
   assert.equal(result[5].text, "이 슬라이드에는 위치가 있는 PIN이 없다.");
   assert.match(String(await viewSlides(material, 2, render, { pages: [1] })), /바뀌어/);
@@ -140,7 +147,7 @@ test("analysis and chat drive any provider through the adapter contract: one fai
   const material = { slides, questions } as unknown as Parameters<typeof analyzeInsight>[2];
   const metrics = (questions: number) => ({ questions, positioned: questions, unanswered: questions, answered: 0, resolved: 0, reactions: 0, answers: 0 });
   const source = { evidence: slides.map((slide) => ({ slideId: slide.id, metrics: metrics(slide.id === "s21" ? 1 : 0) })) } as unknown as Parameters<typeof analyzeInsight>[1];
-  const seen: { tools?: string[]; last?: unknown; toolResult?: unknown; retry?: unknown } = {};
+  const seen: { tools?: string[]; last?: unknown; toolResult?: unknown; other?: unknown } = {};
   const fake: InsightAi = {
     name: "fake", model: () => "fake-1", configured: () => true, imageEdge: () => 100,
     async json({ schema, content, onUsage }) {
@@ -152,8 +159,7 @@ test("analysis and chat drive any provider through the adapter contract: one fai
     },
     async* chat({ messages, tools, runTool }) {
       seen.tools = tools.map((tool) => tool.name); seen.last = messages.at(-1); seen.toolResult = await runTool("view_slides", { pages: [21] });
-      seen.retry = await runTool("propose_document", { replace: [{ id: "missing", title: "t", text: "x" }], insert: [], remove: [] });
-      await runTool("propose_document", { replace: [{ id: "sec-a", title: "개요", text: "새 본문" }], insert: [{ after: null, title: "머리말", text: "안녕", slide: null }], remove: [] });
+      seen.other = await runTool("propose_document", { replace: [] });
       yield "답";
     },
   };
@@ -164,19 +170,19 @@ test("analysis and chat drive any provider through the adapter contract: one fai
     assert.deepEqual([body.provider, body.model, body.failedPages?.length, body.slides[20].questionSummary, body.groups[0].questionIds], ["fake", "fake-1", 20, "표 질문 요약", ["q1"]]);
     const view = async (input: unknown) => viewSlides(material, 21, async (pages) => images.filter((image) => pages.includes(image.page)), input);
     const document: ReportDocument = { title: "리포트", metrics: metricsOf(21), sections: [{ id: "sec-a", title: "강의 개요", text: "본문" }] };
-    let answer = "", proposal: ReportProposal | undefined;
-    for await (const delta of chatReport(fake, { document, material, history: [], message: "21번 슬라이드 봐줘", currentPage: null, view, onProposal: (value) => { proposal = value; }, withData: true, file: null })) answer += delta;
+    let answer = "";
+    for await (const delta of chatReport(fake, { document, material, history: [], message: "21번 슬라이드 봐줘", currentPage: null, view, withData: true, file: null })) answer += delta;
     assert.equal(answer, "답");
-    assert.deepEqual(seen.tools, ["view_slides", "propose_document"]);
-    assert.match(String(seen.retry), /올바르지 않다/);
-    assert.deepEqual(proposal, { replace: [{ id: "sec-a", title: "개요", text: "새 본문" }], insert: [{ after: null, title: "머리말", text: "안녕" }], remove: [] });
+    // RPT-050: answers only; the chat has no tool that edits the document.
+    assert.deepEqual(seen.tools, ["view_slides"]);
+    assert.equal(seen.other, "알 수 없는 도구다.");
     assert.deepEqual((seen.last as { content: { type: string }[] }).content.map((part) => part.type), ["text", "image", "text", "text"]);
     assert.equal((seen.toolResult as { type: string }[])[1].type, "image");
     // RPT-057/058: without source data no slide is attached or viewable, and the attachment rides along this question only.
     const file = chatFile({ name: "메모.md", data: Buffer.from("핵심 메모").toString("base64") });
     for await (const delta of chatReport(fake, { document, material, history: [{ role: "user", text: "이전", createdAt: "t", file: "예전.pdf" }], message: "21번 슬라이드 봐줘",
-      currentPage: null, view, onProposal: () => {}, withData: false, file })) void delta;
-    assert.deepEqual(seen.tools, ["propose_document"]);
+      currentPage: null, view, withData: false, file })) void delta;
+    assert.deepEqual(seen.tools, []);
     assert.equal(seen.toolResult, "알 수 없는 도구다.");
     const last = (seen.last as { content: { type: string; text?: string }[] }).content;
     assert.deepEqual(last.map((part) => part.type), ["text", "text", "text"]);

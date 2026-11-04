@@ -1,26 +1,20 @@
-import type { InsightReportBody } from "../../../../../_model/insight-report.ts";
 import { insightFailure, insightOwner, insightResponse, insightStorage, InsightRequestError } from "../../../../../_service/insight-request.ts";
 
 export const runtime = "nodejs";
 const uuid = /^[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i;
 
-/** DSH-021: the lecture's audience record and the report's topic groups and slide summaries, both filtered by the caller's owner_id (no REST graph read). */
+/** DSH-021: the lecture's audience record, filtered by the caller's owner_id (no REST graph read). */
 export async function GET(request: Request, context: { params: Promise<{ id: string }> }) {
   try {
     const { ownerId } = await insightOwner(request);
     const id = (await context.params).id.toLowerCase();
     if (!uuid.test(id)) throw new InsightRequestError("NOT_FOUND", 404);
     const db = insightStorage();
-    const [audience, report] = await Promise.all([
-      db.from("lecture_audience_records").select("started_at, ended_at, audience, peak_audience").eq("lecture_id", id).eq("owner_id", ownerId).maybeSingle(),
-      db.from("instructor_reports").select("id, analysis").eq("lecture_id", id).eq("owner_id", ownerId).order("updated_at", { ascending: false }).limit(1).maybeSingle()]);
-    if (audience.error || report.error) throw new InsightRequestError("REPORT_STORAGE_UNAVAILABLE", 503);
-    const row = audience.data, analysis = report.data?.analysis as InsightReportBody | null | undefined;
+    const audience = await db.from("lecture_audience_records").select("started_at, ended_at, audience, peak_audience").eq("lecture_id", id).eq("owner_id", ownerId).maybeSingle();
+    if (audience.error) throw new InsightRequestError("REPORT_STORAGE_UNAVAILABLE", 503);
+    const row = audience.data;
     return insightResponse({
       record: row && { startedAt: row.started_at, endedAt: row.ended_at, audience: row.audience, peakAudience: row.peak_audience },
-      topics: Array.isArray(analysis?.groups) ? analysis.groups.map(({ title, summary, questionIds }) => ({ title, summary, questionIds })) : null,
-      slides: Array.isArray(analysis?.slides) ? analysis.slides.map(({ page, questionSummary }) => ({ page, summary: questionSummary })) : null,
-      reportId: report.data?.id ?? null,
     });
   } catch (error) { return insightFailure(error); }
 }

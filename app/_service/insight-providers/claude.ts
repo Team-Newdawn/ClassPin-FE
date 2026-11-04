@@ -51,8 +51,8 @@ export const claude: InsightAi = {
     let said = false;
     for (let round = 0; ; round++) {
       const stream = client().messages.stream({
-        // A propose_document call may carry whole rewritten sections, so the cap is far above a chat answer.
-        model: model(), max_tokens: 16000, output_config: { effort: "low" }, tools, tool_choice: { type: round < 3 ? "auto" : "none" },
+        // "문서만 사용" (RPT-058) sends no tools, and the API takes no tool_choice without them.
+        model: model(), max_tokens: 16000, output_config: { effort: "low" }, ...tools.length ? { tools, tool_choice: { type: round < 3 ? "auto" as const : "none" as const } } : {},
         // The report context is the same for every question on a report, so it is cached for an hour.
         system: [{ type: "text", text: system }, { type: "text", text: context, cache_control: { type: "ephemeral", ttl: "1h" } }],
         messages,

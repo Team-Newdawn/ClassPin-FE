@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { reportRequest } from "@/app/_controller/use-report";
 import { useSessions } from "@/app/_controller/session-store";
-import { REPORT_TEMPLATES, reportAge } from "@/app/_model/report";
+import { reportAge } from "@/app/_model/report";
 import type { ReportSummary } from "../../controller";
 import styles from "./report-switcher.module.css";
 
@@ -55,7 +55,7 @@ export function ReportSwitcher({ reportId, materialId, title }: { reportId: stri
         : <ul>{own.map((row) => <li key={row.id}>
           <Link href={`/admin/reports/${row.id}`} className={styles.option} aria-current={row.id === reportId ? "page" : undefined} onClick={close}>
             {icon(row.id === reportId ? "doc-active" : "doc")}
-            <span><b>{row.title}</b><small>{row.template ? REPORT_TEMPLATES[row.template].label : "자료 맞춤"} · {reportAge(row.updatedAt)}</small></span>
+            <span><b>{row.title}</b><small>{reportAge(row.updatedAt)}</small></span>
             {row.id === reportId && icon("check")}
           </Link></li>)}</ul>}
       <hr />

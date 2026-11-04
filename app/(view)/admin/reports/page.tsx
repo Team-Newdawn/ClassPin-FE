@@ -3,15 +3,14 @@
 import Link from "next/link";
 import { Suspense } from "react";
 import { FolderTreeSidebar } from "@/app/component/folder-tree-sidebar";
-import { BarChart3, FileText, Folder, Plus, Sparkles, Trash2, Zap } from "@/app/component/icons";
+import { FileText, Folder, Sparkles, Trash2 } from "@/app/component/icons";
 import { LoadingScreen } from "@/app/component/loading-screen";
-import { REPORT_REQUEST_MAX, REPORT_TEMPLATES, reportAge, type ReportTemplate } from "@/app/_model/report";
+import { REPORT_REQUEST_MAX, reportAge } from "@/app/_model/report";
 import { useReportHomeController } from "./controller";
-import { ReportDeleteDialog } from "./component/report-delete-dialog";
+import { ReportConfirmDialog } from "./component/report-confirm-dialog";
 import shell from "../insights/shell.module.css";
 import styles from "./page.module.css";
 
-const ICONS: Record<ReportTemplate, typeof Zap> = { executive: Zap, improvement: BarChart3, summary: FileText, blank: Plus };
 const STATUS = { drafting: "작성 중", failed: "초안 실패", ready: "" } as const;
 
 /** Figma ClassPin 2227:2258 (RPT-011/036). */
@@ -45,25 +44,14 @@ function ReportHome() {
         </section>
 
         <fieldset>
-          <legend>{step(2, "어떤 형태로 만들까요?")}</legend>
-          <div className={styles.templates}>
-            {(Object.keys(REPORT_TEMPLATES) as ReportTemplate[]).map((key) => {
-              const Icon = ICONS[key];
-              return <label key={key} className={styles.template}>
-                <input type="radio" name="report-template" value={key} checked={c.template === key} onChange={() => c.setTemplate(key)} />
-                <i aria-hidden="true"><Icon /></i><b>{REPORT_TEMPLATES[key].label}</b><small>{REPORT_TEMPLATES[key].hint}</small>
-              </label>;
-            })}
-          </div>
-        </fieldset>
-
-        <fieldset>
-          <legend>{step(3, "추가로 요청할 내용", true)}</legend>
+          <legend>{step(2, "원하는 리포트를 설명해 주세요", true)}</legend>
+          {/* RPT-031/036: the format is fixed; the prompt shapes the AI-written sections between the overview and the evidence. */}
+          <p id="report-prompt-hint" className={styles.hint}>개요 · 슬라이드별 PIN 질문 흐름 · 질문 유형별 분석 · 슬라이드별 분석은 항상 들어가요. 요청은 AI가 쓰는 본문(독자·관점·분량·문체·꼭 넣을 내용)에 반영돼요.</p>
           <div className={styles.prompt}>
-            <input value={c.request} onChange={(event) => c.setRequest(event.target.value)} maxLength={REPORT_REQUEST_MAX} disabled={c.template === "blank"} aria-label="추가로 요청할 내용"
-              placeholder={c.template === "blank" ? "빈 문서는 AI 초안 없이 시작해요. 요청은 편집 화면의 AI 챗에 남겨 주세요." : "예) P.8에 질문이 몰린 이유를 꼭 넣어주고, 마지막에 다음 강의 제안은 3개로 정리해줘"} />
+            <textarea value={c.request} onChange={(event) => c.setRequest(event.target.value)} maxLength={REPORT_REQUEST_MAX} rows={4} aria-label="원하는 리포트 설명" aria-describedby="report-prompt-hint"
+              placeholder="예) 학과장님께 보고할 문서로, 개조식으로 짧게 써 줘. P.8에 질문이 몰린 이유와 다음 강의 개선안 3개는 꼭 넣어 줘." />
             <button type="submit" className="btn primary large" disabled={!c.materialId || c.report.busy}>
-              <Sparkles aria-hidden="true" />{c.report.busy ? "만드는 중…" : c.template === "blank" ? "빈 문서로 만들기" : "AI로 리포트 만들기"}</button>
+              <Sparkles aria-hidden="true" />{c.report.busy ? "만드는 중…" : "AI로 리포트 만들기"}</button>
           </div>
         </fieldset>
         {c.report.error && <p className={shell.error} role="alert">{c.report.error}</p>}
@@ -81,15 +69,16 @@ function ReportHome() {
                   <span className={styles.thumb} aria-hidden="true"><i /></span>
                   <span className={styles.info}>
                     <b title={row.title}>{row.title}</b>
-                    <small>{[row.template ? REPORT_TEMPLATES[row.template].label : "자료 맞춤", c.folderOf(row)].join(" · ")}</small>
+                    <small>{c.folderOf(row)}</small>
                     <small>{STATUS[row.status] ? <em>{STATUS[row.status]}</em> : null}{reportAge(row.updatedAt)}</small>
                   </span>
                 </Link>
               </li>)}</ul>}
       </section>
     </div>
-    {c.deleteTarget && <ReportDeleteDialog title={c.deleteTarget.title} saving={c.deleting} error={c.deleteError}
-      onClose={() => c.askDelete(null)} onDelete={() => void c.confirmDelete()} />}
+    {c.deleteTarget && <ReportConfirmDialog title={`‘${c.deleteTarget.title}’ 리포트를 삭제할까요?`} saving={c.deleting} error={c.deleteError}
+      description="리포트 문서와 AI 대화가 모두 지워지고 되돌릴 수 없어요. 강의 데이터는 그대로 남아 다시 만들 수 있어요." confirm={{ label: "삭제", saving: "삭제하는 중…" }}
+      onClose={() => c.askDelete(null)} onConfirm={() => void c.confirmDelete()} />}
   </main>;
 }
 

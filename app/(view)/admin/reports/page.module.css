@@ -10,18 +10,11 @@
 .select{position:relative;display:flex;align-items:center;gap:10px;height:43px;padding:0 14px;border:1px solid var(--color-border-strong);border-radius:var(--radius-control);color:var(--color-text-tertiary)}
 .select:focus-within{border-color:var(--color-brand);box-shadow:var(--focus)}.select svg{flex:none;width:16px;height:16px}
 .select select{min-width:0;flex:1;height:100%;border:0;outline:0;background:transparent;color:var(--color-text-primary);font:inherit;font-size:14px;font-weight:600;cursor:pointer}
-.templates{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
-.template{position:relative;display:grid;gap:8px;padding:16px 17px;border:1px solid var(--color-border);border-radius:14px;cursor:pointer}
-.template:has(input:checked){border:2px solid var(--color-brand);padding:15px 16px;background:var(--color-brand-subtle)}
-.template:has(input:focus-visible){box-shadow:var(--focus)}
-.template input{position:absolute;opacity:0;pointer-events:none}
-.template i{width:32px;height:32px;margin-bottom:2px;border-radius:9px;background:var(--color-bg-page);color:var(--color-brand);display:grid;place-items:center}.template i svg{width:16px;height:16px}
-.template:has(input:checked) i{background:var(--color-brand);color:var(--color-text-inverse)}
-.template:has(input:checked)::after{content:"✓";position:absolute;top:21px;right:19px;width:20px;height:20px;border-radius:50%;background:var(--color-brand);color:var(--color-text-inverse);display:grid;place-items:center;font-size:12px;font-weight:700}
-.template b{font-size:15px}.template small{color:var(--color-text-secondary);font-size:13px;line-height:18px}
-.prompt{display:flex;gap:12px;align-items:stretch}
-.prompt input{min-width:0;flex:1;height:52px;padding:0 17px;border:1px solid var(--color-border-strong);border-radius:12px;font:inherit;font-size:15px}
-.prompt input:focus{outline:0;border-color:var(--color-brand);box-shadow:var(--focus)}
+.hint{margin:0 0 10px;color:var(--color-text-secondary);font-size:13px;line-height:19px}
+.prompt{display:flex;gap:12px;align-items:flex-end}
+/* Dragging the resize handle stops at one line: 22px line + 13px padding twice + 1px border twice (border-box). */
+.prompt textarea{min-width:0;min-height:50px;flex:1;padding:13px 17px;resize:vertical;border:1px solid var(--color-border-strong);border-radius:12px;font:inherit;font-size:15px;line-height:22px}
+.prompt textarea:focus{outline:0;border-color:var(--color-brand);box-shadow:var(--focus)}
 .prompt .btn{flex:none;min-width:186px;text-decoration:none}
 .listHead{display:flex;align-items:baseline;justify-content:space-between;margin-bottom:14px}
 .listHead h2{margin:0;font-size:17px;font-weight:700}.listHead h2 span{margin-left:4px;color:var(--color-text-tertiary)}.listHead small{color:var(--color-text-tertiary);font-size:12px}
@@ -36,5 +29,4 @@
 .info{min-width:0;display:grid;gap:3px}.info b{overflow:hidden;font-size:15px;text-overflow:ellipsis;white-space:nowrap}
 .info small{color:var(--color-text-secondary);font-size:12px}.info small+small{color:var(--color-text-tertiary)}
 .info em{margin-right:6px;color:var(--color-brand);font-style:normal;font-weight:700}
-@media(max-width:1023px){.templates{grid-template-columns:repeat(2,minmax(0,1fr))}}
-@media(max-width:767px){.card{padding:18px}.selectors,.templates{grid-template-columns:minmax(0,1fr)}.prompt{flex-direction:column}.prompt .btn{min-width:0}}
+@media(max-width:767px){.card{padding:18px}.selectors{grid-template-columns:minmax(0,1fr)}.prompt{flex-direction:column;align-items:stretch}.prompt .btn{min-width:0}}

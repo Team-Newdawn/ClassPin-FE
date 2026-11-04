@@ -6,7 +6,8 @@ import { join } from "node:path";
 import { execFileSync } from "node:child_process";
 import sharp from "sharp";
 import JSZip from "jszip";
-import { exportReport, previewReportExport, slidePages } from "./report-export.ts";
+import { PDFDocument } from "pdf-lib";
+import { containIn, exportReport, previewReportExport, slidePages } from "./report-export.ts";
 import type { ReportDocument } from "../_model/report.ts";
 
 const long = "광합성은 햇빛과 물을 이용하는 과정입니다. ".repeat(8).trim();
@@ -25,11 +26,9 @@ const zipText = async (bytes: Buffer, pattern: RegExp) => {
   return (await Promise.all(names.map((name) => zip.file(name)!.async("string")))).join("\n").replace(/<[^>]+>/g, "");
 };
 
-test("markdown: title, metrics table, sections in order with slide references, every line kept", async () => {
+test("markdown: title, sections in order with slide references, every line kept; no metrics table", async () => {
   const md = (await exportReport(document, "md", context)).bytes.toString();
-  assert.ok(md.startsWith("# 생물학 1강\n\nbio.pdf · 2026년 10월 23일\n\n| 항목 | 값 |\n| --- | --- |\n| 슬라이드 | 3장 |"));
-  assert.match(md, /\| 참여자 \| 기록 없음 \|/);
-  assert.match(md, /\| 강의 시간 \| 50분 \|/);
+  assert.ok(md.startsWith("# 생물학 1강\n\nbio.pdf · 2026년 10월 23일\n\n## 강의 개요"));
   assert.ok(md.includes("## 슬라이드 3 · 광합성\n\n슬라이드 3\n\n광합성"));
   assert.ok(md.indexOf("## 강의 개요") < md.indexOf("## 슬라이드 3") && md.indexOf("## 슬라이드 3") < md.indexOf("## 빈 섹션"));
   assert.doesNotMatch(md, /## 강의 개요\n\n슬라이드 \d+\n/, "a section without a slide gets no reference line");
@@ -39,11 +38,31 @@ test("markdown: title, metrics table, sections in order with slide references, e
   await assert.rejects(exportReport(document, "xls", context), /INVALID_EXPORT_FORMAT/);
 });
 
-test("docx and pptx carry every section line and the same metrics", async () => {
+test("no format prints the metrics table (2026-11-04)", async () => {
+  const bare = context;
+  const md = (await exportReport(document, "md", bare)).bytes.toString();
+  const docx = await zipText((await exportReport(document, "docx", bare)).bytes, /^word\/document\.xml$/);
+  const pptx = await zipText((await exportReport(document, "pptx", bare)).bytes, /^ppt\/slides\/slide\d+\.xml$/);
+  assert.ok(md.startsWith("# 생물학 1강\n\nbio.pdf · 2026년 10월 23일\n\n## 강의 개요"));
+  for (const text of [md, docx, pptx]) assert.doesNotMatch(text, /강의 시간|최대 동시 참여자|수치/);
+  assert.ok((await PDFDocument.load((await exportReport(document, "pdf", bare)).bytes)).getPageCount() >= 1);
+});
+
+test("chart sections embed their graph in docx and pptx; markdown keeps only the text (RPT-037)", async () => {
+  const charted: ReportDocument = { ...document, sections: [{ id: "f", title: "흐름", text: "P.2에 가장 많았어요.", chart: { kind: "line", points: [{ label: "P.1", value: 2 }, { label: "P.2", value: 5 }] } }] };
+  const media = async (bytes: Buffer, folder: string) => Object.keys((await JSZip.loadAsync(bytes)).files).filter((name) => name.startsWith(folder) && !name.endsWith("/"));
+  assert.equal((await media((await exportReport(charted, "docx", context)).bytes, "word/media/")).length, 1);
+  assert.equal((await media((await exportReport(charted, "pptx", context)).bytes, "ppt/media/")).length, 1);
+  assert.equal((await media((await exportReport(document, "pptx", context)).bytes, "ppt/media/")).length, 0);
+  assert.ok((await exportReport(charted, "md", context)).bytes.toString().includes("## 흐름\n\nP.2에 가장 많았어요."));
+  assert.ok((await PDFDocument.load((await exportReport(charted, "pdf", context)).bytes)).getPageCount() >= 1);
+});
+
+test("docx and pptx carry every section line", async () => {
   const docx = await zipText((await exportReport(document, "docx", context)).bytes, /^word\/document\.xml$/);
   const pptx = await zipText((await exportReport(document, "pptx", context)).bytes, /^ppt\/slides\/slide\d+\.xml$/);
   for (const text of [docx, pptx]) {
-    for (const line of [...lines, "기록 없음", "50분", "7개"]) assert.ok(text.includes(line.replace(/^\s+/, "")), line);
+    for (const line of lines) assert.ok(text.includes(line.replace(/^\s+/, "")), line);
   }
 });
 
@@ -158,4 +177,35 @@ test("formatted text and AI tables reach every format; pptx tables split between
   // A long styled line is cut inside but keeps each piece's style.
   const [first, second] = slidePages(`<big>**${"가".repeat(30)}**</big>`, 10, 2);
   assert.match(first, /^<big>\*\*가+\*\*<\/big>$/); assert.match(second, /^<big>\*\*가+\*\*<\/big>$/);
+});
+
+test("italic, underline and links reach every format as real styles and hyperlinks (RPT-024)", async () => {
+  const styled: ReportDocument = { ...document, sections: [{ id: "s", title: "서식", text: "<i>기울임</i> <u>밑줄</u> [**자료 링크**](https://ohpin.kr/r?a=1&b=2)" }] };
+  const md = (await exportReport(styled, "md", context)).bytes.toString();
+  assert.ok(md.includes("*기울임* 밑줄 [**자료 링크**](https://ohpin.kr/r?a=1&b=2)"), "italic becomes *, underline tags go, the link stays");
+  const docx = await (await JSZip.loadAsync((await exportReport(styled, "docx", context)).bytes)).file("word/document.xml")!.async("string");
+  assert.match(docx, /<w:i\/>/); assert.match(docx, /<w:u w:val="single"\/>/); assert.match(docx, /<w:hyperlink /);
+  const pptx = await JSZip.loadAsync((await exportReport(styled, "pptx", context)).bytes);
+  const slideXml = (await Promise.all(Object.keys(pptx.files).filter((name) => /^ppt\/slides\/slide\d+\.xml$/.test(name)).map((name) => pptx.file(name)!.async("string")))).join("");
+  assert.match(slideXml, / i="1"/); assert.match(slideXml, / u="sng"/); assert.match(slideXml, /<a:hlinkClick /);
+  const pdf = await PDFDocument.load((await exportReport(styled, "pdf", context)).bytes);
+  const annots = pdf.getPages().flatMap((page) => page.node.Annots()?.asArray() ?? []).map((ref) => String(pdf.context.lookup(ref)));
+  assert.ok(annots.some((annot) => annot.includes("/URI (https://ohpin.kr/r?a=1&b=2)")), "pdf carries a clickable link annotation");
+  for (const text of [md, docx, slideXml]) assert.doesNotMatch(text, /&lt;i&gt;|&lt;u&gt;|<i>|<u>/, "no raw markup");
+});
+
+test("pptx pictures keep their aspect ratio inside the box", async () => {
+  assert.deepEqual(containIn({ width: 1920, height: 1080 }, 6.6, 4.75), { w: 6.6, h: 6.6 * 1080 / 1920 });
+  assert.deepEqual(containIn({ width: 640, height: 1280 }, 6.6, 4.75), { w: 4.75 / 2, h: 4.75 });
+  // A wide chart in the real file: its picture's ext keeps 640:240 (EMU), not the 6.6 x 4.75 box.
+  const charted: ReportDocument = { ...document, sections: [{ id: "f", title: "흐름", text: "요약", chart: { kind: "line", points: [{ label: "P.1", value: 2 }, { label: "P.2", value: 5 }] } }] };
+  const zip = await JSZip.loadAsync((await exportReport(charted, "pptx", context)).bytes);
+  const xml = (await Promise.all(Object.keys(zip.files).filter((name) => /^ppt\/slides\/slide\d+\.xml$/.test(name)).map((name) => zip.file(name)!.async("string")))).join("");
+  const pic = /<p:pic>[\s\S]*?<a:ext cx="(\d+)" cy="(\d+)"/.exec(xml)!;
+  assert.ok(Math.abs(Number(pic[1]) / Number(pic[2]) - 640 / 240) < .01, `${pic[1]}x${pic[2]}`);
+  // Without text the graph gets the full slide width (RPT-037), still at 640:240.
+  const bare = await JSZip.loadAsync((await exportReport({ ...charted, sections: [{ ...charted.sections[0], text: "" }] }, "pptx", context)).bytes);
+  const bareXml = (await Promise.all(Object.keys(bare.files).filter((name) => /^ppt\/slides\/slide\d+\.xml$/.test(name)).map((name) => bare.file(name)!.async("string")))).join("");
+  const wide = /<p:pic>[\s\S]*?<a:ext cx="(\d+)" cy="(\d+)"/.exec(bareXml)!;
+  assert.ok(Number(wide[1]) > Number(pic[1]) * 1.5 && Math.abs(Number(wide[1]) / Number(wide[2]) - 640 / 240) < .01);
 });

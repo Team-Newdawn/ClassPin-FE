@@ -8,7 +8,7 @@ import { pathToFileURL } from "node:url";
 const serverOnly = pathToFileURL(join(process.cwd(), "node_modules/next/dist/compiled/server-only/empty.js")).href;
 register("data:text/javascript," + encodeURIComponent(`export function resolve(specifier, context, next) { return next(specifier === "server-only" ? ${JSON.stringify(serverOnly)} : specifier === "next/server" ? "next/server.js" : specifier, context); }`), import.meta.url);
 const { claude } = await import("../../../../_service/insight-providers/claude.ts");
-const { GET, PATCH, POST } = await import("./route.ts");
+const { GET, POST } = await import("./route.ts");
 
 const id = "3f2b8c1e-0d4a-4e6b-9a7c-1b2c3d4e5f60", materialId = "6a000000-0000-4000-8000-000000000001", lectureId = "5a000000-0000-4000-8000-000000000001";
 const versionId = "7a000000-0000-4000-8000-000000000001", slideId = "8a000000-0000-4000-8000-000000000001";
@@ -16,12 +16,12 @@ const metrics = { at: "", slides: 1, questions: 0, pins: 0, reactions: 0, durati
 const document = { title: "리포트", metrics, sections: [{ id: "sec-a", title: "개요", text: "본문" }] };
 const graph = [{ folder_id: null, lectures: [{ id: lectureId, title: "강의", status: "ended", questions: [], materials: [{ id: materialId, file_name: "a.pdf",
   material_versions: [{ id: versionId, version_no: 1, source_path: "o/a.pdf", slides: [{ id: slideId, material_version_id: versionId, page_index: 0, image_path: "o/1.jpg", source_page_index: null }] }] }] }] }];
-type Turn = { role: string; text: string; cleared?: boolean; pending?: boolean; proposal?: unknown };
+type Turn = { role: string; text: string; cleared?: boolean; pending?: boolean };
 const updatedAt = "2026-10-27T00:00:00.000000+00:00";
 
 // Supabase and the REST backend are faked at fetch level: the stored row (null = not the caller's) and every PATCH of it.
-function fake(messages: Turn[] | null, redrafts = 0) {
-  const row = messages && { redrafts, id, owner_id: "owner", material_id: materialId, lecture_id: lectureId, title: "강의", file_name: "a.pdf", status: "ready", error: null,
+function fake(messages: Turn[] | null) {
+  const row = messages && { id, owner_id: "owner", material_id: materialId, lecture_id: lectureId, title: "강의", file_name: "a.pdf", status: "ready", error: null,
     document, previous_document: null, messages, created_at: updatedAt, updated_at: updatedAt, drafted_at: null };
   const writes: Record<string, unknown>[] = [];
   globalThis.fetch = (async (url: string | URL | Request, init?: RequestInit) => {
@@ -39,9 +39,9 @@ function fake(messages: Turn[] | null, redrafts = 0) {
   }) as typeof fetch;
   return writes;
 }
-const call = (method: "GET" | "PATCH" | "POST", body?: unknown, headers: Record<string, string> = { Authorization: "Bearer owner" }, reportId = id) => {
+const call = (method: "GET" | "POST", body?: unknown, headers: Record<string, string> = { Authorization: "Bearer owner" }, reportId = id) => {
   const request = new Request(`http://local/api/admin/reports/${reportId}`, { method, headers, ...body === undefined ? {} : { body: JSON.stringify(body) } });
-  return ({ GET, PATCH, POST })[method](request, { params: Promise.resolve({ id: reportId }) });
+  return ({ GET, POST })[method](request, { params: Promise.resolve({ id: reportId }) });
 };
 const chat = () => call("POST", { action: "chat", message: "요약해 줘" });
 const env = { NEXT_PUBLIC_SUPABASE_URL: "http://supabase.test", NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: "p", SUPABASE_SERVICE_ROLE_KEY: "s", CLAUDE_API_KEY: "c", REST_API_URL: "http://localhost:9" };
@@ -60,38 +60,34 @@ test("reports are owner-only: no token is 401, a bad id or someone else's report
   } finally { globalThis.fetch = realFetch; }
 });
 
-test("a save with a stale updatedAt is refused with 409 and the current report, never written", async () => {
+test("a report cannot be edited: undo and apply are gone, and the route has no PATCH (RPT-008)", async () => {
   const realFetch = globalThis.fetch;
   Object.assign(process.env, env);
   try {
-    let writes = fake([]);
-    const stale = await call("PATCH", { document, updatedAt: "2026-10-26T00:00:00Z" });
-    assert.equal(stale.status, 409);
-    const body = await stale.json();
-    assert.deepEqual([body.error, body.report.updatedAt], ["REPORT_CONFLICT", updatedAt]);
-    assert.equal(writes.length, 0);
-    writes = fake([]);
-    const saved = await call("PATCH", { document: { ...document, sections: [{ id: "sec-a", title: "개요", text: "고친 본문" }] }, updatedAt });
-    assert.equal(saved.status, 200);
-    assert.equal((writes[0].document as typeof document).sections[0].text, "고친 본문");
+    for (const action of ["undo", "apply"]) {
+      const writes = fake([]);
+      assert.equal((await call("POST", { action, messageIndex: 0, updatedAt })).status, 400);
+      assert.equal(writes.length, 0);
+    }
+    assert.equal("PATCH" in await import("./route.ts"), false);
   } finally { globalThis.fetch = realFetch; }
 });
 
-test("a chat question is reserved first, refunded on failure, kept when stopped, limited to 5, and saves the model's proposal", async () => {
+test("a chat question is reserved first, refunded on failure, kept when stopped, limited to 5, and saves answers only", async () => {
   const realFetch = globalThis.fetch, realChat = claude.chat;
   Object.assign(process.env, env);
   try {
-    // Answered with a proposal: the reservation becomes the saved question and an answer carrying the validated proposal.
+    // Answered: the reservation becomes the saved question and its answer; an edit tool call does nothing (RPT-050).
     let writes = fake([]);
     claude.chat = async function* ({ runTool }) {
-      await runTool("propose_document", { replace: [{ id: "sec-a", title: "개요", text: "새 본문" }], insert: [], remove: [] });
+      assert.equal(await runTool("propose_document", { replace: [] }), "알 수 없는 도구다.");
       yield "답";
     };
     assert.equal(await (await chat()).text(), "답");
     assert.equal((writes[0].messages as Turn[]).at(-1)?.pending, true);
     const saved = writes.at(-1)!.messages as Turn[];
     assert.deepEqual(saved.map((turn) => [turn.role, turn.text]), [["user", "요약해 줘"], ["assistant", "답"]]);
-    assert.deepEqual(saved[1].proposal, { replace: [{ id: "sec-a", title: "개요", text: "새 본문" }], insert: [], remove: [] });
+    assert.equal("proposal" in saved[1], false);
 
     // AI failure: the question is refunded.
     writes = fake([]);
@@ -130,15 +126,4 @@ test("a chat question is reserved first, refunded on failure, kept when stopped,
     globalThis.fetch = realFetch;
     claude.chat = realChat;
   }
-});
-
-test("an AI redraft over a document stops at 2 per report and refuses before any AI or storage work", async () => {
-  const realFetch = globalThis.fetch;
-  Object.assign(process.env, env);
-  try {
-    const writes = fake([], 2), limited = await call("POST", { action: "redraft" });
-    assert.equal(limited.status, 429);
-    assert.equal((await limited.json()).error, "REDRAFT_LIMIT");
-    assert.deepEqual(writes, []);
-  } finally { globalThis.fetch = realFetch; }
 });

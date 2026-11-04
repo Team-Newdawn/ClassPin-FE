@@ -6,9 +6,9 @@ import { SessionEndReport } from "./component/session-end-report";
 import { useEndReportPage } from "./controller";
 
 export default function ReportPage() {
-  const { session, folder, loading } = useEndReportPage();
+  const { session, loading } = useEndReportPage();
   const { t } = useLanguage();
   if (loading) return <LoadingScreen />;
   if (!session) return <main className="admin-page"><h1>{t("session.notFound")}</h1></main>;
-  return <SessionEndReport session={session} folder={folder} />;
+  return <SessionEndReport session={session} />;
 }

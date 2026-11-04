@@ -1,30 +1,42 @@
 import type { InsightReportBody } from "./insight-report.ts";
+import type { ChartKind, ChartPoint } from "./report-chart.ts";
 
 /** docs/instructor-report-authoring.md §3. Shared by the report routes, the editor, and export. */
 export type ReportMetrics = {
   at: string; slides: number; questions: number; pins: number;
   reactions: number; durationMinutes: number | null; audience: number | null; peakAudience: number | null;
 };
-export type ReportSection = { id: string; title: string; text: string; /** 1-based slide number. */ slide?: number };
+export type ReportSection = { id: string; title: string; text: string; /** 1-based slide number. */ slide?: number; /** RPT-037: a code-built graph drawn above the section text; the numbers live here, not in a table. */ chart?: ReportChart };
+export type ReportChart = { kind: ChartKind; points: ChartPoint[] };
 export type ReportDocument = { title: string; metrics: ReportMetrics; sections: ReportSection[] };
-/** AI-proposed edit (RPT-053). `after: null` inserts at the top. */
-export type ReportProposal = {
-  replace: { id: string; title: string; text: string }[];
-  insert: { after: string | null; title: string; text: string; slide?: number }[];
-  remove: string[];
-};
-/** `cleared` turns keep only their slot in the question count; `pending` marks a question whose answer is being written; `proposal` rides on an assistant turn, `applied` once the instructor applied it. */
-export type ReportMessage = { role: "user" | "assistant"; text: string; createdAt: string; cleared?: true; pending?: true; proposal?: ReportProposal; applied?: true };
+/** `cleared` turns keep only their slot in the question count; `pending` marks a question whose answer is being written. */
+export type ReportMessage = { role: "user" | "assistant"; text: string; createdAt: string; cleared?: true; pending?: true;
+  /** RPT-057: name of the file sent with this question; the file itself is never stored. */ file?: string };
+/** RPT-057: one file per question, sent to the AI for that question only. Claude takes images up to 5MB. */
+export const CHAT_FILE_MAX_BYTES = 10 * 1024 * 1024, CHAT_IMAGE_MAX_BYTES = 5 * 1024 * 1024;
+export const CHAT_FILE_ACCEPT = ".pdf,.png,.jpg,.jpeg,.txt,.md,.csv,application/pdf,image/png,image/jpeg,text/plain,text/markdown,text/csv";
 export type ReportStatus = "drafting" | "failed" | "ready";
+/** RPT-036: the instructor's own instructions for the AI-written sections (the report's one format is fixed, RPT-031). */
+export const REPORT_REQUEST_MAX = 500;
+/** "방금 수정됨", "n분 전", "n시간 전", "어제", or the date, in Korean time (RPT-011 list). */
+export function reportAge(iso: string, now = Date.now()) {
+  const at = Date.parse(iso), minutes = Math.floor((now - at) / 60_000), day = (time: number) => Math.floor((time + 9 * 3_600_000) / 86_400_000);
+  if (minutes < 1) return "방금 수정됨";
+  if (minutes < 60) return `${minutes}분 전`;
+  if (day(now) === day(at)) return `${Math.floor(minutes / 60)}시간 전`;
+  if (day(now) - day(at) === 1) return "어제";
+  return new Intl.DateTimeFormat("ko-KR", { month: "long", day: "numeric", timeZone: "Asia/Seoul" }).format(at);
+}
+
 export type ReportView = {
   id: string; materialId: string; /** Lecture title and source file name captured when the report was created. */ title: string; fileName: string; status: ReportStatus; error: string | null; createdAt: string; updatedAt: string;
-  document: ReportDocument | null; canUndo: boolean; messages: ReportMessage[]; questionsLeft: number; redraftsLeft: number;
+  document: ReportDocument | null; messages: ReportMessage[]; questionsLeft: number;
+  /** RPT-032: only `GET` of a running draft fills it; the preview is read-only and never saved. */ progress?: DraftProgress | null;
 };
+export type DraftProgress = { step: "render" } | { step: "slides"; done: number; total: number } | { step: "body"; preview: ReportDocument };
 
 export const REPORT_LIMITS = { sections: 300, title: 200, sectionText: 20_000, total: 500_000, sectionId: 64 } as const;
 export const CHAT_QUESTIONS_PER_REPORT = 5;
-/** AI redrafts that replace an existing document; `next dev` has no limit. */
-export const REDRAFTS_PER_REPORT = 2;
 
 const newId = () => globalThis.crypto.randomUUID();
 const clip = (value: string, limit: number) => value.length > limit ? value.slice(0, limit) : value;
@@ -46,12 +58,6 @@ export function reportMetrics(material: MetricsSource, lecture: { startedAt: str
 }
 
 export const METRIC_NONE = "기록 없음";
-/** RPT-023/061: the one metrics table the editor and every export print, so all of them carry the same numbers. */
-export function metricRows(m: ReportMetrics): [string, string][] {
-  const recorded = (value: number | null, unit: string) => value === null ? METRIC_NONE : `${value}${unit}`;
-  return [["슬라이드", `${m.slides}장`], ["질문", `${m.questions}개`], ["PIN", `${m.pins}개`], ["공감", `${m.reactions}개`],
-    ["강의 시간", recorded(m.durationMinutes, "분")], ["참여자", recorded(m.audience, "명")], ["최대 동시 참여자", recorded(m.peakAudience, "명")]];
-}
 /** The draft's own timestamp, not "now": the same document always shows and exports the same date (RPT-064). */
 export const reportDate = (m: ReportMetrics) => new Intl.DateTimeFormat("ko-KR", { dateStyle: "long", timeZone: "Asia/Seoul" }).format(new Date(m.at));
 
@@ -63,45 +69,60 @@ export function overviewText(m: ReportMetrics) {
     `참여자 ${recorded(m.audience, "명")}(최대 동시 ${recorded(m.peakAudience, "명")})`].join("\n");
 }
 
-type DraftQuestion = { page: number; text: string; reactions: number; status: string; answers: readonly string[] };
-const STATUS: Record<string, string> = { unanswered: "미답변", answered: "답변됨", resolved: "해결됨" };
-/** Most-reacted first, at most `limit`, then "외 n개" (RPT-031). */
-function questionLines(questions: readonly DraftQuestion[], limit: number) {
-  const top = [...questions].sort((a, b) => b.reactions - a.reactions).slice(0, limit);
-  return [...top.map((q) => `- ${q.text} (${[q.reactions ? `공감 ${q.reactions}` : "", STATUS[q.status] ?? q.status].filter(Boolean).join(" · ")})`
-    + q.answers.map((answer) => `\n  답변: ${answer}`).join("")),
-  ...(questions.length > limit ? [`외 ${questions.length - limit}개`] : [])];
-}
+type DraftQuestion = { page: number; text: string; reactions: number; pinned: boolean; answers: readonly string[] };
+/** Most-reacted first, each with its answers; RPT-023 leaves answer status out while answers are hidden. */
+const questionLines = (questions: readonly { text: string; reactions: number; answers: readonly string[] }[]) =>
+  [...questions].sort((a, b) => b.reactions - a.reactions).map((q) => `- ${q.text}${q.reactions ? ` (공감 ${q.reactions})` : ""}${q.answers.map((answer) => `\n  답변: ${answer}`).join("")}`);
 const section = (title: string, lines: readonly string[], slide?: number): ReportSection =>
   ({ id: newId(), title: clip(title, REPORT_LIMITS.title), text: clip(lines.filter(Boolean).join("\n\n"), REPORT_LIMITS.sectionText), ...(slide ? { slide } : {}) });
+const table = (head: [string, string], rows: readonly [string, string][]) => [`| ${head.join(" | ")} |`, "| --- | --- |", ...rows.map((row) => `| ${row.join(" | ")} |`)].join("\n");
+
+export type ReportLecture = { title: string; startedAt: string | null; folder: string | null };
+const kst = new Intl.DateTimeFormat("ko-KR", { dateStyle: "long", timeStyle: "short", timeZone: "Asia/Seoul" });
 
 /**
- * RPT-031/033: the first draft. `analysis` null means "수치만으로 시작": the overview plus one section of raw questions per slide
- * that has questions. `questions` is only read in that case; with an analysis the draft quotes the analysis' own question list.
+ * RPT-031 (2026-11-04): the one report format, everything the insight dashboard shows plus the AI's sections:
+ * 개요 (lecture facts and the DSH-031 scoreboard) → the AI's sections (shaped by the instructor's request) → 슬라이드별 PIN 질문 흐름
+ * (DSH-030) → one section per question type (DSH-035) → one section per slide (DSH-033, with every PIN question).
+ * `analysis` null means "수치만으로 시작": the code-built parts only, slides limited to those with questions.
  */
-export function draftReport(input: { title: string; metrics: ReportMetrics; analysis: InsightReportBody | null; questions: readonly DraftQuestion[] }): ReportDocument {
-  const sections = [section("개요", [overviewText(input.metrics)])];
-  if (!input.analysis) {
-    const pages = [...new Set(input.questions.map((q) => q.page))].sort((a, b) => a - b);
-    sections.push(...pages.map((page) => section(`슬라이드 ${page}`, questionLines(input.questions.filter((q) => q.page === page), 10), page)));
-  } else {
-    const body = input.analysis, byId = new Map(body.questions.map((q) => [q.id, q]));
-    sections.push(...body.sections.map((item) => section(item.title, [item.text])));
-    for (const group of body.groups) {
-      const quoted = group.questionIds.flatMap((id) => byId.get(id) ?? []).slice(0, 5);
-      sections.push(section(`주제: ${group.title}`, [group.summary, quoted.length ? `대표 질문\n${quoted.map((q) => `- ${q.text}`).join("\n")}` : ""]));
-    }
-    for (const slide of body.slides) {
-      const own = body.questions.filter((q) => q.page === slide.page);
-      sections.push(section(`슬라이드 ${slide.page}${slide.topic ? ` · ${slide.topic}` : ""}`, [
-        own.length ? slide.questionSummary : slide.content ?? "",
-        (slide.issues ?? []).map((issue) => `- ${issue.title}: ${issue.summary}`).join("\n"),
-        slide.suggestion ? `제안: ${slide.suggestion}` : "",
-        own.length ? `질문\n${questionLines(own, 10).join("\n")}` : "",
-      ], slide.page));
-    }
+export function draftReport(input: { title: string; metrics: ReportMetrics; analysis: InsightReportBody | null; questions: readonly DraftQuestion[]; lecture?: ReportLecture }): ReportDocument {
+  const m = input.metrics, body = input.analysis, none = "기록 없음", started = Date.parse(input.lecture?.startedAt ?? "");
+  const pages = Array.from({ length: m.slides }, (_, index) => index + 1);
+  const pins = pages.map((page) => input.questions.filter((q) => q.page === page && q.pinned).length);
+  const asked = pages.map((page) => input.questions.filter((q) => q.page === page).length);
+  const topSlide = asked.indexOf(Math.max(0, ...asked)), pinned = pins.filter(Boolean).length;
+  const byId = new Map((body?.questions ?? []).map((q) => [q.id, q]));
+  const groups = [...body?.groups ?? []].sort((a, b) => b.questionIds.length - a.questionIds.length);
+  const sections = [section("개요", [
+    [`- 강의명: ${input.lecture?.title ?? none}`, `- 일시: ${Number.isFinite(started) ? kst.format(started) : none}`,
+      `- 진행 시간: ${m.durationMinutes === null ? none : `${m.durationMinutes}분`}`, `- 대상·목적: ${input.lecture ? input.lecture.folder ?? "미분류" : none}`].join("\n"),
+    table(["항목", "값"], [["질문", `${m.questions}건 · 공감 ${m.reactions}`], ["최다 슬라이드", asked[topSlide] ? `P.${topSlide + 1} · ${asked[topSlide]}건` : "없음"],
+      ["핀 찍힌 슬라이드", `${pinned} / ${m.slides} · 핀 ${m.pins}개`], ["최다 주제", groups[0] ? `${groups[0].title} · ${groups[0].questionIds.length}건` : "없음"]]),
+  ])];
+  sections.push(...(body?.sections ?? []).map((item) => section(item.title, [item.text])));
+  // RPT-037 (2026-11-04): the two graph sections carry no sentence; the graph is the content.
+  sections.push({ ...section("슬라이드별 PIN 질문 흐름", []),
+    chart: { kind: "line", points: pins.map((value, index) => ({ label: `P.${index + 1}`, value })) } });
+  if (groups.length) sections.push({ ...section("질문 유형", []),
+    chart: { kind: "bar", points: groups.map((group) => ({ label: group.title, value: group.questionIds.length })) } });
+  for (const group of groups) {
+    const own = group.questionIds.flatMap((id) => byId.get(id) ?? []);
+    const spread = [...new Set(own.map((q) => q.page))].sort((a, b) => a - b).map((page) => `P.${page} (${own.filter((q) => q.page === page).length})`).join(" · ");
+    sections.push(section(`질문 유형: ${group.title}`, [group.summary, `- 질문 ${own.length}건 (${m.questions ? Math.round((own.length / m.questions) * 100) : 0}%)\n- 나온 슬라이드: ${spread || "없음"}`,
+      own.length ? `대표 질문\n${questionLines(own).slice(0, 5).join("\n")}` : ""]));
   }
-  return { title: clip(input.title, REPORT_LIMITS.title), metrics: input.metrics, sections: sections.slice(0, REPORT_LIMITS.sections) };
+  for (const page of pages) {
+    const slide = body?.slides.find((item) => item.page === page), own = input.questions.filter((q) => q.page === page);
+    if (!slide && !own.length) continue;
+    sections.push(section(`슬라이드 ${page}${slide?.topic ? ` · ${slide.topic}` : ""}`, [
+      slide ? own.length ? slide.questionSummary : slide.content ?? "" : "",
+      (slide?.issues ?? []).map((issue) => `- ${issue.title}: ${issue.summary}`).join("\n"),
+      slide?.suggestion ? `제안: ${slide.suggestion}` : "",
+      own.length ? `질문 ${own.length}건 (공감순)\n${questionLines(own).join("\n")}` : "",
+    ], page));
+  }
+  return { title: clip(input.title, REPORT_LIMITS.title), metrics: m, sections: sections.slice(0, REPORT_LIMITS.sections) };
 }
 
 const text = (value: unknown, limit: number) => {
@@ -127,63 +148,42 @@ export function parseReportDocument(value: unknown, stored: ReportDocument): Rep
     if (!id || ids.has(id)) throw new Error("INVALID_DOCUMENT");
     ids.add(id);
     const slide = slideRef(item.slide, stored.metrics.slides);
-    return { id, title: text(item.title, REPORT_LIMITS.title), text: text(item.text, REPORT_LIMITS.sectionText), ...(slide ? { slide } : {}) };
+    const chart = chartRef(item.chart);
+    return { id, title: text(item.title, REPORT_LIMITS.title), text: text(item.text, REPORT_LIMITS.sectionText), ...(slide ? { slide } : {}), ...(chart ? { chart } : {}) };
   });
   checkTotal(sections);
   return { title: text(value.title, REPORT_LIMITS.title), metrics: stored.metrics, sections };
 }
 
-/** Validates the model's `propose_document` input against the current document; throws INVALID_PROPOSAL. */
-export function parseReportProposal(value: unknown, document: ReportDocument): ReportProposal {
-  try {
-    if (!isRecord(value) || !Array.isArray(value.replace) || !Array.isArray(value.insert) || !Array.isArray(value.remove)) throw new Error();
-    const ids = new Set(document.sections.map((item) => item.id));
-    const known = (id: unknown) => { if (typeof id !== "string" || !ids.has(id)) throw new Error(); return id; };
-    const proposal: ReportProposal = {
-      replace: value.replace.map((item) => { if (!isRecord(item)) throw new Error();
-        return { id: known(item.id), title: text(item.title, REPORT_LIMITS.title), text: text(item.text, REPORT_LIMITS.sectionText) }; }),
-      insert: value.insert.map((item) => { if (!isRecord(item)) throw new Error();
-        const slide = slideRef(item.slide, document.metrics.slides);
-        return { after: item.after === null ? null : known(item.after), title: text(item.title, REPORT_LIMITS.title), text: text(item.text, REPORT_LIMITS.sectionText), ...(slide ? { slide } : {}) }; }),
-      remove: value.remove.map(known),
-    };
-    if (!proposal.replace.length && !proposal.insert.length && !proposal.remove.length) throw new Error();
-    checkTotal(applyReportProposal(document, proposal).sections);
-    return proposal;
-  } catch { throw new Error("INVALID_PROPOSAL"); }
+/** Trust boundary for the analysis export (DSH-042): the caller's own numbers and text, checked for shape and size only. */
+export function parseExportDocument(value: unknown): ReportDocument {
+  const m = isRecord(value) && isRecord(value.metrics) ? value.metrics : null;
+  if (!m || typeof m.at !== "string" || !Number.isFinite(Date.parse(m.at))) throw new Error("INVALID_DOCUMENT");
+  const count = (item: unknown) => { if (!Number.isInteger(item) || (item as number) < 0) throw new Error("INVALID_DOCUMENT"); return item as number; };
+  const recorded = (item: unknown) => item === null ? null : count(item);
+  return parseReportDocument(value, { title: "", sections: [], metrics: { at: m.at, slides: count(m.slides), questions: count(m.questions), pins: count(m.pins),
+    reactions: count(m.reactions), durationMinutes: recorded(m.durationMinutes), audience: recorded(m.audience), peakAudience: recorded(m.peakAudience) } });
 }
-
-/** RPT-054. Ids the document no longer has are skipped, so a proposal stays applicable after unrelated edits. */
-export function applyReportProposal(document: ReportDocument, proposal: ReportProposal): ReportDocument {
-  const replaced = new Map(proposal.replace.map((item) => [item.id, item])), removed = new Set(proposal.remove);
-  const inserted = (after: string | null) => proposal.insert.filter((item) => item.after === after)
-    .map(({ title, text, slide }) => ({ id: newId(), title, text, ...(slide ? { slide } : {}) }));
-  const sections = [...inserted(null), ...document.sections.flatMap((item) => {
-    const own = replaced.get(item.id);
-    return [...removed.has(item.id) ? [] : [own ? { ...item, title: own.title, text: own.text } : item], ...inserted(item.id)];
-  })];
-  return { ...document, sections };
-}
-
-/** RPT-054: sections a proposal would overwrite that the instructor edited after `since` (when this tab first saw the proposal). */
-export const staleTargets = (proposal: ReportProposal, editedAt: ReadonlyMap<string, number>, since: number) =>
-  [...proposal.replace.map((item) => item.id), ...proposal.remove].filter((id) => (editedAt.get(id) ?? -Infinity) > since);
 
 /** RPT-024: one styled stretch of a section line. */
-export type TextRun = { text: string; bold?: true; size?: "big" | "small" };
+export type TextRun = { text: string; bold?: true; italic?: true; underline?: true; size?: "big" | "small"; /** http(s) only (RPT-024). */ link?: string };
 /** A body line, or a pipe table whose first row is the header. `source` is the raw text the block came from. */
 type ReportBlock = { kind: "line"; runs: TextRun[]; source: string } | { kind: "table"; rows: TextRun[][][]; source: string };
 const TABLE_LIMITS = { columns: 8, rows: 50 } as const;
 
-const INLINE = /\*\*(.+?)\*\*|<big>(.+?)<\/big>|<small>(.+?)<\/small>/g;
+/** A link target: an absolute http(s) URL without spaces, quotes, angle brackets or parentheses; anything else stays text. */
+export const REPORT_LINK = /^https?:\/\/[^\s()<>"]+$/;
+const INLINE = /\*\*(.+?)\*\*|<big>(.+?)<\/big>|<small>(.+?)<\/small>|<i>(.+?)<\/i>|<u>(.+?)<\/u>|\[([^\]\n]+)\]\((https?:\/\/[^\s()<>"]+)\)/g;
 /** Matched pairs only, innermost style wins for size; an unmatched marker stays literal text. */
 function inlineRuns(text: string, style: Omit<TextRun, "text"> = {}): TextRun[] {
   const runs: TextRun[] = [];
   let last = 0;
   for (const match of text.matchAll(INLINE)) {
     if (match.index > last) runs.push({ text: text.slice(last, match.index), ...style });
-    const [, bold, big, small] = match;
-    runs.push(...inlineRuns(bold ?? big ?? small, bold !== undefined ? { ...style, bold: true } : { ...style, size: big !== undefined ? "big" : "small" }));
+    const [, bold, big, small, italic, underline, label, link] = match;
+    const next: Omit<TextRun, "text"> = bold !== undefined ? { bold: true } : big !== undefined ? { size: "big" } : small !== undefined ? { size: "small" }
+      : italic !== undefined ? { italic: true } : underline !== undefined ? { underline: true } : { link };
+    runs.push(...inlineRuns(bold ?? big ?? small ?? italic ?? underline ?? label, { ...style, ...next }));
     last = match.index + match[0].length;
   }
   if (last < text.length) runs.push({ text: text.slice(last), ...style });
@@ -192,6 +192,17 @@ function inlineRuns(text: string, style: Omit<TextRun, "text"> = {}): TextRun[] 
 const cells = (line: string) => line.trim().replace(/^\|/, "").replace(/\|$/, "").split("|").map((cell) => cell.trim());
 const isTableLine = (line: string | undefined) => line?.trim().startsWith("|") ?? false;
 const isRule = (line: string | undefined) => isTableLine(line) && cells(line!).every((cell) => /^:?-{3,}:?$/.test(cell));
+
+const CHART_KINDS: readonly unknown[] = ["line", "bar"] satisfies ChartKind[];
+/** RPT-037: a section graph from the client: one of two kinds, at most 600 points (slides), short labels, finite non-negative values. */
+function chartRef(value: unknown): ReportChart | undefined {
+  if (value === undefined) return undefined;
+  if (!isRecord(value) || !CHART_KINDS.includes(value.kind) || !Array.isArray(value.points) || value.points.length > 600) throw new Error("INVALID_DOCUMENT");
+  return { kind: value.kind as ChartKind, points: value.points.map((point: unknown) => {
+    if (!isRecord(point) || !Number.isFinite(point.value) || (point.value as number) < 0) throw new Error("INVALID_DOCUMENT");
+    return { label: text(point.label, REPORT_LIMITS.title), value: point.value as number };
+  }) };
+}
 
 /** RPT-024: shared by the editor and every export. A malformed or oversized table stays as plain lines. */
 export function parseReportText(text: string): ReportBlock[] {
@@ -213,19 +224,22 @@ export function parseReportText(text: string): ReportBlock[] {
   return blocks;
 }
 
-/** Inverse of a parsed line: adjacent runs of one style merge, the size tag wraps the bold marks. */
-export function formatReportLine(runs: readonly TextRun[]): string {
+/** Outermost first: size tags wrap links, which wrap italic, underline, then bold marks. */
+const WRAPS = [["size", (value: string, inner: string) => `<${value}>${inner}</${value}>`], ["link", (value: string, inner: string) => `[${inner}](${value})`],
+  ["italic", (_: string, inner: string) => `<i>${inner}</i>`], ["underline", (_: string, inner: string) => `<u>${inner}</u>`],
+  ["bold", (_: string, inner: string) => `**${inner}**`]] as const;
+/** Inverse of a parsed line: adjacent runs that share a style merge under one marker. */
+export function formatReportLine(runs: readonly TextRun[], level = 0): string {
+  if (level === WRAPS.length) return runs.map((run) => run.text).join("");
+  const [key, wrap] = WRAPS[level];
   let out = "";
   for (let index = 0; index < runs.length;) {
-    const size = runs[index].size;
-    let inner = "";
-    for (; index < runs.length && runs[index].size === size;) {
-      const bold = runs[index].bold;
-      let chunk = "";
-      for (; index < runs.length && runs[index].size === size && runs[index].bold === bold; index++) chunk += runs[index].text;
-      inner += bold && chunk ? `**${chunk}**` : chunk;
-    }
-    out += size && inner ? `<${size}>${inner}</${size}>` : inner;
+    const value = runs[index][key];
+    let end = index;
+    while (end < runs.length && runs[end][key] === value) end++;
+    const inner = formatReportLine(runs.slice(index, end), level + 1);
+    out += value && inner ? wrap(String(value), inner) : inner;
+    index = end;
   }
   return out;
 }

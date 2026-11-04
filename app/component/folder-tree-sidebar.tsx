@@ -4,7 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useSessions } from "@/app/_controller/session-store";
-import { BarChart3, PanelLeftClose, PanelLeftOpen } from "@/app/component/icons";
+import { BarChart3, FileText, PanelLeftClose, PanelLeftOpen } from "@/app/component/icons";
 import { PinLogo } from "@/app/component/pin-logo";
 import { WorkspaceAccount } from "@/app/component/workspace-header";
 import { useLanguage } from "@/app/_controller/language-context";
@@ -37,6 +37,9 @@ export function FolderTreeSidebar({ folders, open, activeFolderId, onToggle }: {
       </Link>
       <Link className={styles.home} href="/admin/insights" aria-current={pathname === "/admin/insights" ? "page" : undefined}>
         <BarChart3 aria-hidden="true" width={20} height={20} /><span>{t("nav.insights")}</span>
+      </Link>
+      <Link className={styles.home} href="/admin/reports" aria-current={pathname === "/admin/reports" ? "page" : undefined}>
+        <FileText aria-hidden="true" width={20} height={20} /><span>{t("nav.reports")}</span>
       </Link>
       <div className="folder-tree-heading"><b>{t("folders.myFolders")}</b><span>{folders.length}</span></div>
       <ul className="folder-tree-list">

@@ -6,13 +6,16 @@ import { promisify } from "node:util";
 import { createClient } from "@supabase/supabase-js";
 import sharp from "sharp";
 import { cachedFile } from "../_infrastructure/server/pdf-cache.ts";
+import { pdfPageImage } from "../_infrastructure/server/pdf-page.ts";
 import { resolveDocumentBinary } from "../_infrastructure/server/document-binaries.ts";
 import { renderPdfPages } from "../_infrastructure/server/pdf-render.ts";
 import { restOrigin } from "../_infrastructure/server/rest-origin.ts";
 import { MAX_PAGES, imageEdge, readableText, type SlidePage } from "./insight-ai.ts";
 import { limiter } from "../_infrastructure/server/limiter.ts";
 import { inspectInsightSource } from "./insight-source.ts";
-import { CLASS_FOLDER_NAME_MAX, classFolderPurposeLine, normalizeClassFolderPurpose, normalizeClassFolderPurposeLabel } from "../_model/types.ts";
+import { CLASS_FOLDER_NAME_MAX, classFolderPurposeLine, normalizeClassFolderPurpose, normalizeClassFolderPurposeLabel, type ClassFolderPurpose } from "../_model/types.ts";
+// The folder screen's Korean purpose names (app/_model/i18n.ts folders.purpose*).
+const PURPOSE_NAMES: Record<ClassFolderPurpose, string> = { qa: "Q&A", feedback: "피드백", education: "교육", brainstorming: "브레인스토밍", other: "기타" };
 
 export class InsightRequestError extends Error {
   status: number;
@@ -76,7 +79,13 @@ export async function readOwnedInsightSource(authorization: string, selection: r
     const name = typeof folder?.name === "string" ? folder.name.replace(/\s+/g, " ").replaceAll("\"", "").trim().slice(0, CLASS_FOLDER_NAME_MAX) : "";
     return [String(folder?.id).toLowerCase(), `${name ? `이 자료가 속한 폴더 이름: "${name}".` : ""}${classFolderPurposeLine(purpose, normalizeClassFolderPurposeLabel(purpose, folder?.purpose_label), "ko")}`.trim()];
   }));
-  try { return { ...inspectInsightSource(await boundedJson(response.body, 32 * 1024 * 1024), selection), purposes }; }
+  // RPT-036 보고용 개요: "폴더 이름 · 사용 목적" as plain display text.
+  const folderLabels = new Map((Array.isArray(folders) ? folders : []).map((folder: Record<string, unknown>) => {
+    const purpose = normalizeClassFolderPurpose(folder?.purpose), name = typeof folder?.name === "string" ? folder.name.trim().slice(0, CLASS_FOLDER_NAME_MAX) : "";
+    const label = purpose === "other" ? normalizeClassFolderPurposeLabel(purpose, folder?.purpose_label) ?? PURPOSE_NAMES.other : PURPOSE_NAMES[purpose];
+    return [String(folder?.id).toLowerCase(), [name, label].filter(Boolean).join(" · ")];
+  }));
+  try { return { ...inspectInsightSource(await boundedJson(response.body, 32 * 1024 * 1024), selection), purposes, folderLabels }; }
   catch (error) {
     const missing = error instanceof Error && error.message === "SOURCE_NOT_FOUND";
     throw new InsightRequestError(missing ? "SOURCE_NOT_FOUND" : "INVALID_SOURCE", missing ? 404 : 422);
@@ -146,6 +155,35 @@ export async function renderSlidePages(file: string, dir: string, only?: readonl
 
 const SOURCE_BYTES = 200 * 1024 ** 2;
 type Material = ReturnType<typeof inspectInsightSource>["materials"][number];
+
+/**
+ * RPT-060: slide images for a report export, from the page images `/api/pdf/page` keeps on disk (1920px, the stage size),
+ * so a slide already seen, or a second format of the same export, is not rendered again. Image slides and anything the
+ * cache cannot serve go through renderMaterialSlides. No slide text is extracted; exports do not use it.
+ * The caller has already checked the report owner's access to the material.
+ */
+// One export renders at a time (oneRenderAtATime); within it, half the cores like the draft render, not the viewers' two slots.
+const exportSlot: ReturnType<typeof limiter> = ((globalThis as { exportPageRender?: ReturnType<typeof limiter> }).exportPageRender ??= limiter(Math.min(8, Math.max(1, Math.floor(availableParallelism() / 2)))));
+export async function exportSlideImages(material: Material, dir: string, pages: readonly number[], signal?: AbortSignal) {
+  const wanted = material.slides.filter((slide) => pages.includes(slide.pageIndex + 1)), bucket = insightStorage().storage.from("course-materials");
+  const fromPdf = wanted.filter((slide) => slide.sourcePageIndex !== null);
+  const cached = await Promise.all(fromPdf.map(async (slide) => {
+    signal?.throwIfAborted();
+    const file = await pdfPageImage(material.sourcePath, slide.sourcePageIndex! + 1, 1920, async () => {
+      // Same size gate as renderMaterialSlides before the source reaches the disk cache.
+      const info = await bucket.info(material.sourcePath);
+      if (info.error || typeof info.data?.size !== "number") throw new Error("SOURCE_DOWNLOAD_FAILED");
+      if (info.data.size > SOURCE_BYTES) throw new Error("SOURCE_TOO_LARGE");
+      const download = await bucket.download(material.sourcePath).asStream();
+      if (download.error || !download.data) throw new Error("SOURCE_DOWNLOAD_FAILED");
+      return download.data;
+    }, exportSlot);
+    const { width = 1, height = 1 } = await sharp(file).metadata();
+    return { page: slide.pageIndex + 1, width, height, file, text: "" };
+  }));
+  const rest = wanted.filter((slide) => slide.sourcePageIndex === null).map((slide) => slide.pageIndex + 1);
+  return [...cached, ...rest.length ? await renderMaterialSlides(material, dir, rest, signal) : []];
+}
 
 /** Every slide (or only these slide numbers) as a Claude-ready JPEG keyed by slide number. PDF-page slides render from the cached source;
  * image slides (older PDF uploads, PPT/PPTX) use their stored JPEG, so an image-only deck never downloads its source. */

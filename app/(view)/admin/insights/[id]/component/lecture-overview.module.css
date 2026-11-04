@@ -1,0 +1,24 @@
+.empty{margin:0;padding:32px 16px;border-radius:12px;background:var(--color-bg-page);color:var(--color-text-secondary);font-size:14px;text-align:center}
+.board{margin:0;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}
+.board div{min-width:0;padding:14px 16px;border-radius:12px;background:var(--color-bg-page)}
+.board dt{color:var(--color-text-tertiary);font-size:12px}
+.board dd{margin:4px 0 0;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;font-size:24px;font-weight:700;font-variant-numeric:tabular-nums}
+.board dd+dd{margin-top:2px;color:var(--color-text-secondary);font-size:12px;font-weight:400}
+.chartModes{justify-self:end;display:inline-flex;padding:3px;border-radius:8px;background:var(--color-bg-page)}
+.chartModes button{padding:4px 12px;border:0;border-radius:6px;background:none;color:var(--color-text-secondary);font:inherit;font-size:12px;cursor:pointer}
+.chartModes button[aria-pressed="true"]{background:var(--color-bg-surface);color:var(--color-brand);font-weight:700}.chartModes button:focus-visible{outline:none;box-shadow:var(--focus)}
+.chartScroll{overflow-x:auto}
+/* 18px above the plot (count) and 20px below (slide label); the line overlay uses the same box. */
+.plot{position:relative;min-width:calc(var(--n) * 40px)}
+.bars{height:190px;margin:0;padding:0;list-style:none;display:flex;align-items:flex-end}
+.bars li{flex:1;min-width:0;height:100%;padding:0 4px;display:flex;flex-direction:column;justify-content:flex-end;align-items:center;gap:6px}
+.bars span{font-size:12px;line-height:12px;font-weight:600;color:var(--color-text-secondary);font-variant-numeric:tabular-nums}
+.bars i{width:100%;max-width:48px;min-height:4px;height:calc((100% - 38px) * var(--h));border-radius:6px 6px 2px 2px;background:var(--pin-blue-100)}.bars small{color:var(--color-text-tertiary);font-size:11px;line-height:14px}
+.bars .peak i{background:var(--color-brand)}.bars .peak span{color:var(--color-brand)}
+.line i,.line .peak i{position:relative;min-height:0;background:none}
+/* Counts paint over the line (positioned, later in the DOM) with a surface halo so a passing segment never hides them. */
+.line .bars{position:relative}.line span{text-shadow:0 0 3px var(--color-bg-surface),0 0 3px var(--color-bg-surface)}
+.line i::before{content:"";position:absolute;top:-4px;left:50%;width:8px;height:8px;margin-left:-4px;border-radius:50%;background:var(--color-brand)}
+.lineSvg{position:absolute;top:18px;left:0;width:100%;height:calc(100% - 38px);overflow:visible;pointer-events:none}
+.lineSvg polyline{fill:none;stroke:var(--color-brand);stroke-width:2;stroke-linejoin:round}
+@media(max-width:1023px){.board{grid-template-columns:repeat(2,minmax(0,1fr))}}

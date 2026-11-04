@@ -158,10 +158,10 @@ flow unless a task explicitly spans both products.
 - The right question panel starts with an AI summary of the current slide's
   questions, shown only when that slide has questions. `POST /api/question-summary`
   calls Groq with the server-only `GROQ_API_KEY` and returns 503 without it.
-- Instructor reports (`/admin/reports/[id]`, opened from the `/admin/insights` list, spec `docs/instructor-report-authoring.md`, approved
-  2026-10-27): one report per material, drafted once
-  by the existing AI analysis, then edited as sections with bold, three text sizes and AI-only tables (left) with AI chat that proposes
-  section changes (right; 5 questions per report, one-step undo). No confirmation step; PDF/DOCX
+- Instructor reports (`/admin/reports/[id]`, made on `/admin/reports`, spec `docs/instructor-report-authoring.md`): one fixed,
+  detailed format per report (all dashboard content plus AI sections shaped by the instructor's optional prompt; several reports
+  per material), drafted once by the existing AI analysis. Reports are read-only (decided 2026-11-04): no canvas editing, and the
+  AI chat only answers questions (5 per report; file attachment; with or without slide/question data). PDF/DOCX
   export the document as written (A4), PPTX/MD re-lay it out by code without AI. The analysis
   runs one AI provider per server (`INSIGHT_AI_PROVIDER` claude|openai|gemini, default claude;
   `INSIGHT_AI_MODEL`, default `claude-haiku-5-5`; server-only `CLAUDE_API_KEY`/`OPENAI_API_KEY`/`GEMINI_API_KEY`)

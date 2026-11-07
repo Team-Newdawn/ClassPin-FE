@@ -1,13 +1,14 @@
 import { createWriteStream } from "node:fs";
 import { mkdir, readdir, rename, rm, stat, utimes } from "node:fs/promises";
-import { createHash } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import os from "node:os";
 import path from "node:path";
 import { Readable } from "node:stream";
 import { pipeline } from "node:stream/promises";
 
 const DEFAULT_DIR = path.join(os.tmpdir(), "ohpin-pdf-cache");
-const DEFAULT_MAX_AGE_MS = 24 * 60 * 60 * 1000;
+// Sources and page images live under UUID paths that never change, so they stay two weeks (2026-11-07, was one day); every request still checks RLS.
+const DEFAULT_MAX_AGE_MS = 14 * 24 * 60 * 60 * 1000;
 /** The cache shares the server disk with every other service, so it stays under 3 GiB. */
 const DEFAULT_MAX_BYTES = 3 * 1024 ** 3;
 // ponytail: cleanup runs once a minute or after 256 MiB of new files, so the cache can briefly pass the cap by that much.
@@ -19,7 +20,7 @@ const inflight = new Map<string, Promise<string>>();
  *
  * 수업 시작 직후 수십 명이 동시에 들어와도 같은 key 의 다운로드는 하나만 실행하고 나머지는 그 결과를
  * 기다린다. 원본 경로는 UUID 라 바뀌지 않으므로 신선도는 mtime 으로만 본다.
- * 받은 지 하루가 지난 파일은 지우고, 폴더가 상한을 넘으면 가장 오래 안 쓴 파일부터 지운다.
+ * 받은 지 14일이 지난 파일은 지우고, 폴더가 상한을 넘으면 가장 오래 안 쓴 파일부터 지운다.
  * mtime 은 받은 시각(만료 기준), atime 은 마지막 사용 시각(상한 기준)이다. 쓸 때마다 atime 을 직접 갱신한다.
  */
 export async function findCachedFile(
@@ -45,7 +46,8 @@ export async function cachedFile(
   if (!pending) {
     pending = (async () => {
       await mkdir(dir, { recursive: true });
-      const part = `${file}.${process.pid}.part`;
+      // During a deploy two containers share this folder (docker volume), and both can run as the same pid.
+      const part = `${file}.${randomUUID()}.part`;
       try {
         await pipeline(Readable.fromWeb(await fetchStream() as import("node:stream/web").ReadableStream), createWriteStream(part));
         await rename(part, file);

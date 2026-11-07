@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import type { InsightReportBody } from "./insight-report.ts";
 import { chartSvg } from "./report-chart.ts";
-import { draftReport, parseExportDocument, parseReportDocument, reportMetrics } from "./report.ts";
+import { draftReport, parseReportDocument, reportMetrics } from "./report.ts";
 
 const metrics = reportMetrics(
   { slides: [1, 2, 3], questions: [
@@ -87,15 +87,6 @@ test("report text: inline bold and sizes nest inside one line, tables parse, mal
   // No rule line, a column-count mismatch, or more than 8 columns: plain lines.
   for (const text of ["| a | b |\n| c | d |", "| a | b |\n| --- |", `|${" x |".repeat(9)}\n|${" --- |".repeat(9)}`])
     assert.ok(parseReportText(text).every((block) => block.kind === "line"), text);
-});
-
-test("analysis export document: caller metrics are checked for shape, sections for size", () => {
-  const metrics = { at: "2026-11-01T00:00:00.000Z", slides: 3, questions: 2, pins: 1, reactions: 0, durationMinutes: null, audience: 4, peakAudience: null };
-  const document = { title: "분석", metrics, sections: [{ id: "summary-0", title: "분석 요약", text: "질문 2건" }] };
-  assert.deepEqual(parseExportDocument(document), document);
-  for (const bad of [null, { ...document, metrics: { ...metrics, at: "x" } }, { ...document, metrics: { ...metrics, pins: -1 } },
-    { ...document, metrics: { ...metrics, audience: "4" } }, { ...document, sections: [{ id: "a", title: "t", text: "x".repeat(20_001) }] }])
-    assert.throws(() => parseExportDocument(bad), /INVALID_DOCUMENT/);
 });
 
 test("the chart SVG escapes labels and stays one polyline for hundreds of slides (RPT-037)", () => {

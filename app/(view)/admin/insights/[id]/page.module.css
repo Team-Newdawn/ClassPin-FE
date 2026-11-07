@@ -13,8 +13,6 @@
 .card{container-type:inline-size;min-width:0;padding:24px;border:1px solid var(--color-border);border-radius:16px;background:var(--color-bg-surface);display:grid;gap:18px;align-content:start}
 .cardHead{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}
 .cardHead h2{margin:0;font-size:17px;line-height:20px;font-weight:700}.cardHead p{margin:2px 0 0;color:var(--color-text-tertiary);font-size:12px}
-.export{flex:none;height:30px;padding:0 13px;border:1px solid var(--color-border-strong);border-radius:8px;background:var(--color-bg-surface);display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:600;color:var(--color-text-primary)}
-.export:hover{background:var(--color-bg-page)}.export svg{width:14px;height:14px}
 .summary{margin:0;padding:10px 14px;border-radius:10px;background:var(--color-brand-subtle);display:flex;align-items:baseline;gap:10px;font-size:14px;line-height:20px}
 .summary span{flex:none;display:inline-flex;align-items:center;gap:6px;color:var(--color-brand);font-size:12px;font-weight:700}.summary svg{width:14px;height:14px;align-self:center}
 .empty{margin:0;padding:32px 16px;border-radius:12px;background:var(--color-bg-page);color:var(--color-text-secondary);font-size:14px;text-align:center}
@@ -55,10 +53,6 @@
 /* 560px slide + 28px gap + a 300px side; narrower cards stack (the folder sidebar eats viewport width). */
 @container (max-width:888px){.split,.split:has(.types){grid-template-columns:minmax(0,1fr)}}
 @media(max-width:767px){.card{padding:16px}.actions{width:100%}}
-/* A legend sits on the fieldset's top edge, so top padding would land below it: space above is a margin, 10px below is the first label's. */
-.exportParts{margin:24px 0 0;padding:0;border:0}.exportParts legend{padding:0;font-size:16px;font-weight:700}.exportParts legend+label{margin-top:10px}
-.exportParts label{margin-top:14px;display:flex;align-items:flex-start;gap:10px;cursor:pointer}.exportParts input{flex:none;width:20px;height:20px;margin:0;accent-color:var(--color-brand)}
-.exportParts b{display:block;font-size:14px}.exportParts small{display:block;margin-top:2px;color:var(--color-text-tertiary);font-size:12px}
 /* DSH-046: skeleton lines with a shimmer while the AI result loads; reduced motion stops it (globals.css). */
 .waiting{display:grid;gap:12px}.waiting p{margin:0;color:var(--color-text-secondary);font-size:13px;line-height:20px}
 .skeleton{display:grid;gap:10px}

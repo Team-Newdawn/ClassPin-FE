@@ -10,8 +10,22 @@ const PROBE_TIMEOUT_MS = 20_000;
 
 type DocumentBinary = "pdftoppm" | "soffice";
 
-/** 강의 자료와 피드백 PDF가 같은 배포·개발 런타임 바이너리를 사용하게 한다. */
-export async function resolveDocumentBinary(name: DocumentBinary) {
+const resolved = new Map<DocumentBinary, Promise<string>>();
+/**
+ * 강의 자료와 피드백 PDF가 같은 배포·개발 런타임 바이너리를 사용하게 한다. 찾은 경로는 프로세스 동안 기억한다
+ * (2026-11-07: 페이지 이미지마다 버전 확인 프로세스를 여러 개 띄워 변환 순서까지 섞였다). 실패는 기억하지 않는다.
+ */
+export function resolveDocumentBinary(name: DocumentBinary) {
+  let found = resolved.get(name);
+  if (!found) {
+    found = findDocumentBinary(name);
+    resolved.set(name, found);
+    found.catch(() => resolved.delete(name));
+  }
+  return found;
+}
+
+async function findDocumentBinary(name: DocumentBinary) {
   const envName = name === "pdftoppm" ? "PDFTOPPM_PATH" : "SOFFICE_PATH";
   const versionFlag = name === "pdftoppm" ? "-v" : "--version";
   const pathCandidates = (process.env.PATH ?? "")

@@ -31,14 +31,6 @@ export function PdfPageImage({ url, pageNumber, label, eager = false }: { url: s
     return () => { active = false; };
   }, [url, pageNumber, width, visible]);
 
-  // The stage fetches the next source page once its own image is in, after 0-2 s so a whole audience does not ask at once
-  // (docs/frontend-performance-audit.md, 2026-11-07). A 404 past the last page is expected and ignored.
-  const shown = Boolean(eager && loadedPdfPageImage(url, pageNumber, width));
-  useEffect(() => {
-    if (!shown) return;
-    const timer = window.setTimeout(() => void loadPdfPageImage(url, pageNumber + 1, width).catch(() => {}), Math.random() * 2000);
-    return () => window.clearTimeout(timer);
-  }, [shown, url, pageNumber, width]);
 
   return <img ref={ref} className={styles.pdfPage} src={src} alt={label} data-ready={Boolean(src)} />;
 }

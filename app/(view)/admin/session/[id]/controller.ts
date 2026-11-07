@@ -175,6 +175,18 @@ export function useSessionAdminController() {
       });
   };
 
+  // Materials uploaded before page images existed (or whose upload tab closed early) get the missing ones from the
+  // owner's player, a few seconds after it opens (docs/frontend-performance-audit.md, 2026-11-07).
+  const sourcePdfUrl = session?.slides.find((slide) => slide.pdfUrl?.startsWith("/api/pdf?"))?.pdfUrl;
+  const sourcePages = session?.slides.flatMap((slide) => slide.pdfUrl === sourcePdfUrl && slide.sourcePageIndex !== undefined ? [slide.sourcePageIndex + 1] : []).join(",");
+  useEffect(() => {
+    const sourcePath = sourcePdfUrl && new URL(sourcePdfUrl, location.origin).searchParams.get("path");
+    if (!sourcePdfUrl || !sourcePath || !sourcePages) return;
+    const pages = sourcePages.split(",").map(Number);
+    const timer = window.setTimeout(() => void import("@/app/_infrastructure/browser/pdf-page-images").then(({ storePdfPageImages }) => storePdfPageImages(sourcePdfUrl, sourcePath, pages)), 5_000);
+    return () => window.clearTimeout(timer);
+  }, [sourcePdfUrl, sourcePages]);
+
   const filmstripRef = useRef<HTMLDivElement>(null);
   const currentSlide = session?.currentSlide;
   useEffect(() => {

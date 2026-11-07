@@ -1,6 +1,6 @@
 import { createReadStream } from "node:fs";
 import { Readable } from "node:stream";
-import { PAGE_WIDTHS, pdfPageImage, warmPdfPages } from "@/app/_infrastructure/server/pdf-page";
+import { PAGE_WIDTHS, pdfPageImage } from "@/app/_infrastructure/server/pdf-page";
 import { getSupabaseClientForToken, supabaseServerConfigured } from "@/app/_infrastructure/supabase/server";
 
 const SOURCE_BUCKET = "course-materials";
@@ -26,13 +26,12 @@ export async function GET(request: Request) {
   const { data: info, error } = await bucket.info(sourcePath);
   if (error || !info) return Response.json({ error: "Not available" }, { status: 403 });
 
-  const download = async () => {
-    const { data, error: downloadError } = await bucket.download(sourcePath).asStream();
+  // The same caller JWT reads the stored page image, so participants need the live-lecture Storage policy for it too.
+  const download = async (path = sourcePath) => {
+    const { data, error: downloadError } = await bucket.download(path).asStream();
     if (downloadError || !data) throw downloadError ?? new Error("PDF download failed");
     return data;
   };
-  // Only a request that passed the RLS check starts the deck's warm-up (docs/frontend-performance-audit.md, 2026-11-07).
-  warmPdfPages(sourcePath, page, download);
   try {
     const image = await pdfPageImage(sourcePath, page, width, download);
     return new Response(Readable.toWeb(createReadStream(image)) as ReadableStream, { headers: { "Content-Type": "image/jpeg", "Cache-Control": "no-store" } });

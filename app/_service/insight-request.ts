@@ -1,5 +1,4 @@
 import { execFile } from "node:child_process";
-import { readdir } from "node:fs/promises";
 import { availableParallelism } from "node:os";
 import path from "node:path";
 import { promisify } from "node:util";
@@ -8,7 +7,6 @@ import sharp from "sharp";
 import { cachedFile } from "../_infrastructure/server/pdf-cache.ts";
 import { pdfPageImage } from "../_infrastructure/server/pdf-page.ts";
 import { resolveDocumentBinary } from "../_infrastructure/server/document-binaries.ts";
-import { renderPdfPages } from "../_infrastructure/server/pdf-render.ts";
 import { restOrigin } from "../_infrastructure/server/rest-origin.ts";
 import { MAX_PAGES, imageEdge, readableText, type SlidePage } from "./insight-ai.ts";
 import { limiter } from "../_infrastructure/server/limiter.ts";
@@ -88,6 +86,8 @@ export async function readOwnedInsightSource(authorization: string, selection: r
   try { return { ...inspectInsightSource(await boundedJson(response.body, 32 * 1024 * 1024), selection), purposes, folderLabels }; }
   catch (error) {
     const missing = error instanceof Error && error.message === "SOURCE_NOT_FOUND";
+    // The response keeps one code; the log keeps the check that failed (ORPHAN_QUESTION, SOURCE_LIMIT, ...).
+    if (!missing) console.error("Insight source rejected", error instanceof Error ? error.message : "UNKNOWN");
     throw new InsightRequestError(missing ? "SOURCE_NOT_FOUND" : "INVALID_SOURCE", missing ? 404 : 422);
   }
 }
@@ -110,48 +110,8 @@ export const oneRenderAtATime: ReturnType<typeof limiter> = ((globalThis as { in
 export const oneChatRenderAtATime: ReturnType<typeof limiter> = ((globalThis as { insightChatRender?: ReturnType<typeof limiter> }).insightChatRender ??= limiter(1));
 
 const run = promisify(execFile);
-/**
- * Renders the source PDF's pages (all, or `only` these 1-based pages) into `dir` as JPEGs sized for Claude so PIN
- * pixel coordinates line up, and extracts each page's text with poppler, which the runtime image already ships.
- * The size is computed from every page, so analysis and chat see the same image for a page.
- */
-/** `signal` kills the poppler processes, so an export the instructor closed stops using the CPU. */
-export async function renderSlidePages(file: string, dir: string, only?: readonly number[], signal?: AbortSignal): Promise<SlidePage[]> {
-  const pdftoppm = await resolveDocumentBinary("pdftoppm"), poppler = (name: string) => path.join(/* turbopackIgnore: true */ path.dirname(pdftoppm), name);
-  const { stdout: info } = await run(poppler("pdfinfo"), ["-f", "1", "-l", String(MAX_PAGES + 1), file], { timeout: 60_000, maxBuffer: 16 * 1024 ** 2, signal });
-  const total = Number(/^Pages:\s+(\d+)/m.exec(info)?.[1] ?? 0);
-  if (!total || total > MAX_PAGES) throw new Error("SOURCE_TOO_LARGE");
-  const sizes = Array.from({ length: total }, () => ({ width: 1, height: 1, rot: 0 }));
-  for (const [, page, key, value] of info.matchAll(/^Page\s+(\d+) (size|rot):\s+(.+)$/gm)) {
-    const item = sizes[Number(page) - 1];
-    if (item && key === "rot") item.rot = Number(value);
-    else if (item) [item.width, item.height] = value.split(" x ").map(parseFloat);
-  }
-  const shapes = sizes.map(({ width, height, rot }) => rot % 180 ? { width: height, height: width } : { width, height });
-  const edge = imageEdge(shapes);
-  const pages = only ? [...new Set(only)].filter((page) => page >= 1 && page <= total) : shapes.map((_, index) => index + 1);
-  const args = ["-jpeg", "-scale-to", String(edge), "-jpegopt", "quality=90"], textOf = (from: number, to: number) =>
-    run(poppler("pdftotext"), ["-layout", "-f", String(from), "-l", String(to), file, "-"], { timeout: 120_000, maxBuffer: 256 * 1024 ** 2, signal }).then(({ stdout }) => stdout.split("\f"));
-  const texts = new Map<number, string>();
-  if (only) {
-    await Promise.all(pages.map(async (page) => {
-      const [[text]] = await Promise.all([textOf(page, page), run(pdftoppm, [...args, "-f", String(page), "-l", String(page), file, path.join(dir, "page")], { timeout: 60_000, signal })]);
-      texts.set(page, text);
-    }));
-  } else {
-    const [all] = await Promise.all([textOf(1, total),
-      // Image-heavy decks take seconds per page; use half the cores so live lectures on the same server stay responsive.
-      renderPdfPages({ pdftoppm, pdf: file, outDir: dir, total, maxEdge: edge, quality: 90, maxWorkers: Math.min(8, Math.max(1, Math.floor(availableParallelism() / 2))), timeoutMs: 240_000, signal })]);
-    all.forEach((text, index) => texts.set(index + 1, text));
-  }
-  const files = new Map((await readdir(dir)).flatMap((name) => { const page = /^page-0*(\d+)\.jpg$/.exec(name)?.[1]; return page ? [[Number(page), path.join(dir, name)] as const] : []; }));
-  return pages.map((page) => {
-    const image = files.get(page), { width, height } = shapes[page - 1], scale = edge / Math.max(width, height);
-    if (!image) throw new Error("SOURCE_RENDER_FAILED");
-    const text = (texts.get(page) ?? "").replace(/[ \t]+$/gm, "").replace(/\n{3,}/g, "\n\n").trim().slice(0, 4000);
-    return { page, width: Math.round(width * scale), height: Math.round(height * scale), file: image, text: readableText(text) ? text : "" };
-  });
-}
+/** Extracted page text kept for the AI: trimmed to 4000 chars, dropped when it is mostly garbage glyphs. */
+const slideText = (raw: string) => { const text = raw.replace(/[ \t]+$/gm, "").replace(/\n{3,}/g, "\n\n").trim().slice(0, 4000); return readableText(text) ? text : ""; };
 
 const SOURCE_BYTES = 200 * 1024 ** 2;
 type Material = ReturnType<typeof inspectInsightSource>["materials"][number];
@@ -167,46 +127,58 @@ const exportSlot: ReturnType<typeof limiter> = ((globalThis as { exportPageRende
 export async function exportSlideImages(material: Material, dir: string, pages: readonly number[], signal?: AbortSignal) {
   const wanted = material.slides.filter((slide) => pages.includes(slide.pageIndex + 1)), bucket = insightStorage().storage.from("course-materials");
   const fromPdf = wanted.filter((slide) => slide.sourcePageIndex !== null);
+  // Size gate before the source reaches the disk cache.
+  const download = async () => {
+    const info = await bucket.info(material.sourcePath);
+    if (info.error || typeof info.data?.size !== "number") throw new Error("SOURCE_DOWNLOAD_FAILED");
+    if (info.data.size > SOURCE_BYTES) throw new Error("SOURCE_TOO_LARGE");
+    const file = await bucket.download(material.sourcePath).asStream();
+    if (file.error || !file.data) throw new Error("SOURCE_DOWNLOAD_FAILED");
+    return file.data;
+  };
   const cached = await Promise.all(fromPdf.map(async (slide) => {
     signal?.throwIfAborted();
-    const file = await pdfPageImage(material.sourcePath, slide.sourcePageIndex! + 1, 1920, async () => {
-      // Same size gate as renderMaterialSlides before the source reaches the disk cache.
-      const info = await bucket.info(material.sourcePath);
-      if (info.error || typeof info.data?.size !== "number") throw new Error("SOURCE_DOWNLOAD_FAILED");
-      if (info.data.size > SOURCE_BYTES) throw new Error("SOURCE_TOO_LARGE");
-      const download = await bucket.download(material.sourcePath).asStream();
-      if (download.error || !download.data) throw new Error("SOURCE_DOWNLOAD_FAILED");
-      return download.data;
-    }, exportSlot);
+    const file = await pdfPageImage(material.sourcePath, slide.sourcePageIndex! + 1, 1920, download, exportSlot);
     const { width = 1, height = 1 } = await sharp(file).metadata();
     return { page: slide.pageIndex + 1, width, height, file, text: "" };
   }));
   const rest = wanted.filter((slide) => slide.sourcePageIndex === null).map((slide) => slide.pageIndex + 1);
-  return [...cached, ...rest.length ? await renderMaterialSlides(material, dir, rest, signal) : []];
+  return { pages: [...cached, ...rest.length ? await renderMaterialSlides(material, dir, rest, signal) : []], pdf: fromPdf.length ? await cachedFile(material.sourcePath, download) : null };
 }
 
-/** Every slide (or only these slide numbers) as a Claude-ready JPEG keyed by slide number. PDF-page slides render from the cached source;
- * image slides (older PDF uploads, PPT/PPTX) use their stored JPEG, so an image-only deck never downloads its source. */
+/**
+ * RPT-121: slide images for the shared analysis from the same 1920px page cache the player and exports use, shrunk to the
+ * AI size, with the PDF's extracted text. A slide seen in the player is not rendered again (15 pages, 2026-11-05: 16 s with
+ * pdftoppm → 0.2 s from the cache); pages the cache lacks render one by one and stay cached for the player.
+ */
+export async function analysisSlideImages(material: Material, dir: string, signal?: AbortSignal, only?: readonly number[]): Promise<SlidePage[]> {
+  if (material.slides.length > MAX_PAGES) throw new Error("SOURCE_TOO_LARGE");
+  const { pages, pdf } = await exportSlideImages(material, dir, only ?? material.slides.map((slide) => slide.pageIndex + 1), signal);
+  const sourcePage = new Map(material.slides.flatMap((slide) => slide.sourcePageIndex === null ? [] : [[slide.pageIndex + 1, slide.sourcePageIndex + 1] as const]));
+  // Text of the shown source pages only, so a chat's few slides do not extract the whole PDF.
+  const used = pages.flatMap((page) => sourcePage.get(page.page) ?? []), first = Math.min(...used);
+  const pdftotext = pdf && used.length && path.join(/* turbopackIgnore: true */ path.dirname(await resolveDocumentBinary("pdftoppm")), "pdftotext");
+  const texts = pdftotext ? (await run(pdftotext, ["-layout", "-f", String(first), "-l", String(Math.max(...used)), pdf!, "-"], { timeout: 120_000, maxBuffer: 256 * 1024 ** 2, signal })).stdout.split("\f") : [];
+  // sharp jobs hold libuv threads that /api/pdf disk reads also need, so two at a time, as in renderMaterialSlides.
+  const slot = limiter(2);
+  return Promise.all(pages.map((page) => slot(async () => {
+    const source = sourcePage.get(page.page);
+    // Image slides come from renderMaterialSlides already at the AI size.
+    if (!source) return page;
+    const edge = imageEdge([page]), out = path.join(dir, `ai-${page.page}.jpg`);
+    const saved = await sharp(page.file).resize(edge, edge, { fit: "inside", withoutEnlargement: true }).jpeg({ quality: 90 }).toFile(out);
+    return { page: page.page, width: saved.width, height: saved.height, file: out, text: slideText(texts[source - first] ?? "") };
+  })));
+}
+
+/** Image slides (older PDF uploads, PPT/PPTX; all, or `only` these slide numbers) as Claude-ready JPEGs from their stored image.
+ * PDF-page slides come from the page cache (exportSlideImages), so an image-only deck never downloads its source. */
 export async function renderMaterialSlides(material: Material, dir: string, only?: readonly number[], signal?: AbortSignal): Promise<SlidePage[]> {
   if (material.slides.length > MAX_PAGES) throw new Error("SOURCE_TOO_LARGE");
-  const db = insightStorage(), wanted = material.slides.filter((slide) => !only || only.includes(slide.pageIndex + 1));
-  const fromPdf = wanted.filter((slide) => slide.sourcePageIndex !== null), fromImage = wanted.filter((slide) => slide.sourcePageIndex === null);
-  let rendered = new Map<number, SlidePage>();
-  if (fromPdf.length) {
-    const bucket = db.storage.from("course-materials"), info = await bucket.info(material.sourcePath);
-    if (info.error || typeof info.data?.size !== "number") throw new Error("SOURCE_DOWNLOAD_FAILED");
-    if (info.data.size > SOURCE_BYTES) throw new Error("SOURCE_TOO_LARGE");
-    // Streams to the disk cache /api/pdf shares (same key), so the source never sits in memory.
-    const pdf = await cachedFile(material.sourcePath, async () => {
-      const file = await bucket.download(material.sourcePath).asStream();
-      if (file.error || !file.data) throw new Error("SOURCE_DOWNLOAD_FAILED");
-      return file.data;
-    });
-    rendered = new Map((await renderSlidePages(pdf, dir, only && fromPdf.map((slide) => slide.sourcePageIndex! + 1), signal)).map((page) => [page.page, page]));
-  }
+  const db = insightStorage(), fromImage = material.slides.filter((slide) => slide.sourcePageIndex === null && (!only || only.includes(slide.pageIndex + 1)));
   // sharp jobs hold libuv threads that /api/pdf disk reads and DNS lookups also need, so keep two images in flight.
   const slot = limiter(2);
-  const images = await Promise.all(fromImage.map((slide) => slot(async (): Promise<SlidePage> => {
+  return Promise.all(fromImage.map((slide) => slot(async (): Promise<SlidePage> => {
     signal?.throwIfAborted();
     const file = await db.storage.from("lecture-slides").download(slide.imagePath!);
     if (file.error || !file.data) throw new Error("SOURCE_DOWNLOAD_FAILED");
@@ -215,9 +187,4 @@ export async function renderMaterialSlides(material: Material, dir: string, only
     const saved = await image.resize(edge, edge, { fit: "inside", withoutEnlargement: true }).jpeg({ quality: 90 }).toFile(out);
     return { page: slide.pageIndex + 1, width: saved.width, height: saved.height, file: out, text: "" };
   })));
-  return [...fromPdf.map((slide) => {
-    const page = rendered.get(slide.sourcePageIndex! + 1);
-    if (!page) throw new Error("SOURCE_RENDER_FAILED");
-    return { ...page, page: slide.pageIndex + 1 };
-  }), ...images];
 }

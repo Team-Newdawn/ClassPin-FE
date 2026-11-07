@@ -20,8 +20,8 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
       // Slide numbers point into the deck the draft counted; a deck changed since then exports without images.
       // A closed or replaced request leaves the queue without rendering, or kills its poppler processes mid-render.
       const images = material && material.slides.length === document.metrics.slides
-        ? await oneRenderAtATime(() => { signal.throwIfAborted(); return exportSlideImages(material, work, pages, signal); }) : [];
-      return exportReport(document, format, { fileName: row.file_name, images });
+        ? await oneRenderAtATime(async () => { signal.throwIfAborted(); return (await exportSlideImages(material, work, pages, signal)).pages; }) : [];
+      return exportReport(document, format, { fileName: row.file_name, images, ...(material ? { pinSource: material } : {}) });
     });
   } catch (error) { return insightFailure(error); }
 }

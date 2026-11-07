@@ -1,18 +1,18 @@
 import assert from "node:assert/strict";
 import { createHash, randomUUID } from "node:crypto";
-import { rm } from "node:fs/promises";
+import { rm, stat } from "node:fs/promises";
 import { createServer } from "node:http";
 import { registerHooks } from "node:module";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 import { PDFDocument } from "pdf-lib";
+import sharp from "sharp";
 
-test("page images render once per size, are cached on disk, and still check RLS on every request", { timeout: 30_000 }, async () => {
+test("page images render once per page, thumbnails shrink the full page, the rest of the deck warms up, and RLS is checked on every request", { timeout: 30_000 }, async () => {
   const sourcePath = `${randomUUID()}/${randomUUID()}/source.pdf`;
   const pdf = await PDFDocument.create();
-  pdf.addPage([960, 540]);
-  pdf.addPage([960, 540]);
+  for (let page = 0; page < 3; page++) pdf.addPage([960, 540]);
   const bytes = Buffer.from(await pdf.save());
   let allowed = true, downloads = 0;
   const storage = createServer((req, res) => {
@@ -37,6 +37,8 @@ test("page images render once per size, are cached on disk, and still check RLS 
       return next(specifier.startsWith("@/") ? new URL(`../../../../${specifier.slice(2)}.ts`, import.meta.url).href : specifier, context);
     },
   });
+  const cacheFile = (key) => path.join(os.tmpdir(), "ohpin-pdf-cache", createHash("sha1").update(key).digest("hex"));
+  const cached = (page, width) => cacheFile(`${sourcePath}#p${page}@${width}`);
   const request = (query, token = "caller") => new Request(`http://localhost/api/pdf/page?path=${sourcePath}&${query}`,
     { headers: token ? { Authorization: `Bearer ${token}` } : {} });
   try {
@@ -48,10 +50,13 @@ test("page images render once per size, are cached on disk, and still check RLS 
     const jpeg = Buffer.from(await first.arrayBuffer());
     assert.deepEqual([...jpeg.subarray(0, 2)], [0xff, 0xd8], "a JPEG");
     assert.deepEqual(Buffer.from(await same.arrayBuffer()), jpeg, "concurrent requests share one render");
+    assert.deepEqual([(await sharp(jpeg).metadata()).width, (await stat(cached(2, 1920))).isFile()], [640, true], "the thumbnail is the full page shrunk");
+    // Nobody asked for pages 3 and 1; the warm-up renders them at full size after page 2.
+    for (const page of [3, 1]) while (!(await stat(cached(page, 1920)).catch(() => null))) await new Promise((resolve) => setTimeout(resolve, 50));
     assert.equal((await GET(request("page=1&w=1920"))).status, 200);
     assert.equal(downloads, 1, "the source downloads once and stays in the disk cache");
 
-    assert.equal((await GET(request("page=3&w=640"))).status, 404, "past the last page");
+    assert.equal((await GET(request("page=4&w=640"))).status, 404, "past the last page");
     assert.equal((await GET(request("page=1&w=800"))).status, 400, "only the two sizes");
     assert.equal((await GET(request("page=0&w=640"))).status, 400);
     assert.equal((await GET(request("page=1&w=640", ""))).status, 401);
@@ -64,8 +69,6 @@ test("page images render once per size, are cached on disk, and still check RLS 
     }
     storage.closeAllConnections();
     await new Promise((resolve) => storage.close(() => resolve()));
-    for (const key of [sourcePath, `${sourcePath}#p2@640`, `${sourcePath}#p1@1920`]) {
-      await rm(path.join(os.tmpdir(), "ohpin-pdf-cache", createHash("sha1").update(key).digest("hex")), { force: true });
-    }
+    for (const file of [cacheFile(sourcePath), cached(2, 640), ...[1, 2, 3].map((page) => cached(page, 1920))]) await rm(file, { force: true });
   }
 });

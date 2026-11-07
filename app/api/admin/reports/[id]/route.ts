@@ -1,7 +1,7 @@
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import { boundedJson, insightFailure, insightResponse, InsightRequestError, oneChatRenderAtATime, readOwnedInsightSource, renderMaterialSlides, runningAnalyses } from "../../../../_service/insight-request.ts";
+import { analysisSlideImages, boundedJson, insightFailure, insightResponse, InsightRequestError, oneChatRenderAtATime, readOwnedInsightSource, runningAnalyses } from "../../../../_service/insight-request.ts";
 import { checkDailyDrafts, draftBasis, draftProgress, drafting, ownedReport, reportView, startDraft, type ReportRow } from "../../../../_service/report-request.ts";
 import { CHAT_SLIDES_PER_ANSWER, chatFile, chatReport, insightAi, viewSlides, type ChatFile } from "../../../../_service/insight-ai.ts";
 import { CHAT_QUESTIONS_PER_REPORT, draftReport, type ReportDocument, type ReportMessage } from "../../../../_model/report.ts";
@@ -61,7 +61,7 @@ export async function POST(request: Request, context: Context) {
       const basis = await draftBasis(db, ownerId, source.materials[0], { ...row, folder: source.folderLabels.get(source.materials[0].folderId ?? "") });
       if (!ai) return await save(db, row, { status: "ready", error: null, document: draftReport({ ...basis, analysis: null }), analysis: null }, 202);
       const draftedAt = now(), response = await save(db, row, { status: "drafting", error: null, drafted_at: draftedAt }, 202);
-      if (response.status === 202) startDraft(db, id, draftedAt, ai, source, basis);
+      if (response.status === 202) startDraft(db, id, draftedAt, ai, ownerId, source, basis);
       return response;
     }
     if (body?.action === "cancel") {
@@ -116,7 +116,7 @@ async function chat(request: Request, db: Awaited<ReturnType<typeof ownedReport>
   const budget = { left: CHAT_SLIDES_PER_ANSWER };
   const view = async (input: unknown) => {
     const work = await mkdtemp(path.join(tmpdir(), "report-chat-"));
-    try { return await viewSlides(material, document.metrics.slides, (pages) => oneChatRenderAtATime(() => { signal.throwIfAborted(); return renderMaterialSlides(material, work, pages); }), input, budget); }
+    try { return await viewSlides(material, document.metrics.slides, (pages) => oneChatRenderAtATime(() => analysisSlideImages(material, work, signal, pages)), input, budget); }
     finally { await rm(work, { recursive: true, force: true }); }
   };
   const answer = chatReport(ai, { document, material, history: history.filter((item) => !item.cleared), message, currentPage: slide, view, signal, withData, file });

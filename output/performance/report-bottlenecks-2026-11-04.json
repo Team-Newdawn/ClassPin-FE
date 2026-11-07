@@ -1,0 +1,497 @@
+{
+  "date": "2026-11-04",
+  "scope": "existing local development logs plus offline component measurements; no production traffic or paid AI calls generated",
+  "environment": {
+    "os": "macOS 26.5.2",
+    "architecture": "arm64",
+    "node": "v24.22.2",
+    "logicalCpus": 10,
+    "hostMemoryGiB": 16,
+    "deploymentNode": "22 (Dockerfile)"
+  },
+  "fixture": {
+    "pdfBytes": 51728648,
+    "pdfPages": 15,
+    "pageWidth": 1920,
+    "pageHeight": 1080,
+    "report": "synthetic Korean text: 15 sections, each with a slide image; no charts",
+    "rendererSlots": 5
+  },
+  "existingLogs": {
+    "completedDrafts": [
+      {
+        "pages": 9,
+        "renderMs": 1960,
+        "slidesMs": 21271,
+        "bodyMs": 7515,
+        "logTimestamp": "01:44:58.336",
+        "totalLoggedMs": 30746,
+        "aiSharePercent": 93.62518701619723
+      },
+      {
+        "pages": 3,
+        "renderMs": 309,
+        "slidesMs": 10671,
+        "bodyMs": 7251,
+        "logTimestamp": "05:26:52.160",
+        "totalLoggedMs": 18231,
+        "aiSharePercent": 98.30508474576271
+      }
+    ],
+    "usage": [
+      {
+        "event": "insight_ai_usage",
+        "step": "slides",
+        "provider": "claude",
+        "model": "claude-haiku-5-5",
+        "prompt": 18908,
+        "input": 18908,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "output": 4256,
+        "overTier": false
+      },
+      {
+        "event": "insight_ai_usage",
+        "step": "merge",
+        "provider": "claude",
+        "model": "claude-haiku-5-5",
+        "prompt": 6595,
+        "input": 6595,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "output": 1390,
+        "overTier": false
+      },
+      {
+        "event": "insight_ai_usage",
+        "step": "slides",
+        "provider": "claude",
+        "model": "claude-haiku-5-5",
+        "prompt": 7080,
+        "input": 7080,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "output": 1965,
+        "overTier": false
+      },
+      {
+        "event": "insight_ai_usage",
+        "step": "merge",
+        "provider": "claude",
+        "model": "claude-haiku-5-5",
+        "prompt": 2592,
+        "input": 2592,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "output": 1523,
+        "overTier": false
+      }
+    ]
+  },
+  "requestObservation": {
+    "pages": 3,
+    "post202ElapsedMs": 10700,
+    "postApplicationCodeMs": 10600,
+    "postNextCompileMs": 25,
+    "loggedAsyncMs": 18231,
+    "approxCombinedMsExcludingFinalSaveAndUi": 28931,
+    "note": "one terminal observation; phase breakdown inside preflight is not logged"
+  },
+  "processMeasurements": [
+    {
+      "mode": "render",
+      "exitCode": 0,
+      "sampledProcessTreePeakRssMiB": 456.109375,
+      "maxChildren": 15,
+      "elapsedWithStartupMs": 13536.232416983694,
+      "autoStopped": false
+    },
+    {
+      "mode": "md",
+      "exitCode": 0,
+      "sampledProcessTreePeakRssMiB": 138.421875,
+      "maxChildren": 0,
+      "elapsedWithStartupMs": 620.2923748642206,
+      "autoStopped": false
+    },
+    {
+      "mode": "docx",
+      "exitCode": 0,
+      "sampledProcessTreePeakRssMiB": 220.140625,
+      "maxChildren": 0,
+      "elapsedWithStartupMs": 1333.2710419781506,
+      "autoStopped": false
+    },
+    {
+      "mode": "pptx",
+      "exitCode": 0,
+      "sampledProcessTreePeakRssMiB": 257.734375,
+      "maxChildren": 0,
+      "elapsedWithStartupMs": 1088.8620000332594,
+      "autoStopped": false
+    },
+    {
+      "mode": "pdf",
+      "exitCode": 0,
+      "sampledProcessTreePeakRssMiB": 237.125,
+      "maxChildren": 0,
+      "elapsedWithStartupMs": 1896.4857920072973,
+      "autoStopped": false
+    },
+    {
+      "mode": "concurrent",
+      "exitCode": 0,
+      "sampledProcessTreePeakRssMiB": 253.203125,
+      "maxChildren": 0,
+      "elapsedWithStartupMs": 1348.4865832142532,
+      "autoStopped": false
+    },
+    {
+      "mode": "queue",
+      "exitCode": 0,
+      "sampledProcessTreePeakRssMiB": 454.234375,
+      "maxChildren": 5,
+      "maxPdftoppmProcesses": 5,
+      "elapsedWithStartupMs": 11924.463166855276,
+      "autoStopped": false
+    },
+    {
+      "mode": "memory",
+      "exitCode": 0,
+      "sampledProcessTreePeakRssMiB": 317.484375,
+      "maxChildren": 0,
+      "maxPdftoppmProcesses": 0,
+      "elapsedWithStartupMs": 5924.275833182037,
+      "autoStopped": false
+    }
+  ],
+  "measurements": {
+    "render": {
+      "mode": "render",
+      "runtime": "v24.22.2",
+      "logicalCpus": 10,
+      "memoryScope": "process lifetime peak RSS includes module loading; does not include child processes",
+      "records": [
+        {
+          "label": "render-cold",
+          "elapsedMs": 12890.534,
+          "cpuMs": 298.994,
+          "rssBeforeMiB": 84.11608123779297,
+          "rssAfterMiB": 98.52310943603516,
+          "processLifetimeMaxRssMiB": 207.515625,
+          "eventLoopMaxMs": 84.541439,
+          "eventLoopP99Ms": 15.491071,
+          "pages": 15
+        },
+        {
+          "label": "render-warm-1",
+          "elapsedMs": 4.471250000000509,
+          "cpuMs": 10.8,
+          "rssBeforeMiB": 98.89810943603516,
+          "rssAfterMiB": 99.00748443603516,
+          "processLifetimeMaxRssMiB": 207.515625,
+          "eventLoopMaxMs": 11.026431,
+          "eventLoopP99Ms": 11.026431,
+          "pages": 15
+        },
+        {
+          "label": "render-warm-2",
+          "elapsedMs": 4.576790999999503,
+          "cpuMs": 16.411,
+          "rssBeforeMiB": 99.36685943603516,
+          "rssAfterMiB": 99.36685943603516,
+          "processLifetimeMaxRssMiB": 207.515625,
+          "eventLoopMaxMs": 11.034623,
+          "eventLoopP99Ms": 11.034623,
+          "pages": 15
+        }
+      ]
+    },
+    "md": {
+      "mode": "md",
+      "runtime": "v24.22.2",
+      "logicalCpus": 10,
+      "memoryScope": "process lifetime peak RSS includes module loading; does not include child processes",
+      "records": [
+        {
+          "label": "md-0",
+          "elapsedMs": 2.0475000000000136,
+          "cpuMs": 1.573,
+          "rssBeforeMiB": 85.45964813232422,
+          "rssAfterMiB": 85.56902313232422,
+          "processLifetimeMaxRssMiB": 138.53125,
+          "eventLoopMaxMs": 11.042815,
+          "eventLoopP99Ms": 11.042815,
+          "bytes": 20045
+        },
+        {
+          "label": "md-1",
+          "elapsedMs": 0.41766699999999446,
+          "cpuMs": 0.422,
+          "rssBeforeMiB": 85.58464813232422,
+          "rssAfterMiB": 85.58464813232422,
+          "processLifetimeMaxRssMiB": 138.53125,
+          "eventLoopMaxMs": 11.313151,
+          "eventLoopP99Ms": 11.313151,
+          "bytes": 20045
+        },
+        {
+          "label": "md-2",
+          "elapsedMs": 0.6245419999999626,
+          "cpuMs": 0.9,
+          "rssBeforeMiB": 85.60027313232422,
+          "rssAfterMiB": 85.60027313232422,
+          "processLifetimeMaxRssMiB": 138.53125,
+          "eventLoopMaxMs": 11.034623,
+          "eventLoopP99Ms": 11.034623,
+          "bytes": 20045
+        }
+      ]
+    },
+    "docx": {
+      "mode": "docx",
+      "runtime": "v24.22.2",
+      "logicalCpus": 10,
+      "memoryScope": "process lifetime peak RSS includes module loading; does not include child processes",
+      "records": [
+        {
+          "label": "docx-0",
+          "elapsedMs": 291.81724999999994,
+          "cpuMs": 396.227,
+          "rssBeforeMiB": 85.28811645507812,
+          "rssAfterMiB": 118.84046173095703,
+          "processLifetimeMaxRssMiB": 172.421875,
+          "eventLoopMaxMs": 30.048255,
+          "eventLoopP99Ms": 30.048255,
+          "bytes": 2987127
+        },
+        {
+          "label": "docx-1",
+          "elapsedMs": 257.72375,
+          "cpuMs": 265.723,
+          "rssBeforeMiB": 119.02796173095703,
+          "rssAfterMiB": 157.1865234375,
+          "processLifetimeMaxRssMiB": 204.890625,
+          "eventLoopMaxMs": 20.725759,
+          "eventLoopP99Ms": 20.725759,
+          "bytes": 2987123
+        },
+        {
+          "label": "docx-2",
+          "elapsedMs": 255.4369999999999,
+          "cpuMs": 261.584,
+          "rssBeforeMiB": 157.5458984375,
+          "rssAfterMiB": 171.92696380615234,
+          "processLifetimeMaxRssMiB": 231.90625,
+          "eventLoopMaxMs": 19.480575,
+          "eventLoopP99Ms": 19.480575,
+          "bytes": 2987124
+        }
+      ]
+    },
+    "pptx": {
+      "mode": "pptx",
+      "runtime": "v24.22.2",
+      "logicalCpus": 10,
+      "memoryScope": "process lifetime peak RSS includes module loading; does not include child processes",
+      "records": [
+        {
+          "label": "pptx-0",
+          "elapsedMs": 219.797,
+          "cpuMs": 242.088,
+          "rssBeforeMiB": 84.31920623779297,
+          "rssAfterMiB": 123.18382263183594,
+          "processLifetimeMaxRssMiB": 175.046875,
+          "eventLoopMaxMs": 11.116543,
+          "eventLoopP99Ms": 11.116543,
+          "bytes": 7332591
+        },
+        {
+          "label": "pptx-1",
+          "elapsedMs": 207.31475,
+          "cpuMs": 203.713,
+          "rssBeforeMiB": 123.18382263183594,
+          "rssAfterMiB": 170.33181762695312,
+          "processLifetimeMaxRssMiB": 214.984375,
+          "eventLoopMaxMs": 11.034623,
+          "eventLoopP99Ms": 11.034623,
+          "bytes": 7332591
+        },
+        {
+          "label": "pptx-2",
+          "elapsedMs": 209.73916700000007,
+          "cpuMs": 219.364,
+          "rssBeforeMiB": 170.33181762695312,
+          "rssAfterMiB": 194.19075775146484,
+          "processLifetimeMaxRssMiB": 275.390625,
+          "eventLoopMaxMs": 11.034623,
+          "eventLoopP99Ms": 11.034623,
+          "bytes": 7332591
+        }
+      ]
+    },
+    "pdf": {
+      "mode": "pdf",
+      "runtime": "v24.22.2",
+      "logicalCpus": 10,
+      "memoryScope": "process lifetime peak RSS includes module loading; does not include child processes",
+      "records": [
+        {
+          "label": "pdf-0",
+          "elapsedMs": 486.120542,
+          "cpuMs": 723.84,
+          "rssBeforeMiB": 85.11637878417969,
+          "rssAfterMiB": 162.57984924316406,
+          "processLifetimeMaxRssMiB": 208.078125,
+          "eventLoopMaxMs": 399.769599,
+          "eventLoopP99Ms": 399.769599,
+          "bytes": 5081687
+        },
+        {
+          "label": "pdf-1",
+          "elapsedMs": 500.285083,
+          "cpuMs": 565.969,
+          "rssBeforeMiB": 162.57984924316406,
+          "rssAfterMiB": 198.31438446044922,
+          "processLifetimeMaxRssMiB": 239.765625,
+          "eventLoopMaxMs": 409.993215,
+          "eventLoopP99Ms": 409.993215,
+          "bytes": 5081687
+        },
+        {
+          "label": "pdf-2",
+          "elapsedMs": 402.36958300000015,
+          "cpuMs": 445.335,
+          "rssBeforeMiB": 197.73616790771484,
+          "rssAfterMiB": 214.93270874023438,
+          "processLifetimeMaxRssMiB": 239.765625,
+          "eventLoopMaxMs": 342.884351,
+          "eventLoopP99Ms": 342.884351,
+          "bytes": 5081687
+        }
+      ]
+    },
+    "concurrent": {
+      "mode": "concurrent",
+      "runtime": "v24.22.2",
+      "logicalCpus": 10,
+      "memoryScope": "process lifetime peak RSS includes module loading; does not include child processes",
+      "records": [
+        {
+          "label": "pdf-two-in-flight",
+          "elapsedMs": 894.9925840000001,
+          "cpuMs": 1267.904,
+          "rssBeforeMiB": 90.58462524414062,
+          "rssAfterMiB": 207.64232635498047,
+          "processLifetimeMaxRssMiB": 253.65625,
+          "eventLoopMaxMs": 380.108799,
+          "eventLoopP99Ms": 380.108799,
+          "bytes": [
+            5081687,
+            5081687
+          ],
+          "completionsMs": [
+            894.9657500000001,
+            534.3286250000001
+          ]
+        }
+      ]
+    },
+    "queue": {
+      "mode": "queue",
+      "runtime": "v24.22.2",
+      "logicalCpus": 10,
+      "memoryScope": "process lifetime peak RSS includes module loading; does not include child processes",
+      "records": [
+        {
+          "label": "cold-job-then-cached-job-shared-slot",
+          "elapsedMs": 11430.939958,
+          "cpuMs": 312.254,
+          "rssBeforeMiB": 86.16291046142578,
+          "rssAfterMiB": 103.33540344238281,
+          "processLifetimeMaxRssMiB": 206.765625,
+          "eventLoopMaxMs": 69.926911,
+          "eventLoopP99Ms": 16.310271,
+          "jobs": [
+            {
+              "job": 0,
+              "queueWaitMs": 32.26066700000001,
+              "serviceMs": 11427.419583,
+              "completionMs": 11459.681833,
+              "normalizedQueueWaitMs": 0.0
+            },
+            {
+              "job": 1,
+              "queueWaitMs": 11459.699583000001,
+              "serviceMs": 3.4259169999986625,
+              "completionMs": 11463.125833,
+              "normalizedQueueWaitMs": 11427.438916000001
+            }
+          ]
+        }
+      ]
+    },
+    "memory": {
+      "mode": "memory",
+      "runtime": "v24.22.2",
+      "logicalCpus": 10,
+      "memoryScope": "process lifetime peak RSS includes module loading; does not include child processes",
+      "records": [
+        {
+          "label": "pdf-repeated-12-with-gc-observation",
+          "elapsedMs": 5436.019708,
+          "cpuMs": 6944.403,
+          "rssBeforeMiB": 85.50684356689453,
+          "rssAfterMiB": 298.8247528076172,
+          "processLifetimeMaxRssMiB": 318.125,
+          "eventLoopMaxMs": 397.410303,
+          "eventLoopP99Ms": 387.973119,
+          "samples": [
+            {
+              "completed": 3,
+              "rssMiB": 236.0899429321289,
+              "heapUsedMiB": 22.777603149414062
+            },
+            {
+              "completed": 6,
+              "rssMiB": 293.68383026123047,
+              "heapUsedMiB": 22.662086486816406
+            },
+            {
+              "completed": 9,
+              "rssMiB": 294.6840591430664,
+              "heapUsedMiB": 16.96929931640625
+            },
+            {
+              "completed": 12,
+              "rssMiB": 298.8247528076172,
+              "heapUsedMiB": 16.98242950439453
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "sourceSha256": {
+    "app/_service/insight-ai.ts": "320b1ff00b3982d819c3ae63832904bf0041882331d1a19a93c451b7d410e543",
+    "app/_service/report-request.ts": "a3cde14f4031272ea8d16325645a152738e77061505ba0993e05676ff6f3f3c8",
+    "app/_service/report-export.ts": "56546804ca6c848c8ec1de91911707497d9fa2df11da413064aae5ad2cad7173",
+    "app/_service/insight-request.ts": "25b65ae2e1182339c9a755e0cd6a6560bb82f18ef95f3df2402b40d8e2cc5895",
+    "app/_infrastructure/server/pdf-page.ts": "9bef2e8a41ccc95cc111a5027f598839f8cd715fba25ca4f4e8e4d4a897c22e1",
+    "app/_infrastructure/server/limiter.ts": "161ca754d57e6fcd3a3253a7a3ca29516bf279f90f9b302a5f55b0ca5e3b5b18"
+  },
+  "limitations": [
+    "Only two successful historical draft logs; insufficient for p95/p99 or failure-rate estimates.",
+    "Historical renderMs includes queue waiting; AI and merge wall times include preparation and provider I/O.",
+    "Historical draft log excludes request authentication/source lookup/insert, final ready-state DB save, and UI polling.",
+    "Offline export measurements exclude authentication, REST/Storage transfer, HTTP response, previews, browser and AI.",
+    "Node peak RSS includes module loading and process lifetime; it is not incremental per-request allocation.",
+    "Process-tree RSS is sampled about every 100ms and sums resident pages; it is not exact peak physical unique memory.",
+    "Concurrency exercises component functions and the same limiter primitive, not real authenticated concurrent HTTP requests.",
+    "Queue normalized wait removes the measurement harness initial setup delay.",
+    "Memory observation uses explicit GC every three exports for 12 exports; it cannot prove absence or presence of leaks.",
+    "server-only marker resolved to an empty module outside Next; implementation functions were unchanged.",
+    "Synthetic text/image exports do not cover chart-heavy or long-table reports; local results are not production capacity estimates."
+  ]
+}

@@ -7,6 +7,8 @@ const nextConfig: NextConfig = {
   // 상위 디렉터리에 다른 lockfile 이 있으면 Next 가 트레이싱 루트를 위로 잡아
   // standalone 출력이 중첩된 경로로 떨어진다. 항상 이 폴더를 루트로 고정한다.
   outputFileTracingRoot: path.resolve(import.meta.dirname),
+  // pdf-page.ts runs this script as its own process, so the trace cannot see it or its WebAssembly (2026-11-07).
+  outputFileTracingIncludes: { "/**": ["./app/_infrastructure/server/pdfium-page.mjs", "./node_modules/@embedpdf/pdfium/**/*"] },
 };
 
 export default nextConfig;

@@ -4,6 +4,7 @@ import type { Slide } from "@/app/_model/types";
 import {
   createPdfSlides,
   MAX_SOURCE_FILE_BYTES,
+  pdfProxyUrl,
   SOURCE_CONTENT_TYPES,
   SOURCE_FILE_TOO_LARGE_ERROR,
   sourceFileExtension,
@@ -100,15 +101,24 @@ export async function convertToSlides(file: File, callbacks?: ConvertCallbacks):
   if (extension === ".pdf" && auth) {
     const pdfUrl = URL.createObjectURL(file);
     try {
+      const uploading = uploadSource(file, extension, auth, callbacks?.onUploadProgress);
+      // Page images render from the local file while the source uploads, and the material is created only once they
+      // are stored, so no viewer waits for a server render (docs/frontend-performance-audit.md, 2026-11-07).
+      const storing = import("@/app/_infrastructure/browser/pdf-page-images").then(({ storePdfPageImages }) => storePdfPageImages(pdfUrl, uploading));
       const [upload, pageCount] = await Promise.allSettled([
-        uploadSource(file, extension, auth, callbacks?.onUploadProgress),
+        uploading,
         import("@/app/_infrastructure/browser/pdf-document").then(({ getPdfPageCount }) => getPdfPageCount(pdfUrl)),
       ]);
       if (upload.status === "fulfilled") sourcePath = upload.value;
       if (upload.status === "rejected") throw upload.reason;
       if (pageCount.status === "rejected") throw pageCount.reason;
       callbacks?.onMeta?.(pageCount.value);
-      const slides = createPdfSlides(pageCount.value, pdfUrl);
+      // A failed page image is not an upload failure: the server renders whatever is missing. Once they are stored the new
+      // material points at the server images, not the local file: pdf.js on a 51 MB photo deck took ~3 s a page in the
+      // player right after upload, the stored images ~0.1 s (2026-11-07).
+      const stored = await storing.catch(() => false);
+      if (stored) URL.revokeObjectURL(pdfUrl);
+      const slides = createPdfSlides(pageCount.value, stored ? pdfProxyUrl(sourcePath!, false) : pdfUrl);
       slides.forEach((slide) => callbacks?.onSlide?.(slide, slides.length));
       return { slides, sourcePath };
     } catch (error) {

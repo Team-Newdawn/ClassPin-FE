@@ -128,7 +128,13 @@ export async function exportSlideImages(material: Material, dir: string, pages: 
   const wanted = material.slides.filter((slide) => pages.includes(slide.pageIndex + 1)), bucket = insightStorage().storage.from("course-materials");
   const fromPdf = wanted.filter((slide) => slide.sourcePageIndex !== null);
   // Size gate before the source reaches the disk cache.
-  const download = async () => {
+  const download = async (path?: string) => {
+    // A stored page image (pdfPageImage) skips the source size gate; pdfPageImage caps and checks it.
+    if (path) {
+      const image = await bucket.download(path).asStream();
+      if (image.error || !image.data) throw new Error("PAGE_IMAGE_MISSING");
+      return image.data;
+    }
     const info = await bucket.info(material.sourcePath);
     if (info.error || typeof info.data?.size !== "number") throw new Error("SOURCE_DOWNLOAD_FAILED");
     if (info.data.size > SOURCE_BYTES) throw new Error("SOURCE_TOO_LARGE");
@@ -143,7 +149,7 @@ export async function exportSlideImages(material: Material, dir: string, pages: 
     return { page: slide.pageIndex + 1, width, height, file, text: "" };
   }));
   const rest = wanted.filter((slide) => slide.sourcePageIndex === null).map((slide) => slide.pageIndex + 1);
-  return { pages: [...cached, ...rest.length ? await renderMaterialSlides(material, dir, rest, signal) : []], pdf: fromPdf.length ? await cachedFile(material.sourcePath, download) : null };
+  return { pages: [...cached, ...rest.length ? await renderMaterialSlides(material, dir, rest, signal) : []], pdf: fromPdf.length ? await cachedFile(material.sourcePath, () => download()) : null };
 }
 
 /**

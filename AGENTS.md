@@ -143,9 +143,11 @@ flow unless a task explicitly spans both products.
   source path; do not send large source bytes through Cloud Run request bodies.
 - Source PDFs are read through `GET /api/pdf?path=…` with the requester's JWT, never
   through per-participant signed URLs. Slides show server-rendered page images from
-  `GET /api/pdf/page?path=…&page=…&w=640|1920` (pdftoppm on first view, then the disk
-  cache; decided 2026-10-31); pdf.js stays only for local blob PDFs and export
-  previews. Both routes keep the live-only RLS gate on every request; do not add a
+  `GET /api/pdf/page?path=…&page=…&w=640|1920`: the owner's browser renders each page
+  once with pdf.js into `{source folder}/pages/{n}.jpg`, the route serves that and renders
+  with pdftoppm only when it is missing (decided 2026-11-07, after server rendering stalled
+  the 2 GB EC2 host; never add server-side warm-up or memory-heavy renderers there). Other
+  pdf.js use stays limited to local blob PDFs and export previews. Both routes keep the live-only RLS gate on every request; do not add a
   service-role bypass or long browser cache.
 - Opening a material shows the live player. Its folder rail can collapse, its right
   question panel can resize, and speaker notes sit below the slide.

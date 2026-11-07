@@ -9,13 +9,23 @@ import test from "node:test";
 import { PDFDocument } from "pdf-lib";
 import sharp from "sharp";
 
-test("page images render once per page, thumbnails shrink the full page, the rest of the deck warms up, and RLS is checked on every request", { timeout: 30_000 }, async () => {
+test("page images prefer the owner's stored JPEG, render once per page otherwise, thumbnails shrink the full page, and RLS is checked on every request", { timeout: 30_000 }, async () => {
   const sourcePath = `${randomUUID()}/${randomUUID()}/source.pdf`;
   const pdf = await PDFDocument.create();
   for (let page = 0; page < 3; page++) pdf.addPage([960, 540]);
   const bytes = Buffer.from(await pdf.save());
+  // Page 3 has a stored image from the owner's browser; page 1 has a broken one that must be ignored.
+  const stored = await sharp({ create: { width: 1920, height: 1080, channels: 3, background: "#123456" } }).jpeg().toBuffer();
+  const pages = { 3: stored, 1: Buffer.from("not a jpeg") };
   let allowed = true, downloads = 0;
   const storage = createServer((req, res) => {
+    const page = /\/pages\/(\d+)\.jpg$/.exec(req.url ?? "")?.[1];
+    if (page) {
+      const body = pages[page];
+      res.writeHead(body ? 200 : 400, { "Content-Type": body ? "image/jpeg" : "application/json" });
+      res.end(body ?? JSON.stringify({ statusCode: "404", error: "not_found", message: "Object not found" }));
+      return;
+    }
     assert.equal(req.headers.authorization, "Bearer caller");
     if (req.url?.includes("/object/info/")) {
       res.writeHead(allowed ? 200 : 403, { "Content-Type": "application/json" });
@@ -51,10 +61,9 @@ test("page images render once per page, thumbnails shrink the full page, the res
     assert.deepEqual([...jpeg.subarray(0, 2)], [0xff, 0xd8], "a JPEG");
     assert.deepEqual(Buffer.from(await same.arrayBuffer()), jpeg, "concurrent requests share one render");
     assert.deepEqual([(await sharp(jpeg).metadata()).width, (await stat(cached(2, 1920))).isFile()], [640, true], "the thumbnail is the full page shrunk");
-    // Nobody asked for pages 3 and 1; the warm-up renders them at full size after page 2.
-    for (const page of [3, 1]) while (!(await stat(cached(page, 1920)).catch(() => null))) await new Promise((resolve) => setTimeout(resolve, 50));
+    assert.deepEqual(Buffer.from(await (await GET(request("page=3&w=1920"))).arrayBuffer()), stored, "the stored page image is served as is");
     assert.equal((await GET(request("page=1&w=1920"))).status, 200);
-    assert.equal(downloads, 1, "the source downloads once and stays in the disk cache");
+    assert.equal(downloads, 1, "the source downloads once and stays in the disk cache; a broken stored image is rendered instead");
 
     assert.equal((await GET(request("page=4&w=640"))).status, 404, "past the last page");
     assert.equal((await GET(request("page=1&w=800"))).status, 400, "only the two sizes");

@@ -23,6 +23,12 @@ const warmSlot = slots.pdfPageWarm ??= limiter(1);
  */
 const pdfiumSlot = slots.pdfium ??= limiter(1);
 const PDFIUM_MAX_SOURCE_BYTES = 150 * 1024 ** 2;
+/**
+ * PDFium only when this much memory is free for the process (host and container limit, Node's `availableMemory`).
+ * 2026-11-07: on the 2 GB swapless EC2 host (~400 MB free, 1 GiB container) PDFium plus a warm-up ran it out of memory and
+ * the backend stopped answering, so there it always falls back to pdftoppm (~90 MB) until the host or the cap grows.
+ */
+const PDFIUM_MIN_FREE_BYTES = 1024 ** 3;
 const pdfiumScript = path.join(/* turbopackIgnore: true */ process.cwd(), "app/_infrastructure/server/pdfium-page.mjs");
 const PAST_LAST_PAGE = 99;
 
@@ -43,7 +49,7 @@ export function pdfPageImage(sourcePath: string, page: number, width: number, do
     const pdf = await cachedFile(sourcePath, download);
     const low = slot === warmSlot, options = { encoding: "buffer" as const, maxBuffer: 32 * 1024 ** 2, timeout: 60_000 };
     const command = (file: string, args: string[]) => low ? run("nice", ["-n", "19", file, ...args], options) : run(file, args, options);
-    if ((await stat(pdf)).size <= PDFIUM_MAX_SOURCE_BYTES) {
+    if (process.availableMemory() >= PDFIUM_MIN_FREE_BYTES && (await stat(pdf)).size <= PDFIUM_MAX_SOURCE_BYTES) {
       try {
         const { stdout, stderr } = await slot(() => pdfiumSlot(() => command(process.execPath, [pdfiumScript, pdf, String(page), String(width)])));
         const [pixelWidth, pixelHeight] = String(stderr).split("x").map(Number);

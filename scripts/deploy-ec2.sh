@@ -79,6 +79,8 @@ run_options=(
   --env PORT=3000 --env HOSTNAME=0.0.0.0 --env NODE_ENV=production
   # The cap also covers insight pdftoppm/sharp children. ponytail: unmeasured guess; size from docker stats during an insight run.
   --network ohpin --memory 1g --env NODE_OPTIONS=--max-old-space-size=512
+  # PDF/page-image disk cache (3 GiB cap, 14 days) survives deploys; the outgoing and candidate containers share it.
+  --volume ohpin-fe-pdf-cache:/tmp/ohpin-pdf-cache
   --init --log-opt max-size=10m --log-opt max-file=3
   --health-cmd "$health_cmd" --health-interval 5s --health-timeout 5s
   --health-start-period 10s --health-retries 3

@@ -160,7 +160,7 @@ flow unless a task explicitly spans both products.
   calls Groq with the server-only `GROQ_API_KEY` and returns 503 without it.
 - Instructor reports (`/admin/reports/[id]`, made on `/admin/reports`, spec `docs/instructor-report-authoring.md`): one fixed,
   detailed format per report (all dashboard content plus AI sections shaped by the instructor's optional prompt; several reports
-  per material), drafted once by the existing AI analysis. Reports are read-only (decided 2026-11-04): no canvas editing, and the
+  per material), drafted from the material's shared AI analysis, which the analysis dashboard reads too (spec §4.1; run on first use, not at lecture end). Reports are read-only (decided 2026-11-04): no canvas editing, and the
   AI chat only answers questions (5 per report; file attachment; with or without slide/question data). PDF/DOCX
   export the document as written (A4), PPTX/MD re-lay it out by code without AI. The analysis
   runs one AI provider per server (`INSIGHT_AI_PROVIDER` claude|openai|gemini, default claude;

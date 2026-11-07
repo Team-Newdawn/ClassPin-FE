@@ -6,6 +6,7 @@ import { pathToFileURL } from "node:url";
 import { join } from "node:path";
 import { degrees, PDFDocument, PDFString, rgb, type PDFFont, type PDFPage } from "pdf-lib";
 import fontkit from "@pdf-lib/fontkit";
+import { attachOfficeReportPins, attachReportPins, REPORT_PIN_INSTRUCTIONS, type ReportPinSource, type ReportSlidePlacement } from "./report-pin-package.ts";
 import { BorderStyle, Document, ExternalHyperlink, ImageRun, Packer, Paragraph, ShadingType, Table, TableCell, TableLayoutType, TableRow, TextRun, WidthType } from "docx";
 import PptxGenJS from "pptxgenjs";
 import sharp from "sharp";
@@ -14,7 +15,7 @@ import { C, chartSvg } from "../_model/report-chart.ts";
 
 /** Rendered slide JPEG (from renderMaterialSlides) keyed by 1-based slide number. */
 type SlideImage = { page: number; width: number; height: number; file: string };
-type ReportExportContext = { fileName: string; images: readonly SlideImage[] };
+type ReportExportContext = { fileName: string; images: readonly SlideImage[]; pinSource?: ReportPinSource };
 
 // The bundled PDF font; Docker installs it too, so Office previews render the same face.
 const FONT = "NanumGothic";
@@ -73,7 +74,7 @@ export function slidePages(text: string, perLine: number, rows: number): string[
 function reportModel(document: ReportDocument, context: ReportExportContext, charts: ReadonlyMap<string, SlideImage> = new Map()) {
   // macOS file names arrive decomposed (NFD); the PDF font has no glyphs for loose jamo, so "대학원 논문4" printed as "4".
   document = JSON.parse(JSON.stringify(document).normalize("NFC")) as ReportDocument;
-  return { title: document.title, fileName: context.fileName.normalize("NFC"),
+  return { title: document.title, fileName: context.fileName.normalize("NFC"), pinSource: context.pinSource, images: context.images,
     // The draft's own timestamp, not "now": the same document always exports the same file (RPT-064).
     date: reportDate(document.metrics),
     sections: document.sections.map((section) => ({ ...section, image: charts.get(section.id) ?? (section.slide ? context.images.find((image) => image.page === section.slide) : undefined) })) };
@@ -163,6 +164,7 @@ async function pdfReport(report: Report) {
   const regular = await embed("Regular"), bold = await embed("Bold");
   // A4 points; the design-system type scale is mapped down for print (H1 22, H2 16, Body 10.5, Caption 9).
   const W = 595, H = 842, M = 40, CW = W - M * 2, BOTTOM = H - 52;
+  const placements: ReportSlidePlacement[] = [];
   let page!: PDFPage, y = 0;
   const newPage = () => { page = pdf.addPage([W, H]); y = M; };
   const rule = (x1: number, top1: number, x2: number, top2: number) => page.drawLine({ start: { x: x1, y: H - top1 }, end: { x: x2, y: H - top2 }, thickness: .75, color: hex(C.border) });
@@ -271,6 +273,8 @@ async function pdfReport(report: Report) {
       const w = image.width * scale, h = image.height * scale;
       if (y + h > BOTTOM) newPage();
       page.drawImage(await pdf.embedJpg(await readFile(image.file)), { x: M + (CW - w) / 2, y: H - y - h, width: w, height: h });
+      if (section.slide && image.page === section.slide) placements.push({ slideNumber: section.slide, sectionId: section.id,
+        reportPage: pdf.getPageCount(), rect: { x: M + (CW - w) / 2, y, width: w, height: h } });
       gap(h + 12);
     }
     if (section.text) for (const block of parseReportText(section.text)) {
@@ -286,10 +290,18 @@ async function pdfReport(report: Report) {
     const number = `${index + 1} / ${pages.length}`;
     write(number, W - M - regular.widthOfTextAtSize(number, 8), H - 36, 12, 8, regular, C.tertiary);
   });
+  if (report.pinSource) {
+    await attachReportPins(pdf, report.pinSource, { title: report.title, images: report.images, placements,
+      requestedSlides: report.sections.flatMap((section) => section.slide ?? []) });
+    // RPT-066: extractable white text below the last footer; no extra page or layout changes.
+    pages[pages.length - 1].drawText(REPORT_PIN_INSTRUCTIONS.join("\n"), { x: M, y: 20, size: 5, lineHeight: 6, font: regular, color: rgb(1, 1, 1) });
+  }
   return Buffer.from(await pdf.save());
 }
 
 async function docxReport(report: Report) {
+  const placements: ReportSlidePlacement[] = [];
+  let imageIndex = 0;
   const run = (text: string, options: { size?: number; bold?: boolean; italic?: boolean; underline?: boolean; color?: string } = {}) =>
     new TextRun({ text, font: FONT, size: Math.round((options.size ?? 10.5) * 2), bold: options.bold, italics: options.italic, ...options.underline && { underline: {} },
       color: (options.color ?? C.text).slice(1) });
@@ -315,6 +327,8 @@ async function docxReport(report: Report) {
     children.push(p(run(section.title, { size: 16, bold: true }), { after: 80, keepNext: true }));
     if (section.slide) children.push(p(run(`슬라이드 ${section.slide}`, { size: 9, bold: true, color: C.brand }), { after: 80, keepNext: true }));
     if (section.image) {
+      imageIndex++;
+      if (section.slide && section.image.page === section.slide) placements.push({ slideNumber: section.slide, sectionId: section.id, imageIndex, reportPage: null, rect: null });
       // Page width in pixels (6.27in at 96dpi); tall slides are capped to the page height.
       const scale = Math.min(600 / section.image.width, 860 / section.image.height);
       children.push(new Paragraph({ children: [new ImageRun({ type: "jpg", data: await readFile(section.image.file),
@@ -331,8 +345,18 @@ async function docxReport(report: Report) {
     }
     children.push(p(run(""), { after: 240 }));
   }
-  return Packer.toBuffer(new Document({ creator: "OhPin", title: report.title, sections: [{ children }],
+  if (report.pinSource) {
+    // Reuse the trailing spacer's 15pt line; the guide has three 5pt lines.
+    const guide = new Paragraph({ children: REPORT_PIN_INSTRUCTIONS.map((text, index) => new TextRun({
+      text, font: FONT, size: 10, color: "FFFFFF", break: index ? 1 : 0,
+    })), spacing: { after: 240, line: 100, lineRule: "exact" } });
+    if (report.sections.length) children[children.length - 1] = guide;
+    else children.push(guide);
+  }
+  const bytes = await Packer.toBuffer(new Document({ creator: "OhPin", title: report.title, sections: [{ children }],
     styles: { default: { document: { run: { font: FONT, size: 21 } } } } }));
+  return report.pinSource ? attachOfficeReportPins(bytes, report.pinSource, { format: "docx", title: report.title, pages: null,
+    images: report.images, placements, requestedSlides: report.sections.flatMap((section) => section.slide ?? []) }) : bytes;
 }
 
 const ROWS = Math.floor(BODY.h * 72 / BODY.line);
@@ -344,7 +368,7 @@ const pptxStyle = (part: StyledRun): PptxGenJS.TextPropsOptions => ({ bold: part
   ...(part.underline || part.link) && { underline: { style: "sng" } }, ...part.link && { hyperlink: { url: part.link }, color: C.brand.slice(1) } });
 
 async function pptxReport(report: Report) {
-  const pptx = new PptxGenJS(); pptx.layout = "LAYOUT_WIDE"; pptx.author = "OhPin"; pptx.title = report.title;
+  const pptx = new PptxGenJS(), pages: PptxGenJS.Slide[] = [], placements: ReportSlidePlacement[] = []; pptx.layout = "LAYOUT_WIDE"; pptx.author = "OhPin"; pptx.title = report.title;
   const c = (value: string) => value.slice(1);
   const text = (slide: PptxGenJS.Slide, value: string, options: PptxGenJS.TextPropsOptions) =>
     slide.addText(value, { fontFace: FONT, color: c(C.text), margin: 0, valign: "top", ...options });
@@ -352,7 +376,8 @@ async function pptxReport(report: Report) {
     slide.addShape(pptx.ShapeType.roundRect, { x: options.x, y: options.y, w: options.w, h: options.h, rectRadius: .12,
       fill: { color: c(options.fill ?? "#ffffff") }, line: options.border ? { color: c(options.border), width: .75 } : { type: "none" } });
   const page = (label: string) => {
-    const slide = pptx.addSlide(); slide.background = { color: "FFFFFF" };
+    const slide = pptx.addSlide();
+    pages.push(slide); slide.background = { color: "FFFFFF" };
     if (label) text(slide, label, { x: .6, y: .45, w: 8, h: .3, fontSize: 12, bold: true, color: c(C.brand) });
     text(slide, `${LABEL} · ${oneLine(report.title)}`, { x: .6, y: 7.05, w: 12, h: .25, fontSize: 9, color: c(C.tertiary) });
     return slide;
@@ -373,6 +398,9 @@ async function pptxReport(report: Report) {
         // pptxgenjs' "contain" needs the picture's own size and stretched it to the box; fit and centre it here instead.
         const fit = containIn(image, inner, BODY.h - .3);
         slide.addImage({ path: image.file, x: .75 + (inner - fit.w) / 2, y: BODY.top + .15 + (BODY.h - .3 - fit.h) / 2, ...fit });
+        if (section.slide && image.page === section.slide) placements.push({ slideNumber: section.slide, sectionId: section.id,
+          reportPage: pages.length, rect: { x: (.75 + (inner - fit.w) / 2) * 72,
+            y: (BODY.top + .15 + (BODY.h - .3 - fit.h) / 2) * 72, width: fit.w * 72, height: fit.h * 72 } });
       }
       // Lines and tables stack at the same row estimate the paging used.
       let top = BODY.top, lines: StyledRun[][] = [];
@@ -397,5 +425,10 @@ async function pptxReport(report: Report) {
       flush();
     });
   }
-  return await pptx.write({ outputType: "nodebuffer" }) as Buffer;
+  if (report.pinSource) text(pages[pages.length - 1], REPORT_PIN_INSTRUCTIONS.join("\n"), {
+    x: .6, y: 7.32, w: 12.1, h: .17, fontSize: 3, lineSpacing: 3, color: "FFFFFF",
+  });
+  const bytes = await pptx.write({ outputType: "nodebuffer" }) as Buffer;
+  return report.pinSource ? attachOfficeReportPins(bytes, report.pinSource, { format: "pptx", title: report.title, pages: pages.length,
+    images: report.images, placements, requestedSlides: report.sections.flatMap((section) => section.slide ?? []) }) : bytes;
 }

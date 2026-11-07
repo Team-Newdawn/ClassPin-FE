@@ -5,18 +5,13 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, type ReactNode } from "react";
 import { FolderTreeSidebar } from "@/app/component/folder-tree-sidebar";
-import { ChevronDown, ChevronLeft, ChevronRight, Download, MessageCircleQuestion, Sparkles } from "@/app/component/icons";
+import { ChevronDown, ChevronLeft, ChevronRight, MessageCircleQuestion, Sparkles } from "@/app/component/icons";
 import { SlideCanvas } from "@/app/component/slide-canvas";
-import { ExportDialog } from "@/app/component/export-dialog";
-import { reportRequest } from "@/app/_controller/use-report";
 import { useLanguage } from "@/app/_controller/language-context";
-import { EXPORT_LABELS, EXPORT_PARTS, useInsightsController, type ExportPart, type Section } from "./controller";
-import type { TranslationKey } from "@/app/_model/i18n";
+import { useInsightsController, type Section } from "./controller";
 import { lectureWhen, PinFlow, ScoreBoard } from "./component/lecture-overview";
 import shell from "../shell.module.css";
 import styles from "./page.module.css";
-
-const EXPORT_HINTS = { overview: "insight.hint.overview", flow: "insight.hint.flow", slides: "insight.hint.slides", questions: "insight.hint.questions" } as const satisfies Record<ExportPart, TranslationKey>;
 
 export default function InsightsPage() {
   const c = useInsightsController();
@@ -43,11 +38,10 @@ export default function InsightsPage() {
       {/* DSH-045: every section folds from its title; open by default, not remembered. */}
       <div><h2 id={`${id}-title`}><button type="button" className={styles.toggle} aria-expanded={!closed.has(id)} aria-controls={`${id}-body`}
         onClick={() => setClosed((current) => { const next = new Set(current); if (!next.delete(id)) next.add(id); return next; })}>{title}<ChevronDown aria-hidden="true" /></button></h2><p>{sub}</p></div>
-      <button type="button" className={styles.export} onClick={() => c.openExport(id)} aria-label={t("insight.exportPart", { title })}><Download aria-hidden="true" />{t("insight.export")}</button>
     </div>
     <div id={`${id}-body`} className={styles.cardBody} hidden={closed.has(id)}>
       {/* DSH-046: the question summary waits for the AI result instead of flashing a fallback sentence. */}
-      {id !== "overview" && id !== "slides" && !(id === "questions" && c.analyzing) && <p className={styles.summary}><span><Sparkles aria-hidden="true" />{t("insight.summary")}</span>{c.summaries[id]}</p>}
+      {id !== "overview" && id !== "slides" && !(id === "questions" && c.typesPending) && <p className={styles.summary}><span><Sparkles aria-hidden="true" />{t("insight.summary")}</span>{c.summaries[id]}</p>}
       {body}
     </div>
   </section>;
@@ -70,13 +64,10 @@ export default function InsightsPage() {
       <div className={styles.actions}>
         {/* Figma ClassPin 2235:2476. */}
         <Link className={`btn secondary ${styles.aiButton}`} href={reportHref}><Image src="/assets/design/spark.svg" alt="" width={14} height={14} />{t("insight.createReport")}</Link>
-        <button type="button" className="btn primary" onClick={() => c.openExport()}><Download aria-hidden="true" />{t("insight.exportAll")}</button>
       </div>
     </header>
 
     {card("overview", t("insight.part.overview"), t("insight.sub.overview"), <ScoreBoard board={c.board} />)}
-
-    {card("flow", t("insight.part.flow"), t("insight.sub.flow"), <PinFlow perSlide={c.perSlide} />)}
 
     {card("slides", t("insight.part.slides"), t("insight.sub.slides"), !c.slide ? <p className={styles.empty}>{t("insight.noSlides")}</p> : <div className={styles.split}>
       <div className={styles.viewer}>
@@ -96,11 +87,11 @@ export default function InsightsPage() {
       </div>
       <div className={styles.slideSide}>
         <h3 className={styles.slideTitle}><span className={styles.chip}>P.{c.index + 1}</span>{c.slide.title || t("common.slideNumber", { number: c.index + 1 })}</h3>
-        {/* DSH-040: counts live in the PIN flow chart above; this side is the slide's analysis and its PINs. */}
+        {/* DSH-040: counts live in the PIN flow chart below; this side is the slide's analysis and its PINs. */}
         {!c.slidePins.length ? <p className={styles.empty}>{t("insight.noPins")}</p> : <>
           <h4 className={styles.sideHead}>{t("insight.contentAnalysis")}</h4>
           {c.slideSummary ? <p className={styles.summary}><span><Sparkles aria-hidden="true" />{t("insight.aiSummary")}</span>{c.slideSummary}</p>
-            : c.analyzing ? waiting(2) : <p className={styles.hint}>{c.slideNote}</p>}
+            : c.slidesPending ? waiting(2) : <p className={styles.hint}>{c.slideNote}</p>}
           <div className={styles.listHead}><h4>PIN <span>{c.slidePins.length}</span></h4><small>{t("student.sortByEmpathy")}</small></div>
           <ul className={styles.slideQuestions}>{c.slidePins.map((question) => <li key={question.id}>
             <MessageCircleQuestion aria-hidden="true" /><p>{question.text}</p><small>{t("insight.empathy", { count: question.reactionCount })}</small>
@@ -108,6 +99,8 @@ export default function InsightsPage() {
         </>}
       </div>
     </div>)}
+
+    {card("flow", t("insight.part.flow"), t("insight.sub.flow"), <PinFlow perSlide={c.perSlide} />)}
 
     {card("questions", t("insight.part.questions"), t("insight.sub.questions"), <div className={styles.split}>
       <div className={styles.types}>
@@ -117,10 +110,10 @@ export default function InsightsPage() {
             <span className={styles.typeRow}><span>{type.title}</span><small>{t("common.cases", { count: type.count })} · {type.percent}%</small></span>
             <i aria-hidden="true"><span style={{ width: `${c.types![0].count ? (type.count / c.types![0].count) * 100 : 0}%` }} /></i>
           </button>
-        </li>)}</ul> : c.analyzing ? waiting(5, true) : <p className={styles.empty} role="status">{c.typesNote}</p>}
+        </li>)}</ul> : c.typesPending ? waiting(5, true) : <p className={styles.empty} role="status">{c.typesNote}</p>}
       </div>
       <div className={styles.typeSide}>
-        {c.analyzing && <div className={styles.skeleton} aria-hidden="true">{[0, 1, 2, 3].map((line) => <i key={line} />)}</div>}
+        {c.typesPending && <div className={styles.skeleton} aria-hidden="true">{[0, 1, 2, 3].map((line) => <i key={line} />)}</div>}
         {c.detail && <>
           <h4 className={styles.sideHead}>{c.detail.title} <span>{t("common.cases", { count: c.detail.count })}</span></h4>
           {c.detail.summary && <p className={styles.summary}><span><Sparkles aria-hidden="true" />{t("insight.aiSummary")}</span>{c.detail.summary}</p>}
@@ -132,19 +125,5 @@ export default function InsightsPage() {
         </>}
       </div>
     </div>)}
-
-    {c.exporting && <ExportDialog title={t(c.exporting.all ? "insight.exportAll" : "insight.export")} subtitle={session.title} reloadKey={c.exporting.parts.join()} onClose={c.closeExport}
-      load={(format, signal) => reportRequest(`/api/admin/insights/export?format=${format}&preview=1`, { method: "POST", signal,
-        body: JSON.stringify({ document: c.exportDocument(c.exporting!.parts), fileName: session.fileName }) })}
-      options={<fieldset className={styles.exportParts}><legend>{t("insight.exportParts")}</legend>
-        {EXPORT_PARTS.map((part) => {
-          const checked = c.exporting!.parts.includes(part);
-          // The last checked item stays: an export needs at least one.
-          return <label key={part}><input type="checkbox" checked={checked} disabled={checked && c.exporting!.parts.length === 1} onChange={() => c.toggleExport(part)} />
-            <span><b>{t(EXPORT_LABELS[part])}</b><small>{t(EXPORT_HINTS[part])}</small></span></label>;
-        })}
-      </fieldset>}
-      note={t("insight.exportNote")}
-      actions={<Link className={`btn secondary ${styles.aiButton}`} href={reportHref}><Sparkles aria-hidden="true" />{t("insight.continueReport")}</Link>} />}
   </>);
 }

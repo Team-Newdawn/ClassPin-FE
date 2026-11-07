@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { lectureSpan, rememberView } from "./insight-dashboard.ts";
+import { exportSections, lectureSpan, rememberView } from "./insight-dashboard.ts";
 
 const T0 = Date.parse("2026-10-29T10:00:00.000Z");
 const at = (seconds: number) => new Date(T0 + seconds * 1000).toISOString();
@@ -11,6 +11,12 @@ test("강의 구간은 시작 없으면 null, 종료 없으면 마지막 질문�
   assert.deepEqual(lectureSpan(at(0), at(300), [q(900)]), { start: T0, end: T0 + 300_000 });
   assert.deepEqual(lectureSpan(at(0), null, [q(90), q(30)]), { start: T0, end: T0 + 90_000 });
   assert.deepEqual(lectureSpan(at(0), null, []), { start: T0, end: T0 });
+});
+
+test("내보내기 구역은 한도를 넘으면 줄 단위로 (2), (3)에 이어 쓴다", () => {
+  assert.deepEqual(exportSections("질문", ["aaaa", "bbbb", "cc"], 10), [{ title: "질문", text: "aaaa\nbbbb" }, { title: "질문 (2)", text: "cc" }]);
+  assert.deepEqual(exportSections("요약", [], 10), [{ title: "요약", text: "" }]);
+  assert.deepEqual(exportSections("긴 줄", ["x".repeat(12)], 10), [{ title: "긴 줄", text: "x".repeat(10) }]);
 });
 
 test("최근 연 분석은 다시 열면 시각만 바뀌고 최신 20개만 남는다", () => {

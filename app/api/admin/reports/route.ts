@@ -40,7 +40,7 @@ export async function POST(request: Request) {
       file_name: material.fileName, created_at: now, updated_at: now,
       ...ai ? { status: "drafting", drafted_at: now } : { status: "ready", document: draftReport({ ...basis, analysis: null }), analysis: null } }).select("*").single();
     if (inserted.error || !inserted.data) throw new InsightRequestError("REPORT_STORAGE_UNAVAILABLE", 503);
-    if (ai) startDraft(db, inserted.data.id, now, ai, ownerId, source, basis);
+    if (ai) startDraft(db, inserted.data.id, now, ai, source, basis);
     return insightResponse(reportView(inserted.data as ReportRow), 202);
   } catch (error) { return insightFailure(error); }
 }

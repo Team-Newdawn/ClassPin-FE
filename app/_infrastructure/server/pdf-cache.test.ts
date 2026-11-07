@@ -21,7 +21,7 @@ test("같은 key 의 동시 요청은 한 번만 받고, 신선한 캐시는 재
     assert.equal(await cachedFile("a/b/source.pdf", source, { dir }), first);
     assert.equal(fetches, 1);
 
-    const stale = new Date(Date.now() - 15 * 24 * 60 * 60 * 1000);
+    const stale = new Date(Date.now() - 48 * 60 * 60 * 1000);
     await utimes(first, stale, stale);
     assert.equal(await cachedFile("a/b/source.pdf", source, { dir }), first);
     assert.equal(fetches, 2);
@@ -40,7 +40,7 @@ test("만료 파일 청소 실패가 완성된 PDF 응답을 막지 않는다", 
   try {
     const oldDirectory = path.join(dir, "old-directory");
     await mkdir(oldDirectory);
-    const stale = new Date(Date.now() - 15 * 24 * 60 * 60 * 1000);
+    const stale = new Date(Date.now() - 48 * 60 * 60 * 1000);
     await utimes(oldDirectory, stale, stale);
     const file = await freshCache("source.pdf", async () => new Blob(["pdf"]).stream(), { dir });
     assert.equal(await readFile(file, "utf8"), "pdf");

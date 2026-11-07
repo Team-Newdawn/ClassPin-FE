@@ -11,7 +11,7 @@ export type InsightReportBody = {
   /** Slides whose analysis call failed; the rest of the report is still valid. */
   failedPages?: number[];
   /** Deck order (1-based). `topic` may be empty for appended image slides that are not in the PDF. */
-  slides: { /** Absent on reports made before the shared analysis (RPT-121). */ slideId?: string; page: number; topic: string; /** Plain summary of a slide without questions. */ content?: string; questionSummary: string; suggestion: string; /** Absent on reports generated before slide issues were added. */ issues?: { title: string; summary: string; questionIds: string[] }[]; metrics: InsightMetrics }[];
+  slides: { page: number; topic: string; /** Plain summary of a slide without questions. */ content?: string; questionSummary: string; suggestion: string; /** Absent on reports generated before slide issues were added. */ issues?: { title: string; summary: string; questionIds: string[] }[]; metrics: InsightMetrics }[];
   questions: { id: string; page: number; text: string; answers: string[]; reactions: number; status: string }[];
   /** RPT-035: body sections whose structure the AI chose for this kind of material. */
   sections: { title: string; text: string }[];

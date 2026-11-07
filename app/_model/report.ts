@@ -155,6 +155,16 @@ export function parseReportDocument(value: unknown, stored: ReportDocument): Rep
   return { title: text(value.title, REPORT_LIMITS.title), metrics: stored.metrics, sections };
 }
 
+/** Trust boundary for the analysis export (DSH-042): the caller's own numbers and text, checked for shape and size only. */
+export function parseExportDocument(value: unknown): ReportDocument {
+  const m = isRecord(value) && isRecord(value.metrics) ? value.metrics : null;
+  if (!m || typeof m.at !== "string" || !Number.isFinite(Date.parse(m.at))) throw new Error("INVALID_DOCUMENT");
+  const count = (item: unknown) => { if (!Number.isInteger(item) || (item as number) < 0) throw new Error("INVALID_DOCUMENT"); return item as number; };
+  const recorded = (item: unknown) => item === null ? null : count(item);
+  return parseReportDocument(value, { title: "", sections: [], metrics: { at: m.at, slides: count(m.slides), questions: count(m.questions), pins: count(m.pins),
+    reactions: count(m.reactions), durationMinutes: recorded(m.durationMinutes), audience: recorded(m.audience), peakAudience: recorded(m.peakAudience) } });
+}
+
 /** RPT-024: one styled stretch of a section line. */
 export type TextRun = { text: string; bold?: true; italic?: true; underline?: true; size?: "big" | "small"; /** http(s) only (RPT-024). */ link?: string };
 /** A body line, or a pipe table whose first row is the header. `source` is the raw text the block came from. */

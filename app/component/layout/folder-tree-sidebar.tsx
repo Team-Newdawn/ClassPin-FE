@@ -3,12 +3,12 @@
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useSessions } from "@/app/_controller/session-store";
-import { BarChart3, FileText, PanelLeftClose, PanelLeftOpen } from "@/app/component/icons";
-import { PinLogo } from "@/app/component/pin-logo";
-import { WorkspaceAccount } from "@/app/component/workspace-header";
-import { useLanguage } from "@/app/_controller/language-context";
-import type { ClassFolder } from "@/app/_model/types";
+import { useSessions } from "@/app/_controller/provider/session-store";
+import { BarChart3, FileText, PanelLeftClose, PanelLeftOpen } from "@/app/component/icon/icons";
+import { PinLogo } from "@/app/component/icon/pin-logo";
+import { WorkspaceAccount } from "@/app/component/layout/workspace-header";
+import { useLanguage } from "@/app/_controller/provider/language-context";
+import type { ClassFolder } from "@/app/_model/core/types";
 import { useMemo } from "react";
 import styles from "./folder-tree-sidebar.module.css";
 

@@ -1,8 +1,8 @@
 "use client";
 
 import { useState, type CSSProperties } from "react";
-import { useLanguage } from "@/app/_controller/language-context";
-import type { Locale } from "@/app/_model/i18n";
+import { useLanguage } from "@/app/_controller/provider/language-context";
+import type { Locale } from "@/app/_model/core/i18n";
 import styles from "./lecture-overview.module.css";
 
 /** The dashboard and the end report (docs/ohpin-figma-ui-redesign.md §3.8) show the same two blocks. */

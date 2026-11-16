@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import test from "node:test";
 import { runInNewContext } from "node:vm";
 import ts from "typescript";
-import { formatElapsed } from "../_model/class/session.ts";
+import { formatElapsed } from "../../_model/lecture/session.ts";
 
 test("LIVE time resumes from the frozen value across repeated dialogs and resets on a new start", () => {
   let time = 10_000;
@@ -24,13 +24,13 @@ test("LIVE time resumes from the frozen value across repeated dialogs and resets
       setups.push(() => { effects[index] = { deps, cleanup: setup() || undefined }; });
     },
   };
-  const output = ts.transpileModule(readFileSync("app/_controller/use-live-audience.ts", "utf8"), {
+  const output = ts.transpileModule(readFileSync("app/_controller/live/use-live-audience.ts", "utf8"), {
     compilerOptions: { module: ts.ModuleKind.CommonJS },
   }).outputText;
   const exports = {} as { useLiveElapsed: (startedAt: string | null, live: boolean, paused: boolean) => string | null };
   runInNewContext(output, {
     exports,
-    require: (id: string) => id === "react" ? react : id.endsWith("/class/session") ? { formatElapsed } : {},
+    require: (id: string) => id === "react" ? react : id.endsWith("/lecture/session") ? { formatElapsed } : {},
     Date: class extends Date { static now() { return time; } },
     setInterval: (callback: () => void) => { tick = callback; return 1; },
     clearInterval: () => { tick = undefined; },
@@ -88,7 +88,7 @@ test("audience departures count immediately, ignore late heartbeats, rejoin afte
   let receive: (payload: unknown) => void = () => {};
   let audience = { count: 0, total: 0, peak: 0 }, time = 0, sequence = 0, timerId = 0, closed = false;
   type Audience = typeof audience;
-  const output = ts.transpileModule(readFileSync("app/_controller/use-live-audience.ts", "utf8"), {
+  const output = ts.transpileModule(readFileSync("app/_controller/live/use-live-audience.ts", "utf8"), {
     compilerOptions: { module: ts.ModuleKind.CommonJS },
   }).outputText;
   const exports = {} as { useLiveAudienceCount: (id: string, live: boolean) => Audience; useAudienceHeartbeat: (id: string) => void };
@@ -149,7 +149,7 @@ test("audience departures count immediately, ignore late heartbeats, rejoin afte
 });
 
 test("timeline keeps one sample per tick up to 1440 and only real slide changes up to 5000", () => {
-  const output = ts.transpileModule(readFileSync("app/_controller/use-live-audience.ts", "utf8"), {
+  const output = ts.transpileModule(readFileSync("app/_controller/live/use-live-audience.ts", "utf8"), {
     compilerOptions: { module: ts.ModuleKind.CommonJS },
   }).outputText;
   type Timeline = { samples: { at: string; audience: number; slide: number }[]; slideChanges: { at: string; slide: number }[] };

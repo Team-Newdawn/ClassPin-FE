@@ -3,12 +3,12 @@
 import Link from "next/link";
 import Image from "next/image";
 import { useRef, useState } from "react";
-import { useLanguage } from "@/app/_controller/language-context";
-import type { Question } from "@/app/_model/types";
-import { LECTURE_REACTION_EMOJIS } from "@/app/_model/lecture-reactions";
-import { SlideCanvas } from "@/app/component/slide-canvas";
+import { useLanguage } from "@/app/_controller/provider/language-context";
+import type { Question } from "@/app/_model/core/types";
+import { LECTURE_REACTION_EMOJIS } from "@/app/_model/lecture/lecture-reactions";
+import { SlideCanvas } from "@/app/component/slide/slide-canvas";
 import type { useSessionAdminController } from "../controller";
-import { QR_POSITIONS } from "@/app/_model/presentation-options";
+import { QR_POSITION_LABELS, QR_POSITIONS, QR_SIZES, type QrPosition } from "@/app/_model/presentation/presentation-options";
 import { PinClusterPopover } from "./pin-cluster-popover";
 import { usePinCluster } from "./pin-cluster-controller";
 import styles from "./lecture-preparation.module.css";
@@ -51,8 +51,8 @@ export function LecturePreparation({ controller: c }: { controller: ReturnType<t
   if (!session || !slide) return null;
   const openPreview = (trigger: HTMLButtonElement) => { trigger.focus(); dialogTrigger.current = trigger; setPreviewOpen(true); };
   const qr = session.showPresentationQr && <span className={styles.qr} data-position={options.qrPosition} style={{ width: `min(${options.qrSize}px, 20%)` }} aria-label={t("session.qrPosition")}><Icon name="qr" size={50} /></span>;
-  const positionLabel = (position: string) => t(position === "top-left" ? "session.qrTopLeft" : position === "top-center" ? "session.qrTopCenter" : position === "top-right" ? "session.qrTopRight" : position === "bottom-left" ? "session.qrBottomLeft" : position === "bottom-center" ? "session.qrBottomCenter" : "session.qrBottomRight");
-  const sizeLabel = ["S", "M", "L"][[64, 96, 160].indexOf(options.qrSize)] ?? copy("직접 조절", "Custom");
+  const positionLabel = (position: QrPosition) => t(QR_POSITION_LABELS[position]);
+  const sizeLabel = QR_SIZES.find((preset) => preset.size === options.qrSize)?.label ?? copy("직접 조절", "Custom");
   const noteStatus = c.noteSavingSlideId === slide.id ? t("session.speakerNotesSaving") : c.noteDirty ? t("session.speakerNotesPending") : c.noteSavedSlideId === slide.id ? t("session.speakerNotesSaved") : t("session.speakerNotesAutosaveHint");
   return <div className={styles.root} aria-busy={c.lectureSaving}>
     <header className={styles.header}>
@@ -97,7 +97,7 @@ export function LecturePreparation({ controller: c }: { controller: ReturnType<t
           </div>
           <div className={styles.qrSize}>
             <div className={styles.sizeHeading}><b>{copy("QR 코드 크기", "QR code size")}</b><span role="status" aria-live="polite">{sizeLabel} · {options.qrSize}px {copy("선택됨", "selected")}</span></div>
-            <div className={styles.sizeOptions} role="group" aria-label={t("session.qrSize")}>{([64, 96, 160] as const).map((size, index) => <button key={size} type="button" aria-pressed={options.qrSize === size} disabled={c.lectureSaving} onClick={() => c.changePresentationOptions({ qrSize: size })}><b>{["S", "M", "L"][index]}</b><small>{size}px</small></button>)}</div>
+            <div className={styles.sizeOptions} role="group" aria-label={t("session.qrSize")}>{QR_SIZES.map(({ size, label }) => <button key={size} type="button" aria-pressed={options.qrSize === size} disabled={c.lectureSaving} onClick={() => c.changePresentationOptions({ qrSize: size })}><b>{label}</b><small>{size}px</small></button>)}</div>
           </div>
         </section>
         <section><h2>{copy("청중 반응", "Audience reactions")}</h2><div className={styles.settingRow}><span><b>{copy("공감 허용", "Allow empathy")}</b><small>{copy("같은 질문에 👍로 모이게 해요", "Gather the same question with 👍")}</small></span><Toggle checked={session.allowQuestionReactions} disabled={c.lectureSaving} label={copy("공감 허용", "Allow empathy")} onClick={() => c.toggleReactionAllowed("allowQuestionReactions")} /></div><div className={styles.settingRow}><span><b>{copy("이모지 반응", "Emoji reactions")}</b><small>{LECTURE_REACTION_EMOJIS.join(" ")} {copy("빠른 반응", "quick reactions")}</small></span><Toggle checked={session.allowEmojiReactions} disabled={c.lectureSaving} label={copy("이모지 반응", "Emoji reactions")} onClick={() => c.toggleReactionAllowed("allowEmojiReactions")} /></div><div className={styles.settingRow}><span><b>{copy("질문 핀 공개", "Show question PINs")}</b><small>{copy("청중끼리 서로의 질문 위치를 봐요", "Let the audience see where questions are pinned")}</small></span><Toggle checked={session.showQuestionPins} label={t("session.pinLive")} onClick={c.toggleQuestionPins} /></div></section>

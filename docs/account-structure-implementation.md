@@ -111,7 +111,7 @@ POST는 새 생성 성공 201, 기존 ready 반환 200, 이미 생성 중 202, �
 
 | 위치 | 구현할 내용 |
 | --- | --- |
-| `app/_model/types.ts`, `_service/class-session-service.ts` | 자료 역할·초대·저장 리포트 DTO, 역할 포함 목록/상태 매핑, 이미지 path 기반 모델, 설정 쓰기 통합 |
+| `app/_model/core/types.ts`, `_service/class-session-service.ts` | 자료 역할·초대·저장 리포트 DTO, 역할 포함 목록/상태 매핑, 이미지 path 기반 모델, 설정 쓰기 통합 |
 | `_controller/session-store.tsx` | 공유 자료·초대 상태, 권한 변경 반영, 인증 실패 시 실패 캐시 복원 금지, 계정별 캐시 정리 |
 | `(view)/admin/dashboard`, `folders/[id]` | 공유/대기 카드·역할 배지·승인/거절, owner 공유 메뉴, 승인 전 표지 로딩 금지 |
 | `(view)/admin/session/[id]`, `present/controller.ts`, `_controller/use-live-auto-end.ts` | 역할별 UI·키보드/자동 저장 차단, 로컬 페이지 이동, owner만 발표/이탈 Web Lock·타이머 사용 |

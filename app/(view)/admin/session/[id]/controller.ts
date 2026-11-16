@@ -1,21 +1,22 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPointerEvent } from "react";
-import { questionsByEmpathy, questionsByNewest } from "@/app/_model/question-reactions";
-import { usePinLabelMode } from "@/app/_controller/use-pin-label-mode";
-import { usePresentationOptions } from "@/app/_controller/use-presentation-options";
-import { QR_POSITIONS, type PresentationOptions, type QrPosition, type QuestionDisplayMode } from "@/app/_model/presentation-options";
+import { questionsByEmpathy, questionsByNewest } from "@/app/_model/lecture/question-reactions";
+import { usePinLabelMode } from "@/app/_controller/presentation/use-pin-label-mode";
+import { usePresentationOptions } from "@/app/_controller/presentation/use-presentation-options";
+import { QR_POSITIONS, type PresentationOptions, type QrPosition, type QuestionDisplayMode } from "@/app/_model/presentation/presentation-options";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
-import { useHorizontalSlideWheel } from "@/app/_controller/use-horizontal-slide-wheel";
-import { useLanguage } from "@/app/_controller/language-context";
-import { useLectureReactions } from "@/app/_controller/use-lecture-reactions";
-import { useLiveAudienceCount, useLiveElapsed, useLiveTimeline, type LiveTimeline } from "@/app/_controller/use-live-audience";
-import { useLiveAutoEnd } from "@/app/_controller/use-live-auto-end";
-import { useSessions } from "@/app/_controller/session-store";
-import { recordAudience } from "@/app/_service/report-api";
-import { findNewestIncomingPin, slideIndexFromPageNumber } from "@/app/_model/class/presentation-rotation";
-import { groupQuestionsBySlide } from "@/app/_model/stats";
-import { CLASS_UNFILED_COLOR_INDEX, type PresentationQrPosition, type QuestionStatus } from "@/app/_model/types";
+import { useHorizontalSlideWheel } from "@/app/_controller/presentation/use-horizontal-slide-wheel";
+import { useLanguage } from "@/app/_controller/provider/language-context";
+import { useLectureReactions } from "@/app/_controller/live/use-lecture-reactions";
+import { useLiveAudienceCount, useLiveElapsed, useLiveTimeline, type LiveTimeline } from "@/app/_controller/live/use-live-audience";
+import { useLiveAutoEnd } from "@/app/_controller/live/use-live-auto-end";
+import { useSessions } from "@/app/_controller/provider/session-store";
+import { recordAudience } from "@/app/_service/report/report-api";
+import { findNewestIncomingPin, slideIndexFromPageNumber } from "@/app/_model/presentation/presentation-rotation";
+import { groupQuestionsBySlide } from "@/app/_model/material/stats";
+import { CLASS_UNFILED_COLOR_INDEX, type PresentationQrPosition, type QuestionStatus } from "@/app/_model/core/types";
+import { usePrefetchNeighborSlides } from "@/app/_controller/presentation/use-prefetch-neighbor-slides";
 
 type Tab = "live" | "questions";
 const PRESENTATION_QR_POSITIONS: readonly PresentationQrPosition[] = ["top-left", "top-right", "bottom-left", "bottom-right"];
@@ -300,6 +301,7 @@ export function useSessionAdminController() {
   }, [tab]);
 
   const slide = session?.slides[session.currentSlide];
+  usePrefetchNeighborSlides(session?.slides, session?.currentSlide ?? 0);
   const folder = folders.find((item) => item.id === session?.folderId);
   const folderAccentIndex = folder?.colorIndex ?? CLASS_UNFILED_COLOR_INDEX;
   const folderHref = `/admin/folders/${folder?.id ?? "unfiled"}`;

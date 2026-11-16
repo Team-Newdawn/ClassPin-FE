@@ -1,6 +1,6 @@
 "use client";
 
-import { useSessions } from "./session-store";
+import { useSessions } from "../provider/session-store";
 
 /** 발표 PC와 모바일 리모컨이 같은 강의 설정을 사용한다. */
 export function usePinLabelMode(sessionId: string | undefined) {

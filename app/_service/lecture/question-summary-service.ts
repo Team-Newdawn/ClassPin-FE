@@ -1,5 +1,5 @@
 import { getUploadSession } from "@/app/_infrastructure/supabase/client";
-import type { ClassFolder, Question } from "@/app/_model/types";
+import type { ClassFolder, Question } from "@/app/_model/core/types";
 
 export class SummaryError extends Error {
   constructor(readonly status: number) { super(`Question summary ${status}`); }

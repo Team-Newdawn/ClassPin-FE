@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { clampQrSize, presentationOptions, QR_POSITIONS } from "./presentation-options.ts";
-import type { ClassSession } from "./types.ts";
+import type { ClassSession } from "../core/types.ts";
 
 const session = { showQuestionPins: true, showQuestionLabels: false, presentationQrPosition: "bottom-right" } as ClassSession;
 

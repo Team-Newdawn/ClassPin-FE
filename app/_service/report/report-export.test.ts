@@ -8,7 +8,7 @@ import sharp from "sharp";
 import JSZip from "jszip";
 import { PDFDocument } from "pdf-lib";
 import { containIn, exportReport, previewReportExport, slidePages } from "./report-export.ts";
-import type { ReportDocument } from "../_model/report.ts";
+import type { ReportDocument } from "../../_model/report/report.ts";
 
 const long = "광합성은 햇빛과 물을 이용하는 과정입니다. ".repeat(8).trim();
 const document: ReportDocument = { title: "생물학 1강",

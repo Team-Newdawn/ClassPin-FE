@@ -49,7 +49,7 @@
 |---|---|
 | `app/(view)/zoom/page.tsx`, `page.module.css` | 공개 진입 페이지. 코드를 입력하면 `/join/{code}`로 이동한다. Zoom 안에서는 넓게 모드로 바꾸고, 호스트에게 초대 버튼을 보여준다 |
 | `next.config.ts` | `/zoom`, `/join/*`에 OWASP 헤더 4종 추가. 개발 서버에 터널 도메인 허용 |
-| `app/_model/i18n.ts` | `zoom.*` 문구 5개 (한국어/영어) |
+| `app/_model/core/i18n.ts` | `zoom.*` 문구 5개 (한국어/영어) |
 | `package.json` | `@zoom/appssdk` 0.16.42 (MIT) |
 
 ## 4. Zoom Marketplace 설정
@@ -155,8 +155,8 @@ Zoom은 HTTPS 주소만 받기 때문에 로컬 서버를 터널로 연다.
 
 import { useEffect, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
-import { useLanguage } from "@/app/_controller/language-context";
-import { PinLogo } from "@/app/component/pin-logo";
+import { useLanguage } from "@/app/_controller/provider/language-context";
+import { PinLogo } from "@/app/component/icon/pin-logo";
 import styles from "./page.module.css";
 
 /** Zoom Apps 시작 주소. 사이드 패널을 넓히고, 화면 공유에 보이는 참여 코드로 /join 에 들어간다. */
@@ -226,7 +226,7 @@ export default function ZoomEntry() {
   },
 ```
 
-### `app/_model/i18n.ts` (`ko`, `en`에 각각 추가)
+### `app/_model/core/i18n.ts` (`ko`, `en`에 각각 추가)
 
 ```ts
   "zoom.codeLabel": "참여 코드",

@@ -72,7 +72,8 @@ export function rectanglesOverlap(first: Rectangle, second: Rectangle) {
 
 type BubbleShape = { width: number; height: number };
 type BubbleRequest = { id: string; x: number; y: number; shapes: readonly BubbleShape[]; pin: Rectangle };
-const BUBBLE_GAP = 6;
+/** 말풍선과 보이는 PIN 모양 사이 기본 간격. 화면은 PIN 단위(--pin-unit)를 곱해 넘긴다. */
+export const BUBBLE_GAP = 10;
 
 const overlapArea = (first: Rectangle, second: Rectangle) =>
   Math.max(0, Math.min(first.right, second.right) - Math.max(first.left, second.left))
@@ -81,17 +82,17 @@ const overlapArea = (first: Rectangle, second: Rectangle) =>
 type Candidate = Rectangle & { shape: number };
 
 /** PIN에 닿는 자리들. 옆(좌우)은 위아래로, 위·아래는 좌우로 밀어 본 자리까지 포함하며 앞쪽일수록 우선한다. */
-function adjacentCandidates({ x, y, pin, shapes }: BubbleRequest, width: number, height: number): Candidate[] {
+function adjacentCandidates({ x, y, pin, shapes }: BubbleRequest, width: number, height: number, gap: number): Candidate[] {
   const candidates: (Candidate & { rank: number })[] = [];
   shapes.forEach(({ width: w, height: h }, shape) => {
-    const sides = x > width * .58 ? [pin.left - BUBBLE_GAP - w, pin.right + BUBBLE_GAP] : [pin.right + BUBBLE_GAP, pin.left - BUBBLE_GAP - w];
-    const sideTops = [y - h / 2, pin.top, pin.bottom - h, pin.top - h + BUBBLE_GAP, pin.bottom - BUBBLE_GAP];
-    const capLefts = [x - w / 2, pin.left, pin.right - w, pin.left - w + BUBBLE_GAP, pin.right - BUBBLE_GAP];
+    const sides = x > width * .58 ? [pin.left - gap - w, pin.right + gap] : [pin.right + gap, pin.left - gap - w];
+    const sideTops = [y - h / 2, pin.top, pin.bottom - h, pin.top - h + gap, pin.bottom - gap];
+    const capLefts = [x - w / 2, pin.left, pin.right - w, pin.left - w + gap, pin.right - gap];
     const add = (left: number, top: number, rank: number) => {
       if (left >= 0 && top >= 0 && left + w <= width && top + h <= height) candidates.push({ left, top, right: left + w, bottom: top + h, shape, rank: shape * 100 + rank });
     };
     sideTops.forEach((top, sample) => sides.forEach((left, side) => add(left, top, sample * 4 + side)));
-    capLefts.forEach((left, sample) => [pin.top - BUBBLE_GAP - h, pin.bottom + BUBBLE_GAP].forEach((top, side) => add(left, top, sample * 4 + 2 + side)));
+    capLefts.forEach((left, sample) => [pin.top - gap - h, pin.bottom + gap].forEach((top, side) => add(left, top, sample * 4 + 2 + side)));
   });
   return candidates.sort((first, second) => first.rank - second.rank);
 }
@@ -120,7 +121,7 @@ function distantCandidates({ pin, shapes }: BubbleRequest, width: number, height
  * 4) 그래도 없으면 슬라이드 전체에서 가장 가까운 빈자리를 찾고, 공간이 부족하면 화면 밖 좌표를 반환해 호출자가 더 작게 재배치한다.
  * 반환값은 고른 모양 번호와, 말풍선 기준점(x, y)에서 왼쪽 위 모서리까지의 거리다.
  */
-export function placeBubbles(bubbles: readonly BubbleRequest[], pins: readonly PositionedRectangle[], width: number, height: number, activeId: string | null) {
+export function placeBubbles(bubbles: readonly BubbleRequest[], pins: readonly PositionedRectangle[], width: number, height: number, activeId: string | null, gap = BUBBLE_GAP) {
   const boxes = new Map<string, Candidate>();
   const pinCost = (box: Rectangle) => pins.reduce((sum, other) => sum + overlapArea(box, other.bounds), 0);
   const cost = (box: Rectangle, ignoreId?: string) => {
@@ -128,7 +129,7 @@ export function placeBubbles(bubbles: readonly BubbleRequest[], pins: readonly P
     for (const [id, other] of boxes) if (id !== ignoreId) sum += overlapArea(box, other);
     return sum;
   };
-  const items = new Map(bubbles.map((bubble) => [bubble.id, { bubble, adjacent: adjacentCandidates(bubble, width, height) }]));
+  const items = new Map(bubbles.map((bubble) => [bubble.id, { bubble, adjacent: adjacentCandidates(bubble, width, height, gap) }]));
   // 겹침 여부만 보면 되는 곳은 첫 겹침에서 멈춘다. 격자 후보가 수천 개라 면적 합산보다 훨씬 싸다.
   const blocked = (box: Rectangle) => {
     if (pins.some((other) => rectanglesOverlap(box, other.bounds))) return true;
@@ -145,7 +146,7 @@ export function placeBubbles(bubbles: readonly BubbleRequest[], pins: readonly P
     const shape = bubble.shapes.length - 1;
     const { width: w, height: h } = bubble.shapes[shape];
     const left = Math.max(0, Math.min(bubble.x - w / 2, width - w));
-    const top = Math.max(height, ...pins.map((pin) => pin.bounds.bottom), ...[...boxes.values()].map((box) => box.bottom)) + BUBBLE_GAP;
+    const top = Math.max(height, ...pins.map((pin) => pin.bounds.bottom), ...[...boxes.values()].map((box) => box.bottom)) + gap;
     boxes.set(bubble.id, { left, top, right: left + w, bottom: top + h, shape });
   };
   // 이 말풍선이 들어갈 옆자리를 막은 말풍선이 하나뿐이고, 그 말풍선이 자기 PIN의 다른 옆자리로 옮길 수 있으면 옮긴다.

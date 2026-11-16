@@ -7,8 +7,8 @@ import {
   parseRealtimeReaction,
   scheduleRealtimeReaction,
   type RealtimeReactionPayload
-} from "@/app/_model/realtime-reactions";
-import { subscribeToRealtimeReactions } from "@/app/_service/realtime-reaction-service";
+} from "@/app/_model/lecture/realtime-reactions";
+import { subscribeToRealtimeReactions } from "@/app/_service/lecture/realtime-reaction-service";
 
 const MAX_VISIBLE_REACTIONS = 64;
 const MAX_RECENT_REACTION_IDS = 128;

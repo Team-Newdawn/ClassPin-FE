@@ -1,10 +1,11 @@
 "use client";
 
-import { Folder, Trash2 } from "@/app/component/icons";
-import { useLanguage } from "@/app/_controller/language-context";
-import { SlideCanvas } from "@/app/component/slide-canvas";
+import { Folder, Trash2 } from "@/app/component/icon/icons";
+import { useLanguage } from "@/app/_controller/provider/language-context";
+import { SlideCanvas } from "@/app/component/slide/slide-canvas";
+import { ActionMenu, closeActionMenu } from "@/app/component/control/action-menu";
 
-import type { ClassFolder, ClassSession } from "@/app/_model/types";
+import type { ClassFolder, ClassSession } from "@/app/_model/core/types";
 import styles from "./folder-material-card.module.css";
 
 import Link from "next/link";
@@ -40,14 +41,8 @@ export function FolderMaterialCard({ session, folders, view, moving, onMove, onD
       <Cell className={styles.actions}><div className={styles.controls}><Link className={`btn primary ${styles.start}`} href={`/admin/session/${session.id}`}>{view === "list" && <Image src="/assets/design/play.svg" alt="" width={12} height={12} />}{t("folders.startLive")}</Link>
       <Link className={styles.actionIcon} href={`/admin/session/${session.id}?mode=prepare`} aria-label={t("folders.prepare")} title={t("folders.prepare")}><Image src="/assets/insights/manage.svg" alt="" width={24} height={24} /></Link>
 
-      <details className={styles.menu} name="material-card-actions" onToggle={(event) => {
-        if (view !== "list" || !event.currentTarget.open) return;
-        const rect = event.currentTarget.getBoundingClientRect();
-        const panel = event.currentTarget.lastElementChild as HTMLElement;
-        Object.assign(panel.style, { position: "fixed", top: `${Math.max(12, Math.min(rect.bottom + 6, window.innerHeight - panel.offsetHeight - 12))}px`, left: `${Math.max(12, Math.min(rect.right - 210, window.innerWidth - 222))}px`, right: "auto" });
-      }} onBlur={(event) => { if (!event.currentTarget.contains(event.relatedTarget)) event.currentTarget.removeAttribute("open"); }} onKeyDown={(event) => { if (event.key === "Escape") { event.currentTarget.removeAttribute("open"); event.currentTarget.querySelector("summary")?.focus(); } }}>
-        <summary className={`icon-btn ${styles.menuTrigger}`} aria-label={`${session.title}: ${t("folders.moveTo")}`} title={t("folders.moveTo")} aria-disabled={moving} onClick={(event) => { if (moving) event.preventDefault(); }}>{moving ? <span className="spinner dark" /> : <Image src="/assets/design/dots.svg" alt="" width={16} height={16} />}</summary>
-        <div className={styles.popover}>
+      <ActionMenu name="material-card-actions" className={styles.menu} triggerClassName={`icon-btn ${styles.menuTrigger}`} panelClassName={styles.popover}
+        label={`${session.title}: ${t("folders.moveTo")}`} title={t("folders.moveTo")} disabled={moving} busy={moving} floating={view === "list"}>
           <label>
             <span><Folder />{t("folders.moveTo")}</span>
             <select value={session.folderId ?? ""} aria-label={t("folders.moveMaterial", { title: session.title })} disabled={moving} onChange={(event) => onMove(event.target.value)}>
@@ -55,9 +50,8 @@ export function FolderMaterialCard({ session, folders, view, moving, onMove, onD
               {folders.map((folder) => <option key={folder.id} value={folder.id}>{folder.name}</option>)}
             </select>
           </label>
-          <button type="button" className={styles.destructive} onClick={(event) => { event.currentTarget.closest("details")?.removeAttribute("open"); onDelete(); }}><Trash2 />{t("materials.deleteConfirm")}</button>
-        </div>
-      </details></div></Cell>
+          <button type="button" className={styles.destructive} onClick={(event) => { closeActionMenu(event.currentTarget); onDelete(); }}><Trash2 />{t("materials.deleteConfirm")}</button>
+      </ActionMenu></div></Cell>
     </Root>
   );
 }

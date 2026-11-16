@@ -2,8 +2,8 @@
 
 import Image from "next/image";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useLanguage } from "@/app/_controller/language-context";
-import type { Question } from "@/app/_model/types";
+import { useLanguage } from "@/app/_controller/provider/language-context";
+import type { Question } from "@/app/_model/core/types";
 import { useQuestionSummary, type SummaryPurpose } from "./pin-cluster-controller";
 import styles from "./pin-cluster-popover.module.css";
 

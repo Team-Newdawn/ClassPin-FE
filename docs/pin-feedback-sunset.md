@@ -35,7 +35,7 @@
 
 ## 3. Pin Class로 이동할 공유 동작
 
-- `PFS-020` `lib/pin/presentation-rotation.ts`와 test는 Class 발표가 사용하므로 `app/_model/class/presentation-rotation.ts`와 대응 test로 이동한다.
+- `PFS-020` `lib/pin/presentation-rotation.ts`와 test는 Class 발표가 사용하므로 `app/_model/presentation/presentation-rotation.ts`와 대응 test로 이동한다.
 - `PFS-021` `praise`, `improve`, `confusing`, `bug`, `idea` legacy 카테고리는 이미 복사된 Class 질문 표시를 위해 Class model에 유지한다.
 - `PFS-022` legacy 카테고리 번역은 `pin.category.*`에서 Class 소유 `category.*` key로 이름을 바꾸고 `categoryLabel`이 계속 해석하도록 한다.
 - `PFS-023` Class 참여 화면의 `pin.join.markerTitle`은 `student.markerTitle`로 이름을 바꾼다.
@@ -79,7 +79,7 @@
 - `PFS-061` 다음으로 Pin source deletion package가 전용 route, component, lib, API와 test를 삭제한다.
 - `PFS-062` Class architecture package가 language context, session Facade와 service에서 Pin runtime·import contract를 제거한다.
 - `PFS-063` 모든 소비자가 이전된 뒤 CSS integration package 하나만 `app/globals.css`의 Pin 전용 selector를 제거한다.
-- `PFS-064` `app/_model/types.ts`, `app/_model/i18n.ts`, `app/_controller/language-context.tsx`, `app/component/language-switcher.tsx`, `app/_controller/session-store.tsx`, `app/_service/class-session-service.ts`, `app/globals.css`는 각각 한 package만 소유한다.
+- `PFS-064` `app/_model/core/types.ts`, `app/_model/core/i18n.ts`, `app/_controller/provider/language-context.tsx`, `app/component/control/language-switcher.tsx`, `app/_controller/provider/session-store.tsx`, `app/_service/lecture/class-session-service.ts`, `app/globals.css`는 각각 한 package만 소유한다.
 - `PFS-065` package allowed path는 겹치지 않으며 dependency가 끝나지 않은 삭제 package를 시작하지 않는다.
 - `PFS-066` source 삭제 rollback은 package별 Git revert로 수행한다. 보존된 DB·Storage에는 rollback 작업을 실행하지 않는다.
 
@@ -88,7 +88,7 @@
 - `PFS-070` `app/pin`, `components/pin`, `lib/pin`, `app/api/pin`이 남지 않았는지 파일 목록으로 확인한다.
 - `PFS-071` 실행 코드에서 `@/lib/pin`, `@/components/pin`, `/api/pin`, PinFeedback import와 `/pin` 링크가 사라졌는지 `rg`로 검증한다.
 - `PFS-072` 기존 `/pin` URL이 404를 반환하고 Pin Class의 `/`, `/login`, `/admin`, `/join/[code]`는 기존 계약대로 동작하는지 확인한다.
-- `PFS-073` 이동한 presentation rotation test와 `app/_model/question-categories.test.ts`를 실행해 충돌 회피와 legacy category 표시를 검증한다.
+- `PFS-073` 이동한 presentation rotation test와 `app/_model/core/question-categories.test.ts`를 실행해 충돌 회피와 legacy category 표시를 검증한다.
 - `PFS-074` Class 발표의 PIN 충돌 회피, 공감 milestone·이모지, participant marker picker와 final 설문을 실제 브라우저에서 검증한다.
 - `PFS-075` Supabase stack을 시작하고 clean `npm run supabase:reset`, 기존 Class import SQL, `npm run lint`, `npm run build`를 통과한다.
 - `PFS-076` campaign table, RPC와 `campaign-images`가 reset 이후에도 존재하고 기존 campaign data를 삭제하는 새 migration이 없음을 확인한다.

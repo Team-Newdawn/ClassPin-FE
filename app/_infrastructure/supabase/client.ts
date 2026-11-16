@@ -1,5 +1,5 @@
 import { createClient, type SupabaseClient, type User } from "@supabase/supabase-js";
-import type { Profile } from "@/app/_model/types";
+import type { Profile } from "@/app/_model/core/types";
 import { restRequest } from "@/app/_infrastructure/rest/request";
 import { fetchWithAbortedTransactionRetry } from "./fetch-retry";
 

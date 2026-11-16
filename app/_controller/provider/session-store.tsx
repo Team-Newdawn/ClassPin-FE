@@ -2,14 +2,14 @@
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
-import { useAuth } from "@/app/_controller/auth-context";
-import { defaultQuestionCategorySettings, isParticipantPointAnchor, normalizeClassFolderColorIndex, normalizeClassFolderName, normalizeClassFolderPurpose, normalizeClassFolderPurposeLabel, normalizeQuestionCategorySettings, type ClassFolder, type ClassSession, type CreateClassFolderInput, type ParticipantQuestionInput, type PresentationQrPosition, type Question, type Slide } from "@/app/_model/types";
-import { withQuestionReaction } from "@/app/_model/question-reactions";
-import { normalizeSessions, serializeSessionsForFailureCache } from "@/app/_model/class/session";
-import { classSessionPersistenceEnabled, createClassFolder as persistClassFolder, deleteClassFolder as persistClassFolderDeletion, deleteClassSession as persistSessionDeletion, deleteSessionSlide, fetchLectureSnapshot, fetchLiveSession, fetchLiveSessionById, fetchOwnedClassFolders, fetchOwnedSessions, fetchSessionSlides, markQuestionResolved, moveSessionToFolder as persistSessionFolder, persistSession, postAnswer, updateClassFolder as persistClassFolderUpdate, saveSlideInstructorNote, setQuestionReaction as persistQuestionReaction, submitQuestion, subscribeToLecture, updateLecture, updateQuestion as persistQuestionUpdate, type LectureRealtimeRow } from "@/app/_service/class-session-service";
-import { coalesceRefresh } from "@/app/_model/class/live-refresh";
-import { LECTURE_QUESTIONS_CHANGED_EVENT, lectureReactionTopic } from "@/app/_model/lecture-reactions";
-import { publishRealtimeReaction } from "@/app/_service/realtime-reaction-service";
+import { useAuth } from "@/app/_controller/provider/auth-context";
+import { defaultQuestionCategorySettings, isParticipantPointAnchor, normalizeClassFolderColorIndex, normalizeClassFolderName, normalizeClassFolderPurpose, normalizeClassFolderPurposeLabel, normalizeQuestionCategorySettings, type ClassFolder, type ClassSession, type CreateClassFolderInput, type ParticipantQuestionInput, type PresentationQrPosition, type Question, type Slide } from "@/app/_model/core/types";
+import { withQuestionReaction } from "@/app/_model/lecture/question-reactions";
+import { normalizeSessions, serializeSessionsForFailureCache } from "@/app/_model/lecture/session";
+import { classSessionPersistenceEnabled, createClassFolder as persistClassFolder, deleteClassFolder as persistClassFolderDeletion, deleteClassSession as persistSessionDeletion, deleteSessionSlide, fetchLectureSnapshot, fetchLiveSession, fetchLiveSessionById, fetchOwnedClassFolders, fetchOwnedSessions, fetchSessionSlides, markQuestionResolved, moveSessionToFolder as persistSessionFolder, persistSession, postAnswer, updateClassFolder as persistClassFolderUpdate, saveSlideInstructorNote, setQuestionReaction as persistQuestionReaction, submitQuestion, subscribeToLecture, updateLecture, updateQuestion as persistQuestionUpdate, type LectureRealtimeRow } from "@/app/_service/lecture/class-session-service";
+import { coalesceRefresh } from "@/app/_model/lecture/live-refresh";
+import { LECTURE_QUESTIONS_CHANGED_EVENT, lectureReactionTopic } from "@/app/_model/lecture/lecture-reactions";
+import { publishRealtimeReaction } from "@/app/_service/lecture/realtime-reaction-service";
 
 const STORAGE_KEY = "pin-class-sessions-v1";
 const FOLDER_STORAGE_KEY = "pin-class-folders-v1";
@@ -80,6 +80,7 @@ const errorDetail = (error: unknown) => {
   return error instanceof Error ? error.message : String(error);
 };
 
+const loadOwnedData = () => Promise.all([fetchOwnedSessions(), fetchOwnedClassFolders()]);
 const readCachedSessions = (userId: string) => {
   try {
     const cached = window.localStorage.getItem(cacheKey(userId));
@@ -124,6 +125,8 @@ export function SessionStore({ children }: { children: React.ReactNode }) {
   const ownerId = useRef<string | null>(null);
   const demoChannelRef = useRef<BroadcastChannel | null>(null);
   const sessionsByIdRef = useRef<ReadonlyMap<string, ClassSession>>(new Map());
+  // Started while the profile check runs; taken (and cleared) by the first load after it, so a later load always refetches.
+  const earlyOwnedLoad = useRef<{ userId: string; request: ReturnType<typeof loadOwnedData> } | null>(null);
   const authUserId = user?.id ?? null;
   const authIsAnonymous = user?.is_anonymous ?? false;
   const sessionsById = useMemo(() => new Map(sessions.map((session) => [session.id, session])), [sessions]);
@@ -149,16 +152,26 @@ export function SessionStore({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (!classSessionPersistenceEnabled) return;
     let active = true;
+    const signedInInstructor = authUserId && !authIsAnonymous && !participantRoute;
     if (authLoading) {
+      // The profile check (/me) and the course graph each cross the network; start the graph beside the check, not after it.
+      // The backend still refuses it to a non-instructor, and the result is used only once isAdmin is known.
+      if (signedInInstructor && earlyOwnedLoad.current?.userId !== authUserId) {
+        const request = loadOwnedData();
+        request.catch(() => {});
+        earlyOwnedLoad.current = { userId: authUserId, request };
+      }
       queueMicrotask(() => { if (active) setReady(false); });
       return () => { active = false; };
     }
-    if (authUserId && !authIsAnonymous && isAdmin && !participantRoute) {
+    const early = earlyOwnedLoad.current;
+    earlyOwnedLoad.current = null;
+    if (signedInInstructor && isAdmin) {
       ownerId.current = authUserId;
       queueMicrotask(() => { if (active) setReady(false); });
       const cached = readCachedSessions(authUserId);
       const cachedFolders = readFolders(folderCacheKey(authUserId));
-      void Promise.all([fetchOwnedSessions(), fetchOwnedClassFolders()])
+      void (early?.userId === authUserId ? early.request : loadOwnedData())
         .then(([remote, remoteFolders]) => {
           if (!active) return;
           setSessions(normalizeSessions(remote));

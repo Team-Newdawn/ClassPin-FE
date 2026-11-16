@@ -1,4 +1,4 @@
-import type { ClassFolder, ClassSession, Question, Slide } from "./types.ts";
+import type { ClassFolder, ClassSession, Question, Slide } from "../core/types.ts";
 
 export function summarizeEndReport(slideCount: number, questions: readonly Pick<Question, "slideIndex" | "reactionCount">[]) {
   const counts = Array.from({ length: slideCount }, () => 0);

@@ -1,5 +1,5 @@
 import { createClient } from "@supabase/supabase-js";
-import { CLASS_FOLDER_PURPOSE_LABEL_MAX, CLASS_FOLDER_PURPOSES, classFolderPurposeLine, type ClassFolderPurpose } from "../../_model/types.ts";
+import { CLASS_FOLDER_PURPOSE_LABEL_MAX, CLASS_FOLDER_PURPOSES, classFolderPurposeLine, type ClassFolderPurpose } from "../../_model/core/types.ts";
 
 const MAX_QUESTION_LENGTH = 300;
 // 강의 외 용도(회의·피드백 등)도 있어 작성자나 질문 행위를 서술하지 않고 내용만 쓰게 한다.

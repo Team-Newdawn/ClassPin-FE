@@ -2,8 +2,8 @@
 
 import { useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { safeNextPath } from "@/app/_model/next-path";
-import { authConfigured, observeAuthSession } from "@/app/_service/auth-service";
+import { safeNextPath } from "@/app/_model/core/next-path";
+import { authConfigured, observeAuthSession } from "@/app/_service/auth/auth-service";
 
 export function useAuthCallbackController() {
   const router = useRouter();

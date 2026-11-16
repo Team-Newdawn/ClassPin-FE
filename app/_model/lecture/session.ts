@@ -2,7 +2,7 @@ import {
   isQuestionMarker,
   normalizeQuestionCategorySettings,
   type ClassSession
-} from "../types.ts";
+} from "../core/types.ts";
 
 export const serializeSessionsForFailureCache = (sessions: ClassSession[]) =>
   JSON.stringify(sessions, (key, value) => key === "speakerNote" ? undefined : value);

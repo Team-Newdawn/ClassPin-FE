@@ -1,5 +1,5 @@
 import { LEGACY_QUESTION_CATEGORY_KEYS, type QuestionCategory, type QuestionStatus } from "./types.ts";
-import { SOURCE_FILE_TOO_LARGE_ERROR } from "./upload.ts";
+import { SOURCE_FILE_TOO_LARGE_ERROR } from "../material/upload.ts";
 
 export type Locale = "ko" | "en";
 type Values = Record<string, string | number>;
@@ -14,10 +14,6 @@ const ko = {
   "folders.openMenu": "열기",
   "folders.pin": "맨 위에 고정",
   "folders.unpin": "고정 해제",
-  "folders.copyLiveLink": "참여 링크 복사",
-  "folders.noLiveLink": "LIVE 자료가 있을 때 참여 링크를 복사할 수 있어요",
-  "folders.linkCopied": "참여 링크를 복사했어요",
-  "folders.copyError": "참여 링크를 복사하지 못했어요",
   "folders.appearanceError": "화면 설정을 저장하지 못했어요",
   "folders.browserPreference": "이 브라우저에 저장",
   "folders.deleteTitle": "폴더를 삭제할까요?",
@@ -659,10 +655,6 @@ const en: Record<TranslationKey, Message> = {
   "folders.openMenu": "Open",
   "folders.pin": "Pin to top",
   "folders.unpin": "Unpin",
-  "folders.copyLiveLink": "Copy join link",
-  "folders.noLiveLink": "A live material is required to copy a join link",
-  "folders.linkCopied": "Join link copied",
-  "folders.copyError": "Could not copy the join link",
   "folders.appearanceError": "Could not save appearance settings",
   "folders.browserPreference": "Saved in this browser",
   "folders.deleteTitle": "Delete this folder?",

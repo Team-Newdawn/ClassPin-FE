@@ -1,6 +1,6 @@
 import { Upload } from "tus-js-client";
 import { getSupabaseClient, getUploadSession } from "@/app/_infrastructure/supabase/client";
-import type { Slide } from "@/app/_model/types";
+import type { Slide } from "@/app/_model/core/types";
 import {
   createPdfSlides,
   MAX_SOURCE_FILE_BYTES,
@@ -9,7 +9,7 @@ import {
   SOURCE_FILE_TOO_LARGE_ERROR,
   sourceFileExtension,
   type SourceFileExtension,
-} from "@/app/_model/upload";
+} from "@/app/_model/material/upload";
 
 type ConvertCallbacks = {
   /** 업로드 진행률(0~1). 브라우저가 서버로 바이트를 올리는 동안 호출된다. */

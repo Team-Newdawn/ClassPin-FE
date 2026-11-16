@@ -1,10 +1,10 @@
 "use client";
 
-import { LogOut } from "@/app/component/icons";
-import { useAuth } from "@/app/_controller/auth-context";
-import { useLanguage } from "@/app/_controller/language-context";
-import { LanguageSwitcher } from "@/app/component/language-switcher";
-import { PinLogo } from "@/app/component/pin-logo";
+import { LogOut } from "@/app/component/icon/icons";
+import { useAuth } from "@/app/_controller/provider/auth-context";
+import { useLanguage } from "@/app/_controller/provider/language-context";
+import { LanguageSwitcher } from "@/app/component/control/language-switcher";
+import { PinLogo } from "@/app/component/icon/pin-logo";
 import styles from "./workspace-header.module.css";
 
 export function WorkspaceAccount({ className = "" }: { className?: string }) {

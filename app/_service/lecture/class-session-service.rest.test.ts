@@ -30,7 +30,7 @@ function loadServices() {
   const labelTable = {
     select: (columns: string) => {
       assert(["id,show_question_labels,presentation_options", "show_question_labels,presentation_options"].includes(columns));
-      return columns.startsWith("id,") ? { in: async () => ({ data: [labelRow().data], error: null }) }
+      return columns.startsWith("id,") ? Promise.resolve({ data: [labelRow().data], error: null })
         : { eq: () => ({ single: async () => labelRow() }) };
     },
     update: (values: { show_question_labels?: boolean; presentation_options?: { qrSize: number } }) => {
@@ -70,7 +70,7 @@ function loadServices() {
     }, loaded.exports, loaded);
     return loaded.exports;
   };
-  return { ...load("app/_service/class-session-service.ts"), ...load("app/_service/platform-experience-service.ts"), rpcCalls };
+  return { ...load("app/_service/lecture/class-session-service.ts"), ...load("app/_service/lecture/platform-experience-service.ts"), rpcCalls };
 }
 
 test("business services use REST DTOs, preserve settings, and strip participant notes", async () => {

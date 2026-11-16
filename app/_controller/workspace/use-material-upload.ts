@@ -1,10 +1,10 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { useLanguage } from "@/app/_controller/language-context";
-import { useSessions } from "@/app/_controller/session-store";
-import { localizeUploadError } from "@/app/_model/i18n";
-import { convertToSlides } from "@/app/_service/convert";
+import { useLanguage } from "@/app/_controller/provider/language-context";
+import { useSessions } from "@/app/_controller/provider/session-store";
+import { localizeUploadError } from "@/app/_model/core/i18n";
+import { convertToSlides } from "@/app/_service/upload/convert";
 
 type UploadItem = { id: string; file: File; phase: "waiting" | "uploading" | "processing" | "done" | "failed"; progress: number; error?: string; slideCount?: number };
 

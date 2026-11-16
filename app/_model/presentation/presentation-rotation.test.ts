@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { advancePinPlayback, canRotatePinPlayback, crossedPinMilestone, findIncomingPins, findNewestIncomingPin, nextPresentationSlide, presentationAutoplayDelay, rectanglesOverlap, placeBubbles, slideIndexFromPageNumber } from "./presentation-rotation.ts";
+import { advancePinPlayback, BUBBLE_GAP, canRotatePinPlayback, crossedPinMilestone, findIncomingPins, findNewestIncomingPin, nextPresentationSlide, presentationAutoplayDelay, rectanglesOverlap, placeBubbles, slideIndexFromPageNumber } from "./presentation-rotation.ts";
 
 test("PIN 총합이 새 10단위를 넘으면 건너뛴 구간 중 가장 높은 값을 고른다", () => {
   assert.equal(crossedPinMilestone(9, 10), 10);
@@ -109,7 +109,7 @@ test("말풍선은 겹치지 않게 자기 PIN에 붙이고, 빈자리가 없어
   const gap = (first: { left: number; right: number; top: number; bottom: number }, second: typeof first) =>
     Math.max(0, first.left - second.right, second.left - first.right) + Math.max(0, first.top - second.bottom, second.top - first.bottom);
   boxes.forEach((first, index) => {
-    assert.ok(gap(first, pins[index].bounds) <= 6, `${pins[index].id} 말풍선은 자기 PIN에 붙어 있다`);
+    assert.ok(gap(first, pins[index].bounds) <= BUBBLE_GAP, `${pins[index].id} 말풍선은 자기 PIN에 붙어 있다`);
     boxes.slice(index + 1).forEach((second) => assert.equal(rectanglesOverlap(first, second), false));
     pins.forEach((item) => assert.equal(rectanglesOverlap(first, item.bounds), false));
     assert.ok(first.left >= 0 && first.top >= 0 && first.right <= 400 && first.bottom <= 300);
@@ -123,7 +123,10 @@ test("말풍선은 겹치지 않게 자기 PIN에 붙이고, 빈자리가 없어
   // 넓은 모양이 PIN 옆에 안 들어가면 멀리 보내지 않고 좁은 여러 줄 모양으로 PIN 옆에 둔다.
   const edge = pin("e", 150, 25);
   const narrow = placeBubbles([{ id: "e", x: 150, y: 25, pin: edge.bounds, shapes: [{ width: 200, height: 24 }, { width: 90, height: 44 }] }], [edge], 260, 50, null);
-  assert.deepEqual(narrow.get("e"), { x: 16, y: -22, shape: 1 });
+  assert.deepEqual(narrow.get("e"), { x: 20, y: -22, shape: 1 });
+  // 화면이 커지면 호출자가 PIN 단위만큼 키운 간격을 넘긴다.
+  const wide = placeBubbles([{ id: "e", x: 150, y: 25, pin: edge.bounds, shapes: [{ width: 90, height: 44 }] }], [edge], 400, 50, null, 19);
+  assert.deepEqual(wide.get("e"), { x: 29, y: -22, shape: 0 });
 });
 
 test("긴 말풍선은 전체 높이로 측정하고 공간 부족을 호출자에 알린다", () => {

@@ -1,8 +1,8 @@
 "use client";
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
-import { categoryLabel as getCategoryLabel, type Locale, statusLabel as getStatusLabel, timeAgo as getTimeAgo, translate, type TranslationKey } from "@/app/_model/i18n";
-import type { QuestionCategory, QuestionStatus } from "@/app/_model/types";
+import { categoryLabel as getCategoryLabel, type Locale, statusLabel as getStatusLabel, timeAgo as getTimeAgo, translate, type TranslationKey } from "@/app/_model/core/i18n";
+import type { QuestionCategory, QuestionStatus } from "@/app/_model/core/types";
 
 const STORAGE_KEY = "pin-class-locale";
 

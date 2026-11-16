@@ -6,7 +6,7 @@ import ts from "typescript";
 test("summary requests share in-flight work, isolate tokens, retry failures and bound memory", async () => {
   let token = "owner-a";
   const exports: Record<string, unknown> = {};
-  const code = ts.transpileModule(readFileSync("app/_service/question-summary-service.ts", "utf8"), {
+  const code = ts.transpileModule(readFileSync("app/_service/lecture/question-summary-service.ts", "utf8"), {
     compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 }
   }).outputText;
   new Function("require", "exports", code)(() => ({ getUploadSession: async () => ({ accessToken: token }) }), exports);
@@ -42,7 +42,7 @@ test("summary requests share in-flight work, isolate tokens, retry failures and 
 
 test("summary refresh counts new, edited and deleted questions but not reactions", () => {
   const exports: Record<string, unknown> = {};
-  const code = ts.transpileModule(readFileSync("app/_service/question-summary-service.ts", "utf8"), {
+  const code = ts.transpileModule(readFileSync("app/_service/lecture/question-summary-service.ts", "utf8"), {
     compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 }
   }).outputText;
   new Function("require", "exports", code)(() => ({}), exports);

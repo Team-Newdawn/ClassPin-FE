@@ -1,7 +1,7 @@
-import { boundedJson, insightFailure, insightOwner, insightResponse, insightStorage, InsightRequestError, readOwnedInsightSource } from "../../../_service/insight-request.ts";
-import { checkDailyDrafts, draftBasis, reportView, startDraft, type ReportRow } from "../../../_service/report-request.ts";
-import { insightAi } from "../../../_service/insight-ai.ts";
-import { draftReport, REPORT_REQUEST_MAX } from "../../../_model/report.ts";
+import { boundedJson, insightFailure, insightOwner, insightResponse, insightStorage, InsightRequestError, readOwnedInsightSource } from "../../../_service/insight/insight-request.ts";
+import { checkDailyDrafts, draftBasis, reportView, startDraft, type ReportRow } from "../../../_service/report/report-request.ts";
+import { insightAi } from "../../../_service/insight/insight-ai.ts";
+import { draftReport, REPORT_REQUEST_MAX } from "../../../_model/report/report.ts";
 
 export const runtime = "nodejs";
 export const maxDuration = 300;

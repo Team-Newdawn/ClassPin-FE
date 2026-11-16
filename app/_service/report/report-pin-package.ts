@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import JSZip from "jszip";
 import { PDFArray, PDFDict, PDFName, PDFRawStream, decodePDFRawStream, type PDFDocument, type PDFHexString, type PDFRef, type PDFString } from "pdf-lib";
-import type { inspectInsightSource } from "./insight-source.ts";
+import type { inspectInsightSource } from "../insight/insight-source.ts";
 
 export type ReportPinSource = Pick<ReturnType<typeof inspectInsightSource>["materials"][number],
   "id" | "versionId" | "version" | "lectureId" | "slides" | "questions">;

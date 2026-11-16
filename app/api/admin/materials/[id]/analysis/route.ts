@@ -1,7 +1,7 @@
 import { after } from "next/server";
-import { insightFailure, insightOwner, insightResponse, insightStorage, InsightRequestError, readOwnedInsightSource } from "../../../../../_service/insight-request.ts";
-import { insightAi } from "../../../../../_service/insight-ai.ts";
-import { analysisView, ensureAnalysis, readAnalysis } from "../../../../../_service/material-analysis.ts";
+import { insightFailure, insightOwner, insightResponse, insightStorage, InsightRequestError, readOwnedInsightSource } from "../../../../../_service/insight/insight-request.ts";
+import { insightAi } from "../../../../../_service/insight/insight-ai.ts";
+import { analysisView, ensureAnalysis, readAnalysis } from "../../../../../_service/insight/material-analysis.ts";
 
 export const runtime = "nodejs";
 export const maxDuration = 300;

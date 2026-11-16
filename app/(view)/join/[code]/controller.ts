@@ -2,17 +2,18 @@
 
 import { useEffect, useMemo, useRef, useState, type MouseEvent, type PointerEvent } from "react";
 import { useParams } from "next/navigation";
-import { useLanguage } from "@/app/_controller/language-context";
-import { useSessions } from "@/app/_controller/session-store";
-import { useHorizontalSlideWheel } from "@/app/_controller/use-horizontal-slide-wheel";
-import { useLectureReactions } from "@/app/_controller/use-lecture-reactions";
-import { useAudienceHeartbeat } from "@/app/_controller/use-live-audience";
-import { LECTURE_REACTION_EVENT, lectureReactionTopic, type LectureReactionEmoji } from "@/app/_model/lecture-reactions";
-import { questionsByEmpathy, questionsByNewest } from "@/app/_model/question-reactions";
-import { groupQuestionsBySlide } from "@/app/_model/stats";
-import { LectureClosedError, QuestionRateLimitError } from "@/app/_service/class-session-service";
-import { publishRealtimeReaction } from "@/app/_service/realtime-reaction-service";
-import { acceptsQuestionCategory, enabledQuestionCategories, type Question, type QuestionCategory, type QuestionMarker } from "@/app/_model/types";
+import { useLanguage } from "@/app/_controller/provider/language-context";
+import { useSessions } from "@/app/_controller/provider/session-store";
+import { useHorizontalSlideWheel } from "@/app/_controller/presentation/use-horizontal-slide-wheel";
+import { useLectureReactions } from "@/app/_controller/live/use-lecture-reactions";
+import { useAudienceHeartbeat } from "@/app/_controller/live/use-live-audience";
+import { LECTURE_REACTION_EVENT, lectureReactionTopic, type LectureReactionEmoji } from "@/app/_model/lecture/lecture-reactions";
+import { questionsByEmpathy, questionsByNewest } from "@/app/_model/lecture/question-reactions";
+import { groupQuestionsBySlide } from "@/app/_model/material/stats";
+import { LectureClosedError, QuestionRateLimitError } from "@/app/_service/lecture/class-session-service";
+import { publishRealtimeReaction } from "@/app/_service/lecture/realtime-reaction-service";
+import { acceptsQuestionCategory, enabledQuestionCategories, type Question, type QuestionCategory, type QuestionMarker } from "@/app/_model/core/types";
+import { usePrefetchNeighborSlides } from "@/app/_controller/presentation/use-prefetch-neighbor-slides";
 
 type StudentTool = "pin" | "emoji";
 type QuestionSort = "empathy" | "newest";
@@ -112,6 +113,7 @@ export function useJoinSessionController() {
   }, [session?.id, setActiveSession]);
 
   const current = slideIndex ?? session?.currentSlide ?? 0;
+  usePrefetchNeighborSlides(session?.slides, current);
   const questionsBySlide = useMemo(() => groupQuestionsBySlide(session?.questions ?? []), [session?.questions]);
   const questionsById = useMemo(() => new Map(session?.questions.map((question) => [question.id, question])), [session?.questions]);
   const hasOwnQuestions = useMemo(() => session?.questions.some((question) => question.isMine) ?? false, [session?.questions]);

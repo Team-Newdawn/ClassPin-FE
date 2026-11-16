@@ -1,6 +1,6 @@
 "use client";
 
-import { useLanguage } from "@/app/_controller/language-context";
+import { useLanguage } from "@/app/_controller/provider/language-context";
 import styles from "./language-switcher.module.css";
 
 export function LanguageSwitcher({ className = "" }: { className?: string }) {

@@ -1,9 +1,9 @@
 "use client";
 
-import type { ClassSession } from "../_model/types";
-import { presentationOptions, type PresentationOptions } from "../_model/presentation-options";
-import { useBrowserPreferences } from "./use-browser-preferences";
-import { useSessions } from "./session-store";
+import type { ClassSession } from "../../_model/core/types";
+import { presentationOptions, type PresentationOptions } from "../../_model/presentation/presentation-options";
+import { useBrowserPreferences } from "../workspace/use-browser-preferences";
+import { useSessions } from "../provider/session-store";
 
 export function usePresentationOptions(session: ClassSession | undefined) {
   const [saved, update] = useBrowserPreferences<PresentationOptions>(`presentation:${session?.id ?? ""}`);

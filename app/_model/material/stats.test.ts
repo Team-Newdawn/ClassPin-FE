@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { groupQuestionsBySlide, summarizeFolders, summarizeEndReport } from "./stats.ts";
-import type { ClassFolder, ClassSession, Question } from "./types.ts";
+import type { ClassFolder, ClassSession, Question } from "../core/types.ts";
 
 test("종료 리포트는 동률과 삭제된 슬라이드의 질문을 보존하고 빈 자료를 구분한다", () => {
   const report = summarizeEndReport(2, [{ slideIndex: 0, reactionCount: 2 }, { slideIndex: 1, reactionCount: 3 }, { slideIndex: 9, reactionCount: 4 }]);

@@ -2,10 +2,10 @@
 
 import { Suspense, useState } from "react";
 import Link from "next/link";
-import { PinLogo } from "@/app/component/pin-logo";
-import { useLanguage } from "@/app/_controller/language-context";
-import { LanguageSwitcher } from "@/app/component/language-switcher";
-import { LoadingScreen } from "@/app/component/loading-screen";
+import { PinLogo } from "@/app/component/icon/pin-logo";
+import { useLanguage } from "@/app/_controller/provider/language-context";
+import { LanguageSwitcher } from "@/app/component/control/language-switcher";
+import { LoadingScreen } from "@/app/component/layout/loading-screen";
 import { useLoginController } from "./controller";
 import styles from "./page.module.css";
 

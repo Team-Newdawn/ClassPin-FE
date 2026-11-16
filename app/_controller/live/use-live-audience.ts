@@ -1,9 +1,9 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { formatElapsed } from "@/app/_model/class/session";
-import { LECTURE_AUDIENCE_EVENT, lectureAudienceTopic } from "@/app/_model/lecture-reactions";
-import { publishRealtimeReaction, subscribeToRealtimeReactions } from "@/app/_service/realtime-reaction-service";
+import { formatElapsed } from "@/app/_model/lecture/session";
+import { LECTURE_AUDIENCE_EVENT, lectureAudienceTopic } from "@/app/_model/lecture/lecture-reactions";
+import { publishRealtimeReaction, subscribeToRealtimeReactions } from "@/app/_service/lecture/realtime-reaction-service";
 
 const HEARTBEAT_MS = 60_000;
 const ACTIVE_WINDOW_MS = 150_000;

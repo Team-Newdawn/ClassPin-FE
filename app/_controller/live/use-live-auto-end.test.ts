@@ -47,7 +47,7 @@ test("leaving a LIVE player ends it after 60 minutes unless it returns or anothe
   const ended: string[] = [];
   const setStatus = async (id: string, status: string) => { ended.push(`${id}:${status}`); };
 
-  const output = ts.transpileModule(readFileSync("app/_controller/use-live-auto-end.ts", "utf8"), {
+  const output = ts.transpileModule(readFileSync("app/_controller/live/use-live-auto-end.ts", "utf8"), {
     compilerOptions: { module: ts.ModuleKind.CommonJS },
   }).outputText;
   const exports = {} as { useLiveAutoEnd: (id: string, live: boolean, save: typeof setStatus) => void };

@@ -3,9 +3,9 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
-import { reportRequest } from "@/app/_controller/use-report";
-import { useSessions } from "@/app/_controller/session-store";
-import { reportAge } from "@/app/_model/report";
+import { reportRequest } from "@/app/_controller/workspace/use-report";
+import { useSessions } from "@/app/_controller/provider/session-store";
+import { reportAge } from "@/app/_model/report/report";
 import type { ReportSummary } from "../../controller";
 import styles from "./report-switcher.module.css";
 

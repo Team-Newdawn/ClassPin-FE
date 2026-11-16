@@ -2,8 +2,8 @@
 
 import { useRef, useState, type CSSProperties, type KeyboardEvent, type PointerEvent } from "react";
 import { QRCodeSVG } from "qrcode.react";
-import { useLanguage } from "@/app/_controller/language-context";
-import { clampQrSize, type PresentationOptions, type presentationOptions } from "@/app/_model/presentation-options";
+import { useLanguage } from "@/app/_controller/provider/language-context";
+import { clampQrSize, type PresentationOptions, type presentationOptions } from "@/app/_model/presentation/presentation-options";
 import styles from "./presentation-qr.module.css";
 
 type Layout = ReturnType<typeof presentationOptions>;

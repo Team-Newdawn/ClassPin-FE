@@ -3,7 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 
-import { useLanguage } from "@/app/_controller/language-context";
+import { useLanguage } from "@/app/_controller/provider/language-context";
 import styles from "./pin-logo.module.css";
 
 export function PinLogo({ href = "/" }: { href?: string }) {

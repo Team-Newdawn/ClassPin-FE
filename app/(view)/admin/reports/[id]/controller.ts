@@ -2,10 +2,10 @@
 
 import { useState, useSyncExternalStore, type UIEvent } from "react";
 import { useParams } from "next/navigation";
-import { useReport } from "@/app/_controller/use-report";
-import { useSessions } from "@/app/_controller/session-store";
-import { CHAT_FILE_MAX_BYTES, CHAT_IMAGE_MAX_BYTES } from "@/app/_model/report";
-import { summarizeEndReport } from "@/app/_model/stats";
+import { useReport } from "@/app/_controller/workspace/use-report";
+import { useSessions } from "@/app/_controller/provider/session-store";
+import { CHAT_FILE_MAX_BYTES, CHAT_IMAGE_MAX_BYTES } from "@/app/_model/report/report";
+import { summarizeEndReport } from "@/app/_model/material/stats";
 
 const WIDE = "(min-width: 1024px)";
 const watchWide = (change: () => void) => { const query = matchMedia(WIDE); query.addEventListener("change", change); return () => query.removeEventListener("change", change); };

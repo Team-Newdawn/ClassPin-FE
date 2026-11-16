@@ -2,10 +2,10 @@
 
 import { useCallback, useEffect, useEffectEvent, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { acquirePdfDocument } from "@/app/_infrastructure/browser/pdf-document";
-import { PdfPage } from "@/app/component/pdf-page";
-import { ArrowRight, X } from "@/app/component/icons";
-import { useLanguage } from "@/app/_controller/language-context";
-import type { TranslationKey } from "@/app/_model/i18n";
+import { PdfPage } from "@/app/component/slide/pdf-page";
+import { ArrowRight, X } from "@/app/component/icon/icons";
+import { useLanguage } from "@/app/_controller/provider/language-context";
+import type { TranslationKey } from "@/app/_model/core/i18n";
 import styles from "./export-dialog.module.css";
 
 /** Figma ClassPin 2236:2842. */

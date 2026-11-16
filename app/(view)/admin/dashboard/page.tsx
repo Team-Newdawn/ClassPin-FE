@@ -1,12 +1,12 @@
 "use client";
 
 import Image from "next/image";
-import { Search, Plus } from "@/app/component/icons";
-import { AdminSearch } from "@/app/component/admin-search";
-import { LoadingScreen } from "@/app/component/loading-screen";
-import { FolderTreeSidebar } from "@/app/component/folder-tree-sidebar";
-import type { TranslationKey } from "@/app/_model/i18n";
-import { CLASS_FOLDER_COLOR_OPTIONS, CLASS_FOLDER_PURPOSE_LABEL_MAX, type ClassFolderPurpose } from "@/app/_model/types";
+import { Search, Plus } from "@/app/component/icon/icons";
+import { AdminSearch } from "@/app/component/control/admin-search";
+import { LoadingScreen } from "@/app/component/layout/loading-screen";
+import { FolderTreeSidebar } from "@/app/component/layout/folder-tree-sidebar";
+import type { TranslationKey } from "@/app/_model/core/i18n";
+import { CLASS_FOLDER_COLOR_OPTIONS, CLASS_FOLDER_PURPOSE_LABEL_MAX, type ClassFolderPurpose } from "@/app/_model/core/types";
 import { FolderCard } from "./component/folder-card";
 import { FolderDeleteDialog } from "./component/folder-delete-dialog";
 import { UNFILED_ID, useDashboardController } from "./controller";
@@ -26,7 +26,7 @@ const folderPurposeOptions: Array<{ value: ClassFolderPurpose; label: Translatio
   { value: "other", label: "folders.purposeOther", description: "folders.purposeOtherDescription" },
 ];
 
-import { MaterialUploadDialog } from "@/app/component/material-upload-dialog";
+import { MaterialUploadDialog } from "@/app/component/dialog/material-upload-dialog";
 
 export default function DashboardPage() {
   const {
@@ -35,18 +35,18 @@ export default function DashboardPage() {
     folderError, savingFolder, deletingFolderId, folderActionError, sidebarOpen, toggleSidebar,
     requestUpload,
     submitFolder, openFolderEditor, closeFolderEditor, removeFolder, visibleSummaries,
-    folderToDelete, setFolderToDelete, folderPreferences, folderNotice, changeFolderAppearance, copyFolderLink, renameFolder, hasLiveMaterial, setFolderActionError
+    folderToDelete, setFolderToDelete, folderPreferences, changeFolderAppearance, renameFolder, setFolderActionError
   } = useDashboardController();
 
   if (!ready) return <LoadingScreen />;
   const selectedPurpose = folderPurposeOptions.find((option) => option.value === folderPurpose) ?? folderPurposeOptions[0];
 
   const folderCards = visibleSummaries.map((folder) => <FolderCard key={folder.id} folder={folder} view={view} deleting={deletingFolderId === folder.id}
-    pinned={folderPreferences[folder.id]?.pinned === true} canCopyLink={hasLiveMaterial(folder.id)}
+    pinned={folderPreferences[folder.id]?.pinned === true}
     onRename={folder.id === UNFILED_ID ? undefined : (name) => renameFolder(folder, name)}
     onDelete={folder.id === UNFILED_ID ? undefined : () => { setFolderActionError(null); setFolderToDelete(folder); }}
     onPin={() => changeFolderAppearance(folder, { pinned: folderPreferences[folder.id]?.pinned !== true })}
-    onColor={(colorIndex) => changeFolderAppearance(folder, { colorIndex })} onCopyLink={() => void copyFolderLink(folder)} />);
+    onColor={(colorIndex) => changeFolderAppearance(folder, { colorIndex })} />);
 
   return (
     <main className={`${styles.root} folder-workspace folder-dashboard-shell ${sidebarOpen ? "" : "sidebar-collapsed"}`}>
@@ -66,7 +66,6 @@ export default function DashboardPage() {
           </div>
 
           {folderActionError && !folderToDelete && <div className="session-folder-error" role="alert">{folderActionError}</div>}
-          {folderNotice && <p role="status">{folderNotice}</p>}
 
 
           <section className="folder-section" aria-labelledby="folder-list-title">

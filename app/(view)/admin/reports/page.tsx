@@ -2,12 +2,12 @@
 
 import Link from "next/link";
 import { Suspense } from "react";
-import { FolderTreeSidebar } from "@/app/component/folder-tree-sidebar";
-import { FileText, Folder, Sparkles, Trash2 } from "@/app/component/icons";
-import { LoadingScreen } from "@/app/component/loading-screen";
-import { REPORT_REQUEST_MAX, reportAge } from "@/app/_model/report";
+import { FolderTreeSidebar } from "@/app/component/layout/folder-tree-sidebar";
+import { FileText, Folder, Sparkles, Trash2 } from "@/app/component/icon/icons";
+import { LoadingScreen } from "@/app/component/layout/loading-screen";
+import { REPORT_REQUEST_MAX, reportAge } from "@/app/_model/report/report";
 import { useReportHomeController } from "./controller";
-import { ReportConfirmDialog } from "./component/report-confirm-dialog";
+import { ConfirmDialog } from "@/app/component/dialog/confirm-dialog";
 import shell from "../insights/shell.module.css";
 import styles from "./page.module.css";
 
@@ -76,7 +76,7 @@ function ReportHome() {
               </li>)}</ul>}
       </section>
     </div>
-    {c.deleteTarget && <ReportConfirmDialog title={`‘${c.deleteTarget.title}’ 리포트를 삭제할까요?`} saving={c.deleting} error={c.deleteError}
+    {c.deleteTarget && <ConfirmDialog title={`‘${c.deleteTarget.title}’ 리포트를 삭제할까요?`} saving={c.deleting} error={c.deleteError}
       description="리포트 문서와 AI 대화가 모두 지워지고 되돌릴 수 없어요. 강의 데이터는 그대로 남아 다시 만들 수 있어요." confirm={{ label: "삭제", saving: "삭제하는 중…" }}
       onClose={() => c.askDelete(null)} onConfirm={() => void c.confirmDelete()} />}
   </main>;

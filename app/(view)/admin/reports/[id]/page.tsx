@@ -3,19 +3,19 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useLayoutEffect, useRef, useState, type TextareaHTMLAttributes } from "react";
-import { List, Sparkles, Square } from "@/app/component/icons";
-import { LoadingScreen } from "@/app/component/loading-screen";
-import { ExportDialog } from "@/app/component/export-dialog";
-import { SlideCanvas } from "@/app/component/slide-canvas";
-import { reportMessage, reportRequest } from "@/app/_controller/use-report";
-import { chartSvg } from "@/app/_model/report-chart";
-import { CHAT_QUESTIONS_PER_REPORT, METRIC_NONE, parseReportText, reportDate, type ReportMetrics, CHAT_FILE_ACCEPT, type DraftProgress, type ReportSection, type TextRun } from "@/app/_model/report";
+import { List, Sparkles, Square } from "@/app/component/icon/icons";
+import { LoadingScreen } from "@/app/component/layout/loading-screen";
+import { ExportDialog } from "@/app/component/dialog/export-dialog";
+import { SlideCanvas } from "@/app/component/slide/slide-canvas";
+import { reportMessage, reportRequest } from "@/app/_controller/workspace/use-report";
+import { chartSvg } from "@/app/_model/report/report-chart";
+import { CHAT_QUESTIONS_PER_REPORT, METRIC_NONE, parseReportText, reportDate, type ReportMetrics, CHAT_FILE_ACCEPT, type DraftProgress, type ReportSection, type TextRun } from "@/app/_model/report/report";
 import { useReportEditorController } from "./controller";
-import { FolderTreeSidebar } from "@/app/component/folder-tree-sidebar";
+import { FolderTreeSidebar } from "@/app/component/layout/folder-tree-sidebar";
 import { ReportSwitcher } from "./component/report-switcher";
-import { ReportConfirmDialog } from "../component/report-confirm-dialog";
-import { summarizeEndReport } from "@/app/_model/stats";
-import type { ClassSession } from "@/app/_model/types";
+import { ConfirmDialog } from "@/app/component/dialog/confirm-dialog";
+import { summarizeEndReport } from "@/app/_model/material/stats";
+import type { ClassSession } from "@/app/_model/core/types";
 import styles from "./page.module.css";
 
 // `next dev` has no AI question limit (the server skips CHAT_LIMIT there).
@@ -248,7 +248,7 @@ export default function ReportEditorPage() {
         </div>
       </aside>
     </div>
-    {resetOpen && <ReportConfirmDialog title="새 대화를 시작할까요?" description={`지금까지의 대화가 지워지고 되돌릴 수 없어요. 남은 질문 수(${questionsLabel(report.questionsLeft)})는 그대로예요.`}
+    {resetOpen && <ConfirmDialog title="새 대화를 시작할까요?" description={`지금까지의 대화가 지워지고 되돌릴 수 없어요. 남은 질문 수(${questionsLabel(report.questionsLeft)})는 그대로예요.`}
       confirm={{ label: "새 대화", saving: "지우는 중…" }} saving={busy} error="" onClose={() => setResetOpen(false)}
       onConfirm={() => void c.reset().then(() => setResetOpen(false))} />}
     {c.exportOpen && <ExportDialog title="리포트 내보내기" subtitle={doc?.title || report.title} onClose={() => c.setExportOpen(false)}

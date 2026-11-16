@@ -10,8 +10,8 @@ import { attachOfficeReportPins, attachReportPins, REPORT_PIN_INSTRUCTIONS, type
 import { BorderStyle, Document, ExternalHyperlink, ImageRun, Packer, Paragraph, ShadingType, Table, TableCell, TableLayoutType, TableRow, TextRun, WidthType } from "docx";
 import PptxGenJS from "pptxgenjs";
 import sharp from "sharp";
-import { formatReportLine, parseReportText, reportDate, type ReportDocument, type TextRun as StyledRun } from "../_model/report.ts";
-import { C, chartSvg } from "../_model/report-chart.ts";
+import { formatReportLine, parseReportText, reportDate, type ReportDocument, type TextRun as StyledRun } from "../../_model/report/report.ts";
+import { C, chartSvg } from "../../_model/report/report-chart.ts";
 
 /** Rendered slide JPEG (from renderMaterialSlides) keyed by 1-based slide number. */
 type SlideImage = { page: number; width: number; height: number; file: string };
@@ -132,7 +132,7 @@ export async function previewReportExport(result: Awaited<ReturnType<typeof expo
   const form = new FormData();
   form.set("file", new Blob([new Uint8Array(result.bytes)], { type: result.mime }), `report.${format}`);
   if (format === "pptx" || format === "docx") {
-    const { resolveDocumentBinary } = await import("../_infrastructure/server/document-binaries.ts");
+    const { resolveDocumentBinary } = await import("../../_infrastructure/server/document-binaries.ts");
     const binary = await resolveDocumentBinary("soffice");
     const source = join(work, `report.${format}`);
     await writeFile(source, result.bytes);

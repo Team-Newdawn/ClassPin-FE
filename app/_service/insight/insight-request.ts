@@ -4,15 +4,15 @@ import path from "node:path";
 import { promisify } from "node:util";
 import { createClient } from "@supabase/supabase-js";
 import sharp from "sharp";
-import { cachedFile } from "../_infrastructure/server/pdf-cache.ts";
-import { pdfPageImage } from "../_infrastructure/server/pdf-page.ts";
-import { resolveDocumentBinary } from "../_infrastructure/server/document-binaries.ts";
-import { restOrigin } from "../_infrastructure/server/rest-origin.ts";
+import { cachedFile } from "../../_infrastructure/server/pdf-cache.ts";
+import { pdfPageImage } from "../../_infrastructure/server/pdf-page.ts";
+import { resolveDocumentBinary } from "../../_infrastructure/server/document-binaries.ts";
+import { restOrigin } from "../../_infrastructure/server/rest-origin.ts";
 import { MAX_PAGES, imageEdge, readableText, type SlidePage } from "./insight-ai.ts";
-import { limiter } from "../_infrastructure/server/limiter.ts";
+import { limiter } from "../../_infrastructure/server/limiter.ts";
 import { inspectInsightSource } from "./insight-source.ts";
-import { CLASS_FOLDER_NAME_MAX, classFolderPurposeLine, normalizeClassFolderPurpose, normalizeClassFolderPurposeLabel, type ClassFolderPurpose } from "../_model/types.ts";
-// The folder screen's Korean purpose names (app/_model/i18n.ts folders.purpose*).
+import { CLASS_FOLDER_NAME_MAX, classFolderPurposeLine, normalizeClassFolderPurpose, normalizeClassFolderPurposeLabel, type ClassFolderPurpose } from "../../_model/core/types.ts";
+// The folder screen's Korean purpose names (app/_model/core/i18n.ts folders.purpose*).
 const PURPOSE_NAMES: Record<ClassFolderPurpose, string> = { qa: "Q&A", feedback: "피드백", education: "교육", brainstorming: "브레인스토밍", other: "기타" };
 
 export class InsightRequestError extends Error {

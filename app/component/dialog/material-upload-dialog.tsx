@@ -3,9 +3,9 @@
 import { useEffect, useRef } from "react";
 import Image from "next/image";
 import { X } from "lucide-react";
-import { useLanguage } from "@/app/_controller/language-context";
-import { useMaterialUpload } from "@/app/_controller/use-material-upload";
-import { trapDialogFocus } from "@/app/component/dialog-focus";
+import { useLanguage } from "@/app/_controller/provider/language-context";
+import { useMaterialUpload } from "@/app/_controller/workspace/use-material-upload";
+import { trapDialogFocus } from "@/app/component/dialog/dialog-focus";
 import styles from "./material-upload-dialog.module.css";
 
 export function MaterialUploadDialog({ folderId = null, onClose }: { folderId?: string | null; onClose: () => void }) {

@@ -221,7 +221,7 @@ export interface ClassSession {
   presentationAutoplay: boolean;
   showQuestionPins: boolean;
   showQuestionLabels?: boolean;
-  presentationOptions?: import("./presentation-options").PresentationOptions;
+  presentationOptions?: import("../presentation/presentation-options").PresentationOptions;
   showPresentationQr: boolean;
   presentationQrPosition: PresentationQrPosition;
   questionCategories: QuestionCategorySettings;

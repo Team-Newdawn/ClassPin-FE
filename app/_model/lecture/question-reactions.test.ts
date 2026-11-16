@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { questionsByEmpathy, questionsByNewest, withQuestionReaction } from "./question-reactions.ts";
-import type { Question } from "./types.ts";
+import type { Question } from "../core/types.ts";
 
 const question = (values: Partial<Question> = {}): Question => ({
   id: "question-1",

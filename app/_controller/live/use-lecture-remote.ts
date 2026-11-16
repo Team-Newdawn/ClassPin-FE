@@ -9,7 +9,7 @@ import {
   type LectureRemoteHolder,
   type LectureRemoteSettings,
   type LectureRemoteState
-} from "@/app/_service/class-session-service";
+} from "@/app/_service/lecture/class-session-service";
 
 // ponytail: 5초 폴링. 리모컨은 강의당 1대라 부하가 작다. 즉시 반영이 필요해지면 lectures Realtime 구독으로 바꾼다.
 const REMOTE_POLL_MS = 5000;

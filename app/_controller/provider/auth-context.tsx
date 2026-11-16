@@ -2,8 +2,8 @@
 
 import { createContext, useContext, useEffect, useMemo, useState } from "react";
 import type { User } from "@supabase/supabase-js";
-import type { Profile } from "@/app/_model/types";
-import { authConfigured, fetchOwnProfile, observeAuthSession, signInWithGoogle, signOutUser } from "@/app/_service/auth-service";
+import type { Profile } from "@/app/_model/core/types";
+import { authConfigured, fetchOwnProfile, observeAuthSession, signInWithGoogle, signOutUser } from "@/app/_service/auth/auth-service";
 
 type AuthState = {
   /** false 면 demo 모드 — 로그인 없이 모든 화면을 쓴다. */

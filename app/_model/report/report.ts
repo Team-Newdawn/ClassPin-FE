@@ -1,4 +1,4 @@
-import type { InsightReportBody } from "./insight-report.ts";
+import type { InsightReportBody } from "../insight/insight-report.ts";
 import type { ChartKind, ChartPoint } from "./report-chart.ts";
 
 /** docs/instructor-report-authoring.md §3. Shared by the report routes, the editor, and export. */

@@ -1,7 +1,7 @@
 import type { Metadata, Viewport } from "next";
-import { AuthProvider } from "@/app/_controller/auth-context";
-import { LanguageProvider } from "@/app/_controller/language-context";
-import { SessionStore } from "@/app/_controller/session-store";
+import { AuthProvider } from "@/app/_controller/provider/auth-context";
+import { LanguageProvider } from "@/app/_controller/provider/language-context";
+import { SessionStore } from "@/app/_controller/provider/session-store";
 import "./globals.css";
 
 export const metadata: Metadata = {

@@ -2,13 +2,13 @@
 
 import { useEffect, useEffectEvent, useState } from "react";
 import { useParams } from "next/navigation";
-import { reportRequest } from "@/app/_controller/use-report";
-import { useSessions } from "@/app/_controller/session-store";
-import { useLanguage } from "@/app/_controller/language-context";
-import type { ClassSession } from "@/app/_model/types";
-import type { AnalysisView } from "@/app/_service/material-analysis";
-import { useBrowserPreferences } from "@/app/_controller/use-browser-preferences";
-import { lectureSpan, rememberView } from "@/app/_model/insight-dashboard";
+import { reportRequest } from "@/app/_controller/workspace/use-report";
+import { useSessions } from "@/app/_controller/provider/session-store";
+import { useLanguage } from "@/app/_controller/provider/language-context";
+import type { ClassSession } from "@/app/_model/core/types";
+import type { AnalysisView } from "@/app/_service/insight/material-analysis";
+import { useBrowserPreferences } from "@/app/_controller/workspace/use-browser-preferences";
+import { lectureSpan, rememberView } from "@/app/_model/insight/insight-dashboard";
 import { lectureDate, RECENT_ANALYSES, type RecentAnalyses } from "../controller";
 
 /** docs/instructor-insight-dashboard.md DSH-021. */

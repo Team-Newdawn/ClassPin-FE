@@ -1,4 +1,4 @@
-import type { NormalizedPoint, QuestionStatus } from "./types.ts";
+import type { NormalizedPoint, QuestionStatus } from "../core/types.ts";
 
 // Snapshot aliases only. This module never accepts UI slide indexes or source text.
 export type InsightAnchor =

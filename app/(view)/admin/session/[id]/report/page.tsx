@@ -1,7 +1,7 @@
 "use client";
 
-import { useLanguage } from "@/app/_controller/language-context";
-import { LoadingScreen } from "@/app/component/loading-screen";
+import { useLanguage } from "@/app/_controller/provider/language-context";
+import { LoadingScreen } from "@/app/component/layout/loading-screen";
 import { SessionEndReport } from "./component/session-end-report";
 import { useEndReportPage } from "./controller";
 

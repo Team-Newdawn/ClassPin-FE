@@ -2,18 +2,18 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { ArrowLeft, Folder, Grid2X2, List, MessageCircleQuestion, Trash2, X } from "@/app/component/icons";
-import { AdminSearch } from "@/app/component/admin-search";
+import { ArrowLeft, Folder, Grid2X2, List, MessageCircleQuestion, Trash2, X } from "@/app/component/icon/icons";
+import { AdminSearch } from "@/app/component/control/admin-search";
 
 import { FolderMaterialCard } from "./component/folder-material-card";
-import { FolderTreeSidebar } from "@/app/component/folder-tree-sidebar";
-import { LoadingScreen } from "@/app/component/loading-screen";
-import { SlideCanvas } from "@/app/component/slide-canvas";
-import { WorkspaceHeader } from "@/app/component/workspace-header";
+import { FolderTreeSidebar } from "@/app/component/layout/folder-tree-sidebar";
+import { LoadingScreen } from "@/app/component/layout/loading-screen";
+import { SlideCanvas } from "@/app/component/slide/slide-canvas";
+import { WorkspaceHeader } from "@/app/component/layout/workspace-header";
 import { useFolderController } from "./controller";
 import styles from "./page.module.css";
 
-import { MaterialUploadDialog } from "@/app/component/material-upload-dialog";
+import { MaterialUploadDialog } from "@/app/component/dialog/material-upload-dialog";
 
 export default function FolderPage() {
   const {

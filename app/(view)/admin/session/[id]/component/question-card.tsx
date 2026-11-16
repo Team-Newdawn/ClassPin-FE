@@ -1,8 +1,8 @@
 "use client";
 
-import { useLanguage } from "@/app/_controller/language-context";
-import { ThumbsUp } from "@/app/component/icons";
-import type { Question } from "@/app/_model/types";
+import { useLanguage } from "@/app/_controller/provider/language-context";
+import { ThumbsUp } from "@/app/component/icon/icons";
+import type { Question } from "@/app/_model/core/types";
 
 
 export function QuestionCard({ question, onClick, selected = false }: {

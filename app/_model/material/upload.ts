@@ -1,4 +1,4 @@
-import type { Slide } from "./types.ts";
+import type { Slide } from "../core/types.ts";
 
 export const MAX_SOURCE_FILE_BYTES = 1024 ** 3;
 export const SOURCE_FILE_TOO_LARGE_ERROR = "파일이 1GB를 초과합니다. 더 작은 파일로 다시 시도해 주세요.";

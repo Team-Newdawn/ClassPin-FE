@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import type { InsightReportBody } from "./insight-report.ts";
+import type { InsightReportBody } from "../insight/insight-report.ts";
 import { chartSvg } from "./report-chart.ts";
 import { draftReport, parseReportDocument, reportMetrics } from "./report.ts";
 

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { defaultQuestionCategorySettings, type ClassSession } from "../types.ts";
+import { defaultQuestionCategorySettings, type ClassSession } from "../core/types.ts";
 import { formatElapsed, normalizeSessions, serializeSessionsForFailureCache } from "./session.ts";
 
 const session = (id: string): ClassSession => ({

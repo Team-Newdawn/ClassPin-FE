@@ -1,10 +1,10 @@
 import { readFile } from "node:fs/promises";
 import type { inspectInsightSource } from "./insight-source.ts";
 import { redactInsightText } from "./insight-redaction.ts";
-import { claude } from "./insight-providers/claude.ts";
-import { limiter } from "../_infrastructure/server/limiter.ts";
-import type { InsightReportBody } from "../_model/insight-report.ts";
-import { CHAT_FILE_MAX_BYTES, CHAT_IMAGE_MAX_BYTES, overviewText, REPORT_LIMITS, type ReportDocument, type ReportMessage } from "../_model/report.ts";
+import { claude } from "./providers/claude.ts";
+import { limiter } from "../../_infrastructure/server/limiter.ts";
+import type { InsightReportBody } from "../../_model/insight/insight-report.ts";
+import { CHAT_FILE_MAX_BYTES, CHAT_IMAGE_MAX_BYTES, overviewText, REPORT_LIMITS, type ReportDocument, type ReportMessage } from "../../_model/report/report.ts";
 
 type Source = ReturnType<typeof inspectInsightSource>;
 type Material = Source["materials"][number];

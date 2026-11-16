@@ -195,7 +195,7 @@ FE는 docker 컨테이너 안에서 돈다. 컨테이너의 `127.0.0.1`은 컨�
 |---|---|
 | `app/_infrastructure/server/rest-origin.ts` (신규) | `REST_API_URL` 검사를 한 곳으로 모은다. https는 허용, http는 `localhost`·`127.0.0.1`·`[::1]`·`ohpin-be`만 허용 |
 | `app/api/rest/[...path]/route.ts` | 중복 검사를 지우고 `restOrigin()`을 쓴다. 지금은 `catch {}`가 오류를 버리므로, 클라이언트 abort가 아닌 오류는 `console.error`로 남긴다 |
-| `app/_service/insight-request.ts` (`readOwnedInsightSource`) | 중복 검사를 지우고 `restOrigin()`을 쓴다 |
+| `app/_service/insight/insight-request.ts` (`readOwnedInsightSource`) | 중복 검사를 지우고 `restOrigin()`을 쓴다 |
 | `app/_infrastructure/server/rest-origin.test.ts` (신규) | `http://ohpin-be:8080` 허용, `http://unsafe.example`·경로 포함 주소 거부 |
 | `scripts/prepare-ec2-env.mjs` | `REST_API_URL`이 `http:`면 `ohpin-be`만 허용. localhost 금지는 유지(컨테이너에서 닿지 않음) |
 | `scripts/deploy-ec2.sh` | `docker network create ohpin 2>/dev/null \|\| docker network inspect ohpin >/dev/null`. `run_options`에 `--network ohpin --memory 1g --env NODE_OPTIONS=--max-old-space-size=512`. `REST_API_URL`이 있으면, 후보가 healthy가 된 뒤 후보 안에서 `${REST_API_URL}/api/`가 401(BE 인증 필터 응답, swagger 설정과 무관)인지 확인하고 아니면 배포 중단. 없으면 공개 주소를 쓰므로 지금처럼 건너뛴다 |

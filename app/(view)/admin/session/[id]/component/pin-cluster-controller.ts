@@ -1,9 +1,9 @@
 "use client";
 
 import { useEffect, useMemo, useReducer, useState } from "react";
-import { useLanguage } from "@/app/_controller/language-context";
-import type { Question } from "@/app/_model/types";
-import { countSummaryChanges, SUMMARY_REFRESH_CHANGES, SUMMARY_REFRESH_IDLE_MS, SummaryError, summarizeQuestions, toSummaryItems, type SummaryPurpose } from "@/app/_service/question-summary-service";
+import { useLanguage } from "@/app/_controller/provider/language-context";
+import type { Question } from "@/app/_model/core/types";
+import { countSummaryChanges, SUMMARY_REFRESH_CHANGES, SUMMARY_REFRESH_IDLE_MS, SummaryError, summarizeQuestions, toSummaryItems, type SummaryPurpose } from "@/app/_service/lecture/question-summary-service";
 
 export type { SummaryPurpose };
 

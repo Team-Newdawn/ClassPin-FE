@@ -2,8 +2,8 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { reportApi, type ReportApiError } from "../_service/report-api";
-import type { ReportView } from "../_model/report";
+import { reportApi, type ReportApiError } from "../../_service/report/report-api";
+import type { ReportView } from "../../_model/report/report";
 
 const POLL_MS = 3000;
 // RPT-092: next step for the user, never internal or AI-provider detail.

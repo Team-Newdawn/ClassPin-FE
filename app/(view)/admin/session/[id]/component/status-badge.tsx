@@ -1,8 +1,8 @@
 "use client";
 
-import { Check, Clock3 } from "@/app/component/icons";
-import { useLanguage } from "@/app/_controller/language-context";
-import type { QuestionStatus } from "@/app/_model/types";
+import { Check, Clock3 } from "@/app/component/icon/icons";
+import { useLanguage } from "@/app/_controller/provider/language-context";
+import type { QuestionStatus } from "@/app/_model/core/types";
 import styles from "./status-badge.module.css";
 
 export function StatusBadge({ status }: { status: QuestionStatus }) {

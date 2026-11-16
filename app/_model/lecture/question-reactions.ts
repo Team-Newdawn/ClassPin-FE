@@ -1,4 +1,4 @@
-import type { Question } from "./types.ts";
+import type { Question } from "../core/types.ts";
 
 export const withQuestionReaction = (question: Question, reactedByMe: boolean): Question =>
   question.reactedByMe === reactedByMe ? question : {

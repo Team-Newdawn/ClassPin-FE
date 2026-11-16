@@ -1,12 +1,12 @@
 "use client";
 
-import { useRealtimeReactions } from "@/app/_controller/use-realtime-reactions";
+import { useRealtimeReactions } from "@/app/_controller/live/use-realtime-reactions";
 import {
   LECTURE_QUESTIONS_CHANGED_EVENT,
   LECTURE_REACTION_EMOJIS,
   LECTURE_REACTION_EVENT,
   lectureReactionTopic
-} from "@/app/_model/lecture-reactions";
+} from "@/app/_model/lecture/lecture-reactions";
 
 export function useLectureReactions(lectureId: string | null, onQuestionsChanged?: (lectureId: string) => void) {
   return useRealtimeReactions({

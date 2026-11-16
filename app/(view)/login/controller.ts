@@ -2,8 +2,8 @@
 
 import { useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useAuth } from "@/app/_controller/auth-context";
-import { safeNextPath } from "@/app/_model/next-path";
+import { useAuth } from "@/app/_controller/provider/auth-context";
+import { safeNextPath } from "@/app/_model/core/next-path";
 
 export function useLoginController(startError: string) {
   const router = useRouter();

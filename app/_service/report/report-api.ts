@@ -1,4 +1,4 @@
-import { getAccessToken } from "../_infrastructure/supabase/client";
+import { getAccessToken } from "../../_infrastructure/supabase/client";
 
 export type ReportApiError = Error & { status: number; code?: string; body: Record<string, unknown> };
 

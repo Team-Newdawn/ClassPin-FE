@@ -8,7 +8,7 @@ test("departure broadcasts start keepalive fetch before authentication; regular 
   const requests: { url: string; init: RequestInit }[] = [];
   let authCalls = 0, channelSends = 0, status = 200;
   const channel = { subTopic: "lecture-audience:lecture", httpSend: async () => { channelSends++; } };
-  const output = ts.transpileModule(readFileSync("app/_service/realtime-reaction-service.ts", "utf8"), {
+  const output = ts.transpileModule(readFileSync("app/_service/lecture/realtime-reaction-service.ts", "utf8"), {
     compilerOptions: { module: ts.ModuleKind.CommonJS },
   }).outputText;
   const exports = {} as { publishRealtimeReaction: (topic: string, event: string, payload: Record<string, unknown>, keepalive?: boolean) => Promise<void> };

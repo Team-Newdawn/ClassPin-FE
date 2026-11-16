@@ -1,7 +1,18 @@
-import type { ClassSession, PresentationQrPosition } from "./types.ts";
+import type { TranslationKey } from "../core/i18n.ts";
+import type { ClassSession, PresentationQrPosition } from "../core/types.ts";
 
 export const QR_POSITIONS = ["top-left", "top-center", "top-right", "bottom-left", "bottom-center", "bottom-right"] as const;
 export type QrPosition = typeof QR_POSITIONS[number];
+export const QR_POSITION_LABELS = {
+  "top-left": "session.qrTopLeft",
+  "top-center": "session.qrTopCenter",
+  "top-right": "session.qrTopRight",
+  "bottom-left": "session.qrBottomLeft",
+  "bottom-center": "session.qrBottomCenter",
+  "bottom-right": "session.qrBottomRight",
+} as const satisfies Record<QrPosition, TranslationKey>;
+/** QR size presets, shown as S/M/L. `clampQrSize` keeps any other size between the first and the last. */
+export const QR_SIZES = [{ size: 64, label: "S" }, { size: 96, label: "M" }, { size: 160, label: "L" }] as const;
 export type QuestionDisplayMode = "off" | "pins" | "questions" | "bubbles";
 export type PresentationOptions = {
   qrPosition?: QrPosition;

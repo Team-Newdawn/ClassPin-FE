@@ -4,9 +4,9 @@ import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { chatFile, pickCategory, reportChatContext, pointedSections, viewSlides, readableText, slidesMentioned, analyzeSlides, groupQuestions, reportBody, writeReportSections, chatReport, CHAT_FULL_DOCUMENT_CHARS, type InsightAi } from "./insight-ai.ts";
-import { limiter } from "../_infrastructure/server/limiter.ts";
-import type { ReportDocument } from "../_model/report.ts";
-import { slideImageEdge } from "./insight-providers/claude.ts";
+import { limiter } from "../../_infrastructure/server/limiter.ts";
+import type { ReportDocument } from "../../_model/report/report.ts";
+import { slideImageEdge } from "./providers/claude.ts";
 
 test("slideImageEdge keeps every page within Claude's 1568px / 1568-token image budget", () => {
   const tokens = (w: number, h: number) => Math.ceil(w / 28) * Math.ceil(h / 28);

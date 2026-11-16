@@ -2,16 +2,36 @@
 /* eslint-disable @next/next/no-img-element */
 
 import { Fragment, memo, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { clusterPins } from "@/app/_model/pin-clusters";
-import { placeBubbles } from "@/app/_model/class/presentation-rotation";
-import { useLanguage } from "@/app/_controller/language-context";
-import { questionMarkerEmoji, type Question, type Slide } from "@/app/_model/types";
+import { clusterPins } from "@/app/_model/lecture/pin-clusters";
+import { BUBBLE_GAP, placeBubbles } from "@/app/_model/presentation/presentation-rotation";
+import { useLanguage } from "@/app/_controller/provider/language-context";
+import { questionMarkerEmoji, type Question, type Slide } from "@/app/_model/core/types";
 import { PdfPage } from "./pdf-page";
 import { PdfPageImage } from "./pdf-page-image";
 import styles from "./slide-canvas.module.css";
 
 // 본문 전체를 감싼 실제 높이로 배치한다. 좁은 폭 다음에는 넓은 폭도 시도한다.
 const BUBBLE_WIDTHS = [180, 480, 640];
+// pin_notselected.svg와 pin_selected.svg에서 그려진 모양이 차지하는 비율(두 그림을 합친 범위). 그림의 나머지는 투명하다.
+const DRAWN_PIN = { left: .21, top: .17, right: .82, bottom: .8 };
+
+/**
+ * 말풍선이 붙을 PIN 범위. PIN 버튼은 누르기 쉽게 그림보다 크고, 그림 안에도 투명한 여백이 있다.
+ * 이 둘을 빼야 말풍선이 눈에 보이는 PIN 모양에 붙는다. 영역·경로 질문은 버튼 전체가 보이는 모양이다.
+ */
+function drawnPinBounds(pin: HTMLElement, left: number, top: number) {
+  let x = left, y = top, width = pin.offsetWidth, height = pin.offsetHeight;
+  const icon = pin.querySelector<HTMLElement>(":scope > .question-pin-icon");
+  const clusterSize = pin.classList.contains("pin-cluster-button") ? parseFloat(getComputedStyle(pin).backgroundSize) : NaN;
+  if (icon) {
+    x += icon.offsetLeft; y += icon.offsetTop; width = icon.offsetWidth; height = icon.offsetHeight;
+  } else if (clusterSize > 0) {
+    x += (width - clusterSize) / 2; y += (height - clusterSize) / 2; width = height = clusterSize;
+  } else {
+    return { left: x, right: x + width, top: y, bottom: y + height };
+  }
+  return { left: x + width * DRAWN_PIN.left, right: x + width * DRAWN_PIN.right, top: y + height * DRAWN_PIN.top, bottom: y + height * DRAWN_PIN.bottom };
+}
 
 export const SlideCanvas = memo(function SlideCanvas({ slide, questions = [], visibleQuestionIds, selectedId, liveQuestionId, livePinEffect, onSelectPin, onSelectCluster, expandedIds, highlightedId, dimmed = false, onCanvasClick, showQuestionLabels = false, showPins = true, compact = false, children }: {
   slide: Slide;
@@ -66,7 +86,7 @@ export const SlideCanvas = memo(function SlideCanvas({ slide, questions = [], vi
       const transform = new DOMMatrixReadOnly(getComputedStyle(pin).transform);
       const left = pin.offsetLeft + transform.m41;
       const top = pin.offsetTop + transform.m42;
-      return { id: pin.dataset.bubbleAnchor!, bounds: { left, right: left + pin.offsetWidth, top, bottom: top + pin.offsetHeight } };
+      return { id: pin.dataset.bubbleAnchor!, bounds: drawnPinBounds(pin, left, top) };
     });
     const bubbles = [...root.querySelectorAll<HTMLElement>("[data-bubble-for]")];
     const activeKey = [liveQuestionId, selectedId, livePinEffect ? arrivedPins.ids.at(-1) : null].map((id) => id && bubbles.find((bubble) => bubble.dataset.bubbleFor!.split(" ").includes(id))?.dataset.bubbleFor).find(Boolean) ?? null;
@@ -87,14 +107,16 @@ export const SlideCanvas = memo(function SlideCanvas({ slide, questions = [], vi
     const key = JSON.stringify([origin.width, origin.height, activeKey, pins, requests.map(({ element, ...request }) => (void element, request))]);
     if (lastPlacement.current?.key !== key) {
       let scale = 1;
-      let placements = placeBubbles(requests, pins, origin.width, origin.height, activeKey);
+      // PIN과 같은 단위(slide-canvas.module.css의 --pin-unit: 발표·관리 화면은 캔버스 폭의 0.1%, 그 밖은 1px)로 간격을 키운다.
+      const gap = BUBBLE_GAP * (root.classList.contains("pin-manager") ? origin.width / 1000 : 1);
+      let placements = placeBubbles(requests, pins, origin.width, origin.height, activeKey, gap);
       for (let attempt = 0; attempt < 24 && requests.some(({ id, y, shapes }) => {
         const placement = placements.get(id)!;
         return y + placement.y + shapes[placement.shape].height > origin.height;
       }); attempt++) {
         scale *= .8;
         requests = measure(scale);
-        placements = placeBubbles(requests, scale > .02 ? pins : [], origin.width, origin.height, activeKey);
+        placements = placeBubbles(requests, scale > .02 ? pins : [], origin.width, origin.height, activeKey, gap);
       }
       lastPlacement.current = { key, scale, placements };
     }

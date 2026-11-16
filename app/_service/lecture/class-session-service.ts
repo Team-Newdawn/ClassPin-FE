@@ -1,8 +1,8 @@
-import { isParticipantPointAnchor, isQuestionMarker, normalizeClassFolderColorIndex, normalizeClassFolderName, normalizeClassFolderPurpose, normalizeClassFolderPurposeLabel, normalizeQuestionCategorySettings, type ClassFolder, type ClassSession, type CreateClassFolderInput, type NormalizedPoint, type Question, type QuestionCategorySettings, type Slide } from "@/app/_model/types";
+import { isParticipantPointAnchor, isQuestionMarker, normalizeClassFolderColorIndex, normalizeClassFolderName, normalizeClassFolderPurpose, normalizeClassFolderPurposeLabel, normalizeQuestionCategorySettings, type ClassFolder, type ClassSession, type CreateClassFolderInput, type NormalizedPoint, type Question, type QuestionCategorySettings, type Slide } from "@/app/_model/core/types";
 import { ensureAnonymousUser, getAudienceSupabaseClient, getSessionUser, getSupabaseClient, supabaseConfigured } from "@/app/_infrastructure/supabase/client";
 
 import { RestError, restRequest } from "@/app/_infrastructure/rest/request";
-import { pdfProxyUrl } from "@/app/_model/upload";
+import { pdfProxyUrl } from "@/app/_model/material/upload";
 export const classSessionPersistenceEnabled = supabaseConfigured;
 
 type LectureRow = {
@@ -16,7 +16,7 @@ type LectureRow = {
   presentation_autoplay: boolean;
   show_question_pins: boolean;
   show_question_labels?: boolean;
-  presentation_options?: import("../_model/presentation-options").PresentationOptions;
+  presentation_options?: import("../../_model/presentation/presentation-options").PresentationOptions;
   show_presentation_qr: boolean;
   presentation_qr_position: ClassSession["presentationQrPosition"];
   question_categories: unknown;
@@ -322,8 +322,12 @@ export async function fetchSessionSlides(session: ClassSession, asAudience = fal
 export async function fetchOwnedSessions(): Promise<ClassSession[]> {
   const client = getSupabaseClient();
   if (!client) return [];
-  const courses = await restRequest<OwnedCourseGraphRow[]>(client, "/instructor/courses");
-  const labels = await client.from("lectures").select("id,show_question_labels,presentation_options").in("id", courses.flatMap((course) => course.lectures.map((lecture) => lecture.id)));
+  // The REST graph omits these two lecture columns. RLS shows an instructor only their own lectures (participant
+  // policies need the participant role), so this read runs beside the graph instead of waiting for its lecture ids.
+  const [courses, labels] = await Promise.all([
+    restRequest<OwnedCourseGraphRow[]>(client, "/instructor/courses"),
+    client.from("lectures").select("id,show_question_labels,presentation_options"),
+  ]);
   if (labels.error) throw labels.error;
   const labelsById = new Map((labels.data ?? []).map((lecture) => [lecture.id, lecture]));
   return courses
@@ -491,7 +495,7 @@ export async function updateLecture(sessionId: string, values: {
   presentation_autoplay?: boolean;
   show_question_pins?: boolean;
   show_question_labels?: boolean;
-  presentation_options?: import("../_model/presentation-options").PresentationOptions;
+  presentation_options?: import("../../_model/presentation/presentation-options").PresentationOptions;
   show_presentation_qr?: boolean;
   presentation_qr_position?: ClassSession["presentationQrPosition"];
   question_categories?: QuestionCategorySettings;
@@ -518,14 +522,14 @@ export type LectureRemoteHolder = "none" | "waiting" | "connected";
 export type LectureRemoteSettings = {
   show_question_pins?: boolean;
   show_question_labels?: boolean;
-  presentation_options?: import("../_model/presentation-options").PresentationOptions;
+  presentation_options?: import("../../_model/presentation/presentation-options").PresentationOptions;
   show_presentation_qr?: boolean;
   presentation_qr_position?: ClassSession["presentationQrPosition"];
 };
 export type LectureRemoteState = {
   currentSlide: number; slideCount: number; live: boolean; title: string;
   showQuestionPins: boolean; showQuestionLabels: boolean;
-  presentationOptions?: import("../_model/presentation-options").PresentationOptions;
+  presentationOptions?: import("../../_model/presentation/presentation-options").PresentationOptions;
   showPresentationQr: boolean; presentationQrPosition: ClassSession["presentationQrPosition"];
   questionCount: number;
   questions?: { id: string; text: string; slideIndex: number | null }[];

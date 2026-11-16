@@ -9,7 +9,7 @@ import sharp from "sharp";
 import JSZip from "jszip";
 import { PDFArray, PDFDict, PDFDocument, PDFName, PDFRawStream, PDFHexString, decodePDFRawStream } from "pdf-lib";
 import { exportReport, previewReportExport } from "./report-export.ts";
-import type { ReportDocument } from "../_model/report.ts";
+import type { ReportDocument } from "../../_model/report/report.ts";
 import type { ReportPinSource } from "./report-pin-package.ts";
 
 const source: ReportPinSource = {

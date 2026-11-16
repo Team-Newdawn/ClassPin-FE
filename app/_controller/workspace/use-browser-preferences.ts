@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useMemo, useSyncExternalStore } from "react";
-import { useAuth } from "./auth-context";
+import { useAuth } from "../provider/auth-context";
 
 const CHANGE_EVENT = "ohpin-preferences-changed";
 

@@ -7,6 +7,23 @@ import {
 export const serializeSessionsForFailureCache = (sessions: ClassSession[]) =>
   JSON.stringify(sessions, (key, value) => key === "speakerNote" ? undefined : value);
 
+/**
+ * `sessions` with session `id` replaced by `patch(session)`, or the very same array when the patch changes nothing.
+ * The live player refetches its lecture every 5 s; returning the same array lets React skip the re-render, so an
+ * unchanged poll costs no work (2026-11-16: each such poll blocked a 6x-throttled CPU for 100-190 ms).
+ */
+export function patchSession(sessions: ClassSession[], id: string, patch: (session: ClassSession) => ClassSession) {
+  const index = sessions.findIndex((session) => session.id === id);
+  if (index < 0) return sessions;
+  const before = sessions[index] as unknown as Record<string, unknown>;
+  const after = patch(sessions[index]);
+  const changed = Object.keys({ ...before, ...after }).some((key) => {
+    const was = before[key], now = (after as unknown as Record<string, unknown>)[key];
+    return was !== now && JSON.stringify(was) !== JSON.stringify(now);
+  });
+  return changed ? sessions.map((session, position) => position === index ? after : session) : sessions;
+}
+
 export function normalizeSessions(sessions: ClassSession[]) {
   const seen = new Set<string>();
   const normalized = sessions.map((session) => {

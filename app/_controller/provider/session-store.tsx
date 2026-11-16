@@ -5,7 +5,7 @@ import { usePathname } from "next/navigation";
 import { useAuth } from "@/app/_controller/provider/auth-context";
 import { defaultQuestionCategorySettings, isParticipantPointAnchor, normalizeClassFolderColorIndex, normalizeClassFolderName, normalizeClassFolderPurpose, normalizeClassFolderPurposeLabel, normalizeQuestionCategorySettings, type ClassFolder, type ClassSession, type CreateClassFolderInput, type ParticipantQuestionInput, type PresentationQrPosition, type Question, type Slide } from "@/app/_model/core/types";
 import { withQuestionReaction } from "@/app/_model/lecture/question-reactions";
-import { normalizeSessions, serializeSessionsForFailureCache } from "@/app/_model/lecture/session";
+import { normalizeSessions, patchSession, serializeSessionsForFailureCache } from "@/app/_model/lecture/session";
 import { classSessionPersistenceEnabled, createClassFolder as persistClassFolder, deleteClassFolder as persistClassFolderDeletion, deleteClassSession as persistSessionDeletion, deleteSessionSlide, fetchLectureSnapshot, fetchLiveSession, fetchLiveSessionById, fetchOwnedClassFolders, fetchOwnedSessions, fetchSessionSlides, markQuestionResolved, moveSessionToFolder as persistSessionFolder, persistSession, postAnswer, updateClassFolder as persistClassFolderUpdate, saveSlideInstructorNote, setQuestionReaction as persistQuestionReaction, submitQuestion, subscribeToLecture, updateLecture, updateQuestion as persistQuestionUpdate, type LectureRealtimeRow } from "@/app/_service/lecture/class-session-service";
 import { coalesceRefresh } from "@/app/_model/lecture/live-refresh";
 import { LECTURE_QUESTIONS_CHANGED_EVENT, lectureReactionTopic } from "@/app/_model/lecture/lecture-reactions";
@@ -169,8 +169,6 @@ export function SessionStore({ children }: { children: React.ReactNode }) {
     if (signedInInstructor && isAdmin) {
       ownerId.current = authUserId;
       queueMicrotask(() => { if (active) setReady(false); });
-      const cached = readCachedSessions(authUserId);
-      const cachedFolders = readFolders(folderCacheKey(authUserId));
       void (early?.userId === authUserId ? early.request : loadOwnedData())
         .then(([remote, remoteFolders]) => {
           if (!active) return;
@@ -181,8 +179,9 @@ export function SessionStore({ children }: { children: React.ReactNode }) {
         .catch((error) => {
           if (!active) return;
           console.error(`Supabase session load failed: ${errorDetail(error)}`, error);
-          setSessions(cached);
-          setFolders(cachedFolders);
+          // The failure cache holds the whole account; parse it only when it is actually needed.
+          setSessions(readCachedSessions(authUserId));
+          setFolders(readFolders(folderCacheKey(authUserId)));
           setReady(true);
         });
       return () => { active = false; };
@@ -219,8 +218,7 @@ export function SessionStore({ children }: { children: React.ReactNode }) {
         const latestSession = sessionsByIdRef.current.get(session.id) ?? session;
         const snapshot = await fetchLectureSnapshot(latestSession, asAudience, !full);
         if (!active || !snapshot || refreshSequences.current.get(session.id) !== refreshSequence) return;
-        setSessions((current) => current.map((item) => {
-          if (item.id !== session.id) return item;
+        setSessions((current) => patchSession(current, session.id, (item) => {
           const localTarget = slideTargets.current.get(session.id);
           const localSettings = lectureSettingTargets.current.get(session.id);
           return {
@@ -240,7 +238,7 @@ export function SessionStore({ children }: { children: React.ReactNode }) {
     const requestRefresh = coalesceRefresh((full) => active ? refresh(tracked, full) : Promise.resolve());
     const applyLectureUpdate = (session: ClassSession, lecture: LectureRealtimeRow) => {
       if (!active) return;
-      setSessions((current) => current.map((item) => item.id === session.id ? {
+      setSessions((current) => patchSession(current, session.id, (item) => ({
         ...item,
         currentSlide: !asAudience && slideTargets.current.has(session.id) ? item.currentSlide : lecture.current_page,
         status: lecture.status,
@@ -256,7 +254,7 @@ export function SessionStore({ children }: { children: React.ReactNode }) {
         allowEmojiReactions: lecture.allow_emoji_reactions,
         startedAt: lecture.started_at,
         ...lectureSettingTargets.current.get(session.id)
-      } : item));
+      })));
     };
     const refreshSlides = async (session: ClassSession) => {
       const refreshSequence = (slideRefreshSequences.current.get(session.id) ?? 0) + 1;
@@ -265,7 +263,7 @@ export function SessionStore({ children }: { children: React.ReactNode }) {
         const latestSession = sessionsByIdRef.current.get(session.id) ?? session;
         const slides = await fetchSessionSlides(latestSession, asAudience);
         if (!active || slideRefreshSequences.current.get(session.id) !== refreshSequence) return;
-        setSessions((current) => current.map((item) => item.id === session.id ? { ...item, slides } : item));
+        setSessions((current) => patchSession(current, session.id, (item) => ({ ...item, slides })));
       } catch (error) { console.error("Supabase slide refresh failed", error); }
     };
     const startPoll = (ms: number) => {
@@ -321,24 +319,41 @@ export function SessionStore({ children }: { children: React.ReactNode }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ready, subscriptionKey, participantRoute]);
 
+  // Demo mode: localStorage is the data itself, so every change is written at once.
   useEffect(() => {
-    if (!ready) return;
-    if (classSessionPersistenceEnabled) {
-      if (ownerId.current) window.localStorage.setItem(cacheKey(ownerId.current), serializeSessionsForFailureCache(sessions));
-      return;
-    }
+    if (!ready || classSessionPersistenceEnabled) return;
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify(sessions));
     demoChannelRef.current?.postMessage(sessions);
   }, [sessions, ready]);
 
   useEffect(() => {
-    if (!ready) return;
-    if (classSessionPersistenceEnabled) {
-      if (ownerId.current) window.localStorage.setItem(folderCacheKey(ownerId.current), JSON.stringify(folders));
-      return;
-    }
+    if (!ready || classSessionPersistenceEnabled) return;
     window.localStorage.setItem(FOLDER_STORAGE_KEY, JSON.stringify(folders));
   }, [folders, ready]);
+
+  // Supabase mode: the failure cache only needs the last state, so it is written when the tab is hidden or closed instead of
+  // on every change (2026-11-16: rewriting the whole account on each 5 s poll blocked slow laptops; the largest is 1.19 MB).
+  const failureCache = useRef({ ready, sessions, folders });
+  useEffect(() => { failureCache.current = { ready, sessions, folders }; }, [ready, sessions, folders]);
+  useEffect(() => {
+    if (!classSessionPersistenceEnabled) return;
+    const save = () => {
+      const { ready: loaded, sessions: latest, folders: latestFolders } = failureCache.current;
+      // While another account loads, `ready` is false and the previous account's data must not land under the new id.
+      if (!loaded || !ownerId.current) return;
+      try {
+        window.localStorage.setItem(cacheKey(ownerId.current), serializeSessionsForFailureCache(latest));
+        window.localStorage.setItem(folderCacheKey(ownerId.current), JSON.stringify(latestFolders));
+      } catch (error) { console.error("Session failure cache write failed", error); }
+    };
+    const onVisibility = () => { if (document.visibilityState === "hidden") save(); };
+    document.addEventListener("visibilitychange", onVisibility);
+    window.addEventListener("pagehide", save);
+    return () => {
+      document.removeEventListener("visibilitychange", onVisibility);
+      window.removeEventListener("pagehide", save);
+    };
+  }, []);
 
   useEffect(() => {
     if (classSessionPersistenceEnabled) return;

@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { defaultQuestionCategorySettings, type ClassSession } from "../core/types.ts";
-import { formatElapsed, normalizeSessions, serializeSessionsForFailureCache } from "./session.ts";
+import { formatElapsed, normalizeSessions, patchSession, serializeSessionsForFailureCache } from "./session.ts";
 
 const session = (id: string): ClassSession => ({
   id,
@@ -46,4 +46,20 @@ test("세션 중복을 제거하고 이미 정규화된 배열은 그대로 반�
 
 test("LIVE 경과 시간은 한 시간 전까지 mm:ss, 이후 h:mm:ss 이고 음수는 0이다", () => {
   assert.deepEqual([5_000, 3_599_999, 3_723_000, -2_000].map(formatElapsed), ["00:05", "59:59", "1:02:03", "00:00"]);
+});
+
+test("같은 내용의 재조회는 같은 배열을 돌려주고, 바뀐 강의만 새 객체로 바꾼다", () => {
+  const live = { ...session("live"), questions: [{ id: "q", slideIndex: 0, text: "왜?", reactionCount: 1 }] } as ClassSession;
+  const other = session("other");
+  const sessions = [other, live];
+  // 5초 재조회처럼 내용은 같고 객체만 새로 만든 경우
+  assert.equal(patchSession(sessions, "live", (item) => ({ ...item, questions: item.questions.map((q) => ({ ...q })) })), sessions);
+  assert.equal(patchSession(sessions, "missing", (item) => ({ ...item, title: "x" })), sessions);
+
+  const moved = patchSession(sessions, "live", (item) => ({ ...item, currentSlide: 2 }));
+  assert.notEqual(moved, sessions);
+  assert.equal(moved[0], other, "다른 강의 객체는 그대로 둔다");
+  assert.equal(moved[1].currentSlide, 2);
+  const reacted = patchSession(sessions, "live", (item) => ({ ...item, questions: [{ ...item.questions[0], reactionCount: 2 }] }));
+  assert.equal(reacted[1].questions[0].reactionCount, 2, "질문 안의 값이 바뀌어도 알아챈다");
 });

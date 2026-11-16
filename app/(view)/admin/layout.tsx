@@ -2,8 +2,8 @@
 
 import { useEffect } from "react";
 import { usePathname, useRouter } from "next/navigation";
-import { useAuth } from "@/app/_controller/auth-context";
-import { LoadingScreen } from "@/app/component/loading-screen";
+import { useAuth } from "@/app/_controller/provider/auth-context";
+import { LoadingScreen } from "@/app/component/layout/loading-screen";
 
 /** 강사 화면 가드. 공개 발표 화면과 demo 모드에서는 그대로 통과한다. */
 export default function AdminLayout({ children }: { children: React.ReactNode }) {

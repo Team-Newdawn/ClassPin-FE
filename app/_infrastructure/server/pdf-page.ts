@@ -3,7 +3,7 @@ import { stat } from "node:fs/promises";
 import path from "node:path";
 import { promisify } from "node:util";
 import sharp from "sharp";
-import { pdfPageImagePath } from "../../_model/upload.ts";
+import { pdfPageImagePath } from "../../_model/material/upload.ts";
 import { resolveDocumentBinary } from "./document-binaries.ts";
 import { limiter } from "./limiter.ts";
 import { cachedFile } from "./pdf-cache.ts";

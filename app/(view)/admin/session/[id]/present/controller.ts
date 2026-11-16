@@ -3,17 +3,18 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { useAuth } from "@/app/_controller/auth-context";
-import { useLanguage } from "@/app/_controller/language-context";
-import { useSessions } from "@/app/_controller/session-store";
-import { useLectureReactions } from "@/app/_controller/use-lecture-reactions";
-import { advancePinPlayback, canRotatePinPlayback, crossedPinMilestone, findIncomingPins, nextPresentationSlide, presentationAutoplayDelay } from "@/app/_model/class/presentation-rotation";
-import { groupQuestionsBySlide } from "@/app/_model/stats";
-import type { Question } from "@/app/_model/types";
-import { classSessionPersistenceEnabled } from "@/app/_service/class-session-service";
+import { useAuth } from "@/app/_controller/provider/auth-context";
+import { useLanguage } from "@/app/_controller/provider/language-context";
+import { useSessions } from "@/app/_controller/provider/session-store";
+import { useLectureReactions } from "@/app/_controller/live/use-lecture-reactions";
+import { advancePinPlayback, canRotatePinPlayback, crossedPinMilestone, findIncomingPins, nextPresentationSlide, presentationAutoplayDelay } from "@/app/_model/presentation/presentation-rotation";
+import { groupQuestionsBySlide } from "@/app/_model/material/stats";
+import type { Question } from "@/app/_model/core/types";
+import { classSessionPersistenceEnabled } from "@/app/_service/lecture/class-session-service";
 import { usePinCluster } from "../component/pin-cluster-controller";
-import { usePinLabelMode } from "@/app/_controller/use-pin-label-mode";
-import { usePresentationOptions } from "@/app/_controller/use-presentation-options";
+import { usePinLabelMode } from "@/app/_controller/presentation/use-pin-label-mode";
+import { usePresentationOptions } from "@/app/_controller/presentation/use-presentation-options";
+import { usePrefetchNeighborSlides } from "@/app/_controller/presentation/use-prefetch-neighbor-slides";
 
 const CONTROLS_HIDE_DELAY = 2600;
 const PIN_REVEAL_DELAY = 1000;
@@ -327,6 +328,7 @@ export function useSessionPresentationController() {
   }, [expandedIds, closeCluster, goToSlide, revealControls, session, toggleFullscreen]);
 
   const slide = session?.slides[currentSlide];
+  usePrefetchNeighborSlides(session?.slides, currentSlide);
   const joinUrl = typeof window === "undefined" || !session ? "" : `${window.location.origin}/join/${session.code}`;
   const selectPin = (questionId: string) => {
     if (expandedIds?.includes(questionId)) highlightPin(questionId);

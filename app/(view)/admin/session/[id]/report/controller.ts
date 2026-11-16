@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
-import { useSessions } from "@/app/_controller/session-store";
+import { useSessions } from "@/app/_controller/provider/session-store";
 
 /** The session this route shows; a direct visit loads it once when the store does not have it. */
 export function useEndReportPage() {

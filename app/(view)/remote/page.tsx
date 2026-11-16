@@ -1,11 +1,11 @@
 "use client";
 
-import { ChevronLeft, ChevronRight, MessageCircleQuestion, X } from "@/app/component/icons";
+import { ChevronLeft, ChevronRight, MessageCircleQuestion, X } from "@/app/component/icon/icons";
 import { useCallback, useRef } from "react";
-import { presentationOptions, QR_POSITIONS, type PresentationOptions, type QrPosition } from "@/app/_model/presentation-options";
-import { useLanguage } from "@/app/_controller/language-context";
-import { useLectureRemote } from "@/app/_controller/use-lecture-remote";
-import { LoadingScreen } from "@/app/component/loading-screen";
+import { presentationOptions, QR_POSITION_LABELS, QR_POSITIONS, QR_SIZES, type PresentationOptions, type QrPosition } from "@/app/_model/presentation/presentation-options";
+import { useLanguage } from "@/app/_controller/provider/language-context";
+import { useLectureRemote } from "@/app/_controller/live/use-lecture-remote";
+import { LoadingScreen } from "@/app/component/layout/loading-screen";
 import styles from "./page.module.css";
 
 /** 로그인 없는 발표 리모컨. 처음 연 기기 한 대만 LIVE 슬라이드를 한 장씩 넘긴다. */
@@ -30,7 +30,7 @@ export default function LectureRemote() {
   const disabled = !live || busy;
   const options = presentationOptions({ ...lecture, showQuestionPins: true }, {});
   const changeOptions = (patch: Partial<PresentationOptions>) => changeSettings({ presentation_options: patch });
-  const positionLabel = (position: QrPosition) => t(position === "top-left" ? "session.qrTopLeft" : position === "top-center" ? "session.qrTopCenter" : position === "top-right" ? "session.qrTopRight" : position === "bottom-left" ? "session.qrBottomLeft" : position === "bottom-center" ? "session.qrBottomCenter" : "session.qrBottomRight");
+  const positionLabel = (position: QrPosition) => t(QR_POSITION_LABELS[position]);
   const closeQuestions = () => {
     questionsRef.current?.close();
     setQuestionsOpen(false);
@@ -68,7 +68,7 @@ export default function LectureRemote() {
       <hr />
       <h2>{t("session.qrSize")}</h2>
       <div className={styles.sizes} role="group" aria-label={t("session.qrSize")}>
-        {([64, 96, 160] as const).map((size, index) => <button key={size} type="button" aria-pressed={options.qrSize === size} disabled={disabled || !lecture.showPresentationQr} onClick={() => changeOptions({ qrSize: size })}><b>{["S", "M", "L"][index]}</b><small>{size}px</small></button>)}
+        {QR_SIZES.map(({ size, label }) => <button key={size} type="button" aria-pressed={options.qrSize === size} disabled={disabled || !lecture.showPresentationQr} onClick={() => changeOptions({ qrSize: size })}><b>{label}</b><small>{size}px</small></button>)}
       </div>
       <hr />
       <button type="button" className={styles.toggle} role="switch" aria-checked={options.qrEditable} disabled={disabled || !lecture.showPresentationQr} onClick={() => changeOptions({ qrEditable: !options.qrEditable })}><span>{t("session.qrEditable")}</span><i className={styles.switchTrack} aria-hidden="true" /></button>

@@ -1,6 +1,6 @@
 "use client";
 
-import { pdfPageImagePath } from "@/app/_model/upload";
+import { pdfPageImagePath } from "@/app/_model/material/upload";
 import { getSupabaseClient } from "@/app/_infrastructure/supabase/client";
 import { acquirePdfDocument, PDF_PAGE_WIDTHS } from "./pdf-document";
 

@@ -1,8 +1,8 @@
 "use client";
 
 import { useState, type FormEvent } from "react";
-import { useLanguage } from "@/app/_controller/language-context";
-import { submitLectureExperienceResponse } from "@/app/_service/platform-experience-service";
+import { useLanguage } from "@/app/_controller/provider/language-context";
+import { submitLectureExperienceResponse } from "@/app/_service/lecture/platform-experience-service";
 
 export function usePlatformExperienceController(code: string) {
   const { t } = useLanguage();

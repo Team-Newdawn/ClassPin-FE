@@ -5,20 +5,20 @@ import { PresentationControls } from "./component/presentation-controls";
 import Link from "next/link";
 import { useState } from "react";
 import { QRCodeSVG } from "qrcode.react";
-import { ArrowLeft, Check, ChevronDown, ChevronLeft, ChevronRight, FileText, GripVertical, ListFilter, MessageCircleQuestion, Monitor, MoreHorizontal, PanelLeftClose, PanelLeftOpen, Pencil, Play, QrCode, Search, Smartphone, Square, Trash2, X } from "@/app/component/icons";
-import { lectureRemoteAvailable } from "@/app/_controller/use-lecture-remote";
+import { ArrowLeft, Check, ChevronDown, ChevronLeft, ChevronRight, FileText, GripVertical, ListFilter, MessageCircleQuestion, Monitor, MoreHorizontal, PanelLeftClose, PanelLeftOpen, Pencil, Play, QrCode, Search, Smartphone, Square, Trash2, X } from "@/app/component/icon/icons";
+import { lectureRemoteAvailable } from "@/app/_controller/live/use-lecture-remote";
 import { RemoteDialog } from "./component/remote-dialog";
-import { useLanguage } from "@/app/_controller/language-context";
-import { LoadingScreen } from "@/app/component/loading-screen";
+import { useLanguage } from "@/app/_controller/provider/language-context";
+import { LoadingScreen } from "@/app/component/layout/loading-screen";
 import { QuestionCard } from "./component/question-card";
-import { SlideCanvas } from "@/app/component/slide-canvas";
+import { SlideCanvas } from "@/app/component/slide/slide-canvas";
 import { StatusBadge } from "./component/status-badge";
 import { MAX_QUESTION_PANEL, MIN_QUESTION_PANEL, useSessionAdminController } from "./controller";
 import styles from "./page.module.css";
 import { LecturePreparation } from "./component/lecture-preparation";
 import { PinClusterPopover, QuestionSummary } from "./component/pin-cluster-popover";
 import { usePinCluster } from "./component/pin-cluster-controller";
-import { slideIndexFromPageNumber } from "@/app/_model/class/presentation-rotation";
+import { slideIndexFromPageNumber } from "@/app/_model/presentation/presentation-rotation";
 
 function SessionToggle({ checked, label, onClick }: { checked: boolean; label: string; onClick: () => void }) {
   return <button
@@ -34,7 +34,7 @@ function SessionToggle({ checked, label, onClick }: { checked: boolean; label: s
   </button>;
 }
 
-import { trapDialogFocus } from "@/app/component/dialog-focus";
+import { trapDialogFocus } from "@/app/component/dialog/dialog-focus";
 
 const NOTE_MIN_HEIGHT = 36; // 12px 글자 2줄
 

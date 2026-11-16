@@ -1,4 +1,4 @@
-import { insightFailure, insightOwner, insightResponse, insightStorage, InsightRequestError } from "../../../../../_service/insight-request.ts";
+import { insightFailure, insightOwner, insightResponse, insightStorage, InsightRequestError } from "../../../../../_service/insight/insight-request.ts";
 
 export const runtime = "nodejs";
 const uuid = /^[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i;

@@ -2,9 +2,9 @@
 
 import { useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { reportRequest, useOpenReport } from "@/app/_controller/use-report";
-import { useSessions } from "@/app/_controller/session-store";
-import type { ReportView } from "@/app/_model/report";
+import { reportRequest, useOpenReport } from "@/app/_controller/workspace/use-report";
+import { useSessions } from "@/app/_controller/provider/session-store";
+import type { ReportView } from "@/app/_model/report/report";
 
 export type ReportSummary = Pick<ReportView, "id" | "materialId" | "title" | "status" | "updatedAt">;
 

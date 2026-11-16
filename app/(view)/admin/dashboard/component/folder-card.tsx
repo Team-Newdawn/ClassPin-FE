@@ -3,27 +3,26 @@
 import Link from "next/link";
 import Image from "next/image";
 import { useRef, useState } from "react";
-import { CLASS_FOLDER_COLOR_OPTIONS, normalizeClassFolderName } from "@/app/_model/types";
-import { timeAgo } from "@/app/_model/i18n";
-import { SlideCanvas } from "@/app/component/slide-canvas";
+import { CLASS_FOLDER_COLOR_OPTIONS, normalizeClassFolderName } from "@/app/_model/core/types";
+import { timeAgo } from "@/app/_model/core/i18n";
+import { SlideCanvas } from "@/app/component/slide/slide-canvas";
+import { ActionMenu, closeActionMenu } from "@/app/component/control/action-menu";
 
-import { useLanguage } from "@/app/_controller/language-context";
-import type { FolderSummary } from "@/app/_model/stats";
+import { useLanguage } from "@/app/_controller/provider/language-context";
+import type { FolderSummary } from "@/app/_model/material/stats";
 import styles from "./folder-card.module.css";
 
 const accentClasses = [styles.accent0, styles.accent1, styles.accent2, styles.accent3, styles.accent4, styles.accent5];
 
-export function FolderCard({ folder, view, deleting, pinned, canCopyLink, onRename, onDelete, onPin, onColor, onCopyLink }: {
+export function FolderCard({ folder, view, deleting, pinned, onRename, onDelete, onPin, onColor }: {
   folder: FolderSummary;
   view: "grid" | "list";
   deleting: boolean;
   pinned: boolean;
-  canCopyLink: boolean;
   onRename?: (name: string) => Promise<void>;
   onDelete?: () => void;
   onPin?: () => void;
   onColor?: (index: number) => void;
-  onCopyLink?: () => void;
 }) {
   const { t, locale } = useLanguage();
   const [draft, setDraft] = useState<string | null>(null);
@@ -49,35 +48,18 @@ export function FolderCard({ folder, view, deleting, pinned, canCopyLink, onRena
       requestAnimationFrame(() => inputRef.current?.focus());
     } finally { savingRef.current = false; setSaving(false); }
   };
-  const closeMenu = (element: HTMLElement) => {
-    const details = element.closest("details");
-    details?.removeAttribute("open");
-    details?.querySelector("summary")?.focus();
-  };
   const icon = (name: string) => <Image src={`/assets/design/folder-menu/${name}.svg`} alt="" width={name === "check" ? 10 : 16} height={name === "check" ? 10 : 16} />;
   const menu = onRename && onDelete && (
-    <details className={styles.menu} name="folder-card-actions"
-      onToggle={(event) => {
-        const panel = event.currentTarget.lastElementChild as HTMLElement;
-        if (!event.currentTarget.open) { panel.removeAttribute("style"); return; }
-        if (view !== "list") return;
-        const rect = event.currentTarget.getBoundingClientRect();
-        Object.assign(panel.style, { position: "fixed", top: `${Math.max(12, Math.min(rect.bottom + 6, innerHeight - panel.offsetHeight - 12))}px`, left: `${Math.max(12, Math.min(rect.right - panel.offsetWidth, innerWidth - panel.offsetWidth - 12))}px`, right: "auto" });
-      }}
-      onBlur={(event) => { if (!event.currentTarget.contains(event.relatedTarget)) event.currentTarget.removeAttribute("open"); }}
-      onKeyDown={(event) => { if (event.key === "Escape") { event.currentTarget.removeAttribute("open"); event.currentTarget.querySelector("summary")?.focus(); } }}>
-      <summary className={styles.menuTrigger} aria-label={t("folders.folderMenu", { name: folder.name })} title={t("folders.folderMenu", { name: folder.name })} aria-disabled={deleting || saving} onClick={(event) => { if (deleting || saving) event.preventDefault(); }}>{deleting ? <span className="spinner dark" /> : <Image src="/assets/design/dots.svg" alt="" width={18} height={18} />}</summary>
-      <div className={styles.popover}>
+    <ActionMenu name="folder-card-actions" className={styles.menu} triggerClassName={styles.menuTrigger} panelClassName={styles.popover}
+      label={t("folders.folderMenu", { name: folder.name })} disabled={deleting || saving} busy={deleting} floating={view === "list"}>
         <Link href={`/admin/folders/${folder.id}`}>{icon("open")}{t("folders.openMenu")}</Link>
-        <button type="button" onClick={(event) => { closeMenu(event.currentTarget); setRenameError(false); setDraft(folder.name); }}>{icon("rename")}{t("folders.rename")}</button>
-        <button type="button" aria-pressed={pinned} title={t("folders.browserPreference")} onClick={(event) => { closeMenu(event.currentTarget); onPin?.(); }}>{icon("pin")}{t(pinned ? "folders.unpin" : "folders.pin")}</button>
-        <button type="button" disabled={!canCopyLink} title={!canCopyLink ? t("folders.noLiveLink") : undefined} onClick={(event) => { closeMenu(event.currentTarget); onCopyLink?.(); }}>{icon("link")}{t("folders.copyLiveLink")}</button>
+        <button type="button" onClick={(event) => { closeActionMenu(event.currentTarget); setRenameError(false); setDraft(folder.name); }}>{icon("rename")}{t("folders.rename")}</button>
+        <button type="button" aria-pressed={pinned} title={t("folders.browserPreference")} onClick={(event) => { closeActionMenu(event.currentTarget); onPin?.(); }}>{icon("pin")}{t(pinned ? "folders.unpin" : "folders.pin")}</button>
         <div className={styles.colors}><span>{t("folders.folderColor")}</span><div role="group" aria-label={t("folders.folderColor")}>
-          {CLASS_FOLDER_COLOR_OPTIONS.map((index) => <button key={index} type="button" className={accentClasses[index]} aria-pressed={folder.colorIndex === index} aria-label={t(index === 2 ? "folders.colorBlue" : index === 3 ? "folders.colorSky" : index === 1 ? "folders.colorNavy" : "folders.colorSlate")} title={t("folders.browserPreference")} onClick={(event) => { closeMenu(event.currentTarget); onColor?.(index); }}>{folder.colorIndex === index && icon("check")}</button>)}
+          {CLASS_FOLDER_COLOR_OPTIONS.map((index) => <button key={index} type="button" className={accentClasses[index]} aria-pressed={folder.colorIndex === index} aria-label={t(index === 2 ? "folders.colorBlue" : index === 3 ? "folders.colorSky" : index === 1 ? "folders.colorNavy" : "folders.colorSlate")} title={t("folders.browserPreference")} onClick={(event) => { closeActionMenu(event.currentTarget); onColor?.(index); }}>{folder.colorIndex === index && icon("check")}</button>)}
         </div></div>
-        <button type="button" className={styles.destructive} onClick={(event) => { closeMenu(event.currentTarget); onDelete(); }}>{icon("delete")}{t("folders.delete")}</button>
-      </div>
-    </details>
+        <button type="button" className={styles.destructive} onClick={(event) => { closeActionMenu(event.currentTarget); onDelete(); }}>{icon("delete")}{t("folders.delete")}</button>
+    </ActionMenu>
   );
 
   return (

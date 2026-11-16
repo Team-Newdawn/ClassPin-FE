@@ -1,0 +1,236 @@
+const DEFAULT_QUESTION_CATEGORY_KEYS = ["concept", "why", "example", "error", "important"] as const;
+export const LEGACY_QUESTION_CATEGORY_KEYS = ["praise", "improve", "confusing", "bug", "idea"] as const;
+const BUILT_IN_QUESTION_CATEGORY_KEYS: readonly string[] = [...DEFAULT_QUESTION_CATEGORY_KEYS, ...LEGACY_QUESTION_CATEGORY_KEYS];
+export type QuestionCategory = string;
+export type QuestionStatus = "unanswered" | "answered" | "resolved";
+export type QuestionAnchorKind = "point" | "box" | "path";
+export type PresentationQrPosition = "top-left" | "top-right" | "bottom-left" | "bottom-right";
+export const QUESTION_MARKERS = ["pin", "question", "smile", "idea"] as const;
+export type QuestionMarker = typeof QUESTION_MARKERS[number];
+
+const QUESTION_CATEGORY_LABEL_MAX = 40;
+const QUESTION_CATEGORY_STORED_MAX = 50;
+const QUESTION_CATEGORY_KEY = /^[a-z0-9][a-z0-9-]{0,63}$/;
+
+export type QuestionCategorySetting = { label: string; enabled: boolean; archived: boolean };
+export type QuestionCategorySettings = Record<string, QuestionCategorySetting>;
+
+export const defaultQuestionCategorySettings = (): QuestionCategorySettings => Object.fromEntries(
+  DEFAULT_QUESTION_CATEGORY_KEYS.map((key) => [key, { label: "", enabled: true, archived: false }])
+);
+
+export function normalizeQuestionCategorySettings(value: unknown): QuestionCategorySettings {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return defaultQuestionCategorySettings();
+  const settings: QuestionCategorySettings = {};
+  Object.entries(value as Record<string, unknown>).slice(0, QUESTION_CATEGORY_STORED_MAX).forEach(([key, item]) => {
+    if (!QUESTION_CATEGORY_KEY.test(key) || !item || typeof item !== "object" || Array.isArray(item)) return;
+    const setting = item as Record<string, unknown>;
+    const label = typeof setting.label === "string" ? [...setting.label.trim()].slice(0, QUESTION_CATEGORY_LABEL_MAX).join("") : "";
+    const builtIn = BUILT_IN_QUESTION_CATEGORY_KEYS.includes(key);
+    if (!builtIn && !label) return;
+    settings[key] = {
+      label,
+      enabled: typeof setting.enabled === "boolean" ? setting.enabled : true,
+      archived: typeof setting.archived === "boolean" ? setting.archived : false
+    };
+  });
+  if (!Object.values(settings).some((setting) => setting.enabled && !setting.archived)) {
+    Object.assign(settings, defaultQuestionCategorySettings());
+  }
+  return settings;
+}
+
+export const enabledQuestionCategories = (settings: QuestionCategorySettings) =>
+  Object.keys(settings).filter((key) => settings[key].enabled && !settings[key].archived);
+
+export const acceptsQuestionCategory = (settings: QuestionCategorySettings, category: QuestionCategory) =>
+  enabledQuestionCategories(settings).includes(category);
+
+export const questionCategoryLabel = (
+  settings: QuestionCategorySettings,
+  category: QuestionCategory,
+  fallback: (category: QuestionCategory) => string
+) => settings[category]?.label || fallback(category);
+
+export const isQuestionMarker = (value: unknown): value is QuestionMarker =>
+  typeof value === "string" && (QUESTION_MARKERS as readonly string[]).includes(value);
+
+export const questionMarkerEmoji = (marker: QuestionMarker): string | null =>
+  marker === "question" ? "❓" : marker === "smile" ? "🙂" : marker === "idea" ? "💡" : null;
+
+export interface NormalizedPoint {
+  x: number;
+  y: number;
+}
+
+/** admin = 구글 로그인 강사, participant = QR 익명 수강생 */
+export type UserRole = "admin" | "participant";
+
+export interface Profile {
+  id: string;
+  role: UserRole;
+  email: string | null;
+  displayName: string | null;
+  avatarUrl: string | null;
+}
+
+export const CLASS_FOLDER_NAME_MAX = 80;
+const CLASS_FOLDER_COLOR_COUNT = 6;
+export const CLASS_FOLDER_DEFAULT_COLOR_INDEX = 2;
+export const CLASS_UNFILED_COLOR_INDEX = 0;
+export const CLASS_FOLDER_COLOR_OPTIONS = [2, 3, 1, 0] as const;
+export const CLASS_FOLDER_PURPOSES = ["qa", "feedback", "education", "brainstorming", "other"] as const;
+export type ClassFolderPurpose = typeof CLASS_FOLDER_PURPOSES[number];
+export const CLASS_FOLDER_DEFAULT_PURPOSE: ClassFolderPurpose = "qa";
+export const CLASS_FOLDER_PURPOSE_LABEL_MAX = 40;
+
+// 폴더 사용 목적에 맞춰 요약 관점을 정한다. 목적이 없으면(미분류 자료) 이 줄을 넣지 않는다.
+const PURPOSE_CONTEXT: Record<ClassFolderPurpose, { ko: string; en: string }> = {
+  qa: { ko: "Q&A: 궁금한 점과 헷갈린 점을 중심으로 정리합니다.", en: "Q&A: focus on open questions and points of confusion." },
+  feedback: { ko: "피드백: 항목을 질문보다 의견으로 보고, 좋았던 점·불편한 점과 개선 요청을 중심으로 정리합니다.", en: "Feedback: treat items as opinions rather than questions; focus on what worked, what did not, and requested improvements." },
+  education: { ko: "교육: 학습자가 이해하지 못한 개념과 보충 설명이 필요한 지점을 중심으로 정리합니다.", en: "Education: focus on concepts learners did not understand and where extra explanation is needed." },
+  brainstorming: { ko: "브레인스토밍: 항목을 아이디어로 보고, 반복되는 주제와 발전시킬 만한 아이디어를 중심으로 정리합니다.", en: "Brainstorming: treat items as ideas; focus on recurring themes and ideas worth developing." },
+  other: { ko: "기타: 아래 이름의 목적에 맞는 관점으로 정리합니다.", en: "Other: summarize from the perspective of the purpose named below." },
+};
+
+export const classFolderPurposeLine = (purpose: ClassFolderPurpose | null, label: string | null, locale: "ko" | "en") => {
+  if (!purpose) return "";
+  const clean = label?.replace(/["\n\r]/g, " ");
+  const name = purpose === "other" && clean ? (locale === "ko" ? ` 목적 이름: "${clean}".` : ` Purpose name: "${clean}".`) : "";
+  return `\n${locale === "ko" ? "이 자료가 속한 폴더의 사용 목적" : "Purpose of the folder this material belongs to"} — ${PURPOSE_CONTEXT[purpose][locale]}${name}`;
+};
+
+export function normalizeClassFolderName(value: string) {
+  const name = value.trim();
+  const length = [...name].length;
+  if (length < 1 || length > CLASS_FOLDER_NAME_MAX) {
+    throw new Error(`폴더 이름은 1~${CLASS_FOLDER_NAME_MAX}자로 입력해 주세요.`);
+  }
+  return name;
+}
+
+export function classFolderColorIndexForOrder(index: number) {
+  return (Number.isFinite(index) ? Math.max(0, Math.trunc(index)) : 0) % CLASS_FOLDER_COLOR_COUNT;
+}
+
+export function normalizeClassFolderColorIndex(value: unknown, fallbackIndex = CLASS_FOLDER_DEFAULT_COLOR_INDEX) {
+  return typeof value === "number" && Number.isInteger(value) && value >= 0 && value < CLASS_FOLDER_COLOR_COUNT
+    ? value
+    : classFolderColorIndexForOrder(fallbackIndex);
+}
+
+export function normalizeClassFolderPurpose(value: unknown): ClassFolderPurpose {
+  return typeof value === "string" && (CLASS_FOLDER_PURPOSES as readonly string[]).includes(value)
+    ? value as ClassFolderPurpose
+    : CLASS_FOLDER_DEFAULT_PURPOSE;
+}
+
+/** 직접 입력한 카테고리 이름은 `기타` 목적에서만 유지한다. */
+export function normalizeClassFolderPurposeLabel(purpose: ClassFolderPurpose, value: unknown): string | null {
+  if (purpose !== "other" || typeof value !== "string") return null;
+  const label = [...value.trim()].slice(0, CLASS_FOLDER_PURPOSE_LABEL_MAX).join("");
+  return label || null;
+}
+
+export interface CreateClassFolderInput {
+  name: string;
+  colorIndex: number;
+  purpose: ClassFolderPurpose;
+  /** `기타` 목적에서 직접 입력한 카테고리 이름. 다른 목적에서는 사용하지 않는다. */
+  purposeLabel?: string | null;
+}
+
+export interface ClassFolder {
+  id: string;
+  name: string;
+  createdAt: string;
+  colorIndex: number;
+  purpose: ClassFolderPurpose;
+  /** `기타` 목적에서 직접 입력한 카테고리 이름. 다른 목적에서는 null이다. */
+  purposeLabel?: string | null;
+}
+
+export interface Slide {
+  id: string;
+  pageIndex: number;
+  title: string;
+  imageUrl?: string;
+  /** lecture-slides 버킷 안의 경로. 변환 단계에서 이미 올라간 이미지를 가리킨다. */
+  imagePath?: string;
+  /** 원본 PDF의 0-기반 페이지. imagePath와 동시에 가지지 않는다. */
+  sourcePageIndex?: number;
+  /** 현재 인증 세션에서만 사용하는 PDF 원본 URL. DB에는 저장하지 않는다. */
+  pdfUrl?: string;
+  /** 강의자 전용 발표 메모. 청중 세션 조회에는 포함하지 않는다. */
+  speakerNote?: string;
+}
+
+export interface Question {
+  id: string;
+  sessionId: string;
+  slideIndex: number;
+  x: number | null;
+  y: number | null;
+  anchorKind?: QuestionAnchorKind;
+  width?: number | null;
+  height?: number | null;
+  path?: NormalizedPoint[] | null;
+  category: QuestionCategory;
+  marker: QuestionMarker;
+  text: string;
+  status: QuestionStatus;
+  answer?: string;
+  /** 공개 참여자 조회에서만 계산된다. 작성자 UUID 자체는 노출하지 않는다. */
+  isMine: boolean;
+  reactionCount: number;
+  reactedByMe: boolean;
+  createdAt: string;
+}
+
+type QuestionAnchor = Pick<Question, "anchorKind" | "x" | "y" | "width" | "height" | "path">;
+
+export type ParticipantQuestionInput = Pick<Question, "slideIndex" | "category" | "marker" | "text"> & {
+  anchorKind: "point";
+  x: number;
+  y: number;
+  width: null;
+  height: null;
+  path: null;
+};
+
+export function isParticipantPointAnchor(anchor: QuestionAnchor) {
+  return anchor.anchorKind === "point"
+    && typeof anchor.x === "number" && Number.isFinite(anchor.x) && anchor.x >= 0 && anchor.x <= 1
+    && typeof anchor.y === "number" && Number.isFinite(anchor.y) && anchor.y >= 0 && anchor.y <= 1
+    && anchor.width == null && anchor.height == null && anchor.path == null;
+}
+
+export interface ClassSession {
+  id: string;
+  folderId: string | null;
+  courseId?: string;
+  materialId?: string;
+  materialVersionId?: string;
+  code: string;
+  title: string;
+  fileName: string;
+  /** BE 수명 주기. 화면은 live 여부만 구분하고, pending은 아직 FE에서 만들지 않는다. */
+  status: "before" | "pending" | "live" | "ended";
+  currentSlide: number;
+  presentationInteractions: boolean;
+  presentationAutoplay: boolean;
+  showQuestionPins: boolean;
+  showQuestionLabels?: boolean;
+  presentationOptions?: import("../presentation/presentation-options").PresentationOptions;
+  showPresentationQr: boolean;
+  presentationQrPosition: PresentationQrPosition;
+  questionCategories: QuestionCategorySettings;
+  /** 참여자 공감(👍)과 실시간 이모지 반응 허용. BE가 공감 RPC에서 allow_question_reactions 를 강제한다. */
+  allowQuestionReactions: boolean;
+  allowEmojiReactions: boolean;
+  /** 마지막으로 LIVE를 시작한 시각. BE가 status를 live로 바꿀 때마다 다시 기록한다. */
+  startedAt: string | null;
+  createdAt: string;
+  slides: Slide[];
+  questions: Question[];
+}

@@ -1,14 +1,14 @@
 "use client";
 
 import { useMemo, useState, type FormEvent } from "react";
-import { useLanguage } from "@/app/_controller/language-context";
-import { useSessions } from "@/app/_controller/session-store";
+import { useLanguage } from "@/app/_controller/provider/language-context";
+import { useSessions } from "@/app/_controller/provider/session-store";
 
-import { summarizeFolders, type FolderSummary } from "@/app/_model/stats";
-import { normalizeClassFolderColorIndex, CLASS_FOLDER_DEFAULT_COLOR_INDEX, CLASS_FOLDER_DEFAULT_PURPOSE, CLASS_UNFILED_COLOR_INDEX, type ClassFolder, type ClassFolderPurpose } from "@/app/_model/types";
+import { summarizeFolders, type FolderSummary } from "@/app/_model/material/stats";
+import { normalizeClassFolderColorIndex, CLASS_FOLDER_DEFAULT_COLOR_INDEX, CLASS_FOLDER_DEFAULT_PURPOSE, CLASS_UNFILED_COLOR_INDEX, type ClassFolder, type ClassFolderPurpose } from "@/app/_model/core/types";
 
-import { useAuth } from "@/app/_controller/auth-context";
-import { useBrowserPreferences } from "@/app/_controller/use-browser-preferences";
+import { useAuth } from "@/app/_controller/provider/auth-context";
+import { useBrowserPreferences } from "@/app/_controller/workspace/use-browser-preferences";
 export const UNFILED_ID = "unfiled";
 
 export function useDashboardController() {
@@ -18,9 +18,7 @@ export function useDashboardController() {
   const [sort, setSort] = useState<"recent" | "name">("recent");
   const { folders, sessions, createFolder, updateFolder, deleteFolder, deleteSession, ready } = useSessions();
   const [folderPreferences, saveFolderPreferences] = useBrowserPreferences<Record<string, { pinned?: boolean; colorIndex?: number }>>("folders");
-  const liveFolderIds = useMemo(() => new Set(sessions.filter((session) => session.status === "live").map((session) => session.folderId)), [sessions]);
   const [folderToDelete, setFolderToDelete] = useState<FolderSummary | null>(null);
-  const [folderNotice, setFolderNotice] = useState<string | null>(null);
   const [uploadOpen, setUploadOpen] = useState(false);
   const [folderEditor, setFolderEditor] = useState(false);
   const [folderName, setFolderName] = useState("");
@@ -84,17 +82,6 @@ export function useDashboardController() {
     catch { setFolderActionError(t("folders.appearanceError")); }
   };
 
-  const copyFolderLink = async (folder: FolderSummary) => {
-    const live = sessions.filter((item) => item.folderId === folder.id && item.status === "live")
-      .sort((a, b) => (Date.parse(b.startedAt ?? b.createdAt) || 0) - (Date.parse(a.startedAt ?? a.createdAt) || 0))[0];
-    if (!live) return;
-    setFolderActionError(null);
-    try {
-      await navigator.clipboard.writeText(`${window.location.origin}/join/${encodeURIComponent(live.code)}`);
-      setFolderNotice(t("folders.linkCopied"));
-    } catch { setFolderActionError(t("folders.copyError")); }
-  };
-
   const removeFolder = async (contents: boolean) => {
     if (!folderToDelete || deletingFolderId) return;
     setDeletingFolderId(folderToDelete.id);
@@ -137,9 +124,8 @@ export function useDashboardController() {
     submitFolder,
     openFolderEditor,
     closeFolderEditor,
-    removeFolder, folderToDelete, setFolderToDelete, folderPreferences, folderNotice, changeFolderAppearance, copyFolderLink,
+    removeFolder, folderToDelete, setFolderToDelete, folderPreferences, changeFolderAppearance,
     renameFolder: (folder: ClassFolder, name: string) => updateFolder(folder.id, { ...folder, name }),
-    hasLiveMaterial: (folderId: string) => liveFolderIds.has(folderId),
     visibleSummaries
   };
 }

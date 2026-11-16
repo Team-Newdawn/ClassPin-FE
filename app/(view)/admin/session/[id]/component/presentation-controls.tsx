@@ -1,8 +1,8 @@
 "use client";
 
 import { useId } from "react";
-import { useLanguage } from "@/app/_controller/language-context";
-import { QR_POSITIONS, type QrPosition, type QuestionDisplayMode } from "@/app/_model/presentation-options";
+import { useLanguage } from "@/app/_controller/provider/language-context";
+import { QR_POSITION_LABELS, QR_POSITIONS, QR_SIZES, type QrPosition, type QuestionDisplayMode } from "@/app/_model/presentation/presentation-options";
 import type { useSessionAdminController } from "../controller";
 import styles from "./presentation-controls.module.css";
 
@@ -11,7 +11,7 @@ export function PresentationControls({ controller: c }: { controller: ReturnType
   const id = useId();
   const { presentationOptions: options, session } = c;
   if (!session) return null;
-  const positionLabel = (position: QrPosition) => t(position === "top-left" ? "session.qrTopLeft" : position === "top-center" ? "session.qrTopCenter" : position === "top-right" ? "session.qrTopRight" : position === "bottom-left" ? "session.qrBottomLeft" : position === "bottom-center" ? "session.qrBottomCenter" : "session.qrBottomRight");
+  const positionLabel = (position: QrPosition) => t(QR_POSITION_LABELS[position]);
 
   return <div className={styles.root}>
     <div className={styles.control}><span>{t("session.questionDisplay")}</span><div className={styles.modes} role="group" aria-label={t("session.questionDisplay")}>
@@ -31,7 +31,7 @@ export function PresentationControls({ controller: c }: { controller: ReturnType
         {QR_POSITIONS.map((position) => <button type="button" key={position} data-position={position} aria-pressed={options.qrPosition === position} disabled={c.lectureSaving} onClick={() => c.changePresentationQrPlacement(position)}><span className={styles.thumbnail} aria-hidden="true" /><span>{positionLabel(position)}</span></button>)}
       </div>
       <hr /><b>{t("session.qrSize")}</b>
-      <div className={styles.sizes} role="group" aria-label={t("session.qrSize")}>{([64, 96, 160] as const).map((size, index) => <button type="button" key={size} aria-pressed={options.qrSize === size} onClick={() => c.changePresentationOptions({ qrSize: size })}><b>{["S", "M", "L"][index]}</b><small>{size}px</small></button>)}</div>
+      <div className={styles.sizes} role="group" aria-label={t("session.qrSize")}>{QR_SIZES.map(({ size, label }) => <button type="button" key={size} aria-pressed={options.qrSize === size} onClick={() => c.changePresentationOptions({ qrSize: size })}><b>{label}</b><small>{size}px</small></button>)}</div>
       <hr /><div className={styles.edit}><span>{t("session.qrEditable")}</span><button type="button" className={styles.toggle} role="switch" aria-checked={options.qrEditable} aria-label={t("session.qrEditable")} onClick={() => c.changePresentationOptions({ qrEditable: !options.qrEditable })}><i /></button></div>
       <p>{t("session.qrEditHint")}</p>
     </div>

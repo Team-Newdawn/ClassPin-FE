@@ -57,9 +57,13 @@ app/
       model.ts             # 필요한 경우만
       component/           # 해당 페이지 계열에서만 재사용
   component/               # 여러 페이지가 재사용하는 전역 UI
+    slide/ dialog/ layout/ control/ icon/
   _model/                  # 공유 DTO와 순수 도메인 로직
+    core/ lecture/ presentation/ material/ insight/ report/
   _controller/             # 전역 provider와 공유 React controller
+    provider/ live/ presentation/ workspace/
   _service/                # REST·Supabase 연결을 사용하는 도메인 service
+    lecture/ auth/ upload/ insight/ report/
   _infrastructure/
     supabase/              # Supabase client/server 연결 기반
     rest/                  # REST 요청·JWT 전달 기반
@@ -116,7 +120,7 @@ app/
 ## 8. 구현 패키지와 롤백
 
 - `CFA-070` 구현 전 현재 selector 소비자, route별 요청 수, payload, Realtime 채널, 필수 browser journey의 기준 evidence를 기록한다.
-- `CFA-071` 공유 contract package는 `app/_model`, `app/_service`, `app/_infrastructure`와 `app/_controller/session-store.tsx` Facade를 한 소유자가 담당한다. 이 경로를 여러 작업자가 동시에 편집하지 않는다.
+- `CFA-071` 공유 contract package는 `app/_model`, `app/_service`, `app/_infrastructure`와 `app/_controller/provider/session-store.tsx` Facade를 한 소유자가 담당한다. 이 경로를 여러 작업자가 동시에 편집하지 않는다.
 - `CFA-072` 공유 컴포넌트 package와 route package는 contract가 잠긴 뒤 비중첩 경로로 병렬 실행할 수 있다. route package는 dashboard·folder, session·present, join·auth 경계로 나눈다.
 - `CFA-073` `app/globals.css`는 모든 route/component module 이전 후 하나의 integration package만 편집한다. `/pin` 전용 selector 제거도 같은 package가 담당한다.
 - `CFA-074` 임시 호환 import는 같은 run 안에서 제거한다. 새 dependency와 migration은 추가하지 않는다. REST 전환은 CFA-092에 따른 서버 환경변수와 Route Handler 설정만 허용한다.
@@ -167,10 +171,10 @@ app/
 
 | 요구사항 | 예상 코드 경계 | 검증 |
 | --- | --- | --- |
-| CFA-090, CFA-095, CFA-097 | `app/_service/class-session-service.ts`, 기존 session store/model | folder/session/question endpoint·DTO, participant projection |
+| CFA-090, CFA-095, CFA-097 | `app/_service/lecture/class-session-service.ts`, 기존 session store/model | folder/session/question endpoint·DTO, participant projection |
 | CFA-091, CFA-094 | `app/_infrastructure/rest`, `app/_infrastructure/supabase/client.ts`, auth/experience service | owner/anonymous token 분리, profile·experience 호출 |
 | CFA-092, CFA-093, CFA-096 | `app/api/rest/[...path]/route.ts`, REST 요청 기반, README/env 예시 | local upstream proxy, 204·401/403·404·텍스트 오류 |
-| CFA-098 | `app/_service/convert.ts`, 기존 Storage 업로드 경계 | sourcePath-only 요청, stream·cleanup |
+| CFA-098 | `app/_service/upload/convert.ts`, 기존 Storage 업로드 경계 | sourcePath-only 요청, stream·cleanup |
 | CFA-099 | 기존 model tests, REST targeted check, 로컬 runtime | migration replay, lint/build, browser, Ponytail review |
 
 2026-09-28 사전 확인: FE `origin/feature-dev`와 현재 HEAD는 `e00739a`, BE `main`은 `86b65be858d1892d11da0f9d300240b6d25e2e71`다. 배포 OpenAPI는 29 operation을 제공하며 폴더 목적 DTO를 포함한다. BE source는 폴더 목적 projection과 자동재생 projection/PATCH를 포함한다. 배포 API의 무인증 강사·participant 요청은 각각 401이고 localhost 직접 preflight는 403이다. 이 결과는 인증된 end-to-end 검증을 대신하지 않는다.

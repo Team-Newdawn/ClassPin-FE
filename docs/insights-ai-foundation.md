@@ -21,11 +21,11 @@
 
 | 경로 | 현재 동작 | 설계상 의미 |
 | --- | --- | --- |
-| `app/(view)/admin/insights/controller.ts` → `_model/stats.ts` | session store의 자료를 `buildSessionInsights`로 집계 | 기존 통계 의미와 정렬을 재사용할 수 있다. AI 자료 분석은 아니다. |
+| `app/(view)/admin/insights/controller.ts` → `_model/material/stats.ts` | session store의 자료를 `buildSessionInsights`로 집계 | 기존 통계 의미와 정렬을 재사용할 수 있다. AI 자료 분석은 아니다. |
 | `_controller/session-store.tsx` → `_service/class-session-service.ts:fetchOwnedSessions` | `/instructor/courses` REST 그래프에서 자료·최신 버전·슬라이드·질문을 UI 모델로 변환 | 화면 캐시를 분석의 권위 원본으로 사용하지 않는다. 서버에서 소유권 확인 후 snapshot을 만든다. |
 | `_service/question-summary-service.ts:toSummaryItems` → `/api/question-summary` | 질문 본문·페이지·공감 수를 Groq에 전달 | 슬라이드 이미지, 원본 질문 ID, 위치, 답변 이력이 없으므로 새 분석 입력으로 그대로 쓰면 안 된다. |
 | `/api/question-summary:POST` | 로그인 사용자 검사 후 브라우저가 보낸 items를 요약; 키 없으면 503, 생성 오류는 502 | 저장 리포트에 필요한 자료 소유권 검사·서버 snapshot·근거 검증·영속 작업 경계가 별도로 필요하다. |
-| `_model/types.ts:Slide` | 이미지 경로 또는 PDF 원본 페이지 참조, 강사 메모 | 이미지만 있다고 가정하면 PDF 자료를 놓친다. 메모는 분석에서 제외한다. |
+| `_model/core/types.ts:Slide` | 이미지 경로 또는 PDF 원본 페이지 참조, 강사 메모 | 이미지만 있다고 가정하면 PDF 자료를 놓친다. 메모는 분석에서 제외한다. |
 | `_service/class-session-service.ts:toQuestion` | 최신 답변 하나로 축약; slide 연결 실패는 index 0으로 변환 | 분석에는 원본 slide ID와 전체 답변 이력이 필요하다. 연결 실패를 첫 슬라이드 근거로 바꾸면 안 된다. |
 
 현재 checkout의 파일 검색에서 상세 `material-insights`/`ai-reports` 구현·migration은 확인되지 않았다. 다른 브랜치의 과거 구현을 현재 구현으로 간주하지 않는다. 운영 스키마와 실제 사용자 자료는 미검증이다. 이후 배포 Swagger와 BE 소유 자료 조회 소스를 읽어 source 준비 검사에 필요한 계약을 확인했다.
@@ -171,7 +171,7 @@ PowerPoint는 `.pptx`를 제안하며 구형 바이너리 `.ppt`와 동일하다
 
 이 준비 검사는 비용 quote나 생성 API가 아니다. 조회 시점의 자료를 검증하지만 원자적 DB snapshot 저장을 보장하지 않는다. 실제 생성은 AIR-SYS-020의 원자적 snapshot API와 영속 작업이 연결된 뒤 활성화한다. 배포 Swagger에는 현재 해당 생성/snapshot API가 없으므로 별도 BE 계약이 필요하다. FE 저장소에서 BE 소스는 수정하지 않는다.
 
-2026-10-21: `app/_model/insight-evidence.ts`와 같은 이름의 `.test.ts`에 순수 근거 계산을 구현했다. 새로운 의존성, API, DB migration은 추가하지 않았다.
+2026-10-21: `app/_model/insight/insight-evidence.ts`와 같은 이름의 `.test.ts`에 순수 근거 계산을 구현했다. 새로운 의존성, API, DB migration은 추가하지 않았다.
 
 - point/box/path의 crop 경계를 계산하고 잘못된 좌표는 거부한다. 좌표가 없는 질문에는 crop을 만들지 않는다.
 - snapshot slide alias와 question alias의 중복·고아 참조, 잘못된 집계값을 거부한다. 질문 없는 슬라이드도 결과에 남긴다.
@@ -180,7 +180,7 @@ PowerPoint는 `.pptx`를 제안하며 구형 바이너리 `.ppt`와 동일하다
 
 이 모듈은 비식별화된 서버 snapshot에서 만든 입력을 받는 내부 계산기다. 실제 snapshot 수집·권한 검사, 원문·답변 이력 보존, 이미지 checksum·OCR·가림, AI 응답 schema 파싱·비평, 보고서 전체 근거 수준 계산을 대신하지 않는다. 실제 AI 호출·화면·내보내기는 아직 연결하지 않았다.
 
-검증: `node --test app/_model/insight-evidence.test.ts` 4개 통과, `npm run lint` 통과, `npm run build` 통과. 빌드에는 변경하지 않은 join CSS의 `@position-try` 경고가 남아 있다. 이번 순수 계산 모듈은 UI에서 아직 호출하지 않으므로 실제 인사이트 동작이나 운영 데이터 검증으로 주장하지 않는다. 화면 연결 단계에는 별도로 로그인·폴더·플레이어·키보드·패널 브라우저 회귀 검증이 필요하다.
+검증: `node --test app/_model/insight/insight-evidence.test.ts` 4개 통과, `npm run lint` 통과, `npm run build` 통과. 빌드에는 변경하지 않은 join CSS의 `@position-try` 경고가 남아 있다. 이번 순수 계산 모듈은 UI에서 아직 호출하지 않으므로 실제 인사이트 동작이나 운영 데이터 검증으로 주장하지 않는다. 화면 연결 단계에는 별도로 로그인·폴더·플레이어·키보드·패널 브라우저 회귀 검증이 필요하다.
 
 다음 연결 조건은 서버에서 소유 자료의 원본 slide ID와 전체 질문·답변을 일관되게 읽는 계약 확인이다. UI용 `toQuestion`은 최신 답변만 남기고 없는 slide ID를 첫 페이지로 바꾸므로 snapshot 경로에서 재사용하지 않는다. 이후 이미지 준비·비식별화, 영속 작업·AI 생성/비평, 화면·대화, 네 형식 내보내기 순서로 연결한다.
 

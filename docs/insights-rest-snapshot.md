@@ -51,7 +51,7 @@ REST 스냅샷에 연결한 서버 전용 report 행이 작업 상태·lease·�
 - 별도 로컬 합성 계정에서 실제 Spring REST → 소유권 검증 → snapshot → Groq Qwen/GPT-OSS → canonical → 대화/요약 → 확정 → 4종 다운로드를 확인했다. 개발 서버의 export 모듈이 이전 버전을 유지해 최종 PDF는 새 production build의 로컬 API에서 재검증했다.
 - 브라우저: 폴더 grid/list와 리포트 링크, 자료 관리/플레이어 진입, 노트 저장, 폴더 패널 접기, 질문 패널 키보드 resize, 인사이트 탭/질문/PIN/대화/확정 확인. Orca 입력 명령 일부가 페이지에 반영되지 않아 해당 검증은 DOM 이벤트로 수행했다. 실제 viewport 1291×838에서 페이지 가로 넘침 없음. 모바일 실기기 및 다중 슬라이드 실자료 회귀는 별도다.
 - 최종 검사: Node 14개 테스트(생략 없음), lint/build, 두 SQL 테스트, DB lint 통과. 미인증 조회 401, 다른 강사 조회·다운로드 404, 확정 후 수정 409를 로컬 API에서 확인했다.
-- 테스트 명령: `INSIGHT_OCR_SMOKE=1 INSIGHT_EXPORT_SMOKE=1 node --experimental-strip-types --test app/_model/insight-evidence.test.ts app/_service/insight-*.test.ts app/api/admin/ai-reports/source/route.test.ts app/api/admin/ai-reports/snapshots/route.test.ts`. PDF 텍스트와 페이지 경계 검사는 Poppler, Office 파일 검사는 unzip을 사용한다.
+- 테스트 명령: `INSIGHT_OCR_SMOKE=1 INSIGHT_EXPORT_SMOKE=1 node --experimental-strip-types --test app/_model/insight/insight-evidence.test.ts app/_service/insight/insight-*.test.ts app/api/admin/ai-reports/source/route.test.ts app/api/admin/ai-reports/snapshots/route.test.ts`. PDF 텍스트와 페이지 경계 검사는 Poppler, Office 파일 검사는 unzip을 사용한다.
 - 격리 `insight_snapshot_check`의 전체 FE migration reset 및 두 SQL 테스트(`insight_snapshots.sql`, `insight_reports.sql`) 통과. 로컬 앱 스택에는 두 신규 migration과 테스트 계정/자료만 추가했다. 운영 DB 및 Spring 코드는 수정하지 않았다.
 
 ## 실행과 남은 출시 조건

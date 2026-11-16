@@ -101,10 +101,10 @@ flow unless a task explicitly spans both products.
 - Public participant path: `/join/[code]`; never place it behind the admin guard.
 - Admin guard lives in `app/(view)/admin/layout.tsx` and must fail closed when Supabase is
   configured. Local demo mode may remain available when credentials are absent.
-- `app/_controller/session-store.tsx` is the UI boundary. In Supabase mode Postgres is
+- `app/_controller/provider/session-store.tsx` is the UI boundary. In Supabase mode Postgres is
   authoritative and localStorage is only an account-scoped failure cache. In demo
   mode localStorage + BroadcastChannel are authoritative.
-- `app/_service/class-session-service.ts` owns REST and Supabase reads/writes, while
+- `app/_service/lecture/class-session-service.ts` owns REST and Supabase reads/writes, while
   `app/_infrastructure/supabase` owns client construction. Every new owner-visible
   table or column needs a forward-only migration and RLS-compatible access.
 - Core model: Folder -> many ClassSession records; ClassSession maps to Course ->
@@ -167,8 +167,8 @@ flow unless a task explicitly spans both products.
   export the document as written (A4), PPTX/MD re-lay it out by code without AI. The analysis
   runs one AI provider per server (`INSIGHT_AI_PROVIDER` claude|openai|gemini, default claude;
   `INSIGHT_AI_MODEL`, default `claude-haiku-5-5`; server-only `CLAUDE_API_KEY`/`OPENAI_API_KEY`/`GEMINI_API_KEY`)
-  inside Next `after()`; flow in `app/_service/insight-ai.ts`, one adapter per provider in
-  `app/_service/insight-providers/`. Old `ai_insight_reports` rows stay untouched and hidden.
+  inside Next `after()`; flow in `app/_service/insight/insight-ai.ts`, one adapter per provider in
+  `app/_service/insight/providers/`. Old `ai_insight_reports` rows stay untouched and hidden.
 - The player header shows the LIVE elapsed time from the backend `started_at` (reset
   on every LIVE start) and the live audience count. The end-lecture dialog summarizes
   duration, participants, and questions; elapsed time freezes when that dialog opens
@@ -219,17 +219,17 @@ flow unless a task explicitly spans both products.
 ### Change map
 
 - Entry/auth: `app/(view)/page.tsx`, `app/(view)/login/page.tsx`,
-  `app/(view)/auth/callback/page.tsx`, `app/_controller/auth-context.tsx`,
+  `app/(view)/auth/callback/page.tsx`, `app/_controller/provider/auth-context.tsx`,
   `app/(view)/admin/layout.tsx`.
 - Folder dashboard/detail: `app/(view)/admin/dashboard/page.tsx`,
-  `app/(view)/admin/folders/[id]/page.tsx`, `app/_controller/session-store.tsx`.
+  `app/(view)/admin/folders/[id]/page.tsx`, `app/_controller/provider/session-store.tsx`.
 - Live material workspace: `app/(view)/admin/session/[id]/page.tsx`.
-- Persistence: `app/_model/types.ts`, `app/_service/class-session-service.ts`,
+- Persistence: `app/_model/core/types.ts`, `app/_service/lecture/class-session-service.ts`,
   `app/_infrastructure/supabase/client.ts`, `supabase/migrations/*`.
 - Visual rules and responsive behavior: route and component `*.module.css` files;
   `app/globals.css` owns only tokens and shared primitives. Reuse tokens from
   `DESIGN.md`, and do not introduce direct hex colors when a semantic token exists.
-- Shared statistics: `app/_model/stats.ts`. Keep aggregation functions pure and testable.
+- Shared statistics: `app/_model/material/stats.ts`. Keep aggregation functions pure and testable.
 - The retired `/pin` feedback runtime must not be restored. Its historical
   database and Storage contracts remain migration history unless a task explicitly
   authorizes destructive data retirement.

@@ -2,8 +2,8 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { useLanguage } from "@/app/_controller/language-context";
-import type { ClassSession } from "@/app/_model/types";
+import { useLanguage } from "@/app/_controller/provider/language-context";
+import type { ClassSession } from "@/app/_model/core/types";
 import { lectureOverview, useLectureRecord } from "@/app/(view)/admin/insights/[id]/controller";
 import { lectureWhen, PinFlow, ScoreBoard } from "@/app/(view)/admin/insights/[id]/component/lecture-overview";
 import styles from "./session-end-report.module.css";

@@ -1,7 +1,7 @@
-import { exportSlideImages, insightFailure, oneRenderAtATime, readOwnedInsightSource, InsightRequestError } from "../../../../../_service/insight-request.ts";
-import { EXPORT_FORMATS, exportFile, ownedReport } from "../../../../../_service/report-request.ts";
-import { exportReport } from "../../../../../_service/report-export.ts";
-import type { ReportDocument } from "../../../../../_model/report.ts";
+import { exportSlideImages, insightFailure, oneRenderAtATime, readOwnedInsightSource, InsightRequestError } from "../../../../../_service/insight/insight-request.ts";
+import { EXPORT_FORMATS, exportFile, ownedReport } from "../../../../../_service/report/report-request.ts";
+import { exportReport } from "../../../../../_service/report/report-export.ts";
+import type { ReportDocument } from "../../../../../_model/report/report.ts";
 
 export const runtime = "nodejs";
 export const maxDuration = 300;

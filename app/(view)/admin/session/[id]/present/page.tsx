@@ -2,10 +2,10 @@
 
 import type { CSSProperties } from "react";
 import { PresentationQr } from "../component/presentation-qr";
-import { ChevronLeft, ChevronRight, Maximize2, Minimize2, X } from "@/app/component/icons";
-import { LanguageSwitcher } from "@/app/component/language-switcher";
+import { ChevronLeft, ChevronRight, Maximize2, Minimize2, X } from "@/app/component/icon/icons";
+import { LanguageSwitcher } from "@/app/component/control/language-switcher";
 import { PinClusterPopover } from "../component/pin-cluster-popover";
-import { SlideCanvas } from "@/app/component/slide-canvas";
+import { SlideCanvas } from "@/app/component/slide/slide-canvas";
 import { useSessionPresentationController } from "./controller";
 import styles from "./page.module.css";
 

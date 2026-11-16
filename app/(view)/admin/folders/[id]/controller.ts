@@ -2,11 +2,11 @@
 
 import { useMemo, useState } from "react";
 import { useParams } from "next/navigation";
-import { useLanguage } from "@/app/_controller/language-context";
-import { useSessions } from "@/app/_controller/session-store";
+import { useLanguage } from "@/app/_controller/provider/language-context";
+import { useSessions } from "@/app/_controller/provider/session-store";
 
-import { buildMaterialSearchIndex, searchMaterialIndex } from "@/app/_model/material-search";
-import type { ClassSession } from "@/app/_model/types";
+import { buildMaterialSearchIndex, searchMaterialIndex } from "@/app/_model/material/material-search";
+import type { ClassSession } from "@/app/_model/core/types";
 
 type View = "grid" | "list";
 

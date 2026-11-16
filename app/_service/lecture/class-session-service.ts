@@ -1,0 +1,652 @@
+import { isParticipantPointAnchor, isQuestionMarker, normalizeClassFolderColorIndex, normalizeClassFolderName, normalizeClassFolderPurpose, normalizeClassFolderPurposeLabel, normalizeQuestionCategorySettings, type ClassFolder, type ClassSession, type CreateClassFolderInput, type NormalizedPoint, type Question, type QuestionCategorySettings, type Slide } from "@/app/_model/core/types";
+import { ensureAnonymousUser, getAudienceSupabaseClient, getSessionUser, getSupabaseClient, supabaseConfigured } from "@/app/_infrastructure/supabase/client";
+
+import { RestError, restRequest } from "@/app/_infrastructure/rest/request";
+import { pdfProxyUrl } from "@/app/_model/material/upload";
+export const classSessionPersistenceEnabled = supabaseConfigured;
+
+type LectureRow = {
+  id: string;
+  course_id: string;
+  title: string;
+  join_code: string;
+  status: ClassSession["status"];
+  current_page: number;
+  presentation_interactions: boolean;
+  presentation_autoplay: boolean;
+  show_question_pins: boolean;
+  show_question_labels?: boolean;
+  presentation_options?: import("../../_model/presentation/presentation-options").PresentationOptions;
+  show_presentation_qr: boolean;
+  presentation_qr_position: ClassSession["presentationQrPosition"];
+  question_categories: unknown;
+  allow_question_reactions: boolean;
+  allow_emoji_reactions: boolean;
+  started_at: string | null;
+  created_at: string;
+};
+
+export type LectureRealtimeRow = Pick<LectureRow,
+  "current_page" | "status" | "presentation_interactions" | "presentation_autoplay" | "show_question_pins" | "show_question_labels" | "presentation_options" |
+  "show_presentation_qr" | "presentation_qr_position" | "question_categories" |
+  "allow_question_reactions" | "allow_emoji_reactions" | "started_at"
+>;
+
+type ClassFolderRow = {
+  id: string;
+  name: string;
+  created_at: string;
+  color_index: number;
+  purpose: unknown;
+  purpose_label: unknown;
+};
+
+type SlideRow = {
+  id: string;
+  material_version_id: string;
+  page_index: number;
+  image_path: string | null;
+  source_page_index: number | null;
+};
+
+type SlideInstructorNoteRow = {
+  slide_id: string;
+  body: string;
+};
+
+type DeletedSlideRow = {
+  deleted_image_path: string | null;
+  deleted_page_index: number;
+  deleted_question_count: number;
+};
+
+type QuestionRow = {
+  id: string;
+  lecture_id: string;
+  slide_id: string | null;
+  category: Question["category"];
+  marker?: unknown;
+  raw_text: string;
+  status: Question["status"];
+  reaction_count?: number;
+  reacted_by_me?: boolean;
+  is_mine?: boolean;
+  created_at: string;
+  region_anchors: {
+    kind?: Question["anchorKind"];
+    coords?: { x?: number; y?: number; width?: number; height?: number; points?: unknown };
+  } | Array<{
+    kind?: Question["anchorKind"];
+    coords?: { x?: number; y?: number; width?: number; height?: number; points?: unknown };
+  }> | null;
+  answers: Array<{ body: string; created_at: string }> | null;
+};
+
+type OwnedCourseGraphRow = {
+  id: string;
+  folder_id: string | null;
+  lectures: Array<LectureRow & {
+    materials: Array<{
+      id: string;
+      file_name: string;
+      created_at: string;
+      material_versions: Array<{
+        id: string;
+        version_no: number;
+        source_path: string;
+        slides: Array<SlideRow & {
+          slide_instructor_notes: SlideInstructorNoteRow | SlideInstructorNoteRow[] | null;
+        }>;
+      }>;
+    }>;
+    questions: QuestionRow[];
+  }>;
+};
+
+type AudienceLectureGraphRow = LectureRow & {
+  materials: Array<{
+    id: string;
+    file_name: string;
+    material_versions: Array<{
+      id: string;
+      version_no: number;
+      source_path: string;
+      slides: SlideRow[];
+    }>;
+  }>;
+};
+
+
+function toSlide(
+  client: NonNullable<ReturnType<typeof getSupabaseClient>>,
+  row: SlideRow,
+  pdfUrl?: string,
+  speakerNote?: string,
+): Slide {
+  return {
+    id: row.id,
+    pageIndex: row.page_index,
+    title: `Slide ${row.page_index + 1}`,
+    ...(row.image_path ? {
+      imagePath: row.image_path,
+      imageUrl: client.storage.from("lecture-slides").getPublicUrl(row.image_path).data.publicUrl,
+    } : {}),
+    ...(typeof row.source_page_index === "number" ? {
+      sourcePageIndex: row.source_page_index,
+      ...(pdfUrl ? { pdfUrl } : {}),
+    } : {}),
+    ...(speakerNote === undefined ? {} : { speakerNote }),
+  };
+}
+
+function toNormalizedPath(value: unknown): NormalizedPoint[] | null {
+  if (!Array.isArray(value)) return null;
+  const points = value.flatMap((point) => {
+    if (!Array.isArray(point) || point.length !== 2) return [];
+    const [x, y] = point;
+    return typeof x === "number" && typeof y === "number" && x >= 0 && x <= 1 && y >= 0 && y <= 1
+      ? [{ x, y }]
+      : [];
+  });
+  return points.length >= 2 ? points : null;
+}
+
+/** 코스 개설·답변 같은 강사 전용 쓰기는 구글 로그인 세션을 요구한다. */
+async function requireOwnerUser() {
+  const user = await getSessionUser();
+  if (!user || user.is_anonymous) throw new Error("강사 로그인(Google)이 필요합니다.");
+  return user;
+}
+
+function toQuestion(row: QuestionRow, sessionId: string, slideIndexById: ReadonlyMap<string, number>): Question {
+  const anchorValue = row.region_anchors;
+  const anchor = Array.isArray(anchorValue) ? anchorValue[0] : anchorValue;
+  const path = toNormalizedPath(anchor?.coords?.points);
+  const answer = (row.answers ?? []).reduce<(NonNullable<QuestionRow["answers"]>)[number] | undefined>((latest, item) =>
+    !latest || item.created_at.localeCompare(latest.created_at) >= 0 ? item : latest, undefined);
+  return {
+    id: row.id,
+    sessionId,
+    slideIndex: row.slide_id ? slideIndexById.get(row.slide_id) ?? 0 : 0,
+    x: anchor?.coords?.x ?? path?.[0]?.x ?? null,
+    y: anchor?.coords?.y ?? path?.[0]?.y ?? null,
+    anchorKind: anchor?.kind === "path" && path ? "path" : anchor?.kind === "box" ? "box" : "point",
+    width: anchor?.coords?.width ?? null,
+    height: anchor?.coords?.height ?? null,
+    path,
+    category: row.category,
+    marker: isQuestionMarker(row.marker) ? row.marker : "pin",
+    text: row.raw_text,
+    status: row.status,
+    answer: answer?.body,
+    isMine: row.is_mine ?? false,
+    reactionCount: Math.max(0, row.reaction_count ?? 0),
+    reactedByMe: row.reacted_by_me ?? false,
+    createdAt: row.created_at
+  };
+}
+
+function toQuestions(rows: QuestionRow[], sessionId: string, slides: Slide[]): Question[] {
+  const slideIndexById = new Map(slides.map((slide) => [slide.id, slide.pageIndex]));
+  return [...rows]
+    .sort((a, b) => b.created_at.localeCompare(a.created_at))
+    .map((row) => toQuestion(row, sessionId, slideIndexById));
+}
+
+export async function persistSession(session: ClassSession, sourcePath?: string) {
+  const client = getSupabaseClient();
+  if (!client) throw new Error("Supabase 연결을 찾지 못했습니다.");
+  if (!session.courseId || !session.materialId || !session.materialVersionId) throw new Error("강의 저장 정보가 완전하지 않습니다.");
+  const user = await requireOwnerUser();
+  const slides = [];
+  for (const slide of session.slides) {
+    let imagePath = slide.imagePath ?? "";
+    if (!imagePath && slide.imageUrl) {
+      imagePath = `${user.id}/${session.id}/${slide.id}.jpg`;
+      const image = await fetch(slide.imageUrl).then((response) => response.blob());
+      const { error } = await client.storage.from("lecture-slides").upload(imagePath, image, { contentType: image.type || "image/jpeg", upsert: false });
+      if (error) throw error;
+    }
+    if ((imagePath ? 1 : 0) + (slide.sourcePageIndex === undefined ? 0 : 1) !== 1) {
+      throw new Error("슬라이드 원본 정보가 완전하지 않습니다.");
+    }
+    slides.push({ id: slide.id, pageIndex: slide.pageIndex, imagePath: imagePath || null, sourcePageIndex: slide.sourcePageIndex ?? null });
+  }
+  await restRequest(client, "/instructor/materials", "POST", {
+    id: session.id, courseId: session.courseId, materialId: session.materialId, materialVersionId: session.materialVersionId,
+    folderId: session.folderId, title: session.title, fileName: session.fileName,
+    sourcePath: sourcePath ?? `${user.id}/${session.id}/${session.fileName}`,
+    // 생성 상태는 before다. 다른 상태·자동 넘김이 필요할 때만 추가 저장한다.
+    code: session.code, status: "before", currentSlide: session.currentSlide,
+    presentationInteractions: session.presentationInteractions, showQuestionPins: session.showQuestionPins,
+    showPresentationQr: session.showPresentationQr, presentationQrPosition: session.presentationQrPosition,
+    questionCategories: session.questionCategories, slides,
+  });
+  if (session.status !== "before" || session.presentationAutoplay) {
+    await updateLecture(session.id, {
+      ...(session.status === "before" ? {} : { status: session.status }),
+      ...(session.presentationAutoplay ? { presentation_autoplay: true } : {})
+    });
+  }
+}
+
+const toClassFolder = (folder: ClassFolderRow): ClassFolder => {
+  const purpose = normalizeClassFolderPurpose(folder.purpose);
+  return {
+    id: folder.id,
+    name: folder.name,
+    createdAt: folder.created_at,
+    colorIndex: folder.color_index,
+    purpose,
+    purposeLabel: normalizeClassFolderPurposeLabel(purpose, folder.purpose_label)
+  };
+};
+
+export async function fetchOwnedClassFolders(): Promise<ClassFolder[]> {
+  const client = getSupabaseClient();
+  if (!client) return [];
+  const rows = await restRequest<ClassFolderRow[]>(client, "/instructor/folders");
+  return rows.map(toClassFolder);
+}
+
+export async function createClassFolder(input: CreateClassFolderInput): Promise<ClassFolder> {
+  const name = normalizeClassFolderName(input.name);
+  const colorIndex = normalizeClassFolderColorIndex(input.colorIndex);
+  const purpose = normalizeClassFolderPurpose(input.purpose);
+  const purposeLabel = normalizeClassFolderPurposeLabel(purpose, input.purposeLabel);
+  const client = getSupabaseClient();
+  if (!client) throw new Error("Supabase 연결을 찾지 못했습니다.");
+  return toClassFolder(await restRequest<ClassFolderRow>(client, "/instructor/folders", "POST", { name, colorIndex, purpose, purposeLabel }));
+}
+
+export async function updateClassFolder(folderId: string, input: CreateClassFolderInput): Promise<void> {
+  const name = normalizeClassFolderName(input.name);
+  const purpose = normalizeClassFolderPurpose(input.purpose);
+  const purposeLabel = normalizeClassFolderPurposeLabel(purpose, input.purposeLabel);
+  const client = getSupabaseClient();
+  if (!client) throw new Error("Supabase 연결을 찾지 못했습니다.");
+  // 백엔드 UpdateFolderRequest는 colorIndex를 모르고, 모르는 필드가 있으면 요청 전체를 400으로 거절한다.
+  await restRequest(client, `/instructor/folders/${encodeURIComponent(folderId)}`, "PATCH", { name, purpose, purposeLabel });
+}
+
+export async function deleteClassFolder(folderId: string): Promise<void> {
+  const client = getSupabaseClient();
+  if (!client) throw new Error("Supabase 연결을 찾지 못했습니다.");
+  await restRequest(client, `/instructor/folders/${encodeURIComponent(folderId)}`, "DELETE");
+}
+
+export async function moveSessionToFolder(courseId: string, folderId: string | null): Promise<void> {
+  const client = getSupabaseClient();
+  if (!client) throw new Error("Supabase 연결을 찾지 못했습니다.");
+  await restRequest(client, `/instructor/courses/${encodeURIComponent(courseId)}/folder`, "PATCH", { folderId });
+}
+
+/** 코스와 cascade 데이터를 지운 뒤 더는 참조되지 않는 원본·렌더 이미지를 회수한다. */
+export async function deleteClassSession(courseId: string): Promise<{ cleanupPending: boolean }> {
+  const client = getSupabaseClient();
+  if (!client) throw new Error("Supabase 연결을 찾지 못했습니다.");
+  return restRequest(client, `/instructor/courses/${encodeURIComponent(courseId)}`, "DELETE");
+}
+
+/** 슬라이드와 연결 데이터를 DB에서 삭제한 뒤 공개 Storage 객체를 회수한다. */
+export async function deleteSessionSlide(slideId: string): Promise<DeletedSlideRow & { cleanupPending: boolean }> {
+  const client = getSupabaseClient();
+  if (!client) throw new Error("Supabase 연결을 찾지 못했습니다.");
+  const deleted = await restRequest<DeletedSlideRow>(client, `/instructor/slides/${encodeURIComponent(slideId)}`, "DELETE");
+  if (!deleted) throw new Error("삭제된 슬라이드 정보를 받지 못했습니다.");
+  // Deletion has committed; a cleanup failure must never roll back the slide in the UI.
+  let cleanupPending = true;
+  try {
+    ({ cleanupPending } = await restRequest<{ cleanupPending: boolean }>(client, "/instructor/storage-cleanup", "POST"));
+  } catch (error) { console.error("Deleted slide storage cleanup pending", error); }
+  return { ...deleted, cleanupPending };
+}
+
+/** Realtime INSERT 뒤 현재 자료 버전의 전체 슬라이드를 다시 읽는다. */
+export async function fetchSessionSlides(session: ClassSession, asAudience = false): Promise<Slide[]> {
+  if (!session.materialVersionId) return session.slides;
+  const client = asAudience ? getAudienceSupabaseClient() : getSupabaseClient();
+  if (!client) return session.slides;
+  if (asAudience) await ensureAnonymousUser();
+  const rows = await restRequest<Array<SlideRow & { slide_instructor_notes?: SlideInstructorNoteRow | SlideInstructorNoteRow[] | null }>>(
+    client, `/${asAudience ? "participant" : "instructor"}/versions/${encodeURIComponent(session.materialVersionId)}/slides`
+  );
+  const pdfUrl = session.slides.find((slide) => slide.pdfUrl)?.pdfUrl;
+  return rows.map((slide) => {
+    const note = Array.isArray(slide.slide_instructor_notes) ? slide.slide_instructor_notes[0] : slide.slide_instructor_notes;
+    return toSlide(client, slide, pdfUrl, asAudience ? undefined : note?.body ?? "");
+  });
+}
+
+/** 현재 Google 강사가 소유한 강의 전체를 DB에서 복원한다. */
+export async function fetchOwnedSessions(): Promise<ClassSession[]> {
+  const client = getSupabaseClient();
+  if (!client) return [];
+  // The REST graph omits these two lecture columns. RLS shows an instructor only their own lectures (participant
+  // policies need the participant role), so this read runs beside the graph instead of waiting for its lecture ids.
+  const [courses, labels] = await Promise.all([
+    restRequest<OwnedCourseGraphRow[]>(client, "/instructor/courses"),
+    client.from("lectures").select("id,show_question_labels,presentation_options"),
+  ]);
+  if (labels.error) throw labels.error;
+  const labelsById = new Map((labels.data ?? []).map((lecture) => [lecture.id, lecture]));
+  return courses
+    .flatMap((course) => course.lectures.map((lecture) => ({ course, lecture })))
+    .sort((a, b) => b.lecture.created_at.localeCompare(a.lecture.created_at))
+    .flatMap(({ course, lecture }) => {
+      const material = lecture.materials.reduce<(typeof lecture.materials)[number] | undefined>((first, item) =>
+        !first || item.created_at.localeCompare(first.created_at) < 0 ? item : first, undefined);
+      const version = material?.material_versions.reduce<(typeof material.material_versions)[number] | undefined>((latest, item) =>
+        !latest || item.version_no > latest.version_no ? item : latest, undefined);
+      if (!material || !version) return [];
+      const slides = [...version.slides]
+        .sort((a, b) => a.page_index - b.page_index)
+        .map((slide): Slide => {
+          const noteValue = slide.slide_instructor_notes;
+          const note = Array.isArray(noteValue) ? noteValue[0] : noteValue;
+          return toSlide(client, slide, pdfProxyUrl(version.source_path, false), note?.body ?? "");
+        });
+      const questions = toQuestions(lecture.questions, lecture.id, slides);
+      return [{
+        id: lecture.id,
+        folderId: course.folder_id,
+        code: lecture.join_code,
+        courseId: course.id,
+        materialId: material.id,
+        materialVersionId: version.id,
+        title: lecture.title,
+        fileName: material.file_name,
+        status: lecture.status,
+        currentSlide: lecture.current_page,
+        presentationInteractions: lecture.presentation_interactions,
+        presentationAutoplay: lecture.presentation_autoplay,
+        showQuestionPins: lecture.show_question_pins,
+        showQuestionLabels: labelsById.get(lecture.id)?.show_question_labels ?? false,
+        presentationOptions: labelsById.get(lecture.id)?.presentation_options ?? undefined,
+        showPresentationQr: lecture.show_presentation_qr,
+        presentationQrPosition: lecture.presentation_qr_position,
+        questionCategories: normalizeQuestionCategorySettings(lecture.question_categories),
+        allowQuestionReactions: lecture.allow_question_reactions,
+        allowEmojiReactions: lecture.allow_emoji_reactions,
+        startedAt: lecture.started_at,
+        createdAt: lecture.created_at,
+        slides,
+        questions
+      }];
+    });
+}
+
+/** 현재 강사가 소유한 슬라이드의 발표 메모만 생성하거나 갱신한다. */
+export async function saveSlideInstructorNote(slideId: string, body: string) {
+  const client = getSupabaseClient();
+  if (!client) throw new Error("Supabase 연결을 찾지 못했습니다.");
+  await restRequest(client, `/instructor/slides/${encodeURIComponent(slideId)}/note`, "PUT", { body });
+}
+
+/** 청중 입장 시 강의가 시작 전(204)이거나 종료(410)됐다. 없는 강의(404)와 구분한다. */
+export class LectureClosedError extends Error {}
+/** 한 참여자가 1분 10개·강의당 100개 질문 한도를 넘었다(DB 트리거 → 429). */
+export class QuestionRateLimitError extends Error {}
+
+async function fetchLiveSessionBy(column: "id" | "join_code", value: string): Promise<ClassSession | null> {
+  const client = getAudienceSupabaseClient();
+  if (!client) return null;
+  await ensureAnonymousUser();
+  const path = column === "join_code" ? `/participant/join/${encodeURIComponent(value)}` : `/participant/lectures/${encodeURIComponent(value)}`;
+  const lecture = await restRequest<AudienceLectureGraphRow | undefined>(client, path).catch((error: unknown) => {
+    if (error instanceof RestError && error.status === 404) return null;
+    if (error instanceof RestError && error.status === 410) return undefined;
+    throw error;
+  });
+  if (lecture === null) return null;
+  if (!lecture) throw new LectureClosedError("Lecture is not live");
+  const material = lecture.materials[0];
+  const version = material?.material_versions.reduce<(typeof material.material_versions)[number] | undefined>((latest, item) =>
+        !latest || item.version_no > latest.version_no ? item : latest, undefined);
+  if (!material || !version) return null;
+  const slides: Slide[] = [...version.slides]
+    .sort((a, b) => a.page_index - b.page_index)
+    .map((slide) => toSlide(client, slide, pdfProxyUrl(version.source_path, true)));
+  const session: ClassSession = {
+    id: lecture.id,
+    folderId: null,
+    code: lecture.join_code,
+    courseId: lecture.course_id,
+    materialId: material.id,
+    materialVersionId: version.id,
+    title: lecture.title,
+    fileName: material.file_name,
+    status: "live",
+    currentSlide: lecture.current_page,
+    presentationInteractions: lecture.presentation_interactions,
+    presentationAutoplay: lecture.presentation_autoplay,
+    showQuestionPins: lecture.show_question_pins,
+    showPresentationQr: lecture.show_presentation_qr,
+    presentationQrPosition: lecture.presentation_qr_position,
+    questionCategories: normalizeQuestionCategorySettings(lecture.question_categories),
+    allowQuestionReactions: lecture.allow_question_reactions,
+    allowEmojiReactions: lecture.allow_emoji_reactions,
+    startedAt: lecture.started_at,
+    createdAt: lecture.created_at,
+    slides,
+    questions: []
+  };
+  const questionData = await restRequest<QuestionRow[]>(client, `/participant/lectures/${encodeURIComponent(session.id)}/questions`);
+  return {
+    ...session,
+    questions: toQuestions(Array.isArray(questionData) ? questionData as unknown as QuestionRow[] : [], session.id, slides)
+  };
+}
+
+export function fetchLiveSession(joinCode: string) {
+  return fetchLiveSessionBy("join_code", joinCode.toUpperCase());
+}
+
+export function fetchLiveSessionById(sessionId: string) {
+  return fetchLiveSessionBy("id", sessionId);
+}
+
+export async function submitQuestion(session: ClassSession, question: Question) {
+  const client = getAudienceSupabaseClient();
+  if (!client) return;
+  if (!isParticipantPointAnchor(question)) throw new Error("Participant questions require a point anchor.");
+  const user = await ensureAnonymousUser();
+  if (!user || !session.courseId) throw new Error("Supabase session is missing ownership context.");
+  const slide = session.slides[question.slideIndex];
+  if (!slide) throw new Error("질문을 남길 슬라이드를 찾지 못했습니다.");
+  await restRequest(client, `/participant/lectures/${encodeURIComponent(session.id)}/questions`, "POST", {
+    id: question.id, slideId: slide.id, x: question.x, y: question.y,
+    category: question.category, marker: question.marker, text: question.text,
+  }).catch((error) => {
+    throw error instanceof RestError && error.status === 429 ? new QuestionRateLimitError(error.message) : error;
+  });
+}
+
+export async function updateQuestion(questionId: string, values: Pick<Question, "category" | "marker" | "text">) {
+  const client = getAudienceSupabaseClient();
+  if (!client) return;
+  await ensureAnonymousUser();
+  await restRequest(client, `/participant/questions/${encodeURIComponent(questionId)}`, "PATCH", values);
+}
+
+export async function setQuestionReaction(questionId: string, reacted: boolean) {
+  const client = getAudienceSupabaseClient();
+  if (!client) return;
+  await ensureAnonymousUser();
+  await restRequest(client, `/participant/questions/${encodeURIComponent(questionId)}/reaction`, "PUT", { reacted });
+}
+
+export async function postAnswer(questionId: string, body: string) {
+  const client = getSupabaseClient();
+  if (!client) return;
+  await restRequest(client, `/instructor/questions/${encodeURIComponent(questionId)}/answers`, "POST", { body });
+}
+
+export async function markQuestionResolved(questionId: string) {
+  const client = getSupabaseClient();
+  if (!client) return;
+  await restRequest(client, `/instructor/questions/${encodeURIComponent(questionId)}/resolved`, "PUT");
+}
+
+export async function updateLecture(sessionId: string, values: {
+  current_page?: number;
+  status?: ClassSession["status"];
+  presentation_interactions?: boolean;
+  presentation_autoplay?: boolean;
+  show_question_pins?: boolean;
+  show_question_labels?: boolean;
+  presentation_options?: import("../../_model/presentation/presentation-options").PresentationOptions;
+  show_presentation_qr?: boolean;
+  presentation_qr_position?: ClassSession["presentationQrPosition"];
+  question_categories?: QuestionCategorySettings;
+  allow_question_reactions?: boolean;
+  allow_emoji_reactions?: boolean;
+}) {
+  const client = getSupabaseClient();
+  if (!client) return;
+  // ponytail: BE PATCH /instructor/lectures/{id} 가 일부 필드만 담은 본문을 전부 400으로 거절한다
+  // (UpdateLectureRequest 의 Nulls.FAIL). BE 가 같은 검증·소유자 확인을 위임하는 RPC 를 직접 호출하고,
+  // BE 가 고쳐지면 restRequest 로 되돌린다.
+  // 이 FE 소유 표시 설정은 기존 owner RLS로 저장한다. BE 업무 설정 RPC에는 보내지 않는다.
+  const { show_question_labels, presentation_options, ...settings } = values;
+  if (show_question_labels !== undefined || presentation_options !== undefined) {
+    const { error } = await client.from("lectures").update({ show_question_labels, presentation_options }).eq("id", sessionId).select("id").single();
+    if (error) throw error;
+  }
+  if (!Object.keys(settings).length) return;
+  const { error } = await client.rpc("ohpin_update_lecture_settings", { target_lecture_id: sessionId, settings });
+  if (error) throw error;
+}
+
+export type LectureRemoteHolder = "none" | "waiting" | "connected";
+export type LectureRemoteSettings = {
+  show_question_pins?: boolean;
+  show_question_labels?: boolean;
+  presentation_options?: import("../../_model/presentation/presentation-options").PresentationOptions;
+  show_presentation_qr?: boolean;
+  presentation_qr_position?: ClassSession["presentationQrPosition"];
+};
+export type LectureRemoteState = {
+  currentSlide: number; slideCount: number; live: boolean; title: string;
+  showQuestionPins: boolean; showQuestionLabels: boolean;
+  presentationOptions?: import("../../_model/presentation/presentation-options").PresentationOptions;
+  showPresentationQr: boolean; presentationQrPosition: ClassSession["presentationQrPosition"];
+  questionCount: number;
+  questions?: { id: string; text: string; slideIndex: number | null }[];
+};
+
+// 리모컨 RPC는 FE 마이그레이션 소유라 CFA-097A처럼 Supabase 세션으로 직접 호출한다.
+export async function issueLectureRemote(sessionId: string) {
+  const client = getSupabaseClient();
+  if (!client) throw new Error("Supabase is not configured.");
+  const { data, error } = await client.rpc("ohpin_issue_lecture_remote", { target_lecture_id: sessionId });
+  if (error) throw error;
+  return data as string;
+}
+
+export async function getLectureRemoteHolder(sessionId: string): Promise<LectureRemoteHolder> {
+  const client = getSupabaseClient();
+  if (!client) throw new Error("Supabase is not configured.");
+  const { data, error } = await client.from("lecture_remotes").select("holder_id").eq("lecture_id", sessionId).maybeSingle();
+  if (error) throw error;
+  return !data ? "none" : data.holder_id ? "connected" : "waiting";
+}
+
+/** 링크를 처음 연 익명 세션이 리모컨을 차지한다. step 0은 차지와 상태 조회만 한다. */
+export async function controlLectureRemote(token: string, step: -1 | 0 | 1, settings: LectureRemoteSettings = {}, includeQuestions = false): Promise<LectureRemoteState> {
+  const client = getAudienceSupabaseClient();
+  if (!client) throw new Error("Supabase is not configured.");
+  await ensureAnonymousUser();
+  const { data, error } = await client.rpc("ohpin_remote_control", { remote_token: token, step, settings, include_questions: includeQuestions });
+  if (error) throw error;
+  return {
+    currentSlide: data.current_page, slideCount: data.slide_count, live: data.status === "live", title: data.title,
+    showQuestionPins: data.show_question_pins, showQuestionLabels: data.show_question_labels,
+    presentationOptions: data.presentation_options ?? undefined,
+    showPresentationQr: data.show_presentation_qr, presentationQrPosition: data.presentation_qr_position,
+    questionCount: data.question_count,
+    questions: data.questions?.map((question: { id: string; text: string; slide_index: number | null }) => ({
+      id: question.id, text: question.text, slideIndex: question.slide_index,
+    })),
+  };
+}
+
+export function subscribeToLecture(
+  sessionId: string,
+  materialVersionId: string | undefined,
+  onQuestionsRefresh: () => void,
+  onLectureUpdate: (lecture: LectureRealtimeRow) => void,
+  onSlidesRefresh: () => void,
+  asAudience = false,
+  onConnectionChange?: (connected: boolean) => void
+): (() => void) | null {
+  const client = asAudience ? getAudienceSupabaseClient() : getSupabaseClient();
+  if (!client) return null;
+  // Realtime reuses an existing channel with the same topic. React effects can
+  // reconnect before an asynchronous removeChannel() has finished, so give
+  // every subscription its own topic to avoid mutating a subscribed channel.
+  let channel = client.channel(`lecture:${sessionId}:${crypto.randomUUID()}`)
+    .on("postgres_changes", { event: "UPDATE", schema: "public", table: "lectures", filter: `id=eq.${sessionId}` }, (payload) => {
+      onLectureUpdate(payload.new as LectureRealtimeRow);
+    });
+  // 참여자는 RLS 때문에 자기 질문 행의 이벤트만 받는다. 변경마다 참여자 수만큼 RLS 검사가 돌지
+  // 않도록 참여자는 questions 를 구독하지 않고 broadcast 신호와 보정 폴링으로 목록을 맞춘다.
+  if (!asAudience) {
+    channel = channel.on("postgres_changes", { event: "*", schema: "public", table: "questions", filter: `lecture_id=eq.${sessionId}` }, onQuestionsRefresh);
+  }
+  if (materialVersionId) {
+    channel = channel.on("postgres_changes", {
+      event: "*",
+      schema: "public",
+      table: "slides",
+      filter: `material_version_id=eq.${materialVersionId}`
+    }, onSlidesRefresh);
+  }
+  channel.subscribe((status) => {
+    if (status === "SUBSCRIBED") onConnectionChange?.(true);
+    else if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") onConnectionChange?.(false);
+  });
+  return () => { void client.removeChannel(channel); };
+}
+
+type LectureSnapshot = Pick<ClassSession, "presentationOptions" | "currentSlide" | "status" | "presentationInteractions" | "presentationAutoplay" | "showQuestionPins" | "showQuestionLabels" | "showPresentationQr" | "presentationQrPosition" | "questionCategories" | "allowQuestionReactions" | "allowEmojiReactions" | "startedAt" | "questions">;
+
+/** questionsOnly 는 broadcast 뒤 재조회처럼 질문 목록만 필요할 때 /state 요청을 건너뛴다. */
+export async function fetchLectureSnapshot(session: ClassSession, asAudience = false, questionsOnly = false): Promise<(Partial<LectureSnapshot> & Pick<LectureSnapshot, "questions">) | null> {
+  const client = asAudience ? getAudienceSupabaseClient() : getSupabaseClient();
+  if (!client) return null;
+  if (asAudience) await ensureAnonymousUser();
+  const base = `/${asAudience ? "participant" : "instructor"}/lectures/${encodeURIComponent(session.id)}`;
+  const [lecture, data, labels] = await Promise.all([
+    // 청중 state는 시작 전 204, 종료 410, 없음 404다. 모두 참여 불가로 보고 아래에서 ended로 바꾼다.
+    questionsOnly ? undefined : restRequest<LectureRow | null>(client, `${base}/state`).catch((error: unknown) => {
+      if (asAudience && error instanceof RestError && (error.status === 404 || error.status === 410)) return null;
+      throw error;
+    }),
+    restRequest<QuestionRow[]>(client, `${base}/questions`),
+    asAudience || questionsOnly ? null : client.from("lectures").select("show_question_labels,presentation_options").eq("id", session.id).single(),
+  ]);
+  if (labels?.error) throw labels.error;
+  const questions = toQuestions(
+    Array.isArray(data) ? data as unknown as QuestionRow[] : [],
+    session.id,
+    session.slides
+  );
+  if (questionsOnly) return { questions };
+  return {
+    currentSlide: lecture?.current_page ?? session.currentSlide,
+    status: asAudience && !lecture ? "ended" : (lecture?.status as ClassSession["status"]) ?? session.status,
+    presentationInteractions: lecture?.presentation_interactions ?? session.presentationInteractions,
+    presentationAutoplay: lecture?.presentation_autoplay ?? session.presentationAutoplay,
+    showQuestionPins: lecture?.show_question_pins ?? session.showQuestionPins,
+    showQuestionLabels: labels?.data?.show_question_labels ?? session.showQuestionLabels ?? false,
+    presentationOptions: labels?.data?.presentation_options ?? session.presentationOptions,
+    showPresentationQr: lecture?.show_presentation_qr ?? session.showPresentationQr,
+    presentationQrPosition: (lecture?.presentation_qr_position as ClassSession["presentationQrPosition"]) ?? session.presentationQrPosition,
+    questionCategories: normalizeQuestionCategorySettings(lecture?.question_categories ?? session.questionCategories),
+    allowQuestionReactions: lecture?.allow_question_reactions ?? session.allowQuestionReactions,
+    allowEmojiReactions: lecture?.allow_emoji_reactions ?? session.allowEmojiReactions,
+    startedAt: lecture ? lecture.started_at : session.startedAt,
+    questions
+  };
+}

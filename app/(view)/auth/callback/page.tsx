@@ -2,8 +2,8 @@
 
 import { Suspense } from "react";
 import Link from "next/link";
-import { useLanguage } from "@/app/_controller/language-context";
-import { LoadingScreen } from "@/app/component/loading-screen";
+import { useLanguage } from "@/app/_controller/provider/language-context";
+import { LoadingScreen } from "@/app/component/layout/loading-screen";
 import { useAuthCallbackController } from "./controller";
 
 /**

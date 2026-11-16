@@ -1,10 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { Check, Send } from "@/app/component/icons";
-import { useLanguage } from "@/app/_controller/language-context";
-import { LanguageSwitcher } from "@/app/component/language-switcher";
-import { PinLogo } from "@/app/component/pin-logo";
+import { Check, Send } from "@/app/component/icon/icons";
+import { useLanguage } from "@/app/_controller/provider/language-context";
+import { LanguageSwitcher } from "@/app/component/control/language-switcher";
+import { PinLogo } from "@/app/component/icon/pin-logo";
 import { usePlatformExperienceController } from "../controller";
 import styles from "./platform-experience-form.module.css";
 

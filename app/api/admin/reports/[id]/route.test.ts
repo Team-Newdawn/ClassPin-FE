@@ -7,7 +7,7 @@ import { pathToFileURL } from "node:url";
 // Next resolves `server-only` and the extensionless `next/server` at build time; map them for plain Node here.
 const serverOnly = pathToFileURL(join(process.cwd(), "node_modules/next/dist/compiled/server-only/empty.js")).href;
 register("data:text/javascript," + encodeURIComponent(`export function resolve(specifier, context, next) { return next(specifier === "server-only" ? ${JSON.stringify(serverOnly)} : specifier === "next/server" ? "next/server.js" : specifier, context); }`), import.meta.url);
-const { claude } = await import("../../../../_service/insight-providers/claude.ts");
+const { claude } = await import("../../../../_service/insight/providers/claude.ts");
 const { GET, POST } = await import("./route.ts");
 
 const id = "3f2b8c1e-0d4a-4e6b-9a7c-1b2c3d4e5f60", materialId = "6a000000-0000-4000-8000-000000000001", lectureId = "5a000000-0000-4000-8000-000000000001";

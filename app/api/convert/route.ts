@@ -11,8 +11,8 @@ import { NextResponse } from "next/server";
 import { resolveDocumentBinary } from "@/app/_infrastructure/server/document-binaries";
 import { getPdfPageCount, renderPdfPages } from "@/app/_infrastructure/server/pdf-render";
 import { supabaseServerConfigured } from "@/app/_infrastructure/supabase/server";
-import type { Slide } from "@/app/_model/types";
-import { createPdfSlides, MAX_SOURCE_FILE_BYTES, SOURCE_FILE_TOO_LARGE_ERROR, sourceFileExtension } from "@/app/_model/upload";
+import type { Slide } from "@/app/_model/core/types";
+import { createPdfSlides, MAX_SOURCE_FILE_BYTES, SOURCE_FILE_TOO_LARGE_ERROR, sourceFileExtension } from "@/app/_model/material/upload";
 
 export const runtime = "nodejs";
 const run = promisify(execFile);

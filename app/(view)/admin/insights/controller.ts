@@ -1,8 +1,8 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { useBrowserPreferences } from "@/app/_controller/use-browser-preferences";
-import { useSessions } from "@/app/_controller/session-store";
+import { useBrowserPreferences } from "@/app/_controller/workspace/use-browser-preferences";
+import { useSessions } from "@/app/_controller/provider/session-store";
 
 /** DSH-053: one order only, most recent lecture first. */
 export const lectureDate = (session: { startedAt: string | null; createdAt: string }) => session.startedAt ?? session.createdAt;

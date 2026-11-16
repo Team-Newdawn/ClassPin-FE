@@ -1,11 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import { FolderTreeSidebar } from "@/app/component/folder-tree-sidebar";
-import { Folder, Search } from "@/app/component/icons";
-import { LoadingScreen } from "@/app/component/loading-screen";
-import { SlideCanvas } from "@/app/component/slide-canvas";
-import type { ClassSession } from "@/app/_model/types";
+import { FolderTreeSidebar } from "@/app/component/layout/folder-tree-sidebar";
+import { Folder, Search } from "@/app/component/icon/icons";
+import { LoadingScreen } from "@/app/component/layout/loading-screen";
+import { SlideCanvas } from "@/app/component/slide/slide-canvas";
+import type { ClassSession } from "@/app/_model/core/types";
 import { lectureDate, useInsightListController } from "./controller";
 import shell from "./shell.module.css";
 import styles from "./page.module.css";
